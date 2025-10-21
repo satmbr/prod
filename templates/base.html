@@ -11,44 +11,36 @@
 <header class="header">
   <div class="header-top">
     <div class="brand">
-      <img src="{{ url_for('static', filename='logo-prumat.png') }}" alt="Consórcio PRUMAT">
-      <!-- <div class="brand-title">Consórcio PRUMAT</div> -->
+      <img src="{{ url_for('static', filename='img/logo-prumat.png') }}" alt="Consórcio PRUMAT">
+      <div class="brand-title">Consórcio PRUMAT</div>
     </div>
     <div class="nav-right">
-      <!-- “LAERCIO” → nome do usuário logado; cor #501E0A -->
       <a class="nav-link" href="#user">{{ current_user_name }}</a>
-      <!-- “HELP” em #501E0A (canal de ajuda futuramente) -->
       <a class="nav-link" href="#help">HELP</a>
     </div>
   </div>
 
   <nav class="header-nav">
     <div class="nav-left">
-      <!-- ícone de casa na cor #501E0A -->
-      <span class="home-icon" title="Home">
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M12 3 2 12h3v9h6v-6h2v6h6v-9h3z"/>
-        </svg>
-      </span>
-      <!-- links principais (placeholders) -->
-      <a class="nav-link" href="#link1">Operação</a>
-      <a class="nav-link" href="#link2">Manutenção</a>
-      <a class="nav-link" href="#link3">Equipamentos</a>
-      <a class="nav-link" href="#link4">PDR</a>
-      <!-- <a class="nav-link" href="#link5">link5</a> -->
+      <a class="home-icon" title="Home" href="{{ url_for('index') }}">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2 12h3v9h6v-6h2v6h6v-9h3z"/></svg>
+      </a>
+      <!-- Menu principal; Produção/Registro/Cadastro também aparecem no subnav -->
+      <a class="nav-link" href="{{ url_for('operacao_producao') }}">Produção</a>
+      <a class="nav-link" href="{{ url_for('operacao_registro') }}">Registro</a>
+      <a class="nav-link" href="{{ url_for('operacao_cadastro') }}">Cadastro</a>
     </div>
   </nav>
 
-  <!-- linha amarela #FCD917 separando links e sublinks -->
   <div class="divider"></div>
 
-  <!-- sublinks (placeholders) -->
+  {% if subnav_links %}
   <div class="subnav">
-  <!--  <a href="#sublink1">sublink1</a>
-    <a href="#sublink2">sublink2</a>
-    <a href="#sublink3">sublink3</a>
-    <a href="#sublink4">sublink4</a> -->
+    {% for item in subnav_links %}
+      <a class="subnav-link{% if item.active %} active{% endif %}" href="{{ item.href }}">{{ item.text }}</a>
+    {% endfor %}
   </div>
+  {% endif %}
 </header>
 
 <main>
