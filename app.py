@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, render_template
 import os
 
 def create_app():
@@ -6,7 +6,12 @@ def create_app():
 
     @app.get("/")
     def index():
-        return "Hello from Railway (satmbr/prod)!"
+        return render_template("index.html")
+
+    # healthcheck p/ uptime
+    @app.get("/health")
+    def health():
+        return {"status": "ok"}, 200
 
     return app
 
