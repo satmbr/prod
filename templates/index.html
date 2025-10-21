@@ -1,13 +1,8 @@
-<!doctype html>
-<html lang="pt-br">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>satmbr/prod</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-</head>
-<body>
-  <h1>OK: Railway + Flask</h1>
-  <p>Ambiente: {{ config.get('ENV') }}</p>
-</body>
-</html>
+{% extends "base.html" %}
+{% block title %}PRUMAT · Início{% endblock %}
+{% block content %}
+  <div style="padding:16px">
+    <h1>Bem-vindo, {{ current_user_name }}.</h1>
+    <p>Este é o esqueleto inicial com o cabeçalho padronizado.</p>
+  </div>
+{% endblock %}

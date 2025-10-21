@@ -1,2 +1,49 @@
-body { font-family: system-ui, sans-serif; margin: 2rem; }
-h1 { margin-bottom: .5rem; }
+:root{
+  --brand-brown:#501E0A;
+  --brand-yellow:#FCD917;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial,sans-serif;color:#222}
+
+.header{
+  background:#fff;border-bottom:1px solid #eee;
+}
+.header-top{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:8px 16px;
+}
+.brand{
+  display:flex;align-items:center;gap:12px;
+}
+.brand img{height:36px;width:auto;display:block}
+.brand-title{font-weight:700;color:var(--brand-brown);letter-spacing:.02em}
+
+.header-nav{
+  display:flex;align-items:center;gap:18px;
+  padding:10px 16px;
+}
+.nav-left,.nav-right{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.nav-link{
+  color:var(--brand-brown);text-decoration:none;font-weight:600;opacity:.95;
+}
+.nav-link:hover{opacity:1;text-decoration:underline}
+.home-icon{display:inline-block;vertical-align:middle}
+.home-icon svg{height:22px;width:22px;fill:var(--brand-brown)}
+
+.divider{
+  height:6px;background:var(--brand-yellow);
+}
+
+/* sublinks (placeholder) */
+.subnav{
+  background:#f5f6f7;padding:10px 16px;font-size:.95rem;
+  display:flex;gap:20px;color:#333
+}
+.subnav a{color:#333;text-decoration:none}
+.subnav a:hover{text-decoration:underline}
+
+/* responsivo */
+@media (max-width:768px){
+  .header-nav{flex-direction:column;align-items:flex-start;gap:10px}
+  .nav-right{margin-left:auto}
+}
