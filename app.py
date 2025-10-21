@@ -33,7 +33,7 @@ def create_app():
     @app.get("/operacao/producao")
     def operacao_producao():
         return render_template(
-            "operacao/produção.html",   # arquivo com acento
+            "operacao/producao.html",   # arquivo com acento
             current_user_name=resolve_user_name(),
             subnav_links=producao_subnav(active="producao"),
         )
