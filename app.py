@@ -4,11 +4,11 @@ import os
 def create_app():
     app = Flask(__name__)
 
-    # Temporário: nome do usuário no topo (APP_USER no Railway, ou ?user=Fulano)
+    # Nome do usuário mostrado no topo (APP_USER no Railway, ou ?user=Fulano)
     def resolve_user_name():
         return request.args.get("user") or os.getenv("APP_USER") or "Usuário"
 
-    # Subnav para Operação → (Produção/Registro/Cadastro)
+    # Subnav exclusivo da seção Operação
     def producao_subnav(active: str):
         return [
             {"text": "Produção", "href": url_for("operacao_producao"), "active": active == "producao"},
@@ -20,21 +20,20 @@ def create_app():
     def index():
         return render_template("index.html", current_user_name=resolve_user_name())
 
-    # Seção Operação (página “raiz” da seção)
+    # ===== Seção: Operação =====
     @app.get("/operacao")
     def operacao_index():
+        # Ao entrar na seção, APENAS mostra os sublinks (nenhum ativo ainda)
         return render_template(
             "operacao/index.html",
             current_user_name=resolve_user_name(),
-            subnav_links=None
+            subnav_links=producao_subnav(active=""),
         )
 
-    # Operação → Produção / Registro / Cadastro
     @app.get("/operacao/producao")
     def operacao_producao():
-        # template com acento: produção.html
         return render_template(
-            "operacao/produção.html",
+            "operacao/produção.html",   # arquivo com acento
             current_user_name=resolve_user_name(),
             subnav_links=producao_subnav(active="producao"),
         )
@@ -55,7 +54,6 @@ def create_app():
             subnav_links=producao_subnav(active="cadastro"),
         )
 
-    # Healthcheck
     @app.get("/health")
     def health():
         return {"status": "ok"}, 200

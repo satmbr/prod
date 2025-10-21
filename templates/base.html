@@ -25,15 +25,19 @@
       <a class="home-icon" title="Home" href="{{ url_for('index') }}">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2 12h3v9h6v-6h2v6h6v-9h3z"/></svg>
       </a>
-      <!-- Menu principal; Produção/Registro/Cadastro também aparecem no subnav -->
-      <a class="nav-link" href="{{ url_for('operacao_producao') }}">Produção</a>
-      <a class="nav-link" href="{{ url_for('operacao_registro') }}">Registro</a>
-      <a class="nav-link" href="{{ url_for('operacao_cadastro') }}">Cadastro</a>
+
+      <!-- MENU PRINCIPAL (fixo) -->
+      <a class="nav-link" href="{{ url_for('operacao_index') }}">Operação</a>
+      <a class="nav-link" href="#manutencao">Manutenção</a>
+      <a class="nav-link" href="#equipamentos">Equipamentos</a>
+      <a class="nav-link" href="#pdr">PDR</a>
     </div>
   </nav>
 
+  <!-- Linha amarela -->
   <div class="divider"></div>
 
+  <!-- SUBLINKS: aparecem SOMENTE quando a view envia 'subnav_links' (Operação e filhos) -->
   {% if subnav_links %}
   <div class="subnav">
     {% for item in subnav_links %}
