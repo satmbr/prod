@@ -59,10 +59,11 @@
         <label class="field">
           <span>Novo nome *</span>
           <input required name="novo_eh" type="text" placeholder="ex.: EH-001A">
+		  <button class="btn" type="submit">Atualizar</button>
         </label>
-        <div class="field">
+        <!-- <div class="field align-end">
           <button class="btn" type="submit">Atualizar</button>
-        </div>
+        </div> -->
       </form>
     </div>
   </section>
@@ -88,13 +89,17 @@
               <option value="{{ e.id }}">{{ e.eh }}</option>
             {% endfor %}
           </select>
+		  <button class="btn danger" type="submit"
+            onclick="return confirm('Excluir EH selecionada? Se houver uso em produção, a exclusão pode falhar.');">
+            Excluir
+          </button>
         </label>
-        <div class="field align-end">
+        <!-- <div class="field align-end">
           <button class="btn danger" type="submit"
             onclick="return confirm('Excluir EH selecionada? Se houver uso em produção, a exclusão pode falhar.');">
             Excluir
           </button>
-        </div>
+        </div> -->
       </form>
       <p class="help">Observação: se a EH estiver referenciada em produção, o banco bloqueará a exclusão.</p>
     </div>
@@ -117,10 +122,11 @@
         <label class="field">
           <span>Frente *</span>
           <input required name="frente" type="text" placeholder="ex.: 01 - Renovação">
+		  <button class="btn primary" type="submit">Salvar</button>
         </label>
-        <div class="field align-end">
+        <!-- <div class="field align-end">
           <button class="btn primary" type="submit">Salvar</button>
-        </div>
+        </div> -->
       </form>
     </div>
   </section>
@@ -150,10 +156,11 @@
         <label class="field">
           <span>Novo nome *</span>
           <input required name="nova_frente" type="text" placeholder="ex.: 01 - Renovação (A)">
+		  <button class="btn" type="submit">Atualizar</button>
         </label>
-        <div class="field align-end">
+        <!-- <div class="field align-end">
           <button class="btn" type="submit">Atualizar</button>
-        </div>
+        </div> -->
       </form>
     </div>
   </section>
@@ -179,13 +186,17 @@
               <option value="{{ f.id }}">{{ f.frente }}</option>
             {% endfor %}
           </select>
+		  <button class="btn danger" type="submit"
+            onclick="return confirm('Excluir Frente selecionada? Se houver uso em produção, a exclusão pode falhar.');">
+            Excluir
+          </button>
         </label>
-        <div class="field align-end">
+        <!-- <div class="field align-end">
           <button class="btn danger" type="submit"
             onclick="return confirm('Excluir Frente selecionada? Se houver uso em produção, a exclusão pode falhar.');">
             Excluir
           </button>
-        </div>
+        </div> -->
       </form>
       <p class="help">Observação: se a Frente estiver referenciada, o banco bloqueará a exclusão.</p>
     </div>
