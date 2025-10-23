@@ -1,8 +1,188 @@
 {% extends "base.html" %}
 {% block title %}Operação · Cadastro{% endblock %}
+
 {% block content %}
-  <div style="padding:16px">
-    <h1>Cadastro</h1>
-    <p>(Em breve: cadastros de apoio.)</p>
-  </div>
+<div class="page-wrap">
+
+  <!-- ====== EH ====== -->
+  <section class="panel">
+    <header class="panel-head" data-toggle="#eh-cadastrar">
+      <div class="panel-title">Cadastro de EH</div>
+      <div class="panel-actions">
+        <button type="button" class="btn-icon" aria-label="Expandir/contrair">▾</button>
+      </div>
+    </header>
+    <div class="panel-body" id="eh-cadastrar">
+      <!-- <form method="post" action="{{ url_for('cad_eh_create') }}" class="grid grid-2"> SAIU PELA LINHA ABAIXO-->
+	  <form method="post" action="{{ url_for('operacao.eh_create') }}">
+        <label class="field">
+          <span>EH *</span>
+          <input required name="eh" type="text" placeholder="ex.: EH-001">
+        </label>
+        <div class="field align-end">
+          <button class="btn primary" type="submit">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <section class="panel">
+    <header class="panel-head" data-toggle="#eh-editar">
+      <div class="panel-title">Editar EH</div>
+      <div class="panel-actions">
+        <button type="button" class="btn-icon">▾</button>
+      </div>
+    </header>
+    <div class="panel-body" id="eh-editar">
+      <!-- <form method="post" action="{{ url_for('cad_eh_update') }}" class="grid grid-3"> SAIU PELA LINHA ABAIXO-->
+	  <form method="post" action="{{ url_for('operacao.eh_update') }}">
+        <label class="field">
+          <span>Selecionar EH *</span>
+          <select required name="id">
+            <option value="">-- selecione --</option>
+            {% for e in lista_eh %}
+              <option value="{{ e.id }}">{{ e.eh }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label class="field">
+          <span>Novo nome *</span>
+          <input required name="novo_eh" type="text" placeholder="ex.: EH-001A">
+        </label>
+        <div class="field align-end">
+          <button class="btn" type="submit">Atualizar</button>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <section class="panel danger">
+    <header class="panel-head" data-toggle="#eh-excluir">
+      <div class="panel-title">Excluir EH</div>
+      <div class="panel-actions">
+        <button type="button" class="btn-icon">▾</button>
+      </div>
+    </header>
+    <div class="panel-body" id="eh-excluir">
+      <!-- <form method="post" action="{{ url_for('cad_eh_delete') }}" class="grid grid-2"> SAIU PELA LINHA ABAIXO -->
+	  <form method="post" action="{{ url_for('operacao.eh_delete') }}">
+        <label class="field">
+          <span>Selecionar EH *</span>
+          <select required name="id">
+            <option value="">-- selecione --</option>
+            {% for e in lista_eh %}
+              <option value="{{ e.id }}">{{ e.eh }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <div class="field align-end">
+          <button class="btn danger" type="submit"
+            onclick="return confirm('Excluir EH selecionada? Se houver uso em produção, a exclusão pode falhar.');">
+            Excluir
+          </button>
+        </div>
+      </form>
+      <p class="help">Observação: se a EH estiver referenciada em produção, o banco bloqueará a exclusão.</p>
+    </div>
+  </section>
+
+  <!-- ====== FRENTE ====== -->
+  <section class="panel">
+    <header class="panel-head" data-toggle="#frente-cadastrar">
+      <div class="panel-title">Cadastro de Frente</div>
+      <div class="panel-actions">
+        <button type="button" class="btn-icon">▾</button>
+      </div>
+    </header>
+    <div class="panel-body" id="frente-cadastrar">
+      <!-- <form method="post" action="{{ url_for('cad_frente_create') }}" class="grid grid-2">SAIU PELA LINHA ABAIXO -->
+	  <form method="post" action="{{ url_for('operacao.frente_create') }}">
+        <label class="field">
+          <span>Frente *</span>
+          <input required name="frente" type="text" placeholder="ex.: 01 - Renovação">
+        </label>
+        <div class="field align-end">
+          <button class="btn primary" type="submit">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <section class="panel">
+    <header class="panel-head" data-toggle="#frente-editar">
+      <div class="panel-title">Editar Frente</div>
+      <div class="panel-actions">
+        <button type="button" class="btn-icon">▾</button>
+      </div>
+    </header>
+    <div class="panel-body" id="frente-editar">
+      <!-- <form method="post" action="{{ url_for('cad_frente_update') }}" class="grid grid-3">SAIU PELA LINHA ABAIXO -->
+	  <form method="post" action="{{ url_for('operacao.frente_update') }}">
+        <label class="field">
+          <span>Selecionar Frente *</span>
+          <select required name="id">
+            <option value="">-- selecione --</option>
+            {% for f in lista_frente %}
+              <option value="{{ f.id }}">{{ f.frente }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label class="field">
+          <span>Novo nome *</span>
+          <input required name="nova_frente" type="text" placeholder="ex.: 01 - Renovação (A)">
+        </label>
+        <div class="field align-end">
+          <button class="btn" type="submit">Atualizar</button>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <section class="panel danger">
+    <header class="panel-head" data-toggle="#frente-excluir">
+      <div class="panel-title">Excluir Frente</div>
+      <div class="panel-actions">
+        <button type="button" class="btn-icon">▾</button>
+      </div>
+    </header>
+    <div class="panel-body" id="frente-excluir">
+      <!-- <form method="post" action="{{ url_for('cad_frente_delete') }}" class="grid grid-2">SAIU PELA LINHA ABAIXO -->
+	  <form method="post" action="{{ url_for('operacao.frente_delete') }}">
+        <label class="field">
+          <span>Selecionar Frente *</span>
+          <select required name="id">
+            <option value="">-- selecione --</option>
+            {% for f in lista_frente %}
+              <option value="{{ f.id }}">{{ f.frente }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <div class="field align-end">
+          <button class="btn danger" type="submit"
+            onclick="return confirm('Excluir Frente selecionada? Se houver uso em produção, a exclusão pode falhar.');">
+            Excluir
+          </button>
+        </div>
+      </form>
+      <p class="help">Observação: se a Frente estiver referenciada, o banco bloqueará a exclusão.</p>
+    </div>
+  </section>
+
+  {% if msg %}
+    <div class="alert">{{ msg }}</div>
+  {% endif %}
+
+</div>
+
+<script>
+  // abre/fecha as caixas
+  document.querySelectorAll('.panel-head').forEach(h => {
+    h.addEventListener('click', (e) => {
+      if (e.target.closest('button')) return; // não dupla-aciona
+      const sel = h.getAttribute('data-toggle');
+      const el = document.querySelector(sel);
+      if (el) el.classList.toggle('is-open');
+    });
+  });
+</script>
 {% endblock %}

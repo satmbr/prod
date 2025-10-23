@@ -1,58 +1,26 @@
-from flask import Flask, render_template, request, url_for
+from flask import Flask, request
 import os
 
 def create_app():
     app = Flask(__name__)
 
-    # Nome do usuário mostrado no topo (APP_USER no Railway, ou ?user=Fulano)
-    def resolve_user_name():
-        return request.args.get("user") or os.getenv("APP_USER") or "Usuário"
+    # injeta o nome do usuário em todos os templates
+    @app.context_processor
+    def inject_user():
+        name = (request.args.get("user")
+                or os.getenv("APP_USER")
+                or "Usuário")
+        return {"current_user_name": name}
 
-    # Subnav exclusivo da seção Operação
-    def producao_subnav(active: str):
-        return [
-            {"text": "Produção", "href": url_for("operacao_producao"), "active": active == "producao"},
-            {"text": "Registro",  "href": url_for("operacao_registro"),  "active": active == "registro"},
-            {"text": "Cadastro",  "href": url_for("operacao_cadastro"),  "active": active == "cadastro"},
-        ]
+    # registra blueprints
+    from routes.operacao import bp as operacao_bp
+    app.register_blueprint(operacao_bp, url_prefix="/operacao")
 
     @app.get("/")
     def index():
-        return render_template("index.html", current_user_name=resolve_user_name())
-
-    # ===== Seção: Operação =====
-    @app.get("/operacao")
-    def operacao_index():
-        # Ao entrar na seção, APENAS mostra os sublinks (nenhum ativo ainda)
-        return render_template(
-            "operacao/index.html",
-            current_user_name=resolve_user_name(),
-            subnav_links=producao_subnav(active=""),
-        )
-
-    @app.get("/operacao/producao")
-    def operacao_producao():
-        return render_template(
-            "operacao/producao.html",   # arquivo com acento
-            current_user_name=resolve_user_name(),
-            subnav_links=producao_subnav(active="producao"),
-        )
-
-    @app.get("/operacao/registro")
-    def operacao_registro():
-        return render_template(
-            "operacao/registro.html",
-            current_user_name=resolve_user_name(),
-            subnav_links=producao_subnav(active="registro"),
-        )
-
-    @app.get("/operacao/cadastro")
-    def operacao_cadastro():
-        return render_template(
-            "operacao/cadastro.html",
-            current_user_name=resolve_user_name(),
-            subnav_links=producao_subnav(active="cadastro"),
-        )
+        # página inicial simples; seu index.html atual continua igual
+        from flask import render_template
+        return render_template("index.html")
 
     @app.get("/health")
     def health():
