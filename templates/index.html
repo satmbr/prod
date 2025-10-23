@@ -3,7 +3,6 @@
 {% block content %}
   <div style="padding:16px">
     <h1>Bem-vindo, {{ current_user_name }}.</h1>
-    <p>Escolha uma opção no topo.</p>
-    <p><a href="{{ url_for('operacao_producao') }}">Ir para Operação · Produção</a></p>
+    <p>Use o menu acima. Para Operação, clique em <a href="{{ url_for('operacao.index') }}">Operação</a>.</p>
   </div>
 {% endblock %}
