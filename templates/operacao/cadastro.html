@@ -5,14 +5,22 @@
 <div class="page-wrap">
 
   <!-- ====== EH ====== -->
-  <section class="panel">
-    <header class="panel-head" data-toggle="#eh-cadastrar">
-      <div class="panel-title">Cadastro de EH</div>
-      <div class="panel-actions">
-        <button type="button" class="btn-icon" aria-label="Expandir/contrair">▾</button>
+  <section class="zone">
+    <header class="zone-head" data-target="#eh-cadastrar">
+      <div class="zone-left">
+        <span class="zone-icon">💡</span>
+        <div class="zone-title">Cadastro de EH</div>
+      </div>
+      <div class="zone-actions">
+        <!-- ícone “duas janelas” -->
+        <button type="button" class="icon-btn" aria-label="Opções">
+          <svg viewBox="0 0 24 24" width="16" height="16"><path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/></svg>
+        </button>
+        <!-- seta recolher -->
+        <button type="button" class="icon-btn caret" aria-label="Recolher/Expandir">▴</button>
       </div>
     </header>
-    <div class="panel-body is-open" id="eh-cadastrar">
+    <div class="zone-body" id="eh-cadastrar">
       <form method="post" action="{{ url_for('operacao.eh_create') }}" class="grid grid-2">
         <label class="field">
           <span>EH *</span>
@@ -25,14 +33,18 @@
     </div>
   </section>
 
-  <section class="panel">
-    <header class="panel-head" data-toggle="#eh-editar">
-      <div class="panel-title">Editar EH</div>
-      <div class="panel-actions">
-        <button type="button" class="btn-icon">▾</button>
+  <section class="zone">
+    <header class="zone-head" data-target="#eh-editar">
+      <div class="zone-left">
+        <span class="zone-icon">💡</span>
+        <div class="zone-title">Editar EH</div>
+      </div>
+      <div class="zone-actions">
+        <button type="button" class="icon-btn"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/></svg></button>
+        <button type="button" class="icon-btn caret">▴</button>
       </div>
     </header>
-    <div class="panel-body" id="eh-editar">
+    <div class="zone-body" id="eh-editar">
       <form method="post" action="{{ url_for('operacao.eh_update') }}" class="grid grid-3">
         <label class="field">
           <span>Selecionar EH *</span>
@@ -54,14 +66,18 @@
     </div>
   </section>
 
-  <section class="panel danger">
-    <header class="panel-head" data-toggle="#eh-excluir">
-      <div class="panel-title">Excluir EH</div>
-      <div class="panel-actions">
-        <button type="button" class="btn-icon">▾</button>
+  <section class="zone">
+    <header class="zone-head" data-target="#eh-excluir">
+      <div class="zone-left">
+        <span class="zone-icon">💡</span>
+        <div class="zone-title">Excluir EH</div>
+      </div>
+      <div class="zone-actions">
+        <button type="button" class="icon-btn"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/></svg></button>
+        <button type="button" class="icon-btn caret">▴</button>
       </div>
     </header>
-    <div class="panel-body" id="eh-excluir">
+    <div class="zone-body" id="eh-excluir">
       <form method="post" action="{{ url_for('operacao.eh_delete') }}" class="grid grid-2">
         <label class="field">
           <span>Selecionar EH *</span>
@@ -84,14 +100,18 @@
   </section>
 
   <!-- ====== FRENTE ====== -->
-  <section class="panel">
-    <header class="panel-head" data-toggle="#frente-cadastrar">
-      <div class="panel-title">Cadastro de Frente</div>
-      <div class="panel-actions">
-        <button type="button" class="btn-icon">▾</button>
+  <section class="zone">
+    <header class="zone-head" data-target="#frente-cadastrar">
+      <div class="zone-left">
+        <span class="zone-icon">💡</span>
+        <div class="zone-title">Cadastro de Frente</div>
+      </div>
+      <div class="zone-actions">
+        <button type="button" class="icon-btn"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/></svg></button>
+        <button type="button" class="icon-btn caret">▴</button>
       </div>
     </header>
-    <div class="panel-body is-open" id="frente-cadastrar">
+    <div class="zone-body" id="frente-cadastrar">
       <form method="post" action="{{ url_for('operacao.frente_create') }}" class="grid grid-2">
         <label class="field">
           <span>Frente *</span>
@@ -104,14 +124,18 @@
     </div>
   </section>
 
-  <section class="panel">
-    <header class="panel-head" data-toggle="#frente-editar">
-      <div class="panel-title">Editar Frente</div>
-      <div class="panel-actions">
-        <button type="button" class="btn-icon">▾</button>
+  <section class="zone">
+    <header class="zone-head" data-target="#frente-editar">
+      <div class="zone-left">
+        <span class="zone-icon">💡</span>
+        <div class="zone-title">Editar Frente</div>
+      </div>
+      <div class="zone-actions">
+        <button type="button" class="icon-btn"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/></svg></button>
+        <button type="button" class="icon-btn caret">▴</button>
       </div>
     </header>
-    <div class="panel-body" id="frente-editar">
+    <div class="zone-body" id="frente-editar">
       <form method="post" action="{{ url_for('operacao.frente_update') }}" class="grid grid-3">
         <label class="field">
           <span>Selecionar Frente *</span>
@@ -133,14 +157,18 @@
     </div>
   </section>
 
-  <section class="panel danger">
-    <header class="panel-head" data-toggle="#frente-excluir">
-      <div class="panel-title">Excluir Frente</div>
-      <div class="panel-actions">
-        <button type="button" class="btn-icon">▾</button>
+  <section class="zone">
+    <header class="zone-head" data-target="#frente-excluir">
+      <div class="zone-left">
+        <span class="zone-icon">💡</span>
+        <div class="zone-title">Excluir Frente</div>
+      </div>
+      <div class="zone-actions">
+        <button type="button" class="icon-btn"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/></svg></button>
+        <button type="button" class="icon-btn caret">▴</button>
       </div>
     </header>
-    <div class="panel-body" id="frente-excluir">
+    <div class="zone-body" id="frente-excluir">
       <form method="post" action="{{ url_for('operacao.frente_delete') }}" class="grid grid-2">
         <label class="field">
           <span>Selecionar Frente *</span>
@@ -169,13 +197,15 @@
 </div>
 
 <script>
-  // abre/fecha as caixas ao clicar no cabeçalho
-  document.querySelectorAll('.panel-head').forEach(h => {
+  // Toggle das zonas: clica no cabeçalho para recolher/expandir
+  document.querySelectorAll('.zone-head').forEach(h => {
     h.addEventListener('click', (e) => {
-      if (e.target.closest('button')) return;
-      const sel = h.getAttribute('data-toggle');
-      const el = document.querySelector(sel);
-      if (el) el.classList.toggle('is-open');
+      if (e.target.closest('.icon-btn') && !e.target.closest('.caret')) return;
+      const sel = h.getAttribute('data-target');
+      const body = document.querySelector(sel);
+      const caret = h.querySelector('.caret');
+      if (body) body.classList.toggle('collapsed');
+      if (caret) caret.textContent = (caret.textContent.trim() === '▴') ? '▾' : '▴';
     });
   });
 </script>
