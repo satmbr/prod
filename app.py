@@ -12,13 +12,12 @@ def create_app():
                 or "Usuário")
         return {"current_user_name": name}
 
-    # registra blueprints
+    # registra o blueprint de Operação
     from routes.operacao import bp as operacao_bp
     app.register_blueprint(operacao_bp, url_prefix="/operacao")
 
     @app.get("/")
     def index():
-        # página inicial simples; seu index.html atual continua igual
         from flask import render_template
         return render_template("index.html")
 
