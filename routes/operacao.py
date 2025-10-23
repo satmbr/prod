@@ -25,7 +25,7 @@ def index():
 @bp.get("/producao")
 def producao():
     # template com acento 'produção.html' — renomeie para 'producao.html' se preferir
-    return render_template("operacao/produção.html", subnav_links=_subnav("producao"))
+    return render_template("operacao/producao.html", subnav_links=_subnav("producao"))
 
 @bp.get("/registro")
 def registro():
