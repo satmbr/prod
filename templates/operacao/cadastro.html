@@ -12,9 +12,8 @@
         <button type="button" class="btn-icon" aria-label="Expandir/contrair">▾</button>
       </div>
     </header>
-    <div class="panel-body" id="eh-cadastrar">
-      <!-- <form method="post" action="{{ url_for('cad_eh_create') }}" class="grid grid-2"> SAIU PELA LINHA ABAIXO-->
-	  <form method="post" action="{{ url_for('operacao.eh_create') }}">
+    <div class="panel-body is-open" id="eh-cadastrar">
+      <form method="post" action="{{ url_for('operacao.eh_create') }}" class="grid grid-2">
         <label class="field">
           <span>EH *</span>
           <input required name="eh" type="text" placeholder="ex.: EH-001">
@@ -34,8 +33,7 @@
       </div>
     </header>
     <div class="panel-body" id="eh-editar">
-      <!-- <form method="post" action="{{ url_for('cad_eh_update') }}" class="grid grid-3"> SAIU PELA LINHA ABAIXO-->
-	  <form method="post" action="{{ url_for('operacao.eh_update') }}">
+      <form method="post" action="{{ url_for('operacao.eh_update') }}" class="grid grid-3">
         <label class="field">
           <span>Selecionar EH *</span>
           <select required name="id">
@@ -64,8 +62,7 @@
       </div>
     </header>
     <div class="panel-body" id="eh-excluir">
-      <!-- <form method="post" action="{{ url_for('cad_eh_delete') }}" class="grid grid-2"> SAIU PELA LINHA ABAIXO -->
-	  <form method="post" action="{{ url_for('operacao.eh_delete') }}">
+      <form method="post" action="{{ url_for('operacao.eh_delete') }}" class="grid grid-2">
         <label class="field">
           <span>Selecionar EH *</span>
           <select required name="id">
@@ -94,9 +91,8 @@
         <button type="button" class="btn-icon">▾</button>
       </div>
     </header>
-    <div class="panel-body" id="frente-cadastrar">
-      <!-- <form method="post" action="{{ url_for('cad_frente_create') }}" class="grid grid-2">SAIU PELA LINHA ABAIXO -->
-	  <form method="post" action="{{ url_for('operacao.frente_create') }}">
+    <div class="panel-body is-open" id="frente-cadastrar">
+      <form method="post" action="{{ url_for('operacao.frente_create') }}" class="grid grid-2">
         <label class="field">
           <span>Frente *</span>
           <input required name="frente" type="text" placeholder="ex.: 01 - Renovação">
@@ -116,8 +112,7 @@
       </div>
     </header>
     <div class="panel-body" id="frente-editar">
-      <!-- <form method="post" action="{{ url_for('cad_frente_update') }}" class="grid grid-3">SAIU PELA LINHA ABAIXO -->
-	  <form method="post" action="{{ url_for('operacao.frente_update') }}">
+      <form method="post" action="{{ url_for('operacao.frente_update') }}" class="grid grid-3">
         <label class="field">
           <span>Selecionar Frente *</span>
           <select required name="id">
@@ -146,8 +141,7 @@
       </div>
     </header>
     <div class="panel-body" id="frente-excluir">
-      <!-- <form method="post" action="{{ url_for('cad_frente_delete') }}" class="grid grid-2">SAIU PELA LINHA ABAIXO -->
-	  <form method="post" action="{{ url_for('operacao.frente_delete') }}">
+      <form method="post" action="{{ url_for('operacao.frente_delete') }}" class="grid grid-2">
         <label class="field">
           <span>Selecionar Frente *</span>
           <select required name="id">
@@ -175,10 +169,10 @@
 </div>
 
 <script>
-  // abre/fecha as caixas
+  // abre/fecha as caixas ao clicar no cabeçalho
   document.querySelectorAll('.panel-head').forEach(h => {
     h.addEventListener('click', (e) => {
-      if (e.target.closest('button')) return; // não dupla-aciona
+      if (e.target.closest('button')) return;
       const sel = h.getAttribute('data-toggle');
       const el = document.querySelector(sel);
       if (el) el.classList.toggle('is-open');
