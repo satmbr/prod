@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, url_for, request, redirect
 from sqlalchemy import text
 from db import get_engine
+from datetime import date
 
 bp = Blueprint("operacao", __name__)
 
@@ -117,3 +118,145 @@ def frente_delete():
         return redirect(url_for("operacao.cadastro", msg="Frente excluída."))
     except Exception as e:
         return redirect(url_for("operacao.cadastro", msg=f"Erro ao excluir Frente: {e}"))
+
+@bp.get("/registro")
+def registro():
+    eh, fr = _fetch_listas()
+    # filtros
+    ini = request.args.get("ini")
+    fim = request.args.get("fim")
+    eh_id = request.args.get("eh_id")
+    frente_id = request.args.get("frente_id")
+    tipo = request.args.get("tipo")  # PLN / RLZ / None
+
+    params = {}
+    where_pln = []
+    where_rlz = []
+
+    if ini:
+        where_pln.append("p.data >= :ini")
+        where_rlz.append("r.data >= :ini")
+        params["ini"] = ini
+    if fim:
+        where_pln.append("p.data <= :fim")
+        where_rlz.append("r.data <= :fim")
+        params["fim"] = fim
+    if eh_id:
+        where_pln.append("p.eh_id = :eh_id")
+        where_rlz.append("r.eh_id = :eh_id")
+        params["eh_id"] = eh_id
+    if frente_id:
+        where_pln.append("p.frente_id = :frente_id")
+        where_rlz.append("r.frente_id = :frente_id")
+        params["frente_id"] = frente_id
+
+    sql_pln = f"""
+      SELECT p.id, p.data, 'PLN' AS tipo, e.eh, f.frente, p.planejado AS qtd
+      FROM producao_planejada p
+      JOIN entre_house e ON e.id=p.eh_id
+      JOIN frente_equipe f ON f.id=p.frente_id
+      { 'WHERE ' + ' AND '.join(where_pln) if where_pln else '' }
+    """
+    sql_rlz = f"""
+      SELECT r.id, r.data, 'RLZ' AS tipo, e.eh, f.frente, r.realizado AS qtd
+      FROM producao_realizada r
+      JOIN entre_house e ON e.id=r.eh_id
+      JOIN frente_equipe f ON f.id=r.frente_id
+      { 'WHERE ' + ' AND '.join(where_rlz) if where_rlz else '' }
+    """
+
+    if tipo == "PLN":
+        sql = sql_pln + " ORDER BY data DESC, eh, frente"
+    elif tipo == "RLZ":
+        sql = sql_rlz + " ORDER BY data DESC, eh, frente"
+    else:
+        sql = f"({sql_pln}) UNION ALL ({sql_rlz}) ORDER BY data DESC, eh, frente, tipo"
+
+    with get_engine().connect() as conn:
+        resultados = conn.execute(text(sql), params).mappings().all()
+
+    return render_template(
+        "operacao/registro.html",
+        subnav_links=_subnav("registro"),
+        lista_eh=eh, lista_frente=fr,
+        resultados=resultados,
+        filtros={"ini":ini,"fim":fim,"eh_id":eh_id,"frente_id":frente_id,"tipo":tipo},
+        today=date.today().isoformat(),
+        msg=request.args.get("msg")
+    )
+
+@bp.post("/registro/planejada/create")
+def reg_pln_create():
+    data = request.form.get("data")
+    eh_id = request.form.get("eh_id")
+    frente_id = request.form.get("frente_id")
+    planejado = request.form.get("planejado")
+    if not (data and eh_id and frente_id and planejado):
+        return redirect(url_for("operacao.registro", msg="Preencha todos os campos (Planejada)."))
+    try:
+        with get_engine().begin() as conn:
+            conn.execute(text("""
+                INSERT INTO producao_planejada (data, planejado, eh_id, frente_id)
+                VALUES (:data, :qtd, :eh, :fr)
+                ON CONFLICT (data, eh_id, frente_id) DO UPDATE
+                SET planejado = EXCLUDED.planejado
+            """), {"data":data, "qtd":int(planejado), "eh":eh_id, "fr":frente_id})
+        return redirect(url_for("operacao.registro", msg="Planejada salva."))
+    except Exception as e:
+        return redirect(url_for("operacao.registro", msg=f"Erro Planejada: {e}"))
+
+@bp.post("/registro/realizada/create")
+def reg_rlz_create():
+    data = request.form.get("data")
+    eh_id = request.form.get("eh_id")
+    frente_id = request.form.get("frente_id")
+    realizado = request.form.get("realizado")
+    if not (data and eh_id and frente_id and realizado):
+        return redirect(url_for("operacao.registro", msg="Preencha todos os campos (Realizada)."))
+    try:
+        with get_engine().begin() as conn:
+            conn.execute(text("""
+                INSERT INTO producao_realizada (data, realizado, eh_id, frente_id)
+                VALUES (:data, :qtd, :eh, :fr)
+                ON CONFLICT (data, eh_id, frente_id) DO UPDATE
+                SET realizado = EXCLUDED.realizado
+            """), {"data":data, "qtd":int(realizado), "eh":eh_id, "fr":frente_id})
+        return redirect(url_for("operacao.registro", msg="Realizada salva."))
+    except Exception as e:
+        return redirect(url_for("operacao.registro", msg=f"Erro Realizada: {e}"))
+
+@bp.post("/registro/item/update")
+def reg_item_update():
+    tipo = request.form.get("tipo")  # PLN ou RLZ
+    id_ = request.form.get("id")
+    valor = request.form.get("valor")
+    if not (tipo and id_ and valor and valor.isdigit()):
+        return redirect(url_for("operacao.registro", msg="Dados inválidos no editar."))
+    try:
+        with get_engine().begin() as conn:
+            if tipo == "PLN":
+                conn.execute(text("UPDATE producao_planejada SET planejado=:v WHERE id=:id"),
+                             {"v": int(valor), "id": id_})
+            else:
+                conn.execute(text("UPDATE producao_realizada SET realizado=:v WHERE id=:id"),
+                             {"v": int(valor), "id": id_})
+        return redirect(url_for("operacao.registro", msg="Registro atualizado."))
+    except Exception as e:
+        return redirect(url_for("operacao.registro", msg=f"Erro ao atualizar: {e}"))
+
+@bp.post("/registro/item/delete")
+def reg_item_delete():
+    tipo = request.form.get("tipo")  # PLN ou RLZ
+    id_ = request.form.get("id")
+    if not (tipo and id_):
+        return redirect(url_for("operacao.registro", msg="Dados inválidos no excluir."))
+    try:
+        with get_engine().begin() as conn:
+            if tipo == "PLN":
+                conn.execute(text("DELETE FROM producao_planejada WHERE id=:id"), {"id": id_})
+            else:
+                conn.execute(text("DELETE FROM producao_realizada WHERE id=:id"), {"id": id_})
+        return redirect(url_for("operacao.registro", msg="Registro excluído."))
+    except Exception as e:
+        return redirect(url_for("operacao.registro", msg=f"Erro ao excluir: {e}"))
+

@@ -1,8 +1,224 @@
 {% extends "base.html" %}
 {% block title %}Operação · Registro{% endblock %}
+
 {% block content %}
-  <div style="padding:16px">
-    <h1>Registro</h1>
-    <p>(Em breve: formulário de lançamento de produção.)</p>
-  </div>
+<div class="page-wrap">
+
+  <!-- ========== Registrar Planejada ========== -->
+  <section class="zone">
+    <header class="zone-head" data-target="#reg-pln">
+      <div class="zone-left">
+        <span class="zone-icon">💡</span>
+        <div class="zone-title">Registrar Produção Planejada</div>
+      </div>
+      <div class="zone-actions">
+        <button type="button" class="icon-btn"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/></svg></button>
+        <button type="button" class="icon-btn caret">▾</button>
+      </div>
+    </header>
+    <div class="zone-body collapsed" id="reg-pln">
+      <form method="post" action="{{ url_for('operacao.reg_pln_create') }}" class="grid grid-4">
+        <label class="field">
+          <span>Data *</span>
+          <input required type="date" name="data" value="{{ today }}">
+        </label>
+        <label class="field">
+          <span>EH *</span>
+          <select required name="eh_id">
+            <option value="">-- selecione --</option>
+            {% for e in lista_eh %}<option value="{{ e.id }}">{{ e.eh }}</option>{% endfor %}
+          </select>
+        </label>
+        <label class="field">
+          <span>Frente *</span>
+          <select required name="frente_id">
+            <option value="">-- selecione --</option>
+            {% for f in lista_frente %}<option value="{{ f.id }}">{{ f.frente }}</option>{% endfor %}
+          </select>
+        </label>
+        <label class="field">
+          <span>Planejado *</span>
+          <input required type="number" min="0" step="1" name="planejado" placeholder="0">
+        </label>
+        <div class="field align-end">
+          <button class="btn primary" type="submit">Salvar / Atualizar</button>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <!-- ========== Registrar Realizada ========== -->
+  <section class="zone">
+    <header class="zone-head" data-target="#reg-rlz">
+      <div class="zone-left">
+        <span class="zone-icon">💡</span>
+        <div class="zone-title">Registrar Produção Realizada</div>
+      </div>
+      <div class="zone-actions">
+        <button type="button" class="icon-btn"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/></svg></button>
+        <button type="button" class="icon-btn caret">▾</button>
+      </div>
+    </header>
+    <div class="zone-body collapsed" id="reg-rlz">
+      <form method="post" action="{{ url_for('operacao.reg_rlz_create') }}" class="grid grid-4">
+        <label class="field">
+          <span>Data *</span>
+          <input required type="date" name="data" value="{{ today }}">
+        </label>
+        <label class="field">
+          <span>EH *</span>
+          <select required name="eh_id">
+            <option value="">-- selecione --</option>
+            {% for e in lista_eh %}<option value="{{ e.id }}">{{ e.eh }}</option>{% endfor %}
+          </select>
+        </label>
+        <label class="field">
+          <span>Frente *</span>
+          <select required name="frente_id">
+            <option value="">-- selecione --</option>
+            {% for f in lista_frente %}<option value="{{ f.id }}">{{ f.frente }}</option>{% endfor %}
+          </select>
+        </label>
+        <label class="field">
+          <span>Realizado *</span>
+          <input required type="number" min="0" step="1" name="realizado" placeholder="0">
+        </label>
+        <div class="field align-end">
+          <button class="btn primary" type="submit">Salvar / Atualizar</button>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <!-- ========== Filtros e Lista ========== -->
+  <section class="zone">
+    <header class="zone-head" data-target="#reg-lista">
+      <div class="zone-left">
+        <span class="zone-icon">💡</span>
+        <div class="zone-title">Consultar / Filtrar Registros</div>
+      </div>
+      <div class="zone-actions">
+        <button type="button" class="icon-btn"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/></svg></button>
+        <button type="button" class="icon-btn caret">▾</button>
+      </div>
+    </header>
+    <div class="zone-body collapsed" id="reg-lista">
+      <form method="get" action="{{ url_for('operacao.registro') }}" class="grid grid-5">
+        <label class="field">
+          <span>De</span>
+          <input type="date" name="ini" value="{{ filtros.ini or '' }}">
+        </label>
+        <label class="field">
+          <span>Até</span>
+          <input type="date" name="fim" value="{{ filtros.fim or '' }}">
+        </label>
+        <label class="field">
+          <span>EH</span>
+          <select name="eh_id">
+            <option value="">Todas</option>
+            {% for e in lista_eh %}
+              <option value="{{ e.id }}" {% if filtros.eh_id==e.id|string %}selected{% endif %}>{{ e.eh }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label class="field">
+          <span>Frente</span>
+          <select name="frente_id">
+            <option value="">Todas</option>
+            {% for f in lista_frente %}
+              <option value="{{ f.id }}" {% if filtros.frente_id==f.id|string %}selected{% endif %}>{{ f.frente }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label class="field">
+          <span>Tipo</span>
+          <select name="tipo">
+            <option value="">Ambos</option>
+            <option value="PLN" {% if filtros.tipo=='PLN' %}selected{% endif %}>Planejada</option>
+            <option value="RLZ" {% if filtros.tipo=='RLZ' %}selected{% endif %}>Realizada</option>
+          </select>
+        </label>
+        <div class="field align-end">
+          <button class="btn" type="submit">Aplicar Filtros</button>
+        </div>
+      </form>
+
+      <div style="overflow:auto; margin-top:12px">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Tipo</th>
+              <th>EH</th>
+              <th>Frente</th>
+              <th style="text-align:right">Qtd</th>
+              <th style="width:160px">Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+          {% if resultados %}
+            {% for r in resultados %}
+              <tr>
+                <td>{{ r.data }}</td>
+                <td>{{ 'Planejada' if r.tipo=='PLN' else 'Realizada' }}</td>
+                <td>{{ r.eh }}</td>
+                <td>{{ r.frente }}</td>
+                <td style="text-align:right">{{ r.qtd }}</td>
+                <td>
+                  <!-- Editar: abre prompt e posta -->
+                  <form method="post" action="{{ url_for('operacao.reg_item_update') }}" style="display:inline">
+                    <input type="hidden" name="tipo" value="{{ r.tipo }}">
+                    <input type="hidden" name="id" value="{{ r.id }}">
+                    <input type="hidden" name="valor" value="{{ r.qtd }}">
+                    <button class="btn" type="button"
+                      onclick="editarItem(this.form)">Editar</button>
+                  </form>
+                  <!-- Excluir -->
+                  <form method="post" action="{{ url_for('operacao.reg_item_delete') }}" style="display:inline"
+                        onsubmit="return confirm('Excluir este registro?');">
+                    <input type="hidden" name="tipo" value="{{ r.tipo }}">
+                    <input type="hidden" name="id" value="{{ r.id }}">
+                    <button class="btn danger" type="submit">Excluir</button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          {% else %}
+            <tr><td colspan="6">Sem registros para os filtros informados.</td></tr>
+          {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  {% if msg %}
+    <div class="alert">{{ msg }}</div>
+  {% endif %}
+
+</div>
+
+<script>
+  // Toggle das zonas
+  document.querySelectorAll('.zone-head').forEach(h => {
+    h.addEventListener('click', (e) => {
+      if (e.target.closest('.icon-btn') && !e.target.closest('.caret')) return;
+      const sel = h.getAttribute('data-target');
+      const body = document.querySelector(sel);
+      const caret = h.querySelector('.caret');
+      if (body) body.classList.toggle('collapsed');
+      if (caret) caret.textContent = (caret.textContent.trim() === '▴') ? '▾' : '▴';
+    });
+  });
+
+  // prompt simples para editar quantidade
+  function editarItem(form){
+    const atual = form.valor.value || "0";
+    const novo = prompt("Novo valor:", atual);
+    if(novo === null) return;
+    if(!/^\d+$/.test(novo)){ alert("Informe número inteiro ≥ 0"); return; }
+    form.valor.value = novo;
+    form.submit();
+  }
+</script>
 {% endblock %}
