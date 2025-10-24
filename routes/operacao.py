@@ -5,6 +5,9 @@ from datetime import date
 
 bp = Blueprint("operacao", __name__)
 
+# ----------------------------
+# Helpers
+# ----------------------------
 def _subnav(active: str):
     return [
         {"text": "Produção", "href": url_for("operacao.producao"), "active": active == "producao"},
@@ -13,22 +16,37 @@ def _subnav(active: str):
     ]
 
 def _fetch_listas():
+    """Carrega listas de EH e Frentes para selects."""
     with get_engine().connect() as conn:
         eh = conn.execute(text("SELECT id, eh FROM entre_house ORDER BY eh")).mappings().all()
         fr = conn.execute(text("SELECT id, frente FROM frente_equipe ORDER BY frente")).mappings().all()
     return eh, fr
 
-# ===== GETs =====
+# ----------------------------
+# GETs básicos
+# ----------------------------
 @bp.get("/")
 def index():
     return render_template("operacao/index.html", subnav_links=_subnav(""))
 
 @bp.get("/producao")
 def producao():
-    # template com acento 'produção.html' — renomeie para 'producao.html' se preferir
     return render_template("operacao/producao.html", subnav_links=_subnav("producao"))
 
-# ===== EH (POST) =====
+@bp.get("/cadastro")
+def cadastro():
+    eh, fr = _fetch_listas()
+    return render_template(
+        "operacao/cadastro.html",
+        subnav_links=_subnav("cadastro"),
+        lista_eh=eh,
+        lista_frente=fr,
+        msg=request.args.get("msg"),
+    )
+
+# ----------------------------
+# CADASTRO · EH (POST)
+# ----------------------------
 @bp.post("/cadastro/eh/create")
 def eh_create():
     eh = (request.form.get("eh") or "").strip()
@@ -67,7 +85,9 @@ def eh_delete():
     except Exception as e:
         return redirect(url_for("operacao.cadastro", msg=f"Erro ao excluir EH: {e}"))
 
-# ===== Frente (POST) =====
+# ----------------------------
+# CADASTRO · FRENTE (POST)
+# ----------------------------
 @bp.post("/cadastro/frente/create")
 def frente_create():
     frente = (request.form.get("frente") or "").strip()
@@ -107,6 +127,9 @@ def frente_delete():
     except Exception as e:
         return redirect(url_for("operacao.cadastro", msg=f"Erro ao excluir Frente: {e}"))
 
+# ----------------------------
+# REGISTRO · GET com filtros
+# ----------------------------
 @bp.get("/registro")
 def registro():
     eh, fr = _fetch_listas()
@@ -117,26 +140,16 @@ def registro():
     frente_id = request.args.get("frente_id")
     tipo = request.args.get("tipo")  # PLN / RLZ / None
 
-    params = {}
-    where_pln = []
-    where_rlz = []
+    params, where_pln, where_rlz = {}, [], []
 
     if ini:
-        where_pln.append("p.data >= :ini")
-        where_rlz.append("r.data >= :ini")
-        params["ini"] = ini
+        where_pln.append("p.data >= :ini"); where_rlz.append("r.data >= :ini"); params["ini"] = ini
     if fim:
-        where_pln.append("p.data <= :fim")
-        where_rlz.append("r.data <= :fim")
-        params["fim"] = fim
+        where_pln.append("p.data <= :fim"); where_rlz.append("r.data <= :fim"); params["fim"] = fim
     if eh_id:
-        where_pln.append("p.eh_id = :eh_id")
-        where_rlz.append("r.eh_id = :eh_id")
-        params["eh_id"] = eh_id
+        where_pln.append("p.eh_id = :eh_id"); where_rlz.append("r.eh_id = :eh_id"); params["eh_id"] = eh_id
     if frente_id:
-        where_pln.append("p.frente_id = :frente_id")
-        where_rlz.append("r.frente_id = :frente_id")
-        params["frente_id"] = frente_id
+        where_pln.append("p.frente_id = :frente_id"); where_rlz.append("r.frente_id = :frente_id"); params["frente_id"] = frente_id
 
     sql_pln = f"""
       SELECT p.id, p.data, 'PLN' AS tipo, e.eh, f.frente, p.planejado AS qtd
@@ -170,16 +183,19 @@ def registro():
         resultados=resultados,
         filtros={"ini":ini,"fim":fim,"eh_id":eh_id,"frente_id":frente_id,"tipo":tipo},
         today=date.today().isoformat(),
-        msg=request.args.get("msg")
+        msg=request.args.get("msg"),
     )
 
+# ----------------------------
+# REGISTRO · Planejada/Realizada (UPSERT)
+# ----------------------------
 @bp.post("/registro/planejada/create")
 def reg_pln_create():
-    data = request.form.get("data")
+    data_ = request.form.get("data")
     eh_id = request.form.get("eh_id")
     frente_id = request.form.get("frente_id")
     planejado = request.form.get("planejado")
-    if not (data and eh_id and frente_id and planejado):
+    if not (data_ and eh_id and frente_id and planejado):
         return redirect(url_for("operacao.registro", msg="Preencha todos os campos (Planejada)."))
     try:
         with get_engine().begin() as conn:
@@ -188,18 +204,18 @@ def reg_pln_create():
                 VALUES (:data, :qtd, :eh, :fr)
                 ON CONFLICT (data, eh_id, frente_id) DO UPDATE
                 SET planejado = EXCLUDED.planejado
-            """), {"data":data, "qtd":int(planejado), "eh":eh_id, "fr":frente_id})
+            """), {"data": data_, "qtd": int(planejado), "eh": eh_id, "fr": frente_id})
         return redirect(url_for("operacao.registro", msg="Planejada salva."))
     except Exception as e:
         return redirect(url_for("operacao.registro", msg=f"Erro Planejada: {e}"))
 
 @bp.post("/registro/realizada/create")
 def reg_rlz_create():
-    data = request.form.get("data")
+    data_ = request.form.get("data")
     eh_id = request.form.get("eh_id")
     frente_id = request.form.get("frente_id")
     realizado = request.form.get("realizado")
-    if not (data and eh_id and frente_id and realizado):
+    if not (data_ and eh_id and frente_id and realizado):
         return redirect(url_for("operacao.registro", msg="Preencha todos os campos (Realizada)."))
     try:
         with get_engine().begin() as conn:
@@ -208,11 +224,14 @@ def reg_rlz_create():
                 VALUES (:data, :qtd, :eh, :fr)
                 ON CONFLICT (data, eh_id, frente_id) DO UPDATE
                 SET realizado = EXCLUDED.realizado
-            """), {"data":data, "qtd":int(realizado), "eh":eh_id, "fr":frente_id})
+            """), {"data": data_, "qtd": int(realizado), "eh": eh_id, "fr": frente_id})
         return redirect(url_for("operacao.registro", msg="Realizada salva."))
     except Exception as e:
         return redirect(url_for("operacao.registro", msg=f"Erro Realizada: {e}"))
 
+# ----------------------------
+# REGISTRO · Editar/Excluir itens da lista
+# ----------------------------
 @bp.post("/registro/item/update")
 def reg_item_update():
     tipo = request.form.get("tipo")  # PLN ou RLZ
@@ -247,4 +266,3 @@ def reg_item_delete():
         return redirect(url_for("operacao.registro", msg="Registro excluído."))
     except Exception as e:
         return redirect(url_for("operacao.registro", msg=f"Erro ao excluir: {e}"))
-
