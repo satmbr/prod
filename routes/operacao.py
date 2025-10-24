@@ -28,18 +28,6 @@ def producao():
     # template com acento 'produção.html' — renomeie para 'producao.html' se preferir
     return render_template("operacao/producao.html", subnav_links=_subnav("producao"))
 
-@bp.get("/registro")
-def registro():
-    return render_template("operacao/registro.html", subnav_links=_subnav("registro"))
-
-@bp.get("/cadastro")
-def cadastro():
-    eh, fr = _fetch_listas()
-    msg = request.args.get("msg")
-    return render_template("operacao/cadastro.html",
-                           subnav_links=_subnav("cadastro"),
-                           lista_eh=eh, lista_frente=fr, msg=msg)
-
 # ===== EH (POST) =====
 @bp.post("/cadastro/eh/create")
 def eh_create():
