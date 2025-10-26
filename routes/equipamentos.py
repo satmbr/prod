@@ -54,12 +54,6 @@ def cadastro():
         msg=request.args.get("msg")
     )
 
-@bp.get("/partdiaria")
-def partdiaria():
-    # manteremos como placeholder por enquanto
-    return render_template("equipamentos/partdiaria.html", subnav_links=_subnav("partdiaria"),
-                           filtros={}, resultados=[], today=None, msg=request.args.get("msg"))
-
 # ----------------------------
 # CRUD · MÁQUINA
 # ----------------------------
