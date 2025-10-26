@@ -4,95 +4,195 @@
 {% block content %}
 <div class="page-wrap">
 
+  {# ===================== M Á Q U I N A ===================== #}
   <section class="zone">
-    <header class="zone-head" data-target="#eq-cadastrar">
-      <div class="zone-left">
-        <span class="zone-icon">💡</span>
-        <div class="zone-title">Cadastro de Equipamento</div>
-      </div>
-      <div class="zone-actions">
-        <button type="button" class="icon-btn"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/></svg></button>
-        <button type="button" class="icon-btn caret">▾</button>
-      </div>
+    <header class="zone-head" data-target="#maq-cadastrar">
+      <div class="zone-left"><span class="zone-icon">💡</span><div class="zone-title">Cadastro de Máquina</div></div>
+      <div class="zone-actions"><button type="button" class="icon-btn"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/></svg></button><button type="button" class="icon-btn caret">▾</button></div>
     </header>
-    <div class="zone-body collapsed" id="eq-cadastrar">
-      <form method="post" action="{{ url_for('equipamentos.equip_create') }}" class="grid grid-4">
+    <div class="zone-body collapsed" id="maq-cadastrar">
+      <form method="post" action="{{ url_for('equipamentos.maq_create') }}" class="grid grid-4">
+        <label class="field">
+          <span>TAG *</span>
+          <input required name="tag" type="text" placeholder="ex.: EQ-001">
+        </label>
+        <label class="field">
+          <span>Descrição *</span>
+          <input required name="descricao" type="text" placeholder="ex.: Retroescavadeira">
+        </label>
+        <label class="field">
+          <span>Ativo</span>
+          <input type="checkbox" name="ativo" checked>
+        </label>
+        <div class="field align-end"><button class="btn primary" type="submit">Salvar</button></div>
+      </form>
+    </div>
+  </section>
+
+  <section class="zone">
+    <header class="zone-head" data-target="#maq-editar">
+      <div class="zone-left"><span class="zone-icon">💡</span><div class="zone-title">Editar Máquina</div></div>
+      <div class="zone-actions"><button type="button" class="icon-btn"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/></svg></button><button type="button" class="icon-btn caret">▾</button></div>
+    </header>
+    <div class="zone-body collapsed" id="maq-editar">
+      <form method="post" action="{{ url_for('equipamentos.maq_update') }}" class="grid grid-4">
+        <label class="field">
+          <span>Selecionar Máquina *</span>
+          <select required name="id" id="sel-maq-edit">
+            <option value="">-- selecione --</option>
+            {% for m in maquinas %}
+              <option value="{{ m.id }}">{{ m.tag }} — {{ m.descricao }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label class="field">
+          <span>Nova TAG</span>
+          <input name="nova_tag" type="text" placeholder="(opcional)">
+        </label>
+        <label class="field">
+          <span>Nova Descrição</span>
+          <input name="nova_descricao" type="text" placeholder="(opcional)">
+        </label>
+        <label class="field">
+          <span>Ativo</span>
+          <input type="checkbox" name="ativo">
+        </label>
+        <div class="field align-end"><button class="btn" type="submit">Atualizar</button></div>
+      </form>
+    </div>
+  </section>
+
+  <section class="zone">
+    <header class="zone-head" data-target="#maq-excluir">
+      <div class="zone-left"><span class="zone-icon">💡</span><div class="zone-title">Excluir Máquina</div></div>
+      <div class="zone-actions"><button type="button" class="icon-btn"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/></svg></button><button type="button" class="icon-btn caret">▾</button></div>
+    </header>
+    <div class="zone-body collapsed" id="maq-excluir">
+      <form method="post" action="{{ url_for('equipamentos.maq_delete') }}" class="grid grid-2">
+        <label class="field">
+          <span>Selecionar Máquina *</span>
+          <select required name="id">
+            <option value="">-- selecione --</option>
+            {% for m in maquinas %}
+              <option value="{{ m.id }}">{{ m.tag }} — {{ m.descricao }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <div class="field align-end">
+          <button class="btn danger" type="submit" onclick="return confirm('Excluir máquina selecionada? Pontos de medição associados impedirão a exclusão.');">Excluir</button>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  {# ===================== P O N T O S  D E  M E D I Ç Ã O ===================== #}
+  <section class="zone">
+    <header class="zone-head" data-target="#ponto-cadastrar">
+      <div class="zone-left"><span class="zone-icon">💡</span><div class="zone-title">Cadastro de Ponto de Medição</div></div>
+      <div class="zone-actions"><button type="button" class="icon-btn"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/></svg></button><button type="button" class="icon-btn caret">▾</button></div>
+    </header>
+    <div class="zone-body collapsed" id="ponto-cadastrar">
+      <form method="post" action="{{ url_for('equipamentos.ponto_create') }}" class="grid grid-5">
+        <label class="field">
+          <span>Máquina *</span>
+          <select required name="maquina_id" id="sel-maq-new-ponto">
+            <option value="">-- selecione --</option>
+            {% for m in maquinas %}
+              <option value="{{ m.id }}">{{ m.tag }} — {{ m.descricao }}</option>
+            {% endfor %}
+          </select>
+        </label>
         <label class="field">
           <span>Código *</span>
-          <input required name="codigo" type="text" placeholder="ex.: EQ-001">
+          <input required name="codigo" type="text" placeholder="ex.: HORIMETRO">
         </label>
         <label class="field">
-          <span>Nome *</span>
-          <input required name="nome" type="text" placeholder="ex.: Retroescavadeira">
+          <span>Unidade *</span>
+          <input required name="unidade" type="text" placeholder="ex.: h">
         </label>
         <label class="field">
-          <span>Tipo</span>
-          <input name="tipo" type="text" placeholder="ex.: Pesado">
+          <span>Ativo</span>
+          <input type="checkbox" name="ativo" checked>
         </label>
-        <div class="field align-end">
-          <button class="btn primary" type="submit">Salvar</button>
-        </div>
+        <div class="field align-end"><button class="btn primary" type="submit">Salvar</button></div>
       </form>
     </div>
   </section>
 
   <section class="zone">
-    <header class="zone-head" data-target="#eq-editar">
-      <div class="zone-left">
-        <span class="zone-icon">💡</span>
-        <div class="zone-title">Editar Equipamento</div>
-      </div>
-      <div class="zone-actions">
-        <button type="button" class="icon-btn"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/></svg></button>
-        <button type="button" class="icon-btn caret">▾</button>
-      </div>
+    <header class="zone-head" data-target="#ponto-editar">
+      <div class="zone-left"><span class="zone-icon">💡</span><div class="zone-title">Editar Ponto de Medição</div></div>
+      <div class="zone-actions"><button type="button" class="icon-btn"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/></svg></button><button type="button" class="icon-btn caret">▾</button></div>
     </header>
-    <div class="zone-body collapsed" id="eq-editar">
-      <form method="post" action="{{ url_for('equipamentos.equip_update') }}" class="grid grid-4">
+    <div class="zone-body collapsed" id="ponto-editar">
+      <form method="post" action="{{ url_for('equipamentos.ponto_update') }}" class="grid grid-5">
         <label class="field">
-          <span>Selecionar *</span>
-          <select required name="id">
-            <option value="">-- selecione --</option>
-            <!-- depois populamos via banco -->
+          <span>Máquina</span>
+          <select name="maquina_id" id="sel-maq-edit-ponto">
+            <option value="">(manter)</option>
+            {% for m in maquinas %}
+              <option value="{{ m.id }}">{{ m.tag }} — {{ m.descricao }}</option>
+            {% endfor %}
           </select>
         </label>
         <label class="field">
-          <span>Novo nome</span>
-          <input name="nome" type="text" placeholder="Novo nome">
+          <span>Ponto *</span>
+          <select required name="id" id="sel-ponto-edit">
+            <option value="">-- selecione --</option>
+            {% for p in pontos %}
+              <option value="{{ p.id }}" data-maq="{{ p.maquina_id }}">
+                {{ p.maquina_tag }} · {{ p.codigo }} ({{ p.unidade }}) {{ '(inativo)' if not p.ativo else '' }}
+              </option>
+            {% endfor %}
+          </select>
         </label>
         <label class="field">
-          <span>Novo tipo</span>
-          <input name="tipo" type="text" placeholder="Novo tipo">
+          <span>Novo Código</span>
+          <input name="codigo" type="text" placeholder="(opcional)">
         </label>
-        <div class="field align-end">
-          <button class="btn" type="submit">Atualizar</button>
-        </div>
+        <label class="field">
+          <span>Nova Unidade</span>
+          <input name="unidade" type="text" placeholder="(opcional)">
+        </label>
+        <label class="field">
+          <span>Ativo</span>
+          <input type="checkbox" name="ativo">
+        </label>
+        <div class="field align-end"><button class="btn" type="submit">Atualizar</button></div>
       </form>
+      <p class="help">Dica: selecione uma máquina para filtrar os pontos na lista.</p>
     </div>
   </section>
 
   <section class="zone">
-    <header class="zone-head" data-target="#eq-excluir">
-      <div class="zone-left">
-        <span class="zone-icon">💡</span>
-        <div class="zone-title">Excluir Equipamento</div>
-      </div>
-      <div class="zone-actions">
-        <button type="button" class="icon-btn"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/></svg></button>
-        <button type="button" class="icon-btn caret">▾</button>
-      </div>
+    <header class="zone-head" data-target="#ponto-excluir">
+      <div class="zone-left"><span class="zone-icon">💡</span><div class="zone-title">Excluir Ponto de Medição</div></div>
+      <div class="zone-actions"><button type="button" class="icon-btn"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/></svg></button><button type="button" class="icon-btn caret">▾</button></div>
     </header>
-    <div class="zone-body collapsed" id="eq-excluir">
-      <form method="post" action="{{ url_for('equipamentos.equip_delete') }}" class="grid grid-2">
+    <div class="zone-body collapsed" id="ponto-excluir">
+      <form method="post" action="{{ url_for('equipamentos.ponto_delete') }}" class="grid grid-3">
         <label class="field">
-          <span>Selecionar *</span>
-          <select required name="id">
+          <span>Máquina</span>
+          <select id="sel-maq-del-ponto">
+            <option value="">(todas)</option>
+            {% for m in maquinas %}
+              <option value="{{ m.id }}">{{ m.tag }} — {{ m.descricao }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label class="field">
+          <span>Ponto *</span>
+          <select required name="id" id="sel-ponto-del">
             <option value="">-- selecione --</option>
-            <!-- depois populamos via banco -->
+            {% for p in pontos %}
+              <option value="{{ p.id }}" data-maq="{{ p.maquina_id }}">
+                {{ p.maquina_tag }} · {{ p.codigo }} ({{ p.unidade }}) {{ '(inativo)' if not p.ativo else '' }}
+              </option>
+            {% endfor %}
           </select>
         </label>
         <div class="field align-end">
-          <button class="btn danger" type="submit" onclick="return confirm('Excluir equipamento selecionado?');">Excluir</button>
+          <button class="btn danger" type="submit" onclick="return confirm('Excluir ponto selecionado? Se houver medições, a exclusão será bloqueada.');">Excluir</button>
         </div>
       </form>
     </div>
@@ -104,6 +204,7 @@
 </div>
 
 <script>
+  // Toggle das zonas
   document.querySelectorAll('.zone-head').forEach(h => {
     h.addEventListener('click', (e) => {
       if (e.target.closest('.icon-btn') && !e.target.closest('.caret')) return;
@@ -114,5 +215,20 @@
       if (caret) caret.textContent = (caret.textContent.trim() === '▴') ? '▾' : '▴';
     });
   });
+
+  // Filtro de pontos por máquina (edição e exclusão)
+  function filterPoints(selMachineId, selPointsId){
+    const msel = document.getElementById(selMachineId);
+    const psel = document.getElementById(selPointsId);
+    if(!msel || !psel) return;
+    const maq = msel.value;
+    [...psel.options].forEach(opt=>{
+      if(!opt.value){ opt.hidden=false; return; }
+      const om = opt.getAttribute('data-maq');
+      opt.hidden = (maq && om !== maq);
+    });
+  }
+  document.getElementById('sel-maq-edit-ponto')?.addEventListener('change', ()=>filterPoints('sel-maq-edit-ponto','sel-ponto-edit'));
+  document.getElementById('sel-maq-del-ponto')?.addEventListener('change', ()=>filterPoints('sel-maq-del-ponto','sel-ponto-del'));
 </script>
 {% endblock %}
