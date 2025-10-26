@@ -140,24 +140,35 @@ def ponto_create():
 @bp.post("/cadastro/ponto/update")
 def ponto_update():
     id_ = request.form.get("id")
-    maquina_id = request.form.get("maquina_id")  # opcional: permite mover para outra máquina
+    maquina_id = request.form.get("maquina_id")  # agora OBRIGATÓRIA para validar vínculo
     codigo = (request.form.get("codigo") or "").strip()
     unidade = (request.form.get("unidade") or "").strip()
     ativo = True if request.form.get("ativo") == "on" else False
-    if not id_:
-        return redirect(url_for("equipamentos.cadastro", msg="Selecione o ponto a atualizar."))
+
+    if not id_ or not maquina_id:
+        return redirect(url_for("equipamentos.cadastro", msg="Selecione a máquina e o ponto para atualizar."))
+
     try:
-        sets, params = [], {"id": id_}
-        if maquina_id:
-            sets.append("maquina_id=:maquina_id"); params["maquina_id"] = maquina_id
+        sets, params = [], {"id": id_, "maquina_id": maquina_id}
         if codigo:
             sets.append("codigo=:codigo"); params["codigo"] = codigo
         if unidade:
             sets.append("unidade=:unidade"); params["unidade"] = unidade
         sets.append("ativo=:ativo"); params["ativo"] = ativo
 
+        if not sets:
+            return redirect(url_for("equipamentos.cadastro", msg="Nada para atualizar."))
+
         with get_engine().begin() as conn:
-            conn.execute(text(f"UPDATE ponto_medicao SET {', '.join(sets)} WHERE id=:id"), params)
+            # garante que o ponto pertence à máquina selecionada
+            result = conn.execute(
+                text(f"UPDATE ponto_medicao SET {', '.join(sets)} WHERE id=:id AND maquina_id=:maquina_id"),
+                params
+            )
+            if result.rowcount == 0:
+                return redirect(url_for("equipamentos.cadastro",
+                                        msg="Ponto não pertence à máquina selecionada ou não existe."))
+
         return redirect(url_for("equipamentos.cadastro", msg="Ponto atualizado."))
     except Exception as e:
         return redirect(url_for("equipamentos.cadastro", msg=f"Erro ao atualizar ponto: {e}"))
@@ -165,11 +176,21 @@ def ponto_update():
 @bp.post("/cadastro/ponto/delete")
 def ponto_delete():
     id_ = request.form.get("id")
-    if not id_:
-        return redirect(url_for("equipamentos.cadastro", msg="Selecione o ponto a excluir."))
+    maquina_id = request.form.get("maquina_id")  # OBRIGATÓRIA
+    if not id_ or not maquina_id:
+        return redirect(url_for("equipamentos.cadastro", msg="Selecione a máquina e o ponto a excluir."))
+
     try:
         with get_engine().begin() as conn:
-            conn.execute(text("DELETE FROM ponto_medicao WHERE id=:id"), {"id": id_})
+            # apaga somente se pertencer à máquina informada
+            result = conn.execute(
+                text("DELETE FROM ponto_medicao WHERE id=:id AND maquina_id=:maquina_id"),
+                {"id": id_, "maquina_id": maquina_id}
+            )
+            if result.rowcount == 0:
+                return redirect(url_for("equipamentos.cadastro",
+                                        msg="Ponto não pertence à máquina selecionada ou não existe."))
+
         return redirect(url_for("equipamentos.cadastro", msg="Ponto excluído."))
     except Exception as e:
         return redirect(url_for("equipamentos.cadastro", msg=f"Erro ao excluir ponto: {e}"))
