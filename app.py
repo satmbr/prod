@@ -15,6 +15,9 @@ def create_app():
     # registra o blueprint de Operação
     from routes.operacao import bp as operacao_bp
     app.register_blueprint(operacao_bp, url_prefix="/operacao")
+    
+    from routes.equipamentos import bp as equipamentos_bp
+    app.register_blueprint(equipamentos_bp, url_prefix="/equipamentos")
 
     @app.get("/")
     def index():

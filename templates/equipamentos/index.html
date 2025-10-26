@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}Equipamentos{% endblock %}
+{% block content %}
+  <div class="page-wrap">
+    <div class="alert">Escolha uma opção: <a href="{{ url_for('equipamentos.cadastro') }}">Cadastro</a> ou <a href="{{ url_for('equipamentos.partdiaria') }}">PartDiaria</a>.</div>
+  </div>
+{% endblock %}

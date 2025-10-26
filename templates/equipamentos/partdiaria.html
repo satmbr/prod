@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% block title %}Equipamentos · PartDiaria{% endblock %}
+
+{% block content %}
+<div class="page-wrap">
+
+  <section class="zone">
+    <header class="zone-head" data-target="#pd-lancar">
+      <div class="zone-left">
+        <span class="zone-icon">💡</span>
+        <div class="zone-title">Lançar Parte Diária</div>
+      </div>
+      <div class="zone-actions">
+        <button type="button" class="icon-btn"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/></svg></button>
+        <button type="button" class="icon-btn caret">▾</button>
+      </div>
+    </header>
+    <div class="zone-body collapsed" id="pd-lancar">
+      <form method="post" action="{{ url_for('equipamentos.part_create') }}" class="grid grid-5">
+        <label class="field">
+          <span>Data *</span>
+          <input required type="date" name="data" value="{{ today }}">
+        </label>
+        <label class="field">
+          <span>Equipamento *</span>
+          <select required name="equip">
+            <option value="">-- selecione --</option>
+            <!-- depois populamos via banco -->
+          </select>
+        </label>
+        <label class="field">
+          <span>Horas Trabalhadas *</span>
+          <input required type="number" name="horas" min="0" step="0.5" placeholder="0">
+        </label>
+        <label class="field">
+          <span>Observação</span>
+          <input type="text" name="obs" placeholder="Opcional">
+        </label>
+        <div class="field align-end">
+          <button class="btn primary" type="submit">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <section class="zone">
+    <header class="zone-head" data-target="#pd-lista">
+      <div class="zone-left">
+        <span class="zone-icon">💡</span>
+        <div class="zone-title">Consultar / Filtrar</div>
+      </div>
+      <div class="zone-actions">
+        <button type="button" class="icon-btn"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/></svg></button>
+        <button type="button" class="icon-btn caret">▾</button>
+      </div>
+    </header>
+    <div class="zone-body collapsed" id="pd-lista">
+      <form method="get" action="{{ url_for('equipamentos.partdiaria') }}" class="grid grid-4">
+        <label class="field">
+          <span>De</span>
+          <input type="date" name="ini" value="{{ filtros.ini or '' }}">
+        </label>
+        <label class="field">
+          <span>Até</span>
+          <input type="date" name="fim" value="{{ filtros.fim or '' }}">
+        </label>
+        <label class="field">
+          <span>Equipamento</span>
+          <input type="text" name="equip" value="{{ filtros.equip or '' }}" placeholder="Código/Nome">
+        </label>
+        <div class="field align-end">
+          <button class="btn" type="submit">Aplicar Filtros</button>
+        </div>
+      </form>
+
+      <div style="overflow:auto; margin-top:12px">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Equipamento</th>
+              <th style="text-align:right">Horas</th>
+              <th>Obs</th>
+              <th style="width:160px">Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+          {% if resultados %}
+            {% for r in resultados %}
+              <tr>
+                <td>{{ r.data }}</td>
+                <td>{{ r.equip }}</td>
+                <td style="text-align:right">{{ r.horas }}</td>
+                <td>{{ r.obs }}</td>
+                <td>
+                  <form method="post" action="{{ url_for('equipamentos.part_item_update') }}" style="display:inline">
+                    <input type="hidden" name="id" value="{{ r.id }}">
+                    <input type="hidden" name="valor" value="{{ r.horas }}">
+                    <button class="btn" type="button" onclick="editarHoras(this.form)">Editar</button>
+                  </form>
+                  <form method="post" action="{{ url_for('equipamentos.part_item_delete') }}" style="display:inline" onsubmit="return confirm('Excluir lançamento?');">
+                    <input type="hidden" name="id" value="{{ r.id }}">
+                    <button class="btn danger" type="submit">Excluir</button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          {% else %}
+            <tr><td colspan="5">Sem lançamentos para os filtros informados.</td></tr>
+          {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  {% if msg %}
+    <div class="alert">{{ msg }}</div>
+  {% endif %}
+</div>
+
+<script>
+  document.querySelectorAll('.zone-head').forEach(h => {
+    h.addEventListener('click', (e) => {
+      if (e.target.closest('.icon-btn') && !e.target.closest('.caret')) return;
+      const sel = h.getAttribute('data-target');
+      const body = document.querySelector(sel);
+      const caret = h.querySelector('.caret');
+      if (body) body.classList.toggle('collapsed');
+      if (caret) caret.textContent = (caret.textContent.trim() === '▴') ? '▾' : '▴';
+    });
+  });
+
+  function editarHoras(form){
+    const atual = form.valor.value || "0";
+    const novo = prompt("Horas trabalhadas:", atual);
+    if(novo === null) return;
+    if(!/^\d+(\.\d+)?$/.test(novo)){ alert("Informe número válido (ex.: 7.5)"); return; }
+    form.valor.value = novo;
+    form.submit();
+  }
+</script>
+{% endblock %}
