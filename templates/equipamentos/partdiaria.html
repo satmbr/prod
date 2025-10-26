@@ -1,39 +1,52 @@
 {% extends "base.html" %}
-{% block title %}Equipamentos · PartDiaria{% endblock %}
+{% block title %}Equipamentos · Parte Diária{% endblock %}
 
 {% block content %}
 <div class="page-wrap">
 
+  <!-- ==================== LANÇAR PARTE DIÁRIA ==================== -->
   <section class="zone">
     <header class="zone-head" data-target="#pd-lancar">
-      <div class="zone-left">
-        <span class="zone-icon">💡</span>
-        <div class="zone-title">Lançar Parte Diária</div>
-      </div>
+      <div class="zone-left"><span class="zone-icon">💡</span><div class="zone-title">Lançar Parte Diária</div></div>
       <div class="zone-actions">
         <button type="button" class="icon-btn"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/></svg></button>
         <button type="button" class="icon-btn caret">▾</button>
       </div>
     </header>
     <div class="zone-body collapsed" id="pd-lancar">
-      <form method="post" action="{{ url_for('equipamentos.part_create') }}" class="grid grid-5">
+      <form method="post" action="{{ url_for('equipamentos.part_create') }}" class="grid grid-6">
         <label class="field">
           <span>Data *</span>
           <input required type="date" name="data" value="{{ today }}">
         </label>
         <label class="field">
-          <span>Equipamento *</span>
-          <select required name="equip">
+          <span>Máquina *</span>
+          <select required name="maquina_id">
             <option value="">-- selecione --</option>
-            <!-- depois populamos via banco -->
+            {% for m in maquinas %}
+              <option value="{{ m.id }}">{{ m.tag }} — {{ m.descricao }}</option>
+            {% endfor %}
           </select>
         </label>
         <label class="field">
-          <span>Horas Trabalhadas *</span>
-          <input required type="number" name="horas" min="0" step="0.5" placeholder="0">
+          <span>Atividade *</span>
+          <select required name="atividade_id">
+            <option value="">-- selecione --</option>
+            {% for a in atividades %}
+              <option value="{{ a.id }}">{{ a.nome }}</option>
+            {% endfor %}
+          </select>
         </label>
         <label class="field">
-          <span>Observação</span>
+          <span>Início *</span>
+          <input required type="time" name="hora_inicio">
+        </label>
+        <label class="field">
+          <span>Fim *</span>
+          <input required type="time" name="hora_fim">
+        </label>
+        <label class="field">
+          <span>Obs</span>
           <input type="text" name="obs" placeholder="Opcional">
         </label>
         <div class="field align-end">
@@ -43,19 +56,18 @@
     </div>
   </section>
 
+  <!-- ==================== CONSULTAR / EDITAR / EXCLUIR ==================== -->
   <section class="zone">
-    <header class="zone-head" data-target="#pd-lista">
-      <div class="zone-left">
-        <span class="zone-icon">💡</span>
-        <div class="zone-title">Consultar / Filtrar</div>
-      </div>
+    <header class="zone-head" data-target="#pd-listar">
+      <div class="zone-left"><span class="zone-icon">💡</span><div class="zone-title">Consultar / Editar / Excluir</div></div>
       <div class="zone-actions">
         <button type="button" class="icon-btn"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/></svg></button>
         <button type="button" class="icon-btn caret">▾</button>
       </div>
     </header>
-    <div class="zone-body collapsed" id="pd-lista">
-      <form method="get" action="{{ url_for('equipamentos.partdiaria') }}" class="grid grid-4">
+    <div class="zone-body collapsed" id="pd-listar">
+
+      <form method="get" action="{{ url_for('equipamentos.partdiaria') }}" class="grid grid-5">
         <label class="field">
           <span>De</span>
           <input type="date" name="ini" value="{{ filtros.ini or '' }}">
@@ -65,8 +77,26 @@
           <input type="date" name="fim" value="{{ filtros.fim or '' }}">
         </label>
         <label class="field">
-          <span>Equipamento</span>
-          <input type="text" name="equip" value="{{ filtros.equip or '' }}" placeholder="Código/Nome">
+          <span>Máquina</span>
+          <select name="maq">
+            <option value="">(todas)</option>
+            {% for m in maquinas %}
+              <option value="{{ m.id }}" {{ 'selected' if filtros.maq and filtros.maq|string == m.id|string else '' }}>
+                {{ m.tag }} — {{ m.descricao }}
+              </option>
+            {% endfor %}
+          </select>
+        </label>
+        <label class="field">
+          <span>Atividade</span>
+          <select name="act">
+            <option value="">(todas)</option>
+            {% for a in atividades %}
+              <option value="{{ a.id }}" {{ 'selected' if filtros.act and filtros.act|string == a.id|string else '' }}>
+                {{ a.nome }}
+              </option>
+            {% endfor %}
+          </select>
         </label>
         <div class="field align-end">
           <button class="btn" type="submit">Aplicar Filtros</button>
@@ -78,39 +108,114 @@
           <thead>
             <tr>
               <th>Data</th>
-              <th>Equipamento</th>
-              <th style="text-align:right">Horas</th>
+              <th>Máquina</th>
+              <th>Atividade</th>
+              <th>Início</th>
+              <th>Fim</th>
               <th>Obs</th>
-              <th style="width:160px">Ações</th>
+              <th style="width:200px">Ações</th>
             </tr>
           </thead>
           <tbody>
           {% if resultados %}
             {% for r in resultados %}
               <tr>
-                <td>{{ r.data }}</td>
-                <td>{{ r.equip }}</td>
-                <td style="text-align:right">{{ r.horas }}</td>
-                <td>{{ r.obs }}</td>
-                <td>
-                  <form method="post" action="{{ url_for('equipamentos.part_item_update') }}" style="display:inline">
-                    <input type="hidden" name="id" value="{{ r.id }}">
-                    <input type="hidden" name="valor" value="{{ r.horas }}">
-                    <button class="btn" type="button" onclick="editarHoras(this.form)">Editar</button>
-                  </form>
-                  <form method="post" action="{{ url_for('equipamentos.part_item_delete') }}" style="display:inline" onsubmit="return confirm('Excluir lançamento?');">
-                    <input type="hidden" name="id" value="{{ r.id }}">
-                    <button class="btn danger" type="submit">Excluir</button>
-                  </form>
-                </td>
+                <form method="post" action="{{ url_for('equipamentos.part_update') }}">
+                  <input type="hidden" name="id" value="{{ r.id }}">
+                  <td><input type="date" name="data" value="{{ r.data }}"></td>
+                  <td>{{ r.maquina_tag }} — {{ r.maquina_desc }}</td>
+                  <td>
+                    <select name="atividade_id" required>
+                      {% for a in atividades %}
+                        <option value="{{ a.id }}" {{ 'selected' if a.id == r.atividade_id else '' }}>{{ a.nome }}</option>
+                      {% endfor %}
+                    </select>
+                  </td>
+                  <td><input type="time" name="hora_inicio" value="{{ r.hora_inicio }}"></td>
+                  <td><input type="time" name="hora_fim" value="{{ r.hora_fim }}"></td>
+                  <td><input type="text" name="obs" value="{{ r.obs or '' }}"></td>
+                  <td>
+                    <button class="btn" type="submit">Salvar</button>
+                    <form method="post" action="{{ url_for('equipamentos.part_delete') }}" style="display:inline" onsubmit="return confirm('Excluir lançamento?');">
+                      <input type="hidden" name="id" value="{{ r.id }}">
+                      <button class="btn danger" type="submit">Excluir</button>
+                    </form>
+                  </td>
+                </form>
               </tr>
             {% endfor %}
           {% else %}
-            <tr><td colspan="5">Sem lançamentos para os filtros informados.</td></tr>
+            <tr><td colspan="7">Sem resultados para os filtros.</td></tr>
           {% endif %}
           </tbody>
         </table>
       </div>
+
+    </div>
+  </section>
+
+  <!-- ==================== ATIVIDADES (CRUD) ==================== -->
+  <section class="zone">
+    <header class="zone-head" data-target="#act-cadastrar">
+      <div class="zone-left"><span class="zone-icon">💡</span><div class="zone-title">Cadastro de Atividade</div></div>
+      <div class="zone-actions"><button type="button" class="icon-btn"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/></svg></button><button type="button" class="icon-btn caret">▾</button></div>
+    </header>
+    <div class="zone-body collapsed" id="act-cadastrar">
+      <form method="post" action="{{ url_for('equipamentos.act_create') }}" class="grid grid-3">
+        <label class="field">
+          <span>Nome *</span>
+          <input required name="nome" type="text" placeholder="ex.: Operação">
+        </label>
+        <div class="field align-end"><button class="btn primary" type="submit">Salvar</button></div>
+      </form>
+    </div>
+  </section>
+
+  <section class="zone">
+    <header class="zone-head" data-target="#act-editar">
+      <div class="zone-left"><span class="zone-icon">💡</span><div class="zone-title">Editar Atividade</div></div>
+      <div class="zone-actions"><button type="button" class="icon-btn"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/></svg></button><button type="button" class="icon-btn caret">▾</button></div>
+    </header>
+    <div class="zone-body collapsed" id="act-editar">
+      <form method="post" action="{{ url_for('equipamentos.act_update') }}" class="grid grid-3">
+        <label class="field">
+          <span>Atividade *</span>
+          <select required name="id">
+            <option value="">-- selecione --</option>
+            {% for a in atividades %}
+              <option value="{{ a.id }}">{{ a.nome }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label class="field">
+          <span>Novo Nome</span>
+          <input name="nome" type="text" placeholder="(opcional)">
+        </label>
+        <div class="field align-end"><button class="btn" type="submit">Atualizar</button></div>
+      </form>
+    </div>
+  </section>
+
+  <section class="zone">
+    <header class="zone-head" data-target="#act-excluir">
+      <div class="zone-left"><span class="zone-icon">💡</span><div class="zone-title">Excluir Atividade</div></div>
+      <div class="zone-actions"><button type="button" class="icon-btn"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/></svg></button><button type="button" class="icon-btn caret">▾</button></div>
+    </header>
+    <div class="zone-body collapsed" id="act-excluir">
+      <form method="post" action="{{ url_for('equipamentos.act_delete') }}" class="grid grid-2">
+        <label class="field">
+          <span>Atividade *</span>
+          <select required name="id">
+            <option value="">-- selecione --</option>
+            {% for a in atividades %}
+              <option value="{{ a.id }}">{{ a.nome }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <div class="field align-end">
+          <button class="btn danger" type="submit" onclick="return confirm('Excluir atividade? Se houver parte diária usando, a exclusão será bloqueada.');">Excluir</button>
+        </div>
+      </form>
     </div>
   </section>
 
@@ -120,6 +225,7 @@
 </div>
 
 <script>
+  // Toggle das zonas
   document.querySelectorAll('.zone-head').forEach(h => {
     h.addEventListener('click', (e) => {
       if (e.target.closest('.icon-btn') && !e.target.closest('.caret')) return;
@@ -130,14 +236,5 @@
       if (caret) caret.textContent = (caret.textContent.trim() === '▴') ? '▾' : '▴';
     });
   });
-
-  function editarHoras(form){
-    const atual = form.valor.value || "0";
-    const novo = prompt("Horas trabalhadas:", atual);
-    if(novo === null) return;
-    if(!/^\d+(\.\d+)?$/.test(novo)){ alert("Informe número válido (ex.: 7.5)"); return; }
-    form.valor.value = novo;
-    form.submit();
-  }
 </script>
 {% endblock %}
