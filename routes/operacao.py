@@ -36,22 +36,28 @@ def _clean_nav(nav): return [n for n in nav if n]
 @bp.get("/producao")
 def producao():
     """Tela de acompanhamento de produção + parte diária (2 contêineres)."""
+    from datetime import date
+
     sel_eh = request.args.get("eh")      # id da entre_house
     sel_fr = request.args.get("fr")      # id da frente_equipe
     sel_dt = request.args.get("dt") or date.today().isoformat()
+    sel_dt_obj = date.fromisoformat(sel_dt)  # evita usar ::date no SQL
 
-    sel_maq = request.args.get("maq")    # para parte diária
+    sel_maq   = request.args.get("maq")   # para parte diária
     sel_dt_pd = request.args.get("dt_pd") or sel_dt
 
     with get_engine().connect() as conn:
-        # listas de seleção
+        # listas para selects
         eh_list = conn.execute(text("SELECT id, eh FROM entre_house ORDER BY eh")).mappings().all()
         fr_list = conn.execute(text("SELECT id, frente FROM frente_equipe ORDER BY frente")).mappings().all()
         maq_list = conn.execute(text("""
-            SELECT id, tag, descricao FROM maquina WHERE ativo IS TRUE ORDER BY tag
+            SELECT id, tag, descricao
+            FROM maquina
+            WHERE ativo IS TRUE
+            ORDER BY tag
         """)).mappings().all()
 
-        # -------------------- BLOCO 1: PRODUÇÃO (tabela + gráfico) --------------------
+        # ===================== BLOCO 1: PRODUÇÃO =====================
         prod_rows = []
         chart_prod = {"labels": [], "prev_dia": [], "real_dia": [], "prev_tot": [], "real_tot": []}
 
@@ -59,20 +65,23 @@ def producao():
             sql = text("""
                 WITH dias AS (
                     SELECT gs::date AS d
-                    FROM generate_series(date_trunc('month', :refdt::date)::date,
-                                         :refdt::date, interval '1 day') gs
+                    FROM generate_series(
+                        date_trunc('month', :refdt),
+                        :refdt,
+                        interval '1 day'
+                    ) gs
                 ),
                 pl AS (
-                    SELECT data::date, SUM(planejado) AS planejado
+                    SELECT data::date AS data, SUM(planejado) AS planejado
                     FROM producao_planejada
-                    WHERE eh_id=:eh AND frente_id=:fr
-                    GROUP BY data
+                    WHERE eh_id = :eh AND frente_id = :fr
+                    GROUP BY data::date
                 ),
                 rl AS (
-                    SELECT data::date, SUM(realizado) AS realizado
+                    SELECT data::date AS data, SUM(realizado) AS realizado
                     FROM producao_realizada
-                    WHERE eh_id=:eh AND frente_id=:fr
-                    GROUP BY data
+                    WHERE eh_id = :eh AND frente_id = :fr
+                    GROUP BY data::date
                 ),
                 base AS (
                     SELECT d.d AS data,
@@ -91,10 +100,9 @@ def producao():
                 FROM base
                 ORDER BY data
             """)
-            params = {"eh": sel_eh, "fr": sel_fr, "refdt": sel_dt}
+            params = {"eh": sel_eh, "fr": sel_fr, "refdt": sel_dt_obj}
             prod = conn.execute(sql, params).mappings().all()
 
-            # computa dif e atraso (dif/850)
             for r in prod:
                 dif = (r["realizado_total"] or 0) - (r["previsto_total"] or 0)
                 atraso = (dif / 850.0) if 850 else 0.0
@@ -107,18 +115,16 @@ def producao():
                     "dif": dif,
                     "atraso": atraso,
                 })
-                # dados do gráfico
                 chart_prod["labels"].append(r["data"].strftime("%d/%m"))
                 chart_prod["prev_dia"].append(float(r["previsto_dia"]))
                 chart_prod["real_dia"].append(float(r["realizado_dia"]))
                 chart_prod["prev_tot"].append(float(r["previsto_total"]))
                 chart_prod["real_tot"].append(float(r["realizado_total"]))
 
-        # -------------------- BLOCO 2: PARTE DIÁRIA (lista + gráfico) --------------------
+        # ===================== BLOCO 2: PARTE DIÁRIA =====================
         pd_lista = []
-        pd_graf  = {"labels": [], "horas": []}  # acumulado de horas por atividade (no dia)
+        pd_graf  = {"labels": [], "horas": []}
         if sel_maq and sel_dt_pd:
-            # lista do dia
             pd_sql = text("""
                 SELECT pd.id,
                        a.nome AS evento,
@@ -133,7 +139,6 @@ def producao():
             """)
             pd_lista = conn.execute(pd_sql, {"maq": sel_maq, "d": sel_dt_pd}).mappings().all()
 
-            # agrupado por atividade
             pd_agg = conn.execute(text("""
                 SELECT a.nome AS evento,
                        ROUND(EXTRACT(EPOCH FROM SUM(pd.hora_fim - pd.hora_inicio))/3600.0, 2) AS horas
@@ -157,7 +162,7 @@ def producao():
         sel_maq=sel_maq, sel_dt_pd=sel_dt_pd,
         prod_rows=prod_rows, chart_prod=chart_prod,
         pd_lista=pd_lista, pd_graf=pd_graf,
-        msg=request.args.get("msg")
+        msg=request.args.get("msg"),
     )
 
 @bp.get("/cadastro")
