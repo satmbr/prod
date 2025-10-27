@@ -12,49 +12,48 @@
         <div class="zone-title">Acompanhamento de Produção</div>
       </div>
       <div class="zone-actions">
-        <button type="button" class="icon-btn"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/></svg></button>
-        <button type="button" class="icon-btn caret">▴</button>
+        <button type="button" class="icon-btn">
+          <svg viewBox="0 0 24 24" width="16" height="16">
+            <path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/>
+          </svg>
+        </button>
+        <button type="button" class="icon-btn caret">▾</button>
       </div>
     </header>
 
-    <div class="zone-body" id="z-prod">
+    <!-- começa FECHADO -->
+    <div class="zone-body collapsed" id="z-prod">
       <form class="grid grid-5" method="get" action="{{ url_for('operacao.producao') }}">
         <label class="field">
           <span>Selecionar EH</span>
           <select name="eh" required>
             <option value="">-- selecione --</option>
             {% for e in eh_list %}
-              <option value="{{ e.id }}" {{ 'selected' if sel_eh and sel_eh|string == e.id|string else '' }}>
-                {{ e.eh }}
-              </option>
+              <option value="{{ e.id }}" {{ 'selected' if sel_eh and sel_eh|string == e.id|string else '' }}>{{ e.eh }}</option>
             {% endfor %}
           </select>
         </label>
-
         <label class="field">
           <span>Selecionar Frente</span>
           <select name="fr" required>
             <option value="">-- selecione --</option>
             {% for f in fr_list %}
-              <option value="{{ f.id }}" {{ 'selected' if sel_fr and sel_fr|string == f.id|string else '' }}>
-                {{ f.frente }}
-              </option>
+              <option value="{{ f.id }}" {{ 'selected' if sel_fr and sel_fr|string == f.id|string else '' }}>{{ f.frente }}</option>
             {% endfor %}
           </select>
         </label>
-
         <label class="field">
           <span>Selecionar Data</span>
           <input type="date" name="dt" value="{{ sel_dt }}">
         </label>
-
         <div class="field align-end">
           <button class="btn" type="submit">Aplicar</button>
         </div>
       </form>
 
-      <div class="grid grid-2" style="align-items:start; margin-top:12px">
-        <div>
+      <!-- 50% tabela / 50% gráfico -->
+      <div class="grid" style="display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:start; margin-top:12px">
+        <div style="min-width:0">
           <div style="overflow:auto">
             <table class="table">
               <thead>
@@ -89,9 +88,9 @@
           </div>
         </div>
 
-        <div>
+        <div style="min-width:0">
           <h3 style="text-align:center; font-weight:600; margin:0 0 6px 0">ACOMPANHAMENTO</h3>
-          <canvas id="chartProducao" height="140"></canvas>
+          <div style="height:360px"><canvas id="chartProducao"></canvas></div>
           <div style="display:flex; gap:24px; justify-content:center; margin-top:8px; font-weight:600; color:#666">
             <span>▮ PREVISTO DIA</span>
             <span>▮ REALIZADO DIA</span>
@@ -111,14 +110,19 @@
         <div class="zone-title">Parte Diária</div>
       </div>
       <div class="zone-actions">
-        <button type="button" class="icon-btn"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/></svg></button>
-        <button type="button" class="icon-btn caret">▴</button>
+        <button type="button" class="icon-btn">
+          <svg viewBox="0 0 24 24" width="16" height="16">
+            <path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/>
+          </svg>
+        </button>
+        <button type="button" class="icon-btn caret">▾</button>
       </div>
     </header>
 
-    <div class="zone-body" id="z-pd">
+    <!-- começa FECHADO -->
+    <div class="zone-body collapsed" id="z-pd">
       <form class="grid grid-4" method="get" action="{{ url_for('operacao.producao') }}">
-        {# preserva filtros do bloco 1 #}
+        <!-- preserva filtros do bloco 1 -->
         <input type="hidden" name="eh" value="{{ sel_eh or '' }}">
         <input type="hidden" name="fr" value="{{ sel_fr or '' }}">
         <input type="hidden" name="dt" value="{{ sel_dt or '' }}">
@@ -145,17 +149,18 @@
         </div>
       </form>
 
-      <div class="grid grid-2" style="align-items:start; margin-top:12px">
-        <div>
+      <!-- 50% tabela / 50% gráfico -->
+      <div class="grid" style="display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:start; margin-top:12px">
+        <div style="min-width:0">
           <div style="overflow:auto">
             <table class="table">
               <thead>
-              <tr>
-                <th>EVENTO</th>
-                <th>INÍCIO</th>
-                <th>FIM</th>
-                <th>DURAÇÃO (h)</th>
-              </tr>
+                <tr>
+                  <th>EVENTO</th>
+                  <th>INÍCIO</th>
+                  <th>FIM</th>
+                  <th>DURAÇÃO (h)</th>
+                </tr>
               </thead>
               <tbody>
               {% if pd_lista %}
@@ -175,9 +180,9 @@
           </div>
         </div>
 
-        <div>
+        <div style="min-width:0">
           <h3 style="text-align:center; font-weight:600; margin:0 0 6px 0">RESUMO PARTE DIÁRIA</h3>
-          <canvas id="chartPD" height="140"></canvas>
+          <div style="height:360px"><canvas id="chartPD"></canvas></div>
         </div>
       </div>
     </div>
@@ -191,7 +196,7 @@
 <!-- Charts -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
 <script>
-  // Minimizar/expandir
+  // Toggle containers
   document.querySelectorAll('.zone-head').forEach(h => {
     h.addEventListener('click', (e) => {
       if (e.target.closest('.icon-btn') && !e.target.closest('.caret')) return;
@@ -203,7 +208,7 @@
     });
   });
 
-  // --------- Chart Produção (barras: previsto/realizado dia; linhas: totais) ---------
+  // Chart Produção
   (function(){
     const labels = {{ chart_prod.labels|tojson|safe }};
     const prevDia = {{ chart_prod.prev_dia|tojson|safe }};
@@ -225,19 +230,15 @@
           ]
         },
         options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          scales: {
-            y: { beginAtZero: true, title: { display: true, text: 'Barras (Previsto / Realizado Dia)' } },
-            y1: { display: false }
-          },
+          responsive: true, maintainAspectRatio: false,
+          scales: { y: { beginAtZero: true } },
           plugins: { legend: { display: false } }
         }
       });
     }
   })();
 
-  // --------- Chart Parte Diária (barras por atividade no dia) ---------
+  // Chart Parte Diária
   (function(){
     const labels = {{ pd_graf.labels|tojson|safe }};
     const horas  = {{ pd_graf.horas|tojson|safe }};
