@@ -29,9 +29,136 @@ def _fetch_listas():
 def index():
     return render_template("operacao/index.html", subnav_links=_subnav(""))
 
+# remove itens None
+def _clean_nav(nav): return [n for n in nav if n]
+# ----------------------------------------------------------------
+
 @bp.get("/producao")
 def producao():
-    return render_template("operacao/producao.html", subnav_links=_subnav("producao"))
+    """Tela de acompanhamento de produção + parte diária (2 contêineres)."""
+    sel_eh = request.args.get("eh")      # id da entre_house
+    sel_fr = request.args.get("fr")      # id da frente_equipe
+    sel_dt = request.args.get("dt") or date.today().isoformat()
+
+    sel_maq = request.args.get("maq")    # para parte diária
+    sel_dt_pd = request.args.get("dt_pd") or sel_dt
+
+    with get_engine().connect() as conn:
+        # listas de seleção
+        eh_list = conn.execute(text("SELECT id, eh FROM entre_house ORDER BY eh")).mappings().all()
+        fr_list = conn.execute(text("SELECT id, frente FROM frente_equipe ORDER BY frente")).mappings().all()
+        maq_list = conn.execute(text("""
+            SELECT id, tag, descricao FROM maquina WHERE ativo IS TRUE ORDER BY tag
+        """)).mappings().all()
+
+        # -------------------- BLOCO 1: PRODUÇÃO (tabela + gráfico) --------------------
+        prod_rows = []
+        chart_prod = {"labels": [], "prev_dia": [], "real_dia": [], "prev_tot": [], "real_tot": []}
+
+        if sel_eh and sel_fr:
+            sql = text("""
+                WITH dias AS (
+                    SELECT gs::date AS d
+                    FROM generate_series(date_trunc('month', :refdt::date)::date,
+                                         :refdt::date, interval '1 day') gs
+                ),
+                pl AS (
+                    SELECT data::date, SUM(planejado) AS planejado
+                    FROM producao_planejada
+                    WHERE eh_id=:eh AND frente_id=:fr
+                    GROUP BY data
+                ),
+                rl AS (
+                    SELECT data::date, SUM(realizado) AS realizado
+                    FROM producao_realizada
+                    WHERE eh_id=:eh AND frente_id=:fr
+                    GROUP BY data
+                ),
+                base AS (
+                    SELECT d.d AS data,
+                           COALESCE(pl.planejado, 0) AS previsto_dia,
+                           COALESCE(rl.realizado, 0) AS realizado_dia
+                    FROM dias d
+                    LEFT JOIN pl ON pl.data = d.d
+                    LEFT JOIN rl ON rl.data = d.d
+                    ORDER BY d.d
+                )
+                SELECT data,
+                       previsto_dia,
+                       SUM(previsto_dia) OVER (ORDER BY data) AS previsto_total,
+                       realizado_dia,
+                       SUM(realizado_dia) OVER (ORDER BY data) AS realizado_total
+                FROM base
+                ORDER BY data
+            """)
+            params = {"eh": sel_eh, "fr": sel_fr, "refdt": sel_dt}
+            prod = conn.execute(sql, params).mappings().all()
+
+            # computa dif e atraso (dif/850)
+            for r in prod:
+                dif = (r["realizado_total"] or 0) - (r["previsto_total"] or 0)
+                atraso = (dif / 850.0) if 850 else 0.0
+                prod_rows.append({
+                    "data": r["data"],
+                    "previsto_dia": r["previsto_dia"],
+                    "previsto_total": r["previsto_total"],
+                    "realizado_dia": r["realizado_dia"],
+                    "realizado_total": r["realizado_total"],
+                    "dif": dif,
+                    "atraso": atraso,
+                })
+                # dados do gráfico
+                chart_prod["labels"].append(r["data"].strftime("%d/%m"))
+                chart_prod["prev_dia"].append(float(r["previsto_dia"]))
+                chart_prod["real_dia"].append(float(r["realizado_dia"]))
+                chart_prod["prev_tot"].append(float(r["previsto_total"]))
+                chart_prod["real_tot"].append(float(r["realizado_total"]))
+
+        # -------------------- BLOCO 2: PARTE DIÁRIA (lista + gráfico) --------------------
+        pd_lista = []
+        pd_graf  = {"labels": [], "horas": []}  # acumulado de horas por atividade (no dia)
+        if sel_maq and sel_dt_pd:
+            # lista do dia
+            pd_sql = text("""
+                SELECT pd.id,
+                       a.nome AS evento,
+                       to_char(pd.hora_inicio, 'HH24:MI') AS inicio,
+                       to_char(pd.hora_fim, 'HH24:MI')    AS fim,
+                       EXTRACT(EPOCH FROM (pd.hora_fim - pd.hora_inicio))/3600.0 AS horas
+                FROM parte_diaria pd
+                JOIN atividade a ON a.id = pd.atividade_id
+                WHERE pd.maquina_id = :maq
+                  AND pd.data = :d
+                ORDER BY pd.hora_inicio
+            """)
+            pd_lista = conn.execute(pd_sql, {"maq": sel_maq, "d": sel_dt_pd}).mappings().all()
+
+            # agrupado por atividade
+            pd_agg = conn.execute(text("""
+                SELECT a.nome AS evento,
+                       ROUND(EXTRACT(EPOCH FROM SUM(pd.hora_fim - pd.hora_inicio))/3600.0, 2) AS horas
+                FROM parte_diaria pd
+                JOIN atividade a ON a.id = pd.atividade_id
+                WHERE pd.maquina_id = :maq
+                  AND pd.data = :d
+                GROUP BY a.nome
+                ORDER BY horas DESC
+            """), {"maq": sel_maq, "d": sel_dt_pd}).mappings().all()
+
+            for r in pd_agg:
+                pd_graf["labels"].append(r["evento"])
+                pd_graf["horas"].append(float(r["horas"] or 0))
+
+    return render_template(
+        "operacao/producao.html",
+        subnav_links=_clean_nav(_subnav("producao")),
+        eh_list=eh_list, fr_list=fr_list, maq_list=maq_list,
+        sel_eh=sel_eh, sel_fr=sel_fr, sel_dt=sel_dt,
+        sel_maq=sel_maq, sel_dt_pd=sel_dt_pd,
+        prod_rows=prod_rows, chart_prod=chart_prod,
+        pd_lista=pd_lista, pd_graf=pd_graf,
+        msg=request.args.get("msg")
+    )
 
 @bp.get("/cadastro")
 def cadastro():

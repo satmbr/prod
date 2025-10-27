@@ -1,8 +1,259 @@
 {% extends "base.html" %}
 {% block title %}Operação · Produção{% endblock %}
+
 {% block content %}
-  <div style="padding:16px">
-    <h1>Produção</h1>
-    <p>Use os sublinks acima: Produção / Registro / Cadastro.</p>
-  </div>
+<div class="page-wrap">
+
+  <!-- ==================== CONTÊINER 1 · ACOMPANHAMENTO DE PRODUÇÃO ==================== -->
+  <section class="zone">
+    <header class="zone-head" data-target="#z-prod">
+      <div class="zone-left">
+        <span class="zone-icon">💡</span>
+        <div class="zone-title">Acompanhamento de Produção</div>
+      </div>
+      <div class="zone-actions">
+        <button type="button" class="icon-btn"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/></svg></button>
+        <button type="button" class="icon-btn caret">▴</button>
+      </div>
+    </header>
+
+    <div class="zone-body" id="z-prod">
+      <form class="grid grid-5" method="get" action="{{ url_for('operacao.producao') }}">
+        <label class="field">
+          <span>Selecionar EH</span>
+          <select name="eh" required>
+            <option value="">-- selecione --</option>
+            {% for e in eh_list %}
+              <option value="{{ e.id }}" {{ 'selected' if sel_eh and sel_eh|string == e.id|string else '' }}>
+                {{ e.eh }}
+              </option>
+            {% endfor %}
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Selecionar Frente</span>
+          <select name="fr" required>
+            <option value="">-- selecione --</option>
+            {% for f in fr_list %}
+              <option value="{{ f.id }}" {{ 'selected' if sel_fr and sel_fr|string == f.id|string else '' }}>
+                {{ f.frente }}
+              </option>
+            {% endfor %}
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Selecionar Data</span>
+          <input type="date" name="dt" value="{{ sel_dt }}">
+        </label>
+
+        <div class="field align-end">
+          <button class="btn" type="submit">Aplicar</button>
+        </div>
+      </form>
+
+      <div class="grid grid-2" style="align-items:start; margin-top:12px">
+        <div>
+          <div style="overflow:auto">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>DATA</th>
+                  <th>PREVISTO DIA</th>
+                  <th>PREVISTO TOTAL</th>
+                  <th>REALIZADO DIA</th>
+                  <th>REALIZADO TOTAL</th>
+                  <th>DIF.</th>
+                  <th>ATRASO</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% if prod_rows %}
+                  {% for r in prod_rows %}
+                    <tr>
+                      <td>{{ r.data.strftime('%d/%m/%Y') }}</td>
+                      <td class="num">{{ r.previsto_dia }}</td>
+                      <td class="num">{{ r.previsto_total }}</td>
+                      <td class="num">{{ r.realizado_dia }}</td>
+                      <td class="num">{{ r.realizado_total }}</td>
+                      <td class="num">{{ '%0.0f'|format(r.dif) }}</td>
+                      <td class="num">{{ '%.2f'|format(r.atraso) }}</td>
+                    </tr>
+                  {% endfor %}
+                {% else %}
+                  <tr><td colspan="7">Nenhum registro encontrado para esta seleção.</td></tr>
+                {% endif %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div>
+          <h3 style="text-align:center; font-weight:600; margin:0 0 6px 0">ACOMPANHAMENTO</h3>
+          <canvas id="chartProducao" height="140"></canvas>
+          <div style="display:flex; gap:24px; justify-content:center; margin-top:8px; font-weight:600; color:#666">
+            <span>▮ PREVISTO DIA</span>
+            <span>▮ REALIZADO DIA</span>
+            <span>▭ PREVISTO TOTAL</span>
+            <span>▭ REALIZADO TOTAL</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== CONTÊINER 2 · PARTE DIÁRIA ==================== -->
+  <section class="zone">
+    <header class="zone-head" data-target="#z-pd">
+      <div class="zone-left">
+        <span class="zone-icon">💡</span>
+        <div class="zone-title">Parte Diária</div>
+      </div>
+      <div class="zone-actions">
+        <button type="button" class="icon-btn"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/></svg></button>
+        <button type="button" class="icon-btn caret">▴</button>
+      </div>
+    </header>
+
+    <div class="zone-body" id="z-pd">
+      <form class="grid grid-4" method="get" action="{{ url_for('operacao.producao') }}">
+        {# preserva filtros do bloco 1 #}
+        <input type="hidden" name="eh" value="{{ sel_eh or '' }}">
+        <input type="hidden" name="fr" value="{{ sel_fr or '' }}">
+        <input type="hidden" name="dt" value="{{ sel_dt or '' }}">
+
+        <label class="field">
+          <span>Máquina</span>
+          <select name="maq" required>
+            <option value="">-- selecione --</option>
+            {% for m in maq_list %}
+              <option value="{{ m.id }}" {{ 'selected' if sel_maq and sel_maq|string == m.id|string else '' }}>
+                {{ m.tag }} — {{ m.descricao }}
+              </option>
+            {% endfor %}
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Data</span>
+          <input type="date" name="dt_pd" value="{{ sel_dt_pd }}">
+        </label>
+
+        <div class="field align-end">
+          <button class="btn" type="submit">Aplicar</button>
+        </div>
+      </form>
+
+      <div class="grid grid-2" style="align-items:start; margin-top:12px">
+        <div>
+          <div style="overflow:auto">
+            <table class="table">
+              <thead>
+              <tr>
+                <th>EVENTO</th>
+                <th>INÍCIO</th>
+                <th>FIM</th>
+                <th>DURAÇÃO (h)</th>
+              </tr>
+              </thead>
+              <tbody>
+              {% if pd_lista %}
+                {% for r in pd_lista %}
+                  <tr>
+                    <td>{{ r.evento }}</td>
+                    <td>{{ r.inicio }}</td>
+                    <td>{{ r.fim }}</td>
+                    <td class="num">{{ '%.2f'|format(r.horas or 0) }}</td>
+                  </tr>
+                {% endfor %}
+              {% else %}
+                <tr><td colspan="4">Nenhum registro para a máquina na data selecionada.</td></tr>
+              {% endif %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div>
+          <h3 style="text-align:center; font-weight:600; margin:0 0 6px 0">RESUMO PARTE DIÁRIA</h3>
+          <canvas id="chartPD" height="140"></canvas>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  {% if msg %}
+    <div class="alert">{{ msg }}</div>
+  {% endif %}
+</div>
+
+<!-- Charts -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
+<script>
+  // Minimizar/expandir
+  document.querySelectorAll('.zone-head').forEach(h => {
+    h.addEventListener('click', (e) => {
+      if (e.target.closest('.icon-btn') && !e.target.closest('.caret')) return;
+      const sel = h.getAttribute('data-target');
+      const body = document.querySelector(sel);
+      const caret = h.querySelector('.caret');
+      if (body) body.classList.toggle('collapsed');
+      if (caret) caret.textContent = (caret.textContent.trim() === '▴') ? '▾' : '▴';
+    });
+  });
+
+  // --------- Chart Produção (barras: previsto/realizado dia; linhas: totais) ---------
+  (function(){
+    const labels = {{ chart_prod.labels|tojson|safe }};
+    const prevDia = {{ chart_prod.prev_dia|tojson|safe }};
+    const realDia = {{ chart_prod.real_dia|tojson|safe }};
+    const prevTot = {{ chart_prod.prev_tot|tojson|safe }};
+    const realTot = {{ chart_prod.real_tot|tojson|safe }};
+
+    const ctx = document.getElementById('chartProducao');
+    if (ctx && labels.length){
+      new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [
+            { type: 'bar',  label: 'Previsto Dia',   data: prevDia },
+            { type: 'bar',  label: 'Realizado Dia',  data: realDia },
+            { type: 'line', label: 'Previsto Total', data: prevTot, tension: 0.3 },
+            { type: 'line', label: 'Realizado Total',data: realTot, tension: 0.3 },
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: { beginAtZero: true, title: { display: true, text: 'Barras (Previsto / Realizado Dia)' } },
+            y1: { display: false }
+          },
+          plugins: { legend: { display: false } }
+        }
+      });
+    }
+  })();
+
+  // --------- Chart Parte Diária (barras por atividade no dia) ---------
+  (function(){
+    const labels = {{ pd_graf.labels|tojson|safe }};
+    const horas  = {{ pd_graf.horas|tojson|safe }};
+
+    const ctx = document.getElementById('chartPD');
+    if (ctx && labels.length){
+      new Chart(ctx, {
+        type: 'bar',
+        data: { labels, datasets: [{ label: 'Horas', data: horas }] },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          scales: { y: { beginAtZero: true, title: { display:true, text:'Horas' } } },
+          plugins: { legend: { display: false } }
+        }
+      });
+    }
+  })();
+</script>
 {% endblock %}
