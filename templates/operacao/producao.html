@@ -25,7 +25,7 @@
     <div class="zone-body collapsed" id="z-prod">
       <form class="grid grid-5" method="get" action="{{ url_for('operacao.producao') }}">
         <label class="field">
-          <span>Selecionar EH</span>
+          <!--<span>Selecionar EH</span>-->
           <select name="eh" required>
             <option value="">-- selecione --</option>
             {% for e in eh_list %}
@@ -34,7 +34,7 @@
           </select>
         </label>
         <label class="field">
-          <span>Selecionar Frente</span>
+          <!--<span>Selecionar Frente</span>-->
           <select name="fr" required>
             <option value="">-- selecione --</option>
             {% for f in fr_list %}
@@ -43,11 +43,12 @@
           </select>
         </label>
         <label class="field">
-          <span>Selecionar Data</span>
+          <!--<span>Selecionar Data</span>-->
           <input type="date" name="dt" value="{{ sel_dt }}">
+		  <button class="btn" type="submit">Aplicar</button>
         </label>
         <div class="field align-end">
-          <button class="btn" type="submit">Aplicar</button>
+          <!--<button class="btn" type="submit">Aplicar</button>-->
         </div>
       </form>
 
