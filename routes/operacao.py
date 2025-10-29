@@ -15,6 +15,10 @@ def _subnav(active: str):
         {"text": "Cadastro",  "href": url_for("operacao.cadastro"),  "active": active == "cadastro"},
     ]
 
+# remove itens None
+def _clean_nav(nav):
+    return [n for n in nav if n]
+
 def _fetch_listas():
     """Carrega listas de EH e Frentes para selects."""
     with get_engine().connect() as conn:
@@ -23,21 +27,18 @@ def _fetch_listas():
     return eh, fr
 
 # ----------------------------
-# GETs básicos
+# GET raiz Operação
 # ----------------------------
 @bp.get("/")
 def index():
     return render_template("operacao/index.html", subnav_links=_subnav(""))
 
-# remove itens None
-def _clean_nav(nav): return [n for n in nav if n]
 # ----------------------------------------------------------------
-
+# PRODUÇÃO
+# ----------------------------------------------------------------
 @bp.get("/producao")
 def producao():
     """Tela de acompanhamento de produção + parte diária (2 contêineres)."""
-    from datetime import date
-
     sel_eh = request.args.get("eh")      # id da entre_house
     sel_fr = request.args.get("fr")      # id da frente_equipe
     sel_dt = request.args.get("dt") or date.today().isoformat()
@@ -50,10 +51,10 @@ def producao():
         # listas para selects
         eh_list = conn.execute(text("SELECT id, eh FROM entre_house ORDER BY eh")).mappings().all()
         fr_list = conn.execute(text("SELECT id, frente FROM frente_equipe ORDER BY frente")).mappings().all()
+        # Se sua tabela 'maquina' não tiver 'ativo', remova o WHERE
         maq_list = conn.execute(text("""
             SELECT id, tag, descricao
             FROM maquina
-            WHERE ativo IS TRUE
             ORDER BY tag
         """)).mappings().all()
 
@@ -165,6 +166,9 @@ def producao():
         msg=request.args.get("msg"),
     )
 
+# ----------------------------------------------------------------
+# CADASTRO (EH / FRENTE)
+# ----------------------------------------------------------------
 @bp.get("/cadastro")
 def cadastro():
     eh, fr = _fetch_listas()
@@ -176,9 +180,7 @@ def cadastro():
         msg=request.args.get("msg"),
     )
 
-# ----------------------------
-# CADASTRO · EH (POST)
-# ----------------------------
+# EH
 @bp.post("/cadastro/eh/create")
 def eh_create():
     eh = (request.form.get("eh") or "").strip()
@@ -217,9 +219,7 @@ def eh_delete():
     except Exception as e:
         return redirect(url_for("operacao.cadastro", msg=f"Erro ao excluir EH: {e}"))
 
-# ----------------------------
-# CADASTRO · FRENTE (POST)
-# ----------------------------
+# FRENTE
 @bp.post("/cadastro/frente/create")
 def frente_create():
     frente = (request.form.get("frente") or "").strip()
@@ -259,142 +259,124 @@ def frente_delete():
     except Exception as e:
         return redirect(url_for("operacao.cadastro", msg=f"Erro ao excluir Frente: {e}"))
 
-# ----------------------------
-# REGISTRO · GET com filtros
-# ----------------------------
+# ----------------------------------------------------------------
+# REGISTRO (Executado / Planejado) — NOVO FLUXO
+# ----------------------------------------------------------------
+
 @bp.get("/registro")
 def registro():
-    eh, fr = _fetch_listas()
-    # filtros
-    ini = request.args.get("ini")
-    fim = request.args.get("fim")
-    eh_id = request.args.get("eh_id")
-    frente_id = request.args.get("frente_id")
-    tipo = request.args.get("tipo")  # PLN / RLZ / None
-
-    params, where_pln, where_rlz = {}, [], []
-
-    if ini:
-        where_pln.append("p.data >= :ini"); where_rlz.append("r.data >= :ini"); params["ini"] = ini
-    if fim:
-        where_pln.append("p.data <= :fim"); where_rlz.append("r.data <= :fim"); params["fim"] = fim
-    if eh_id:
-        where_pln.append("p.eh_id = :eh_id"); where_rlz.append("r.eh_id = :eh_id"); params["eh_id"] = eh_id
-    if frente_id:
-        where_pln.append("p.frente_id = :frente_id"); where_rlz.append("r.frente_id = :frente_id"); params["frente_id"] = frente_id
-
-    sql_pln = f"""
-      SELECT p.id, p.data, 'PLN' AS tipo, e.eh, f.frente, p.planejado AS qtd
-      FROM producao_planejada p
-      JOIN entre_house e ON e.id=p.eh_id
-      JOIN frente_equipe f ON f.id=p.frente_id
-      { 'WHERE ' + ' AND '.join(where_pln) if where_pln else '' }
-    """
-    sql_rlz = f"""
-      SELECT r.id, r.data, 'RLZ' AS tipo, e.eh, f.frente, r.realizado AS qtd
-      FROM producao_realizada r
-      JOIN entre_house e ON e.id=r.eh_id
-      JOIN frente_equipe f ON f.id=r.frente_id
-      { 'WHERE ' + ' AND '.join(where_rlz) if where_rlz else '' }
-    """
-
-    if tipo == "PLN":
-        sql = sql_pln + " ORDER BY data DESC, eh, frente"
-    elif tipo == "RLZ":
-        sql = sql_rlz + " ORDER BY data DESC, eh, frente"
-    else:
-        sql = f"({sql_pln}) UNION ALL ({sql_rlz}) ORDER BY data DESC, eh, frente, tipo"
+    """Tela de Registro com dois segmentos (Executado e Planejado).
+       Ambos iniciam fechados; após salvar, mantemos o segmento aberto via ?open=..."""
+    keep_open = request.args.get("open")  # "realizada" | "planejada" | None
+    feh = request.args.get("feh")
+    ffr = request.args.get("ffr")
+    fdt = request.args.get("fdt")  # opcional filtro por dia (YYYY-MM-DD)
 
     with get_engine().connect() as conn:
-        resultados = conn.execute(text(sql), params).mappings().all()
+        eh_list = conn.execute(text("SELECT id, eh FROM entre_house ORDER BY eh")).mappings().all()
+        fr_list = conn.execute(text("SELECT id, frente FROM frente_equipe ORDER BY frente")).mappings().all()
+
+        # Listagens (últimos 30 ou filtrados)
+        params = {}
+        where = []
+        if feh:
+            where.append("eh_id = :feh")
+            params["feh"] = feh
+        if ffr:
+            where.append("frente_id = :ffr")
+            params["ffr"] = ffr
+        if fdt:
+            where.append("data = :fdt")
+            params["fdt"] = fdt
+
+        where_sql = ("WHERE " + " AND ".join(where)) if where else ""
+        limit_sql = "" if where else "LIMIT 30"
+
+        sql_rlz = text(f"""
+            SELECT id, data, eh_id, frente_id, realizado
+            FROM producao_realizada
+            {where_sql}
+            ORDER BY data DESC, id DESC
+            {limit_sql}
+        """)
+        sql_pln = text(f"""
+            SELECT id, data, eh_id, frente_id, planejado
+            FROM producao_planejada
+            {where_sql}
+            ORDER BY data DESC, id DESC
+            {limit_sql}
+        """)
+        lista_rlz = conn.execute(sql_rlz, params).mappings().all()
+        lista_pln = conn.execute(sql_pln, params).mappings().all()
 
     return render_template(
         "operacao/registro.html",
-        subnav_links=_subnav("registro"),
-        lista_eh=eh, lista_frente=fr,
-        resultados=resultados,
-        filtros={"ini":ini,"fim":fim,"eh_id":eh_id,"frente_id":frente_id,"tipo":tipo},
-        today=date.today().isoformat(),
-        msg=request.args.get("msg"),
+        subnav_links=_clean_nav(_subnav("registro")),
+        eh_list=eh_list, fr_list=fr_list,
+        lista_rlz=lista_rlz, lista_pln=lista_pln,
+        feh=feh, ffr=ffr, fdt=fdt,
+        keep_open=keep_open,  # para manter container aberto após salvar
+        msg=request.args.get("msg")
     )
 
-# ----------------------------
-# REGISTRO · Planejada/Realizada (UPSERT)
-# ----------------------------
-@bp.post("/registro/planejada/create")
-def reg_pln_create():
-    data_ = request.form.get("data")
-    eh_id = request.form.get("eh_id")
-    frente_id = request.form.get("frente_id")
-    planejado = request.form.get("planejado")
-    if not (data_ and eh_id and frente_id and planejado):
-        return redirect(url_for("operacao.registro", msg="Preencha todos os campos (Planejada)."))
-    try:
-        with get_engine().begin() as conn:
-            conn.execute(text("""
-                INSERT INTO producao_planejada (data, planejado, eh_id, frente_id)
-                VALUES (:data, :qtd, :eh, :fr)
-                ON CONFLICT (data, eh_id, frente_id) DO UPDATE
-                SET planejado = EXCLUDED.planejado
-            """), {"data": data_, "qtd": int(planejado), "eh": eh_id, "fr": frente_id})
-        return redirect(url_for("operacao.registro", msg="Planejada salva."))
-    except Exception as e:
-        return redirect(url_for("operacao.registro", msg=f"Erro Planejada: {e}"))
 
-@bp.post("/registro/realizada/create")
-def reg_rlz_create():
-    data_ = request.form.get("data")
-    eh_id = request.form.get("eh_id")
-    frente_id = request.form.get("frente_id")
-    realizado = request.form.get("realizado")
-    if not (data_ and eh_id and frente_id and realizado):
-        return redirect(url_for("operacao.registro", msg="Preencha todos os campos (Realizada)."))
-    try:
-        with get_engine().begin() as conn:
-            conn.execute(text("""
-                INSERT INTO producao_realizada (data, realizado, eh_id, frente_id)
-                VALUES (:data, :qtd, :eh, :fr)
-                ON CONFLICT (data, eh_id, frente_id) DO UPDATE
-                SET realizado = EXCLUDED.realizado
-            """), {"data": data_, "qtd": int(realizado), "eh": eh_id, "fr": frente_id})
-        return redirect(url_for("operacao.registro", msg="Realizada salva."))
-    except Exception as e:
-        return redirect(url_for("operacao.registro", msg=f"Erro Realizada: {e}"))
+@bp.post("/registro/realizada")
+def registro_realizada_create():
+    """Salvar Executado (Realizada) — upsert por (data, eh, frente). Mantém aberto após salvar."""
+    form = request.form
+    eh_id = form.get("eh_id")
+    fr_id = form.get("frente_id")
+    data_ = form.get("data")
+    valor = form.get("realizado")
 
-# ----------------------------
-# REGISTRO · Editar/Excluir itens da lista
-# ----------------------------
-@bp.post("/registro/item/update")
-def reg_item_update():
-    tipo = request.form.get("tipo")  # PLN ou RLZ
-    id_ = request.form.get("id")
-    valor = request.form.get("valor")
-    if not (tipo and id_ and valor and valor.isdigit()):
-        return redirect(url_for("operacao.registro", msg="Dados inválidos no editar."))
-    try:
-        with get_engine().begin() as conn:
-            if tipo == "PLN":
-                conn.execute(text("UPDATE producao_planejada SET planejado=:v WHERE id=:id"),
-                             {"v": int(valor), "id": id_})
-            else:
-                conn.execute(text("UPDATE producao_realizada SET realizado=:v WHERE id=:id"),
-                             {"v": int(valor), "id": id_})
-        return redirect(url_for("operacao.registro", msg="Registro atualizado."))
-    except Exception as e:
-        return redirect(url_for("operacao.registro", msg=f"Erro ao atualizar: {e}"))
+    if not (eh_id and fr_id and data_ and valor):
+        return redirect(url_for("operacao.registro", open="realizada", msg="Preencha todos os campos!"))
 
-@bp.post("/registro/item/delete")
-def reg_item_delete():
-    tipo = request.form.get("tipo")  # PLN ou RLZ
-    id_ = request.form.get("id")
-    if not (tipo and id_):
-        return redirect(url_for("operacao.registro", msg="Dados inválidos no excluir."))
-    try:
-        with get_engine().begin() as conn:
-            if tipo == "PLN":
-                conn.execute(text("DELETE FROM producao_planejada WHERE id=:id"), {"id": id_})
-            else:
-                conn.execute(text("DELETE FROM producao_realizada WHERE id=:id"), {"id": id_})
-        return redirect(url_for("operacao.registro", msg="Registro excluído."))
-    except Exception as e:
-        return redirect(url_for("operacao.registro", msg=f"Erro ao excluir: {e}"))
+    with get_engine().begin() as conn:
+        conn.execute(text("""
+            INSERT INTO producao_realizada (data, realizado, eh_id, frente_id)
+            VALUES (:data, :valor, :eh, :fr)
+            ON CONFLICT (data, eh_id, frente_id)
+            DO UPDATE SET realizado = EXCLUDED.realizado
+        """), {"data": data_, "valor": int(valor), "eh": eh_id, "fr": fr_id})
+
+    return redirect(url_for("operacao.registro", open="realizada", feh=eh_id, ffr=fr_id, fdt=data_, msg="Registro salvo!"))
+
+
+@bp.post("/registro/planejada")
+def registro_planejada_create():
+    """Salvar Planejado — upsert por (data, eh, frente). Mantém aberto após salvar."""
+    form = request.form
+    eh_id = form.get("eh_id")
+    fr_id = form.get("frente_id")
+    data_ = form.get("data")
+    valor = form.get("planejado")
+
+    if not (eh_id and fr_id and data_ and valor):
+        return redirect(url_for("operacao.registro", open="planejada", msg="Preencha todos os campos!"))
+
+    with get_engine().begin() as conn:
+        conn.execute(text("""
+            INSERT INTO producao_planejada (data, planejado, eh_id, frente_id)
+            VALUES (:data, :valor, :eh, :fr)
+            ON CONFLICT (data, eh_id, frente_id)
+            DO UPDATE SET planejado = EXCLUDED.planejado
+        """), {"data": data_, "valor": int(valor), "eh": eh_id, "fr": fr_id})
+
+    return redirect(url_for("operacao.registro", open="planejada", feh=eh_id, ffr=fr_id, fdt=data_, msg="Registro salvo!"))
+
+
+@bp.post("/registro/realizada/delete")
+def registro_realizada_delete():
+    rid = request.form.get("id")
+    with get_engine().begin() as conn:
+        conn.execute(text("DELETE FROM producao_realizada WHERE id=:id"), {"id": rid})
+    return redirect(url_for("operacao.registro", open="realizada", msg="Registro executado excluído."))
+
+
+@bp.post("/registro/planejada/delete")
+def registro_planejada_delete():
+    pid = request.form.get("id")
+    with get_engine().begin() as conn:
+        conn.execute(text("DELETE FROM producao_planejada WHERE id=:id"), {"id": pid})
+    return redirect(url_for("operacao.registro", open="planejada", msg="Registro planejado excluído."))
