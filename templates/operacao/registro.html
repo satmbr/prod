@@ -228,8 +228,8 @@
               {% for r in lista_pln %}
               <tr>
                 <td>{{ r.data.strftime('%d/%m/%Y') }}</td>
-                <td>{{ r.eh_id }}</td>
-                <td>{{ r.frente_id }}</td>
+                <td>{{ r.eh_nome }}</td>
+                <td>{{ r.frente_nome }}</td>
                 <td class="num">{{ r.planejado }}</td>
                 <td>
                   <form method="post" action="{{ url_for('operacao.registro_planejada_delete') }}" onsubmit="return confirm('Excluir registro planejado?')">

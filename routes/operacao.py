@@ -308,7 +308,7 @@ def registro():
                 r.frente_id,
                 e.eh       AS eh_nome,
                 f.frente   AS frente_nome,
-                r.realizado AS qtd
+                r.realizado AS realizado
             FROM producao_realizada r
             JOIN entre_house   e ON e.id = r.eh_id
             JOIN frente_equipe f ON f.id = r.frente_id
@@ -326,7 +326,7 @@ def registro():
                 p.frente_id,
                 e.eh       AS eh_nome,
                 f.frente   AS frente_nome,
-                p.planejado AS qtd
+                p.planejado AS planejado
             FROM producao_planejada p
             JOIN entre_house   e ON e.id = p.eh_id
             JOIN frente_equipe f ON f.id = p.frente_id
