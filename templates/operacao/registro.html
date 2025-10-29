@@ -106,8 +106,8 @@
               {% for r in lista_rlz %}
               <tr>
                 <td>{{ r.data.strftime('%d/%m/%Y') }}</td>
-                <td>{{ r.eh_id }}</td>
-                <td>{{ r.frente_id }}</td>
+                <td>{{ r.eh_nome }}</td>
+                <td>{{ r.frente_nome }}</td>
                 <td class="num">{{ r.realizado }}</td>
                 <td>
                   <form method="post" action="{{ url_for('operacao.registro_realizada_delete') }}" onsubmit="return confirm('Excluir registro executado?')">
