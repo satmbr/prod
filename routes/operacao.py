@@ -134,22 +134,30 @@ def producao():
             prod = conn.execute(sql_acomp, {"eh": sel_eh, "fr": sel_fr, "refdt": refdt}).mappings().all()
 
             for r in prod:
-                dif = (r["realizado_total"] or 0) - (r["previsto_total"] or 0)
-                atraso = (dif / 850.0) if 850 else 0.0
+                prev_tot = float(r["previsto_total"] or 0)
+                real_tot = float(r["realizado_total"] or 0)
+                prev_dia = float(r["previsto_dia"] or 0)
+                real_dia = float(r["realizado_dia"] or 0)
+
+                dif = real_tot - prev_tot
+                atraso = dif / 850.0  # agora tudo float
+
                 acomp_rows.append({
                     "data": r["data"],
-                    "previsto_dia": r["previsto_dia"],
-                    "previsto_total": r["previsto_total"],
-                    "realizado_dia": r["realizado_dia"],
-                    "realizado_total": r["realizado_total"],
+                    "previsto_dia": prev_dia,
+                    "previsto_total": prev_tot,
+                    "realizado_dia": real_dia,
+                    "realizado_total": real_tot,
                     "dif": dif,
                     "atraso": atraso,
                 })
+
                 acomp_chart["labels"].append(r["data"].strftime("%d/%m"))
-                acomp_chart["prev_dia"].append(float(r["previsto_dia"]))
-                acomp_chart["real_dia"].append(float(r["realizado_dia"]))
-                acomp_chart["prev_tot"].append(float(r["previsto_total"]))
-                acomp_chart["real_tot"].append(float(r["realizado_total"]))
+                acomp_chart["prev_dia"].append(prev_dia)
+                acomp_chart["real_dia"].append(real_dia)
+                acomp_chart["prev_tot"].append(prev_tot)
+                acomp_chart["real_tot"].append(real_tot)
+
 
         # ============================================================
         # 2) PARTE DIÁRIA — lista do dia + gráfico de horas por evento (50/50)
