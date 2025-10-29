@@ -270,42 +270,71 @@ def registro():
     keep_open = request.args.get("open")  # "realizada" | "planejada" | None
     feh = request.args.get("feh")
     ffr = request.args.get("ffr")
-    fdt = request.args.get("fdt")  # opcional filtro por dia (YYYY-MM-DD)
+    fdt = request.args.get("fdt")  # filtro opcional por dia (YYYY-MM-DD)
 
     with get_engine().connect() as conn:
         eh_list = conn.execute(text("SELECT id, eh FROM entre_house ORDER BY eh")).mappings().all()
         fr_list = conn.execute(text("SELECT id, frente FROM frente_equipe ORDER BY frente")).mappings().all()
 
-        # Listagens (últimos 30 ou filtrados)
+        # Filtros (constroem cláusulas diferentes para cada alias)
         params = {}
-        where = []
+        where_rlz, where_pln = [], []
+
         if feh:
-            where.append("eh_id = :feh")
+            where_rlz.append("r.eh_id = :feh")
+            where_pln.append("p.eh_id = :feh")
             params["feh"] = feh
+
         if ffr:
-            where.append("frente_id = :ffr")
+            where_rlz.append("r.frente_id = :ffr")
+            where_pln.append("p.frente_id = :ffr")
             params["ffr"] = ffr
+
         if fdt:
-            where.append("data = :fdt")
+            where_rlz.append("r.data = :fdt")
+            where_pln.append("p.data = :fdt")
             params["fdt"] = fdt
 
-        where_sql = ("WHERE " + " AND ".join(where)) if where else ""
-        limit_sql = "" if where else "LIMIT 30"
+        where_sql_rlz = ("WHERE " + " AND ".join(where_rlz)) if where_rlz else ""
+        where_sql_pln = ("WHERE " + " AND ".join(where_pln)) if where_pln else ""
+        limit_sql = "" if (feh or ffr or fdt) else "LIMIT 30"
 
+        # Executado (Realizada) com nomes
         sql_rlz = text(f"""
-            SELECT id, data, eh_id, frente_id, realizado
-            FROM producao_realizada
-            {where_sql}
-            ORDER BY data DESC, id DESC
+            SELECT
+                r.id,
+                r.data,
+                r.eh_id,
+                r.frente_id,
+                e.eh       AS eh_nome,
+                f.frente   AS frente_nome,
+                r.realizado AS qtd
+            FROM producao_realizada r
+            JOIN entre_house   e ON e.id = r.eh_id
+            JOIN frente_equipe f ON f.id = r.frente_id
+            {where_sql_rlz}
+            ORDER BY r.data DESC, e.eh, f.frente, r.id DESC
             {limit_sql}
         """)
+
+        # Planejado com nomes
         sql_pln = text(f"""
-            SELECT id, data, eh_id, frente_id, planejado
-            FROM producao_planejada
-            {where_sql}
-            ORDER BY data DESC, id DESC
+            SELECT
+                p.id,
+                p.data,
+                p.eh_id,
+                p.frente_id,
+                e.eh       AS eh_nome,
+                f.frente   AS frente_nome,
+                p.planejado AS qtd
+            FROM producao_planejada p
+            JOIN entre_house   e ON e.id = p.eh_id
+            JOIN frente_equipe f ON f.id = p.frente_id
+            {where_sql_pln}
+            ORDER BY p.data DESC, e.eh, f.frente, p.id DESC
             {limit_sql}
         """)
+
         lista_rlz = conn.execute(sql_rlz, params).mappings().all()
         lista_pln = conn.execute(sql_pln, params).mappings().all()
 
@@ -315,7 +344,7 @@ def registro():
         eh_list=eh_list, fr_list=fr_list,
         lista_rlz=lista_rlz, lista_pln=lista_pln,
         feh=feh, ffr=ffr, fdt=fdt,
-        keep_open=keep_open,  # para manter container aberto após salvar
+        keep_open=keep_open,  # mantém container aberto após salvar
         msg=request.args.get("msg")
     )
 
