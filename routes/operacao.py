@@ -319,10 +319,8 @@ def registro():
         msg=request.args.get("msg")
     )
 
-
 @bp.post("/registro/realizada")
 def registro_realizada_create():
-    """Salvar Executado (Realizada) — upsert por (data, eh, frente). Mantém aberto após salvar."""
     form = request.form
     eh_id = form.get("eh_id")
     fr_id = form.get("frente_id")
@@ -340,12 +338,11 @@ def registro_realizada_create():
             DO UPDATE SET realizado = EXCLUDED.realizado
         """), {"data": data_, "valor": int(valor), "eh": eh_id, "fr": fr_id})
 
-    return redirect(url_for("operacao.registro", open="realizada", feh=eh_id, ffr=fr_id, fdt=data_, msg="Registro salvo!"))
-
+    # 👉 sem filtros na URL
+    return redirect(url_for("operacao.registro", open="realizada", msg="Registro salvo!"))
 
 @bp.post("/registro/planejada")
 def registro_planejada_create():
-    """Salvar Planejado — upsert por (data, eh, frente). Mantém aberto após salvar."""
     form = request.form
     eh_id = form.get("eh_id")
     fr_id = form.get("frente_id")
@@ -363,8 +360,8 @@ def registro_planejada_create():
             DO UPDATE SET planejado = EXCLUDED.planejado
         """), {"data": data_, "valor": int(valor), "eh": eh_id, "fr": fr_id})
 
-    return redirect(url_for("operacao.registro", open="planejada", feh=eh_id, ffr=fr_id, fdt=data_, msg="Registro salvo!"))
-
+    # 👉 sem filtros na URL
+    return redirect(url_for("operacao.registro", open="planejada", msg="Registro salvo!"))
 
 @bp.post("/registro/realizada/delete")
 def registro_realizada_delete():
@@ -372,7 +369,6 @@ def registro_realizada_delete():
     with get_engine().begin() as conn:
         conn.execute(text("DELETE FROM producao_realizada WHERE id=:id"), {"id": rid})
     return redirect(url_for("operacao.registro", open="realizada", msg="Registro executado excluído."))
-
 
 @bp.post("/registro/planejada/delete")
 def registro_planejada_delete():
