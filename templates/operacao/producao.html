@@ -2,260 +2,308 @@
 {% block title %}Operação · Produção{% endblock %}
 
 {% block content %}
-<div class="page-wrap">
 
-  <!-- ==================== CONTÊINER 1 · ACOMPANHAMENTO DE PRODUÇÃO ==================== -->
-  <section class="zone">
-    <header class="zone-head" data-target="#z-prod">
-      <div class="zone-left">
-        <span class="zone-icon">💡</span>
-        <div class="zone-title">Acompanhamento de Produção</div>
+<h2 class="titulo-secao">Operação · Produção</h2>
+
+<!-- util: classe para colapsar -->
+<style>
+  details.card { margin-bottom: 16px; border:1px solid #ddd; border-radius:10px; background:#fff; }
+  details.card > summary {
+    cursor: pointer; padding: 12px 16px; font-weight: 600;
+    color:#501E0A; list-style:none; border-bottom:1px solid #eee; user-select:none;
+  }
+  details.card[open] > summary { border-bottom:1px solid #eee; }
+  .card-body { padding: 12px 16px 16px 16px; }
+  .grid-2 { display:grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid-3 { display:grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .toolbar { display:flex; gap:8px; align-items:end; flex-wrap:wrap; margin-bottom:8px; }
+  .toolbar label { font-size:.85rem; color:#333; }
+  .toolbar input, .toolbar select { padding:6px 8px; }
+  .table { width:100%; border-collapse: collapse; }
+  .table th, .table td { border-bottom:1px solid #eee; padding:8px; text-align:left; }
+  .muted { color:#666; }
+  .right { text-align:right; }
+  .chip { font-size:.8rem; padding:2px 8px; border-radius:999px; background:#FCD917; color:#501E0A; }
+  .btn { background:#501E0A; color:#fff; border:none; padding:8px 12px; border-radius:8px; cursor:pointer; }
+  .btn:disabled { opacity:.5; cursor:not-allowed; }
+  .btn-outline { background:#fff; border:1px solid #501E0A; color:#501E0A; }
+  canvas { width:100%; height:360px; }
+</style>
+
+<!-- ===================================================== -->
+<!-- 1) ACOMPANHAMENTO (fechado por padrão)                 -->
+<!-- ===================================================== -->
+<details class="card" {% if open_acomp %}open{% endif %}>
+  <summary>📊 Acompanhamento <span class="chip">Diário + Acumulado</span></summary>
+  <div class="card-body">
+
+    <form class="toolbar" method="get" action="{{ url_for('operacao.producao') }}">
+      <input type="hidden" name="open_acomp" value="1">
+      <label>
+        EH
+        <select name="eh" required>
+          <option value="">– selecione –</option>
+          {% for e in eh_list %}
+            <option value="{{ e.id }}" {% if sel_eh and sel_eh|int == e.id %}selected{% endif %}>{{ e.eh }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>
+        Frente
+        <select name="fr" required>
+          <option value="">– selecione –</option>
+          {% for f in fr_list %}
+            <option value="{{ f.id }}" {% if sel_fr and sel_fr|int == f.id %}selected{% endif %}>{{ f.frente }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>
+        Data de referência
+        <input type="date" name="dt" value="{{ sel_dt or '' }}">
+      </label>
+
+      <!-- preservar aberturas dos outros painéis se estavam abertos -->
+      {% if open_pd %}<input type="hidden" name="open_pd" value="1">{% endif %}
+      {% if open_frentes %}<input type="hidden" name="open_frentes" value="1">{% endif %}
+
+      <button class="btn" type="submit">Aplicar</button>
+      <a class="btn btn-outline" href="{{ url_for('operacao.producao', open_acomp=1) }}">Limpar</a>
+    </form>
+
+    <div class="grid-2">
+      <!-- TABELA 50% -->
+      <div>
+        {% if acomp_rows and acomp_rows|length %}
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th class="right">Prev. Dia</th>
+                <th class="right">Prev. Total</th>
+                <th class="right">Real. Dia</th>
+                <th class="right">Real. Total</th>
+                <th class="right">Dif.</th>
+                <th class="right">Atraso (dias)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in acomp_rows %}
+              <tr>
+                <td>{{ r.data.strftime('%d/%m/%Y') }}</td>
+                <td class="right">{{ r.previsto_dia }}</td>
+                <td class="right">{{ r.previsto_total }}</td>
+                <td class="right">{{ r.realizado_dia }}</td>
+                <td class="right">{{ r.realizado_total }}</td>
+                <td class="right">{{ r.dif }}</td>
+                <td class="right">{{ '%.2f'|format(r.atraso) }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        {% else %}
+          <p class="muted">Selecione EH, Frente e Data e clique em <strong>Aplicar</strong>.</p>
+        {% endif %}
       </div>
-      <div class="zone-actions">
-        <button type="button" class="icon-btn">
-          <svg viewBox="0 0 24 24" width="16" height="16">
-            <path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/>
-          </svg>
-        </button>
-        <button type="button" class="icon-btn caret">▾</button>
-      </div>
-    </header>
 
-    <!-- começa FECHADO -->
-    <div class="zone-body collapsed" id="z-prod">
-      <form class="grid grid-5" method="get" action="{{ url_for('operacao.producao') }}">
-        <label class="field">
-          <!--<span>Selecionar EH</span>-->
-          <select name="eh" required>
-            <option value="">-- selecione --</option>
-            {% for e in eh_list %}
-              <option value="{{ e.id }}" {{ 'selected' if sel_eh and sel_eh|string == e.id|string else '' }}>{{ e.eh }}</option>
-            {% endfor %}
-          </select>
-        </label>
-        <label class="field">
-          <!--<span>Selecionar Frente</span>-->
-          <select name="fr" required>
-            <option value="">-- selecione --</option>
-            {% for f in fr_list %}
-              <option value="{{ f.id }}" {{ 'selected' if sel_fr and sel_fr|string == f.id|string else '' }}>{{ f.frente }}</option>
-            {% endfor %}
-          </select>
-        </label>
-        <label class="field">
-          <!--<span>Selecionar Data</span>-->
-          <input type="date" name="dt" value="{{ sel_dt }}">
-		  <button class="btn" type="submit">Aplicar</button>
-        </label>
-        <div class="field align-end">
-          <!--<button class="btn" type="submit">Aplicar</button>-->
-        </div>
-      </form>
-
-      <!-- 50% tabela / 50% gráfico -->
-      <div class="grid" style="display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:start; margin-top:12px">
-        <div style="min-width:0">
-          <div style="overflow:auto">
-            <table class="table">
-              <thead>
-                <tr>
-                  <th>DATA</th>
-                  <th>PREVISTO DIA</th>
-                  <th>PREVISTO TOTAL</th>
-                  <th>REALIZADO DIA</th>
-                  <th>REALIZADO TOTAL</th>
-                  <th>DIF.</th>
-                  <th>ATRASO</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% if prod_rows %}
-                  {% for r in prod_rows %}
-                    <tr>
-                      <td>{{ r.data.strftime('%d/%m/%Y') }}</td>
-                      <td class="num">{{ r.previsto_dia }}</td>
-                      <td class="num">{{ r.previsto_total }}</td>
-                      <td class="num">{{ r.realizado_dia }}</td>
-                      <td class="num">{{ r.realizado_total }}</td>
-                      <td class="num">{{ '%0.0f'|format(r.dif) }}</td>
-                      <td class="num">{{ '%.2f'|format(r.atraso) }}</td>
-                    </tr>
-                  {% endfor %}
-                {% else %}
-                  <tr><td colspan="7">Nenhum registro encontrado para esta seleção.</td></tr>
-                {% endif %}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div style="min-width:0">
-          <h3 style="text-align:center; font-weight:600; margin:0 0 6px 0">ACOMPANHAMENTO</h3>
-          <div style="height:360px"><canvas id="chartProducao"></canvas></div>
-          <div style="display:flex; gap:24px; justify-content:center; margin-top:8px; font-weight:600; color:#666">
-            <span>▮ PREVISTO DIA</span>
-            <span>▮ REALIZADO DIA</span>
-            <span>▭ PREVISTO TOTAL</span>
-            <span>▭ REALIZADO TOTAL</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ==================== CONTÊINER 2 · PARTE DIÁRIA ==================== -->
-  <section class="zone">
-    <header class="zone-head" data-target="#z-pd">
-      <div class="zone-left">
-        <span class="zone-icon">💡</span>
-        <div class="zone-title">Parte Diária</div>
-      </div>
-      <div class="zone-actions">
-        <button type="button" class="icon-btn">
-          <svg viewBox="0 0 24 24" width="16" height="16">
-            <path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/>
-          </svg>
-        </button>
-        <button type="button" class="icon-btn caret">▾</button>
-      </div>
-    </header>
-
-    <!-- começa FECHADO -->
-    <div class="zone-body collapsed" id="z-pd">
-      <form class="grid grid-4" method="get" action="{{ url_for('operacao.producao') }}">
-        <!-- preserva filtros do bloco 1 -->
-        <input type="hidden" name="eh" value="{{ sel_eh or '' }}">
-        <input type="hidden" name="fr" value="{{ sel_fr or '' }}">
-        <input type="hidden" name="dt" value="{{ sel_dt or '' }}">
-
-        <label class="field">
-          <span>Máquina</span>
-          <select name="maq" required>
-            <option value="">-- selecione --</option>
-            {% for m in maq_list %}
-              <option value="{{ m.id }}" {{ 'selected' if sel_maq and sel_maq|string == m.id|string else '' }}>
-                {{ m.tag }} — {{ m.descricao }}
-              </option>
-            {% endfor %}
-          </select>
-        </label>
-
-        <label class="field">
-          <span>Data</span>
-          <input type="date" name="dt_pd" value="{{ sel_dt_pd }}">
-        </label>
-
-        <div class="field align-end">
-          <button class="btn" type="submit">Aplicar</button>
-        </div>
-      </form>
-
-      <!-- 50% tabela / 50% gráfico -->
-      <div class="grid" style="display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:start; margin-top:12px">
-        <div style="min-width:0">
-          <div style="overflow:auto">
-            <table class="table">
-              <thead>
-                <tr>
-                  <th>EVENTO</th>
-                  <th>INÍCIO</th>
-                  <th>FIM</th>
-                  <th>DURAÇÃO (h)</th>
-                </tr>
-              </thead>
-              <tbody>
-              {% if pd_lista %}
-                {% for r in pd_lista %}
-                  <tr>
-                    <td>{{ r.evento }}</td>
-                    <td>{{ r.inicio }}</td>
-                    <td>{{ r.fim }}</td>
-                    <td class="num">{{ '%.2f'|format(r.horas or 0) }}</td>
-                  </tr>
-                {% endfor %}
-              {% else %}
-                <tr><td colspan="4">Nenhum registro para a máquina na data selecionada.</td></tr>
-              {% endif %}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div style="min-width:0">
-          <h3 style="text-align:center; font-weight:600; margin:0 0 6px 0">RESUMO PARTE DIÁRIA</h3>
-          <div style="height:360px"><canvas id="chartPD"></canvas></div>
-        </div>
+      <!-- GRÁFICO 50% -->
+      <div>
+        <canvas id="acompChart"></canvas>
       </div>
     </div>
-  </section>
 
-  {% if msg %}
-    <div class="alert">{{ msg }}</div>
-  {% endif %}
-</div>
+  </div>
+</details>
 
-<!-- Charts -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
+<!-- ===================================================== -->
+<!-- 2) PARTE DIÁRIA (fechado por padrão)                   -->
+<!-- ===================================================== -->
+<details class="card" {% if open_pd %}open{% endif %}>
+  <summary>🧰 Parte Diária <span class="chip">Eventos do dia</span></summary>
+  <div class="card-body">
+
+    <form class="toolbar" method="get" action="{{ url_for('operacao.producao') }}">
+      <input type="hidden" name="open_pd" value="1">
+      <label>
+        Máquina
+        <select name="maq" required>
+          <option value="">– selecione –</option>
+          {% for m in maq_list %}
+            <option value="{{ m.id }}" {% if sel_maq and sel_maq|int == m.id %}selected{% endif %}>{{ m.tag }} — {{ m.descricao }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>
+        Data
+        <input type="date" name="dt_pd" value="{{ sel_dt_pd or '' }}">
+      </label>
+
+      <!-- preservar aberturas dos outros painéis se estavam abertos -->
+      {% if open_acomp %}<input type="hidden" name="open_acomp" value="1">{% endif %}
+      {% if open_frentes %}<input type="hidden" name="open_frentes" value="1">{% endif %}
+
+      <button class="btn" type="submit">Aplicar</button>
+      <a class="btn btn-outline" href="{{ url_for('operacao.producao', open_pd=1) }}">Limpar</a>
+    </form>
+
+    <div class="grid-2">
+      <!-- TABELA 50% -->
+      <div>
+        {% if pd_lista and pd_lista|length %}
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Evento</th>
+                <th>Início</th>
+                <th>Fim</th>
+                <th class="right">Horas</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in pd_lista %}
+              <tr>
+                <td>{{ r.evento }}</td>
+                <td>{{ r.inicio }}</td>
+                <td>{{ r.fim }}</td>
+                <td class="right">{{ '%.2f'|format(r.horas or 0) }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        {% else %}
+          <p class="muted">Selecione Máquina e Data e clique em <strong>Aplicar</strong>.</p>
+        {% endif %}
+      </div>
+
+      <!-- GRÁFICO 50% -->
+      <div>
+        <canvas id="pdChart"></canvas>
+      </div>
+    </div>
+
+  </div>
+</details>
+
+<!-- ===================================================== -->
+<!-- 3) FRENTES (fechado por padrão)                        -->
+<!-- ===================================================== -->
+<details class="card" {% if open_frentes %}open{% endif %}>
+  <summary>🧩 Frentes <span class="chip">Resumo mensal por EH</span></summary>
+  <div class="card-body">
+
+    <form class="toolbar" method="get" action="{{ url_for('operacao.producao') }}">
+      <input type="hidden" name="open_frentes" value="1">
+      <label>
+        EH
+        <select name="fr_eh" required>
+          <option value="">– selecione –</option>
+          {% for e in eh_list %}
+            <option value="{{ e.id }}" {% if fr_eh and fr_eh|int == e.id %}selected{% endif %}>{{ e.eh }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>
+        Data de referência (mês)
+        <input type="date" name="fr_mes" value="{{ fr_mes or '' }}">
+      </label>
+
+      <!-- preservar aberturas dos outros painéis -->
+      {% if open_acomp %}<input type="hidden" name="open_acomp" value="1">{% endif %}
+      {% if open_pd %}<input type="hidden" name="open_pd" value="1">{% endif %}
+
+      <button class="btn" type="submit">Aplicar</button>
+      <a class="btn btn-outline" href="{{ url_for('operacao.producao', open_frentes=1) }}">Limpar</a>
+    </form>
+
+    {% if fr_rows and fr_rows|length %}
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Frente</th>
+            <th class="right">Planejado (Mês)</th>
+            <th class="right">Realizado (Mês)</th>
+            <th class="right">Dif.</th>
+            <th class="right">% Exec.</th>
+            <th class="right">Atraso (dias)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in fr_rows %}
+          <tr>
+            <td>{{ r.frente }}</td>
+            <td class="right">{{ r.planejado_total or 0 }}</td>
+            <td class="right">{{ r.realizado_total or 0 }}</td>
+            <td class="right">{{ r.dif or 0 }}</td>
+            <td class="right">{{ r.perc_exec is not none and ('%.2f%%'|format(r.perc_exec)) or '—' }}</td>
+            <td class="right">{{ r.atraso is not none and ('%.2f'|format(r.atraso)) or '—' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p class="muted">Selecione uma EH e uma Data de referência e clique em <strong>Aplicar</strong>.</p>
+    {% endif %}
+
+  </div>
+</details>
+
+{% if msg %}
+  <p class="muted">{{ msg }}</p>
+{% endif %}
+
+<!-- Chart.js (assuma que não está no base) -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
 <script>
-  // Toggle containers
-  document.querySelectorAll('.zone-head').forEach(h => {
-    h.addEventListener('click', (e) => {
-      if (e.target.closest('.icon-btn') && !e.target.closest('.caret')) return;
-      const sel = h.getAttribute('data-target');
-      const body = document.querySelector(sel);
-      const caret = h.querySelector('.caret');
-      if (body) body.classList.toggle('collapsed');
-      if (caret) caret.textContent = (caret.textContent.trim() === '▴') ? '▾' : '▴';
-    });
-  });
-
-  // Chart Produção
+  // ========== ACOMPANHAMENTO ==========
   (function(){
-    const labels = {{ chart_prod.labels|tojson|safe }};
-    const prevDia = {{ chart_prod.prev_dia|tojson|safe }};
-    const realDia = {{ chart_prod.real_dia|tojson|safe }};
-    const prevTot = {{ chart_prod.prev_tot|tojson|safe }};
-    const realTot = {{ chart_prod.real_tot|tojson|safe }};
+    const labels = {{ acomp_chart.labels|tojson }};
+    const prevDia = {{ acomp_chart.prev_dia|tojson }};
+    const realDia = {{ acomp_chart.real_dia|tojson }};
+    const prevTot = {{ acomp_chart.prev_tot|tojson }};
+    const realTot = {{ acomp_chart.real_tot|tojson }};
 
-    const ctx = document.getElementById('chartProducao');
-    if (ctx && labels.length){
-      new Chart(ctx, {
+    const el = document.getElementById('acompChart');
+    if (el && labels && labels.length) {
+      new Chart(el.getContext('2d'), {
         type: 'bar',
         data: {
           labels,
           datasets: [
-            { type: 'bar',  label: 'Previsto Dia',   data: prevDia },
-            { type: 'bar',  label: 'Realizado Dia',  data: realDia },
-            { type: 'line', label: 'Previsto Total', data: prevTot, tension: 0.3 },
-            { type: 'line', label: 'Realizado Total',data: realTot, tension: 0.3 },
+            { label: 'Previsto (dia)', data: prevDia },
+            { label: 'Realizado (dia)', data: realDia },
+            { label: 'Previsto (acum.)', data: prevTot, type: 'line' },
+            { label: 'Realizado (acum.)', data: realTot, type: 'line' }
           ]
         },
         options: {
-          responsive: true, maintainAspectRatio: false,
-          scales: { y: { beginAtZero: true } },
-          plugins: { legend: { display: false } }
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: { legend: { position: 'top' } },
+          scales: { x: { grid: { display:false } }, y: { beginAtZero:true } }
         }
       });
     }
   })();
 
-  // Chart Parte Diária
+  // ========== PARTE DIÁRIA ==========
   (function(){
-    const labels = {{ pd_graf.labels|tojson|safe }};
-    const horas  = {{ pd_graf.horas|tojson|safe }};
-
-    const ctx = document.getElementById('chartPD');
-    if (ctx && labels.length){
-      new Chart(ctx, {
+    const labels = {{ pd_chart.labels|tojson }};
+    const horas  = {{ pd_chart.horas|tojson }};
+    const el = document.getElementById('pdChart');
+    if (el && labels && labels.length) {
+      new Chart(el.getContext('2d'), {
         type: 'bar',
-        data: { labels, datasets: [{ label: 'Horas', data: horas }] },
+        data: { labels, datasets: [{ label: 'Horas no dia', data: horas }] },
         options: {
-          responsive: true, maintainAspectRatio: false,
-          scales: { y: { beginAtZero: true, title: { display:true, text:'Horas' } } },
-          plugins: { legend: { display: false } }
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { position: 'top' } },
+          scales: { x: { grid: { display:false } }, y: { beginAtZero:true } }
         }
       });
     }
   })();
 </script>
+
 {% endblock %}

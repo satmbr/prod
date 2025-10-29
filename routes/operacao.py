@@ -38,32 +38,62 @@ def index():
 # ----------------------------------------------------------------
 @bp.get("/producao")
 def producao():
-    """Tela de acompanhamento de produção + parte diária (2 contêineres)."""
+    """
+    /operacao/producao com 3 contêineres:
+      - Acompanhamento (tabela diária + gráfico diário/acumulado)
+      - Parte Diária (eventos por máquina no dia + gráfico de horas por evento)
+      - Frentes (resumo por frente no mês para uma EH)
+
+    Todos iniciam fechados; quando abertos, permanecem abertos ao aplicar filtros
+    (via query params open_acomp/open_pd/open_frentes).
+    """
+    from datetime import date, datetime
+
+    # --------------------
+    # FLAGS de abertura (mantidas via formulários)
+    # --------------------
+    open_acomp   = request.args.get("open_acomp") == "1"
+    open_pd      = request.args.get("open_pd") == "1"
+    open_frentes = request.args.get("open_frentes") == "1"
+
+    # --------------------
+    # Filtros — Acompanhamento
+    # --------------------
     sel_eh = request.args.get("eh")      # id da entre_house
     sel_fr = request.args.get("fr")      # id da frente_equipe
     sel_dt = request.args.get("dt") or date.today().isoformat()
-    sel_dt_obj = date.fromisoformat(sel_dt)  # evita usar ::date no SQL
+    refdt  = date.fromisoformat(sel_dt)
 
-    sel_maq   = request.args.get("maq")   # para parte diária
+    # --------------------
+    # Filtros — Parte Diária
+    # --------------------
+    sel_maq   = request.args.get("maq")       # id da máquina
     sel_dt_pd = request.args.get("dt_pd") or sel_dt
 
+    # --------------------
+    # Filtros — Frentes (resumo por frente no mês)
+    # --------------------
+    fr_eh  = request.args.get("fr_eh")  # id da entre_house
+    fr_mes = request.args.get("fr_mes") or sel_dt  # data de referência para o mês
+
     with get_engine().connect() as conn:
-        # listas para selects
+        # Listas para selects
         eh_list = conn.execute(text("SELECT id, eh FROM entre_house ORDER BY eh")).mappings().all()
         fr_list = conn.execute(text("SELECT id, frente FROM frente_equipe ORDER BY frente")).mappings().all()
-        # Se sua tabela 'maquina' não tiver 'ativo', remova o WHERE
         maq_list = conn.execute(text("""
             SELECT id, tag, descricao
             FROM maquina
             ORDER BY tag
         """)).mappings().all()
 
-        # ===================== BLOCO 1: PRODUÇÃO =====================
-        prod_rows = []
-        chart_prod = {"labels": [], "prev_dia": [], "real_dia": [], "prev_tot": [], "real_tot": []}
+        # ============================================================
+        # 1) ACOMPANHAMENTO — tabela diária + gráfico (50/50)
+        # ============================================================
+        acomp_rows = []
+        acomp_chart = {"labels": [], "prev_dia": [], "real_dia": [], "prev_tot": [], "real_tot": []}
 
         if sel_eh and sel_fr:
-            sql = text("""
+            sql_acomp = text("""
                 WITH dias AS (
                     SELECT gs::date AS d
                     FROM generate_series(
@@ -101,13 +131,12 @@ def producao():
                 FROM base
                 ORDER BY data
             """)
-            params = {"eh": sel_eh, "fr": sel_fr, "refdt": sel_dt_obj}
-            prod = conn.execute(sql, params).mappings().all()
+            prod = conn.execute(sql_acomp, {"eh": sel_eh, "fr": sel_fr, "refdt": refdt}).mappings().all()
 
             for r in prod:
                 dif = (r["realizado_total"] or 0) - (r["previsto_total"] or 0)
                 atraso = (dif / 850.0) if 850 else 0.0
-                prod_rows.append({
+                acomp_rows.append({
                     "data": r["data"],
                     "previsto_dia": r["previsto_dia"],
                     "previsto_total": r["previsto_total"],
@@ -116,15 +145,17 @@ def producao():
                     "dif": dif,
                     "atraso": atraso,
                 })
-                chart_prod["labels"].append(r["data"].strftime("%d/%m"))
-                chart_prod["prev_dia"].append(float(r["previsto_dia"]))
-                chart_prod["real_dia"].append(float(r["realizado_dia"]))
-                chart_prod["prev_tot"].append(float(r["previsto_total"]))
-                chart_prod["real_tot"].append(float(r["realizado_total"]))
+                acomp_chart["labels"].append(r["data"].strftime("%d/%m"))
+                acomp_chart["prev_dia"].append(float(r["previsto_dia"]))
+                acomp_chart["real_dia"].append(float(r["realizado_dia"]))
+                acomp_chart["prev_tot"].append(float(r["previsto_total"]))
+                acomp_chart["real_tot"].append(float(r["realizado_total"]))
 
-        # ===================== BLOCO 2: PARTE DIÁRIA =====================
+        # ============================================================
+        # 2) PARTE DIÁRIA — lista do dia + gráfico de horas por evento (50/50)
+        # ============================================================
         pd_lista = []
-        pd_graf  = {"labels": [], "horas": []}
+        pd_chart = {"labels": [], "horas": []}
         if sel_maq and sel_dt_pd:
             pd_sql = text("""
                 SELECT pd.id,
@@ -152,17 +183,71 @@ def producao():
             """), {"maq": sel_maq, "d": sel_dt_pd}).mappings().all()
 
             for r in pd_agg:
-                pd_graf["labels"].append(r["evento"])
-                pd_graf["horas"].append(float(r["horas"] or 0))
+                pd_chart["labels"].append(r["evento"])
+                pd_chart["horas"].append(float(r["horas"] or 0))
+
+        # ============================================================
+        # 3) FRENTES — resumo por frente no mês (para uma EH)
+        # ============================================================
+        fr_rows = []
+        if fr_eh and fr_mes:
+            refm = date.fromisoformat(fr_mes)
+            sql_fr = text("""
+                WITH pl AS (
+                    SELECT frente_id, SUM(planejado) AS pln
+                    FROM producao_planejada
+                    WHERE eh_id = :eh
+                      AND data >= date_trunc('month', :refm)
+                      AND data <= :refm
+                    GROUP BY frente_id
+                ),
+                rl AS (
+                    SELECT frente_id, SUM(realizado) AS rlz
+                    FROM producao_realizada
+                    WHERE eh_id = :eh
+                      AND data >= date_trunc('month', :refm)
+                      AND data <= :refm
+                    GROUP BY frente_id
+                )
+                SELECT f.id, f.frente,
+                       COALESCE(pl.pln, 0) AS planejado_total,
+                       COALESCE(rl.rlz, 0) AS realizado_total,
+                       COALESCE(rl.rlz,0) - COALESCE(pl.pln,0) AS dif,
+                       CASE
+                         WHEN COALESCE(pl.pln,0) = 0 THEN NULL
+                         ELSE ROUND( (COALESCE(rl.rlz,0)::numeric / NULLIF(pl.pln,0)) * 100, 2)
+                       END AS perc_exec,
+                       ROUND( (COALESCE(rl.rlz,0) - COALESCE(pl.pln,0)) / 850.0, 2) AS atraso
+                FROM frente_equipe f
+                LEFT JOIN pl ON pl.frente_id = f.id
+                LEFT JOIN rl ON rl.frente_id = f.id
+                WHERE (COALESCE(pl.pln,0) <> 0 OR COALESCE(rl.rlz,0) <> 0)
+                ORDER BY f.frente
+            """)
+            fr_rows = conn.execute(sql_fr, {"eh": fr_eh, "refm": refm}).mappings().all()
 
     return render_template(
         "operacao/producao.html",
         subnav_links=_clean_nav(_subnav("producao")),
+
+        # selects
         eh_list=eh_list, fr_list=fr_list, maq_list=maq_list,
+
+        # filtros (para manter na UI)
         sel_eh=sel_eh, sel_fr=sel_fr, sel_dt=sel_dt,
         sel_maq=sel_maq, sel_dt_pd=sel_dt_pd,
-        prod_rows=prod_rows, chart_prod=chart_prod,
-        pd_lista=pd_lista, pd_graf=pd_graf,
+        fr_eh=fr_eh, fr_mes=fr_mes,
+
+        # dados
+        acomp_rows=acomp_rows, acomp_chart=acomp_chart,
+        pd_lista=pd_lista, pd_chart=pd_chart,
+        fr_rows=fr_rows,
+
+        # abertura de contêineres
+        open_acomp=open_acomp,
+        open_pd=open_pd,
+        open_frentes=open_frentes,
+
         msg=request.args.get("msg"),
     )
 
