@@ -146,8 +146,9 @@ def producao():
         # ============================================================
         # BLOCO 2 — PARTE DIÁRIA (por máquina + dia)
         # ============================================================
+        # ===================== BLOCO 2 — PARTE DIÁRIA =====================
         pd_lista = []
-        pd_graf  = {"labels": [], "horas": []}  # horas agregadas por evento (em horas decimais; formate no template como HH:MM)
+        pd_graf  = {"labels": [], "horas": [], "minutos": []}  # minutos para o template
 
         if sel_maq and sel_dt_pd:
             sql_pd = text("""
@@ -175,8 +176,10 @@ def producao():
                 ORDER BY horas_dec DESC
             """)
             for r in conn.execute(sql_pd_agg, {"maq": sel_maq, "d": sel_dt_pd}).mappings():
+                h = float(r["horas_dec"] or 0.0)
                 pd_graf["labels"].append(r["evento"])
-                pd_graf["horas"].append(float(r["horas_dec"] or 0.0))
+                pd_graf["horas"].append(h)
+                pd_graf["minutos"].append(int(round(h * 60)))
 
         # ============================================================
         # BLOCO 3 — FRENTES (por EH, dia a dia)
