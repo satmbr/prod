@@ -39,225 +39,293 @@ def index():
 @bp.get("/producao")
 def producao():
     """
-    /operacao/producao com 3 contêineres:
-      - Acompanhamento (tabela diária + gráfico diário/acumulado)
-      - Parte Diária (eventos por máquina no dia + gráfico de horas por evento)
-      - Frentes (resumo por frente no mês para uma EH)
-
-    Todos iniciam fechados; quando abertos, permanecem abertos ao aplicar filtros
-    (via query params open_acomp/open_pd/open_frentes).
+    Produção com:
+      - Filtros fixos (EH, Frente, Data, Máquina) + aplicar/limpar
+      - Acompanhamento (tabela+gráfico) — inicia fechado
+      - PartDiária (tabela+gráfico HH:MM) — inicia fechado
+      - Frentes (tabela) — inicia fechado
+      - Descarga e Segregação de Dormentes (intervalo data) — inicia fechado
     """
-    from datetime import date, datetime
+    from datetime import date, datetime, time
 
-    # --------------------
-    # FLAGS de abertura (mantidas via formulários)
-    # --------------------
-    open_acomp   = request.args.get("open_acomp") == "1"
-    open_pd      = request.args.get("open_pd") == "1"
-    open_frentes = request.args.get("open_frentes") == "1"
+    # -------- Filtros do topo (sempre visíveis) --------
+    sel_eh   = request.args.get("eh")       # id entre_house
+    sel_fr   = request.args.get("fr")       # id frente_equipe
+    sel_dt   = request.args.get("dt") or date.today().isoformat()
+    sel_maq  = request.args.get("maq")      # id máquina (PD)
+    # filtros exclusivos do bloco “Descarga/Segregação”
+    dsd_i    = request.args.get("dsd_ini")
+    dsd_f    = request.args.get("dsd_fim")
 
-    # --------------------
-    # Filtros — Acompanhamento
-    # --------------------
-    sel_eh = request.args.get("eh")      # id da entre_house
-    sel_fr = request.args.get("fr")      # id da frente_equipe
-    sel_dt = request.args.get("dt") or date.today().isoformat()
-    refdt  = date.fromisoformat(sel_dt)
-
-    # --------------------
-    # Filtros — Parte Diária
-    # --------------------
-    sel_maq   = request.args.get("maq")       # id da máquina
-    sel_dt_pd = request.args.get("dt_pd") or sel_dt
-
-    # --------------------
-    # Filtros — Frentes (resumo por frente no mês)
-    # --------------------
-    fr_eh  = request.args.get("fr_eh")  # id da entre_house
-    fr_mes = request.args.get("fr_mes") or sel_dt  # data de referência para o mês
+    # datas como objetos (evita ::date no SQL)
+    sel_dt_obj = date.fromisoformat(sel_dt)
 
     with get_engine().connect() as conn:
-        # Listas para selects
-        eh_list = conn.execute(text("SELECT id, eh FROM entre_house ORDER BY eh")).mappings().all()
-        fr_list = conn.execute(text("SELECT id, frente FROM frente_equipe ORDER BY frente")).mappings().all()
+        # Listas (selects)
+        eh_list  = conn.execute(text("SELECT id, eh FROM entre_house ORDER BY eh")).mappings().all()
+        fr_list  = conn.execute(text("SELECT id, frente FROM frente_equipe ORDER BY frente")).mappings().all()
         maq_list = conn.execute(text("""
             SELECT id, tag, descricao
             FROM maquina
+            WHERE ativo IS TRUE
             ORDER BY tag
         """)).mappings().all()
 
-        # ============================================================
-        # 1) ACOMPANHAMENTO — tabela diária + gráfico (50/50)
-        # ============================================================
-        acomp_rows = []
-        acomp_chart = {"labels": [], "prev_dia": [], "real_dia": [], "prev_tot": [], "real_tot": []}
+        # ===================== BLOCO 1: ACOMPANHAMENTO =====================
+        # Mostra todos os dias que têm registro (planejado ou realizado) para a EH+Frente.
+        prod_rows  = []
+        chart_prod = {"labels": [], "prev_dia": [], "real_dia": [], "prev_tot": [], "real_tot": []}
 
         if sel_eh and sel_fr:
-            sql_acomp = text("""
-                WITH dias AS (
-                    SELECT gs::date AS d
-                    FROM generate_series(
-                        date_trunc('month', :refdt),
-                        :refdt,
-                        interval '1 day'
-                    ) gs
+            sql = text("""
+                WITH datas AS (
+                   SELECT DISTINCT data::date AS d
+                   FROM producao_planejada WHERE eh_id=:eh AND frente_id=:fr
+                   UNION
+                   SELECT DISTINCT data::date AS d
+                   FROM producao_realizada WHERE eh_id=:eh AND frente_id=:fr
                 ),
                 pl AS (
-                    SELECT data::date AS data, SUM(planejado) AS planejado
-                    FROM producao_planejada
-                    WHERE eh_id = :eh AND frente_id = :fr
-                    GROUP BY data::date
+                   SELECT data::date AS data, SUM(planejado) AS planejado
+                   FROM producao_planejada
+                   WHERE eh_id=:eh AND frente_id=:fr
+                   GROUP BY data::date
                 ),
                 rl AS (
-                    SELECT data::date AS data, SUM(realizado) AS realizado
-                    FROM producao_realizada
-                    WHERE eh_id = :eh AND frente_id = :fr
-                    GROUP BY data::date
+                   SELECT data::date AS data, SUM(realizado) AS realizado
+                   FROM producao_realizada
+                   WHERE eh_id=:eh AND frente_id=:fr
+                   GROUP BY data::date
                 ),
                 base AS (
-                    SELECT d.d AS data,
-                           COALESCE(pl.planejado, 0) AS previsto_dia,
-                           COALESCE(rl.realizado, 0) AS realizado_dia
-                    FROM dias d
-                    LEFT JOIN pl ON pl.data = d.d
-                    LEFT JOIN rl ON rl.data = d.d
-                    ORDER BY d.d
+                   SELECT d.d AS data,
+                          COALESCE(pl.planejado, 0) AS previsto_dia,
+                          COALESCE(rl.realizado, 0) AS realizado_dia
+                   FROM datas d
+                   LEFT JOIN pl ON pl.data=d.d
+                   LEFT JOIN rl ON rl.data=d.d
                 )
                 SELECT data,
                        previsto_dia,
-                       SUM(previsto_dia) OVER (ORDER BY data) AS previsto_total,
+                       SUM(previsto_dia) OVER (ORDER BY data)  AS previsto_total,
                        realizado_dia,
                        SUM(realizado_dia) OVER (ORDER BY data) AS realizado_total
                 FROM base
                 ORDER BY data
             """)
-            prod = conn.execute(sql_acomp, {"eh": sel_eh, "fr": sel_fr, "refdt": refdt}).mappings().all()
+            rows = conn.execute(sql, {"eh": sel_eh, "fr": sel_fr}).mappings().all()
 
-            for r in prod:
+            for r in rows:
                 prev_tot = float(r["previsto_total"] or 0)
                 real_tot = float(r["realizado_total"] or 0)
-                prev_dia = float(r["previsto_dia"] or 0)
-                real_dia = float(r["realizado_dia"] or 0)
-
-                dif = real_tot - prev_tot
-                atraso = dif / 850.0  # agora tudo float
-
-                acomp_rows.append({
+                dif      = real_tot - prev_tot
+                atraso   = (dif / 850.0) if 850 else 0.0  # referência passada
+                prod_rows.append({
                     "data": r["data"],
-                    "previsto_dia": prev_dia,
+                    "previsto_dia": float(r["previsto_dia"] or 0),
                     "previsto_total": prev_tot,
-                    "realizado_dia": real_dia,
+                    "realizado_dia": float(r["realizado_dia"] or 0),
                     "realizado_total": real_tot,
                     "dif": dif,
                     "atraso": atraso,
+                    "is_sel_day": (r["data"] == sel_dt_obj),
                 })
+                chart_prod["labels"].append(r["data"].strftime("%d/%m"))
+                chart_prod["prev_dia"].append(float(r["previsto_dia"] or 0))
+                chart_prod["real_dia"].append(float(r["realizado_dia"] or 0))
+                chart_prod["prev_tot"].append(prev_tot)
+                chart_prod["real_tot"].append(real_tot)
 
-                acomp_chart["labels"].append(r["data"].strftime("%d/%m"))
-                acomp_chart["prev_dia"].append(prev_dia)
-                acomp_chart["real_dia"].append(real_dia)
-                acomp_chart["prev_tot"].append(prev_tot)
-                acomp_chart["real_tot"].append(real_tot)
-
-
-        # ============================================================
-        # 2) PARTE DIÁRIA — lista do dia + gráfico de horas por evento (50/50)
-        # ============================================================
+        # ===================== BLOCO 2: PART DIÁRIA =====================
+        # tabela do dia + gráfico de horas por atividade (HH:MM)
         pd_lista = []
-        pd_chart = {"labels": [], "horas": []}
-        if sel_maq and sel_dt_pd:
+        pd_graf  = {"labels": [], "minutos": []}  # guardamos minutos; formatamos HH:MM no front
+
+        if sel_maq and sel_dt:
             pd_sql = text("""
                 SELECT pd.id,
                        a.nome AS evento,
                        to_char(pd.hora_inicio, 'HH24:MI') AS inicio,
                        to_char(pd.hora_fim, 'HH24:MI')    AS fim,
-                       EXTRACT(EPOCH FROM (pd.hora_fim - pd.hora_inicio))/3600.0 AS horas
+                       EXTRACT(EPOCH FROM (pd.hora_fim - pd.hora_inicio)) / 60.0 AS minutos
                 FROM parte_diaria pd
                 JOIN atividade a ON a.id = pd.atividade_id
                 WHERE pd.maquina_id = :maq
                   AND pd.data = :d
                 ORDER BY pd.hora_inicio
             """)
-            pd_lista = conn.execute(pd_sql, {"maq": sel_maq, "d": sel_dt_pd}).mappings().all()
+            pd_lista = conn.execute(pd_sql, {"maq": sel_maq, "d": sel_dt_obj}).mappings().all()
 
-            pd_agg = conn.execute(text("""
+            # agregado por atividade para o gráfico
+            agg = conn.execute(text("""
                 SELECT a.nome AS evento,
-                       ROUND(EXTRACT(EPOCH FROM SUM(pd.hora_fim - pd.hora_inicio))/3600.0, 2) AS horas
+                       EXTRACT(EPOCH FROM SUM(pd.hora_fim - pd.hora_inicio)) / 60.0 AS minutos
                 FROM parte_diaria pd
                 JOIN atividade a ON a.id = pd.atividade_id
-                WHERE pd.maquina_id = :maq
-                  AND pd.data = :d
+                WHERE pd.maquina_id=:maq AND pd.data=:d
                 GROUP BY a.nome
-                ORDER BY horas DESC
-            """), {"maq": sel_maq, "d": sel_dt_pd}).mappings().all()
+                ORDER BY 1
+            """), {"maq": sel_maq, "d": sel_dt_obj}).mappings().all()
 
-            for r in pd_agg:
-                pd_chart["labels"].append(r["evento"])
-                pd_chart["horas"].append(float(r["horas"] or 0))
+            for r in agg:
+                pd_graf["labels"].append(r["evento"])
+                pd_graf["minutos"].append(float(r["minutos"] or 0.0))
 
-        # ============================================================
-        # 3) FRENTES — resumo por frente no mês (para uma EH)
-        # ============================================================
-        fr_rows = []
-        if fr_eh and fr_mes:
-            refm = date.fromisoformat(fr_mes)
-            sql_fr = text("""
-                WITH pl AS (
-                    SELECT frente_id, SUM(planejado) AS pln
-                    FROM producao_planejada
-                    WHERE eh_id = :eh
-                      AND data >= date_trunc('month', :refm)
-                      AND data <= :refm
-                    GROUP BY frente_id
-                ),
-                rl AS (
-                    SELECT frente_id, SUM(realizado) AS rlz
-                    FROM producao_realizada
-                    WHERE eh_id = :eh
-                      AND data >= date_trunc('month', :refm)
-                      AND data <= :refm
-                    GROUP BY frente_id
-                )
-                SELECT f.id, f.frente,
-                       COALESCE(pl.pln, 0) AS planejado_total,
-                       COALESCE(rl.rlz, 0) AS realizado_total,
-                       COALESCE(rl.rlz,0) - COALESCE(pl.pln,0) AS dif,
-                       CASE
-                         WHEN COALESCE(pl.pln,0) = 0 THEN NULL
-                         ELSE ROUND( (COALESCE(rl.rlz,0)::numeric / NULLIF(pl.pln,0)) * 100, 2)
-                       END AS perc_exec,
-                       ROUND( (COALESCE(rl.rlz,0) - COALESCE(pl.pln,0)) / 850.0, 2) AS atraso
-                FROM frente_equipe f
-                LEFT JOIN pl ON pl.frente_id = f.id
-                LEFT JOIN rl ON rl.frente_id = f.id
-                WHERE (COALESCE(pl.pln,0) <> 0 OR COALESCE(rl.rlz,0) <> 0)
-                ORDER BY f.frente
-            """)
-            fr_rows = conn.execute(sql_fr, {"eh": fr_eh, "refm": refm}).mappings().all()
+# ===================== BLOCO 3: FRENTES =====================
+frentes_rows = []
+if sel_eh:
+    fr_sql = text("""
+        WITH datas AS (
+            SELECT DISTINCT data::date AS d
+            FROM producao_realizada
+            WHERE eh_id = :eh AND frente_id IN (1,2,3,4,6)
+        ),
+        f1 AS ( -- 01 - Renovação
+            SELECT data::date AS d, SUM(realizado) AS r1
+            FROM producao_realizada
+            WHERE eh_id=:eh AND frente_id=1
+            GROUP BY data::date
+        ),
+        f2 AS ( -- 02 - Carregamento_novo
+            SELECT data::date AS d, SUM(realizado) AS r2
+            FROM producao_realizada
+            WHERE eh_id=:eh AND frente_id=2
+            GROUP BY data::date
+        ),
+        f3 AS ( -- 03 - Remoção_grampos
+            SELECT data::date AS d, SUM(realizado) AS r3
+            FROM producao_realizada
+            WHERE eh_id=:eh AND frente_id=3
+            GROUP BY data::date
+        ),
+        f4 AS ( -- 04 - Remoção_galochas
+            SELECT data::date AS d, SUM(realizado) AS r4
+            FROM producao_realizada
+            WHERE eh_id=:eh AND frente_id=4
+            GROUP BY data::date
+        ),
+        f6 AS ( -- 06 - Aplicação_grampos
+            SELECT data::date AS d, SUM(realizado) AS r6
+            FROM producao_realizada
+            WHERE eh_id=:eh AND frente_id=6
+            GROUP BY data::date
+        ),
+        base AS (
+            SELECT d.d AS data,
+                   COALESCE(f1.r1,0) AS r1,
+                   COALESCE(f2.r2,0) AS r2,
+                   COALESCE(f3.r3,0) AS r3,
+                   COALESCE(f4.r4,0) AS r4,
+                   COALESCE(f6.r6,0) AS r6
+            FROM datas d
+            LEFT JOIN f1 ON f1.d=d.d
+            LEFT JOIN f2 ON f2.d=d.d
+            LEFT JOIN f3 ON f3.d=d.d
+            LEFT JOIN f4 ON f4.d=d.d
+            LEFT JOIN f6 ON f6.d=d.d
+        )
+        SELECT
+           data,
+           r2::float                AS carregado,
+           (SUM(r2) OVER (ORDER BY data) - SUM(r1) OVER (ORDER BY data))::float AS saldo,
+           (SUM(r2) OVER (ORDER BY data))::float  AS acum_carregado,
+
+           r3::float                AS rem_grampos,
+           (SUM(r3) OVER (ORDER BY data) - SUM(r1) OVER (ORDER BY data))::float AS frente_grampos,
+           (SUM(r3) OVER (ORDER BY data))::float  AS acum_grampos,
+
+           r4::float                AS rem_galochas,
+           (SUM(r4) OVER (ORDER BY data) - SUM(r1) OVER (ORDER BY data))::float AS frente_galochas,
+           (SUM(r4) OVER (ORDER BY data))::float  AS acum_galochas,
+
+           r6::float                AS aplicado,
+           (SUM(r1) OVER (ORDER BY data) - SUM(r6) OVER (ORDER BY data))::float AS frente_aplicado,
+           (SUM(r6) OVER (ORDER BY data))::float  AS acum_aplicado
+        FROM base
+        ORDER BY data
+    """)
+    frentes_rows = conn.execute(fr_sql, {"eh": sel_eh}).mappings().all()
+
+# ===================== BLOCO 4: DESCARGA & SEGREGAÇÃO =====================
+dsd_rows = []
+if sel_eh and dsd_i and dsd_f:
+    dsd_sql = text("""
+        WITH rng AS (
+            SELECT gs::date AS d
+            FROM generate_series(:di::date, :df::date, interval '1 day') gs
+        ),
+        e AS (SELECT id, eh FROM entre_house WHERE id=:eh),
+        f5 AS ( -- 05 - Descarregamento_velho
+            SELECT data::date AS d, SUM(realizado) AS r5
+            FROM producao_realizada
+            WHERE eh_id=:eh AND frente_id=5 AND data BETWEEN :di AND :df
+            GROUP BY data::date
+        ),
+        f7 AS ( -- 07 - Descarregamento_novo
+            SELECT data::date AS d, SUM(realizado) AS r7
+            FROM producao_realizada
+            WHERE eh_id=:eh AND frente_id=7 AND data BETWEEN :di AND :df
+            GROUP BY data::date
+        ),
+        f8 AS ( -- 08 - Segregacao_novo
+            SELECT data::date AS d, SUM(realizado) AS r8
+            FROM producao_realizada
+            WHERE eh_id=:eh AND frente_id=8 AND data BETWEEN :di AND :df
+            GROUP BY data::date
+        ),
+        f9 AS ( -- 09 - Segregacao_velho
+            SELECT data::date AS d, SUM(realizado) AS r9
+            FROM producao_realizada
+            WHERE eh_id=:eh AND frente_id=9 AND data BETWEEN :di AND :df
+            GROUP BY data::date
+        ),
+        base AS (
+            SELECT r.d AS data,
+                   COALESCE(f7.r7,0) AS r7,
+                   COALESCE(f5.r5,0) AS r5,
+                   COALESCE(f8.r8,0) AS r8,
+                   COALESCE(f9.r9,0) AS r9
+            FROM rng r
+            LEFT JOIN f7 ON f7.d=r.d
+            LEFT JOIN f5 ON f5.d=r.d
+            LEFT JOIN f8 ON f8.d=r.d
+            LEFT JOIN f9 ON f9.d=r.d
+        )
+        SELECT
+           b.data,
+           (b.r7)::float AS novo,
+           (SUM(b.r7) OVER (ORDER BY b.data))::float AS acum_novo,
+           (b.r5)::float AS velho,
+           (SUM(b.r5) OVER (ORDER BY b.data))::float AS acum_velho,
+           (b.r8)::float AS seg_novo,
+           (SUM(b.r8) OVER (ORDER BY b.data))::float AS acum_seg_novo,
+           (b.r9)::float AS seg_velho,
+           (SUM(b.r9) OVER (ORDER BY b.data))::float AS acum_seg_velho,
+           e.eh AS eh_nome
+        FROM base b CROSS JOIN e
+        ORDER BY b.data
+    """)
+    dsd_rows = conn.execute(
+        dsd_sql, {"eh": sel_eh, "di": dsd_i, "df": dsd_f}
+    ).mappings().all()
 
     return render_template(
         "operacao/producao.html",
         subnav_links=_clean_nav(_subnav("producao")),
-
         # selects
         eh_list=eh_list, fr_list=fr_list, maq_list=maq_list,
-
-        # filtros (para manter na UI)
+        # filtros atuais
         sel_eh=sel_eh, sel_fr=sel_fr, sel_dt=sel_dt,
-        sel_maq=sel_maq, sel_dt_pd=sel_dt_pd,
-        fr_eh=fr_eh, fr_mes=fr_mes,
-
+        sel_maq=sel_maq, dsd_i=dsd_i, dsd_f=dsd_f,
         # dados
-        acomp_rows=acomp_rows, acomp_chart=acomp_chart,
-        pd_lista=pd_lista, pd_chart=pd_chart,
-        fr_rows=fr_rows,
-
-        # abertura de contêineres
-        open_acomp=open_acomp,
-        open_pd=open_pd,
-        open_frentes=open_frentes,
-
+        prod_rows=prod_rows, chart_prod=chart_prod,
+        pd_lista=pd_lista, pd_graf=pd_graf,
+        frentes_rows=frentes_rows,
+        dsd_rows=dsd_rows,
+        # mensagem
         msg=request.args.get("msg"),
     )
+
 
 # ----------------------------------------------------------------
 # CADASTRO (EH / FRENTE)

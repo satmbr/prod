@@ -1,309 +1,335 @@
 {% extends "base.html" %}
-{% block title %}Operação · Produção{% endblock %}
+{% set brown = "#501E0A" %}
 
 {% block content %}
 
-<h2 class="titulo-secao">Operação · Produção</h2>
-
-<!-- util: classe para colapsar -->
-<style>
-  details.card { margin-bottom: 16px; border:1px solid #ddd; border-radius:10px; background:#fff; }
-  details.card > summary {
-    cursor: pointer; padding: 12px 16px; font-weight: 600;
-    color:#501E0A; list-style:none; border-bottom:1px solid #eee; user-select:none;
-  }
-  details.card[open] > summary { border-bottom:1px solid #eee; }
-  .card-body { padding: 12px 16px 16px 16px; }
-  .grid-2 { display:grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-  .grid-3 { display:grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-  .toolbar { display:flex; gap:8px; align-items:end; flex-wrap:wrap; margin-bottom:8px; }
-  .toolbar label { font-size:.85rem; color:#333; }
-  .toolbar input, .toolbar select { padding:6px 8px; }
-  .table { width:100%; border-collapse: collapse; }
-  .table th, .table td { border-bottom:1px solid #eee; padding:8px; text-align:left; }
-  .muted { color:#666; }
-  .right { text-align:right; }
-  .chip { font-size:.8rem; padding:2px 8px; border-radius:999px; background:#FCD917; color:#501E0A; }
-  .btn { background:#501E0A; color:#fff; border:none; padding:8px 12px; border-radius:8px; cursor:pointer; }
-  .btn:disabled { opacity:.5; cursor:not-allowed; }
-  .btn-outline { background:#fff; border:1px solid #501E0A; color:#501E0A; }
-  canvas { width:100%; height:360px; }
-</style>
-
-<!-- ===================================================== -->
-<!-- 1) ACOMPANHAMENTO (fechado por padrão)                 -->
-<!-- ===================================================== -->
-<details class="card" {% if open_acomp %}open{% endif %}>
-  <summary>📊 Acompanhamento <span class="chip">Diário + Acumulado</span></summary>
+<!-- Filtros fixos (sempre visíveis) -->
+<div class="card mb-2">
+  <div class="card-header flex-between">
+    <div class="flex items-center gap-2">
+      <span class="icon">🧭</span>
+      <strong style="color:{{ brown }}">Operação · Produção</strong>
+    </div>
+  </div>
   <div class="card-body">
-
-    <form class="toolbar" method="get" action="{{ url_for('operacao.producao') }}">
-      <input type="hidden" name="open_acomp" value="1">
+    <form class="grid grid-6" method="get" action="{{ url_for('operacao.producao') }}">
       <label>
-        EH
-        <select name="eh" required>
-          <option value="">– selecione –</option>
+        <span>EH</span>
+        <select name="eh">
+          <option value="">-- selecione --</option>
           {% for e in eh_list %}
-            <option value="{{ e.id }}" {% if sel_eh and sel_eh|int == e.id %}selected{% endif %}>{{ e.eh }}</option>
+            <option value="{{ e.id }}" {{ 'selected' if sel_eh and sel_eh|int==e.id else '' }}>{{ e.eh }}</option>
           {% endfor %}
         </select>
       </label>
+
       <label>
-        Frente
-        <select name="fr" required>
-          <option value="">– selecione –</option>
+        <span>Frente</span>
+        <select name="fr">
+          <option value="">-- selecione --</option>
           {% for f in fr_list %}
-            <option value="{{ f.id }}" {% if sel_fr and sel_fr|int == f.id %}selected{% endif %}>{{ f.frente }}</option>
+            <option value="{{ f.id }}" {{ 'selected' if sel_fr and sel_fr|int==f.id else '' }}>{{ f.frente }}</option>
           {% endfor %}
         </select>
       </label>
+
       <label>
-        Data de referência
+        <span>Data</span>
         <input type="date" name="dt" value="{{ sel_dt or '' }}">
       </label>
 
-      <!-- preservar aberturas dos outros painéis se estavam abertos -->
-      {% if open_pd %}<input type="hidden" name="open_pd" value="1">{% endif %}
-      {% if open_frentes %}<input type="hidden" name="open_frentes" value="1">{% endif %}
+      <label>
+        <span>Máquina (PartDiária)</span>
+        <select name="maq">
+          <option value="">-- selecione --</option>
+          {% for m in maq_list %}
+            <option value="{{ m.id }}" {{ 'selected' if sel_maq and sel_maq|int==m.id else '' }}>
+              {{ m.tag }} · {{ m.descricao }}
+            </option>
+          {% endfor %}
+        </select>
+      </label>
 
-      <button class="btn" type="submit">Aplicar</button>
-      <a class="btn btn-outline" href="{{ url_for('operacao.producao', open_acomp=1) }}">Limpar</a>
+      <div class="flex items-end gap-2">
+        <button class="btn btn-primary" type="submit">Aplicar</button>
+        <a class="btn" href="{{ url_for('operacao.producao') }}">Limpar</a>
+      </div>
     </form>
+  </div>
+</div>
 
-    <div class="grid-2">
-      <!-- TABELA 50% -->
-      <div>
-        {% if acomp_rows and acomp_rows|length %}
-          <table class="table">
-            <thead>
-              <tr>
-                <th>Data</th>
-                <th class="right">Prev. Dia</th>
-                <th class="right">Prev. Total</th>
-                <th class="right">Real. Dia</th>
-                <th class="right">Real. Total</th>
-                <th class="right">Dif.</th>
-                <th class="right">Atraso (dias)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for r in acomp_rows %}
-              <tr>
-                <td>{{ r.data.strftime('%d/%m/%Y') }}</td>
-                <td class="right">{{ r.previsto_dia }}</td>
-                <td class="right">{{ r.previsto_total }}</td>
-                <td class="right">{{ r.realizado_dia }}</td>
-                <td class="right">{{ r.realizado_total }}</td>
-                <td class="right">{{ r.dif }}</td>
-                <td class="right">{{ '%.2f'|format(r.atraso) }}</td>
-              </tr>
+<!-- ACOMPANHAMENTO (fechado por padrão) -->
+<details class="card mb-2" {% if request.args.get('open')=='acomp' %}open{% endif %}>
+  <summary class="card-header flex-between">
+    <div class="flex items-center gap-2">
+      <span class="icon">📊</span>
+      <strong>Acompanhamento</strong>
+    </div>
+    <div class="actions"></div>
+  </summary>
+  <div class="card-body">
+    <div class="grid grid-2">
+      <!-- Tabela 50% -->
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Prev. Dia</th>
+              <th>Prev. Total</th>
+              <th>Real. Dia</th>
+              <th>Real. Total</th>
+              <th>Dif.</th>
+              <th>Atraso</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% if prod_rows %}
+              {% for r in prod_rows %}
+                <tr style="{% if r.is_sel_day %}background:#e8f8e8{% endif %}">
+                  <td>{{ r.data.strftime('%d/%m/%Y') }}</td>
+                  <td>{{ '%.0f'|format(r.previsto_dia) }}</td>
+                  <td>{{ '%.0f'|format(r.previsto_total) }}</td>
+                  <td>{{ '%.0f'|format(r.realizado_dia) }}</td>
+                  <td>{{ '%.0f'|format(r.realizado_total) }}</td>
+                  <td>{{ '%.0f'|format(r.dif) }}</td>
+                  <td>{{ '%.2f'|format(r.atraso) }}</td>
+                </tr>
               {% endfor %}
-            </tbody>
-          </table>
-        {% else %}
-          <p class="muted">Selecione EH, Frente e Data e clique em <strong>Aplicar</strong>.</p>
-        {% endif %}
+            {% else %}
+              <tr><td colspan="7">Nenhum registro encontrado para os filtros.</td></tr>
+            {% endif %}
+          </tbody>
+        </table>
       </div>
 
-      <!-- GRÁFICO 50% -->
+      <!-- Gráfico 50% -->
       <div>
         <canvas id="acompChart"></canvas>
       </div>
     </div>
-
   </div>
 </details>
 
-<!-- ===================================================== -->
-<!-- 2) PARTE DIÁRIA (fechado por padrão)                   -->
-<!-- ===================================================== -->
-<details class="card" {% if open_pd %}open{% endif %}>
-  <summary>🧰 Parte Diária <span class="chip">Eventos do dia</span></summary>
+<!-- PART DIÁRIA (fechado por padrão) -->
+<details class="card mb-2">
+  <summary class="card-header flex-between">
+    <div class="flex items-center gap-2">
+      <span class="icon">⏱️</span>
+      <strong>PartDiária</strong>
+    </div>
+  </summary>
   <div class="card-body">
-
-    <form class="toolbar" method="get" action="{{ url_for('operacao.producao') }}">
-      <input type="hidden" name="open_pd" value="1">
-      <label>
-        Máquina
-        <select name="maq" required>
-          <option value="">– selecione –</option>
-          {% for m in maq_list %}
-            <option value="{{ m.id }}" {% if sel_maq and sel_maq|int == m.id %}selected{% endif %}>{{ m.tag }} — {{ m.descricao }}</option>
-          {% endfor %}
-        </select>
-      </label>
-      <label>
-        Data
-        <input type="date" name="dt_pd" value="{{ sel_dt_pd or '' }}">
-      </label>
-
-      <!-- preservar aberturas dos outros painéis se estavam abertos -->
-      {% if open_acomp %}<input type="hidden" name="open_acomp" value="1">{% endif %}
-      {% if open_frentes %}<input type="hidden" name="open_frentes" value="1">{% endif %}
-
-      <button class="btn" type="submit">Aplicar</button>
-      <a class="btn btn-outline" href="{{ url_for('operacao.producao', open_pd=1) }}">Limpar</a>
-    </form>
-
-    <div class="grid-2">
-      <!-- TABELA 50% -->
-      <div>
-        {% if pd_lista and pd_lista|length %}
-          <table class="table">
-            <thead>
-              <tr>
-                <th>Evento</th>
-                <th>Início</th>
-                <th>Fim</th>
-                <th class="right">Horas</th>
-              </tr>
-            </thead>
-            <tbody>
+    <div class="grid grid-2">
+      <!-- Tabela 50% -->
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Evento</th><th>Início</th><th>Fim</th><th>Duração</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% if pd_lista %}
               {% for r in pd_lista %}
-              <tr>
-                <td>{{ r.evento }}</td>
-                <td>{{ r.inicio }}</td>
-                <td>{{ r.fim }}</td>
-                <td class="right">{{ '%.2f'|format(r.horas or 0) }}</td>
-              </tr>
+                {% set mm = (r.minutos or 0)|float %}
+                {% set hh = (mm // 60)|int %}
+                {% set rm = (mm % 60)|int %}
+                <tr>
+                  <td>{{ r.evento }}</td>
+                  <td>{{ r.inicio }}</td>
+                  <td>{{ r.fim }}</td>
+                  <td>{{ '%02d:%02d'|format(hh, rm) }}</td>
+                </tr>
               {% endfor %}
-            </tbody>
-          </table>
-        {% else %}
-          <p class="muted">Selecione Máquina e Data e clique em <strong>Aplicar</strong>.</p>
-        {% endif %}
+            {% else %}
+              <tr><td colspan="4">Nenhum registro para a máquina/data selecionadas.</td></tr>
+            {% endif %}
+          </tbody>
+        </table>
       </div>
 
-      <!-- GRÁFICO 50% -->
+      <!-- Gráfico 50% -->
       <div>
         <canvas id="pdChart"></canvas>
       </div>
     </div>
-
   </div>
 </details>
 
-<!-- ===================================================== -->
-<!-- 3) FRENTES (fechado por padrão)                        -->
-<!-- ===================================================== -->
-<details class="card" {% if open_frentes %}open{% endif %}>
-  <summary>🧩 Frentes <span class="chip">Resumo mensal por EH</span></summary>
+<!-- FRENTES (fechado por padrão) -->
+<details class="card mb-2">
+  <summary class="card-header flex-between">
+    <div class="flex items-center gap-2">
+      <span class="icon">🧱</span>
+      <strong>Resumo EH (Frentes)</strong>
+    </div>
+  </summary>
   <div class="card-body">
-
-    <form class="toolbar" method="get" action="{{ url_for('operacao.producao') }}">
-      <input type="hidden" name="open_frentes" value="1">
-      <label>
-        EH
-        <select name="fr_eh" required>
-          <option value="">– selecione –</option>
-          {% for e in eh_list %}
-            <option value="{{ e.id }}" {% if fr_eh and fr_eh|int == e.id %}selected{% endif %}>{{ e.eh }}</option>
-          {% endfor %}
-        </select>
-      </label>
-      <label>
-        Data de referência (mês)
-        <input type="date" name="fr_mes" value="{{ fr_mes or '' }}">
-      </label>
-
-      <!-- preservar aberturas dos outros painéis -->
-      {% if open_acomp %}<input type="hidden" name="open_acomp" value="1">{% endif %}
-      {% if open_pd %}<input type="hidden" name="open_pd" value="1">{% endif %}
-
-      <button class="btn" type="submit">Aplicar</button>
-      <a class="btn btn-outline" href="{{ url_for('operacao.producao', open_frentes=1) }}">Limpar</a>
-    </form>
-
-    {% if fr_rows and fr_rows|length %}
-      <table class="table">
+    <div class="table-wrap">
+      <table>
         <thead>
           <tr>
-            <th>Frente</th>
-            <th class="right">Planejado (Mês)</th>
-            <th class="right">Realizado (Mês)</th>
-            <th class="right">Dif.</th>
-            <th class="right">% Exec.</th>
-            <th class="right">Atraso (dias)</th>
+            <th>DATA</th>
+            <th colspan="3">CARREGAMENTO</th>
+            <th colspan="3">REMOÇÃO DE GRAMPOS</th>
+            <th colspan="3">REMOÇÃO DE GALOCHAS</th>
+            <th colspan="3">APLICAÇÃO DE GRAMPOS</th>
+          </tr>
+          <tr>
+            <th></th>
+            <th>CARREGADO</th><th>SALDO</th><th>ACUMULADO</th>
+            <th>REMOÇÃO</th><th>FRENTE</th><th>ACUMULADO</th>
+            <th>REMOÇÃO</th><th>FRENTE</th><th>ACUMULADO</th>
+            <th>APLICADO</th><th>FRENTE</th><th>ACUMULADO</th>
           </tr>
         </thead>
         <tbody>
-          {% for r in fr_rows %}
-          <tr>
-            <td>{{ r.frente }}</td>
-            <td class="right">{{ r.planejado_total or 0 }}</td>
-            <td class="right">{{ r.realizado_total or 0 }}</td>
-            <td class="right">{{ r.dif or 0 }}</td>
-            <td class="right">{{ r.perc_exec is not none and ('%.2f%%'|format(r.perc_exec)) or '—' }}</td>
-            <td class="right">{{ r.atraso is not none and ('%.2f'|format(r.atraso)) or '—' }}</td>
-          </tr>
-          {% endfor %}
+          {% if frentes_rows and frentes_rows|length %}
+            {% for r in frentes_rows %}
+              <tr>
+                <td>{{ r.data.strftime('%d/%m/%Y') }}</td>
+                <td>{{ r.carregado }}</td><td>{{ r.saldo }}</td><td>{{ r.acum_carregado }}</td>
+                <td>{{ r.rem_grampos }}</td><td>{{ r.frente_grampos }}</td><td>{{ r.acum_grampos }}</td>
+                <td>{{ r.rem_galochas }}</td><td>{{ r.frente_galochas }}</td><td>{{ r.acum_galochas }}</td>
+                <td>{{ r.aplicado }}</td><td>{{ r.frente_aplicado }}</td><td>{{ r.acum_aplicado }}</td>
+              </tr>
+            {% endfor %}
+          {% else %}
+            <tr><td colspan="13">Sem dados para os filtros (estrutura pronta para ligar às suas medições/atividades).</td></tr>
+          {% endif %}
         </tbody>
       </table>
-    {% else %}
-      <p class="muted">Selecione uma EH e uma Data de referência e clique em <strong>Aplicar</strong>.</p>
-    {% endif %}
-
+    </div>
   </div>
 </details>
 
-{% if msg %}
-  <p class="muted">{{ msg }}</p>
-{% endif %}
+<!-- DESCARGA & SEGREGAÇÃO (fechado por padrão) -->
+<details class="card">
+  <summary class="card-header flex-between">
+    <div class="flex items-center gap-2">
+      <span class="icon">🚧</span>
+      <strong>Descarga e Segregação de Dormentes</strong>
+    </div>
+  </summary>
+  <div class="card-body">
+    <form class="grid grid-4 mb-2" method="get" action="{{ url_for('operacao.producao') }}">
+      <input type="hidden" name="eh" value="{{ sel_eh or '' }}">
+      <input type="hidden" name="fr" value="{{ sel_fr or '' }}">
+      <input type="hidden" name="dt" value="{{ sel_dt or '' }}">
+      <input type="hidden" name="maq" value="{{ sel_maq or '' }}">
+      <label><span>Início</span><input type="date" name="dsd_ini" value="{{ dsd_i or '' }}"></label>
+      <label><span>Fim</span><input type="date" name="dsd_fim" value="{{ dsd_f or '' }}"></label>
+      <div class="flex items-end gap-2">
+        <button class="btn btn-primary" type="submit">Aplicar</button>
+        <a class="btn" href="{{ url_for('operacao.producao', eh=sel_eh, fr=sel_fr, dt=sel_dt, maq=sel_maq) }}">Limpar</a>
+      </div>
+    </form>
 
-<!-- Chart.js (assuma que não está no base) -->
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>DATA</th>
+            <th colspan="4">DESCARREGAMENTO</th>
+            <th colspan="4">SEGREGAÇÃO</th>
+          </tr>
+          <tr>
+            <th>EH</th>
+            <th>NOVO</th><th>ACUMULADO</th><th>EH/PÁTIO</th>
+            <th>VELHO</th><th>ACUMULADO</th><th>EH/PÁTIO</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if dsd_rows and dsd_rows|length %}
+            {% for r in dsd_rows %}
+              <tr>
+                <td>{{ r.data.strftime('%d/%m/%Y') }}</td>
+                <td>{{ r.novo }}</td><td>{{ r.acum_novo }}</td><td>{{ r.eh_nome }}</td>
+                <td>{{ r.velho }}</td><td>{{ r.acum_velho }}</td><td>{{ r.eh_nome }}</td>
+              </tr>
+            {% endfor %}
+          {% else %}
+            <tr><td colspan="7">Configure a origem dos “executados” para exibir esta sessão (estrutura já pronta).</td></tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</details>
+
+<!-- Scripts dos gráficos -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
 <script>
-  // ========== ACOMPANHAMENTO ==========
-  (function(){
-    const labels = {{ acomp_chart.labels|tojson }};
-    const prevDia = {{ acomp_chart.prev_dia|tojson }};
-    const realDia = {{ acomp_chart.real_dia|tojson }};
-    const prevTot = {{ acomp_chart.prev_tot|tojson }};
-    const realTot = {{ acomp_chart.real_tot|tojson }};
+(function(){
+  // Acompanhamento
+  const lbls = {{ chart_prod.labels|tojson }};
+  const prevDia = {{ chart_prod.prev_dia|tojson }};
+  const realDia = {{ chart_prod.real_dia|tojson }};
+  const prevTot = {{ chart_prod.prev_tot|tojson }};
+  const realTot = {{ chart_prod.real_tot|tojson }};
 
-    const el = document.getElementById('acompChart');
-    if (el && labels && labels.length) {
-      new Chart(el.getContext('2d'), {
-        type: 'bar',
-        data: {
-          labels,
-          datasets: [
-            { label: 'Previsto (dia)', data: prevDia },
-            { label: 'Realizado (dia)', data: realDia },
-            { label: 'Previsto (acum.)', data: prevTot, type: 'line' },
-            { label: 'Realizado (acum.)', data: realTot, type: 'line' }
-          ]
+  if (document.getElementById('acompChart')) {
+    const ctx = document.getElementById('acompChart').getContext('2d');
+    new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: lbls,
+        datasets: [
+          { label: 'PREVISTO DIA', data: prevDia, yAxisID: 'y', order: 2 },
+          { label: 'REALIZADO DIA', data: realDia, yAxisID: 'y', order: 2 },
+          { label: 'PREVISTO TOTAL', data: prevTot, yAxisID: 'y1', type: 'line', order: 1 },
+          { label: 'REALIZADO TOTAL', data: realTot, yAxisID: 'y1', type: 'line', order: 1 },
+        ]
+      },
+      options: {
+        responsive: true,
+        scales: {
+          y: { position: 'left', title: { display:true, text:'Barras (Previsto/Realizado Dia)'} },
+          y1:{ position: 'right', grid:{ drawOnChartArea:false }, title:{ display:true, text:'Linhas (Total Acumulado)'} }
+        }
+      }
+    });
+  }
+
+  // PartDiária — converte minutos em HH:MM nos tooltips
+  const pdLbls = {{ pd_graf.labels|tojson }};
+  const pdMin  = {{ pd_graf.minutos|tojson }};
+  if (document.getElementById('pdChart')) {
+    const ctx2 = document.getElementById('pdChart').getContext('2d');
+    new Chart(ctx2, {
+      type: 'bar',
+      data: { labels: pdLbls, datasets:[{ label:'Horas no dia', data: pdMin }] },
+      options: {
+        parsing:false,
+        plugins:{
+          tooltip:{
+            callbacks:{
+              label:(ctx)=>{
+                const m = ctx.raw || 0;
+                const hh = Math.floor(m/60), mm = Math.floor(m%60);
+                return `${ctx.dataset.label}: ${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`;
+              }
+            }
+          }
         },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          interaction: { mode: 'index', intersect: false },
-          plugins: { legend: { position: 'top' } },
-          scales: { x: { grid: { display:false } }, y: { beginAtZero:true } }
+        scales:{
+          y:{ ticks:{ callback:(v)=>{ const m=v; const hh=Math.floor(m/60), mm=Math.floor(m%60); return `${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`; } } }
         }
-      });
-    }
-  })();
-
-  // ========== PARTE DIÁRIA ==========
-  (function(){
-    const labels = {{ pd_chart.labels|tojson }};
-    const horas  = {{ pd_chart.horas|tojson }};
-    const el = document.getElementById('pdChart');
-    if (el && labels && labels.length) {
-      new Chart(el.getContext('2d'), {
-        type: 'bar',
-        data: { labels, datasets: [{ label: 'Horas no dia', data: horas }] },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { position: 'top' } },
-          scales: { x: { grid: { display:false } }, y: { beginAtZero:true } }
-        }
-      });
-    }
-  })();
+      }
+    });
+  }
+})();
 </script>
+
+<style>
+  .grid-6 { display:grid; grid-template-columns: repeat(6,minmax(0,1fr)); gap:.75rem }
+  .grid-4 { display:grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap:.75rem }
+  .grid-2 { display:grid; grid-template-columns: 1fr 1fr; gap:1rem }
+  .table-wrap { overflow:auto; max-height: 52vh; }
+  details.card { border-radius: 10px; }
+  details > summary { cursor: pointer; list-style: none; }
+  details > summary::-webkit-details-marker { display:none; }
+</style>
 
 {% endblock %}
