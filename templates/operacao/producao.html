@@ -58,48 +58,49 @@
     </div>
   </div>
   <div class="fx-card-body">
-    <form id="frmProdFiltro" method="get" action="{{ url_for('operacao.producao') }}">
-      <div class="row g-3">
-        <div class="col-12 col-lg-3">
-          <label class="form-label small muted">EH</label>
-          <select name="eh" class="form-select">
-            <option value="">-- selecione --</option>
-            {% for e in eh_list %}
-              <option value="{{ e.id }}" {{ 'selected' if sel_eh and sel_eh|string==e.id|string else '' }}>
-                {{ e.eh }}
-              </option>
-            {% endfor %}
-          </select>
-        </div>
-        <div class="col-12 col-lg-3">
-          <label class="form-label small muted">Frente</label>
-          <select name="fr" class="form-select">
-            <option value="">-- selecione --</option>
-            {% for f in fr_list %}
-              <option value="{{ f.id }}" {{ 'selected' if sel_fr and sel_fr|string==f.id|string else '' }}>
-                {{ f.frente }}
-              </option>
-            {% endfor %}
-          </select>
-        </div>
-        <div class="col-12 col-lg-3">
-          <label class="form-label small muted">Data</label>
-          <input type="date" name="dt" class="form-control" value="{{ sel_dt or '' }}">
-        </div>
-        <div class="col-12 col-lg-3">
-          <label class="form-label small muted">Máquina (PartDiária)</label>
-          <select name="maq" class="form-select">
-            <option value="">-- selecione --</option>
-            {% for m in maq_list %}
-              <option value="{{ m.id }}" {{ 'selected' if sel_maq and sel_maq|string==m.id|string else '' }}>
-                {{ m.tag }} · {{ m.descricao }}
-              </option>
-            {% endfor %}
-          </select>
-        </div>
-      </div>
-    </form>
-  </div>
+	<form id="frmProdFiltro" method="get" action="{{ url_for('operacao.producao') }}">
+	  <div class="row g-2 align-items-end">
+		<div class="col-12 col-xl-3 col-lg-3 col-md-6">
+		  <label class="form-label small muted">EH</label>
+		  <select name="eh" class="form-select">
+			<option value="">-- selecione --</option>
+			{% for e in eh_list %}
+			  <option value="{{ e.id }}" {{ 'selected' if sel_eh and sel_eh|string==e.id|string else '' }}>{{ e.eh }}</option>
+			{% endfor %}
+		  </select>
+		</div>
+
+		<div class="col-12 col-xl-3 col-lg-3 col-md-6">
+		  <label class="form-label small muted">Frente</label>
+		  <select name="fr" class="form-select">
+			<option value="">-- selecione --</option>
+			{% for f in fr_list %}
+			  <option value="{{ f.id }}" {{ 'selected' if sel_fr and sel_fr|string==f.id|string else '' }}>{{ f.frente }}</option>
+			{% endfor %}
+		  </select>
+		</div>
+
+		<div class="col-12 col-xl-3 col-lg-3 col-md-6">
+		  <label class="form-label small muted">Data</label>
+		  <input type="date" name="dt" class="form-control" value="{{ sel_dt or '' }}">
+		</div>
+
+		<div class="col-12 col-xl-2 col-lg-2 col-md-6">
+		  <label class="form-label small muted">Máquina (PartDiária)</label>
+		  <select name="maq" class="form-select">
+			<option value="">-- selecione --</option>
+			{% for m in maq_list %}
+			  <option value="{{ m.id }}" {{ 'selected' if sel_maq and sel_maq|string==m.id|string else '' }}>{{ m.tag }} · {{ m.descricao }}</option>
+			{% endfor %}
+		  </select>
+		</div>
+
+		<div class="col-12 col-xl-1 col-lg-1 col-md-12 d-grid gap-2">
+		  <button form="frmProdFiltro" type="submit" class="btn-icon">Aplicar</button>
+		  <a class="btn-outline text-center" href="{{ url_for('operacao.producao') }}">Limpar</a>
+		</div>
+	  </div>
+	</form>
 </div>
 
 <!-- ==================== ACOMPANHAMENTO (começa fechado) ==================== -->
