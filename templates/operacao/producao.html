@@ -1,439 +1,610 @@
-{% extends "base.html" %}
-{% set brown = "#501E0A" %}
+{# templates/operacao/producao.html #}
+{% extends 'layout.html' %}
+
+{% block title %}Produção PRUMAT{% endblock %}
 
 {% block content %}
 
-<!-- ====== MACROS ====== -->
-{% macro hhmm_from_hours(h) -%}
-  {%- if h is not defined or h is none -%}
-    00:00
-  {%- else -%}
-    {%- set mins = (h * 60) | round(0, 'floor') -%}
-    {%- set hh = (mins // 60) | int -%}
-    {%- set mm = (mins % 60) | int -%}
-    {{ "%02d:%02d"|format(hh, mm) }}
-  {%- endif -%}
-{%- endmacro %}
-
-{% macro hhmm_from_minutes(m) -%}
-  {%- if m is not defined or m is none -%}
-    00:00
-  {%- else -%}
-    {%- set mm = m|int -%}
-    {%- set hh = (mm // 60) | int -%}
-    {%- set rm = (mm % 60) | int -%}
-    {{ "%02d:%02d"|format(hh, rm) }}
-  {%- endif -%}
-{%- endmacro %}
-
 <style>
-  /* pequenos ajustes para as tabelas desta página */
-  .tbl th { background:#0b0f1a; color:#fff; font-weight:600; }
-  .tbl th,.tbl td { padding:.55rem .75rem; vertical-align:middle; }
-  .tbl .is-today { background:#e9f7ef; } /* verde bem claro */
-  .split-50 .col-left, .split-50 .col-right { width:100%; }
-  @media (min-width: 992px){
-    .split-50 { display:flex; gap:1rem; }
-    .split-50 .col-left, .split-50 .col-right { width:50%; }
-  }
-  .muted { color:#6c757d; }
-  .fx-card { border:1px solid #e6e8ec; border-radius:.6rem; background:#fff; }
-  .fx-card + .fx-card { margin-top:1rem; }
-  .fx-card-head { padding:.6rem .9rem; background:#eef1f6; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #e6e8ec; border-top-left-radius:.6rem; border-top-right-radius:.6rem; }
-  .fx-card-head h3 { font-size:1.05rem; margin:0; display:flex; align-items:center; gap:.5rem; }
-  .fx-card-tools { display:flex; align-items:center; gap:.5rem; }
-  .fx-card-body { padding: .9rem; }
-  .btn-icon { border:0; background:#0b2d50; color:#fff; padding:.4rem .6rem; border-radius:.4rem; }
-  .btn-outline { border:1px solid #c9d1e0; background:#fff; color:#0b2d50; padding:.35rem .6rem; border-radius:.4rem; }
-  .collapse-toggle { cursor:pointer; }
+    body {
+        font-size: 0.78rem;
+    }
+    select, input, button {
+        font-size: 0.7rem;
+        padding: 0.25rem 0.45rem;
+    }
+    .table th, .table td {
+        padding: 0.1rem 0.3rem;
+        font-size: 0.65rem;
+        white-space: nowrap;
+    }
+    .table.table {
+        width: 100%;
+        max-width: 650px;
+        margin-left: 0;
+    }
+    .tabela-fixa {
+        width: 100%;
+        max-width: 1100px;
+        margin: 0 auto;
+    }
+    canvas#graficoProducao, canvas#graficoPartDiaria {
+        height: 300px !important;
+        max-height: 320px;
+    }
+    .gauge-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 24px;
+        justify-content: center;
+        margin-top: 40px;
+    }
+    .gauge-item {
+        position: relative;
+        width: 140px;
+        height: 140px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+    .gauge-item canvas {
+        width: 100% !important;
+        height: 100% !important;
+    }
+    .gauge-item img {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 36px;
+        height: 36px;
+        transform: translate(-50%, -50%);
+        z-index: 5;
+        pointer-events: none;
+    }
+    .gauge-label {
+        text-align: center;
+        font-weight: bold;
+        font-size: 0.75rem;
+        margin-top: 6px;
+    }
+    .linha-destaque {
+        background-color: #E2EFDA !important;
+    }
 </style>
 
-<!-- ==================== FILTRO PRINCIPAL (fixo, sempre aberto) ==================== -->
-<div class="fx-card">
-  <div class="fx-card-head">
-    <h3><span>🧭</span><span>Operação · Produção</span></h3>
-    <div class="fx-card-tools">
-      <button form="frmProdFiltro" type="submit" class="btn-icon">Aplicar</button>
-      <a class="btn-outline" href="{{ url_for('operacao.producao') }}">Limpar</a>
+<!-- Chart.js e plugin -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+
+<div class="container p-1">
+
+    <!-- Cabeçalho contrato -->
+    <div class="table-responsive mb-3">
+        <table class="table table-bordered align-middle text-center w-100" style="border-color: #007472;">
+            <tr>
+                <td rowspan="2" style="width: 15%;">
+                    <img src="{{ url_for('static', filename='vale-logo.png') }}" alt="Logo Vale" style="height: 40px;">
+                </td>
+                <td><strong>CONTRATO</strong></td>
+                <td>5900124188</td>
+                <td><strong>EMPRESA</strong></td>
+                <td>PRUMAT</td>
+                <td rowspan="2" style="width: 15%;">
+                    <img src="{{ url_for('static', filename='prumat-logo.png') }}" alt="Logo PRUMAT" style="height: 40px;">
+                </td>
+            </tr>
+            <tr>
+                <td><strong>ESCOPO</strong></td>
+                <td colspan="3">Operação e Manutenção Renovadora P-190 EFVM</td>
+            </tr>
+        </table>
     </div>
-  </div>
-  <div class="fx-card-body">
-	<form id="frmProdFiltro" method="get" action="{{ url_for('operacao.producao') }}">
-	  <div class="row g-2 align-items-end">
-		<div class="col-12 col-xl-3 col-lg-3 col-md-6">
-		  <label class="form-label small muted">EH</label>
-		  <select name="eh" class="form-select">
-			<option value="">-- selecione --</option>
-			{% for e in eh_list %}
-			  <option value="{{ e.id }}" {{ 'selected' if sel_eh and sel_eh|string==e.id|string else '' }}>{{ e.eh }}</option>
-			{% endfor %}
-		  </select>
-		</div>
 
-		<div class="col-12 col-xl-3 col-lg-3 col-md-6">
-		  <label class="form-label small muted">Frente</label>
-		  <select name="fr" class="form-select">
-			<option value="">-- selecione --</option>
-			{% for f in fr_list %}
-			  <option value="{{ f.id }}" {{ 'selected' if sel_fr and sel_fr|string==f.id|string else '' }}>{{ f.frente }}</option>
-			{% endfor %}
-		  </select>
-		</div>
-
-		<div class="col-12 col-xl-3 col-lg-3 col-md-6">
-		  <label class="form-label small muted">Data</label>
-		  <input type="date" name="dt" class="form-control" value="{{ sel_dt or '' }}">
-		</div>
-
-		<div class="col-12 col-xl-2 col-lg-2 col-md-6">
-		  <label class="form-label small muted">Máquina (PartDiária)</label>
-		  <select name="maq" class="form-select">
-			<option value="">-- selecione --</option>
-			{% for m in maq_list %}
-			  <option value="{{ m.id }}" {{ 'selected' if sel_maq and sel_maq|string==m.id|string else '' }}>{{ m.tag }} · {{ m.descricao }}</option>
-			{% endfor %}
-		  </select>
-		</div>
-
-		<div class="col-12 col-xl-1 col-lg-1 col-md-12 d-grid gap-2">
-		  <button form="frmProdFiltro" type="submit" class="btn-icon">Aplicar</button>
-		  <a class="btn-outline text-center" href="{{ url_for('operacao.producao') }}">Limpar</a>
-		</div>
-	  </div>
-	</form>
-</div>
-
-<!-- ==================== ACOMPANHAMENTO (começa fechado) ==================== -->
-<div class="fx-card" data-collapse>
-  <div class="fx-card-head">
-    <h3 class="collapse-toggle" data-target="#acc-body"><span>📊</span><span>Acompanhamento</span></h3>
-    <div class="fx-card-tools"><button class="btn-outline collapse-toggle" data-target="#acc-body">▼</button></div>
-  </div>
-  <div class="fx-card-body" id="acc-body" style="display:none;">
-    <div class="split-50">
-      <div class="col-left">
-        <div class="table-responsive">
-          <table class="table table-sm align-middle tbl">
-            <thead>
-              <tr>
-                <th>DATA</th>
-                <th class="text-end">PREVISTO DIA</th>
-                <th class="text-end">PREVISTO TOTAL</th>
-                <th class="text-end">REALIZADO DIA</th>
-                <th class="text-end">REALIZADO TOTAL</th>
-                <th class="text-end">DIF.</th>
-                <th class="text-end">ATRASO</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% if prod_rows and prod_rows|length>0 %}
-                {% for r in prod_rows %}
-                  <tr class="{{ 'is-today' if sel_dt and r.data and r.data.isoformat()==sel_dt else '' }}">
-                    <td>{{ r.data.strftime("%d/%m/%Y") if r.data }}</td>
-                    <td class="text-end">{{ r.previsto_dia }}</td>
-                    <td class="text-end">{{ r.previsto_total }}</td>
-                    <td class="text-end">{{ r.realizado_dia }}</td>
-                    <td class="text-end">{{ r.realizado_total }}</td>
-                    <td class="text-end">{{ r.dif }}</td>
-                    <td class="text-end">{{ "%.2f"|format((r.atraso or 0)) }}</td>
-                  </tr>
+    <!-- Filtros -->
+    <form method="GET" class="row g-2 mb-3">
+        <div class="col-md-4">
+            <label for="eh_id" class="form-label fw-semibold">Selecionar EH:</label>
+            <select name="eh_id" id="eh_id" class="form-select" onchange="this.form.submit()">
+                {% for eh in ehs %}
+                    <option value="{{ eh.id }}" {% if eh.id == eh_id %}selected{% endif %}>{{ eh.nome }}</option>
                 {% endfor %}
-              {% else %}
-                <tr><td colspan="7" class="text-center text-muted">Nenhum registro encontrado para esta EH/Frente.</td></tr>
-              {% endif %}
-            </tbody>
-          </table>
+            </select>
         </div>
-      </div>
-      <div class="col-right">
-        <canvas id="accChart" height="180"></canvas>
-        <div class="small muted mt-2">Barras: Previsto/Realizado do dia · Linhas: Acumulados.</div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- ==================== PART DIÁRIA (começa fechado) ==================== -->
-<div class="fx-card" data-collapse>
-  <div class="fx-card-head">
-    <h3 class="collapse-toggle" data-target="#pd-body"><span>⏱️</span><span>PartDiária</span></h3>
-    <div class="fx-card-tools"><button class="btn-outline collapse-toggle" data-target="#pd-body">▼</button></div>
-  </div>
-  <div class="fx-card-body" id="pd-body" style="display:none;">
-    <div class="split-50">
-      <div class="col-left">
-        <div class="table-responsive">
-          <table class="table table-sm align-middle tbl">
-            <thead>
-              <tr>
-                <th>EVENTO</th>
-                <th>INÍCIO</th>
-                <th>FIM</th>
-                <th class="text-end">DURAÇÃO</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% if pd_lista and pd_lista|length>0 %}
-                {% for r in pd_lista %}
-                  <tr>
-                    <td>{{ r.evento }}</td>
-                    <td>{{ r.inicio }}</td>
-                    <td>{{ r.fim }}</td>
-                    <td class="text-end">
-                      {# preferimos horas_txt (HH:MM). se não vier, convertemos a partir de horas (float) #}
-                      {% if r.horas_txt is defined and r.horas_txt %}
-                        {{ r.horas_txt }}
-                      {% else %}
-                        {{ hhmm_from_hours(r.horas) }}
-                      {% endif %}
-                    </td>
-                  </tr>
-                {% endfor %}
-              {% else %}
-                <tr><td colspan="4" class="text-center text-muted">Nenhum registro para a máquina/data selecionadas.</td></tr>
-              {% endif %}
-            </tbody>
-          </table>
+        <div class="col-md-2">
+            <label for="data_partdiaria" class="form-label fw-semibold">Selecionar Data:</label>
+            <input type="date" name="data_partdiaria" id="data_partdiaria"
+                   class="form-control" value="{{ data_partdiaria }}" onchange="this.form.submit()">
         </div>
-      </div>
-      <div class="col-right">
-        <canvas id="pdChart" height="180"></canvas>
-        <div class="small muted mt-2">Gráfico por atividade (total do dia em HH:MM).</div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- ==================== RESUMO EH (FRENTES) ==================== -->
-<div class="fx-card" data-collapse>
-  <div class="fx-card-head">
-    <h3 class="collapse-toggle" data-target="#fr-body"><span>🧱</span><span>Resumo EH (Frentes)</span></h3>
-    <div class="fx-card-tools"><button class="btn-outline collapse-toggle" data-target="#fr-body">▼</button></div>
-  </div>
-  <div class="fx-card-body" id="fr-body" style="display:none;">
-    <div class="table-responsive">
-      <table class="table table-sm align-middle tbl">
-        <thead>
-          <tr>
-            <th rowspan="2">DATA</th>
-
-            <th colspan="3" class="text-center">CARREGAMENTO</th>
-            <th colspan="3" class="text-center">REMOÇÃO DE GRAMPOS</th>
-            <th colspan="3" class="text-center">REMOÇÃO DE GALOCHAS</th>
-            <th colspan="3" class="text-center">APLICAÇÃO DE GRAMPOS</th>
-          </tr>
-          <tr>
-            <th class="text-end">CARREGADO</th>
-            <th class="text-end">SALDO</th>
-            <th class="text-end">ACUMULADO</th>
-
-            <th class="text-end">REMOÇÃO</th>
-            <th class="text-end">FRENTE</th>
-            <th class="text-end">ACUMULADO</th>
-
-            <th class="text-end">REMOÇÃO</th>
-            <th class="text-end">FRENTE</th>
-            <th class="text-end">ACUMULADO</th>
-
-            <th class="text-end">APLICADO</th>
-            <th class="text-end">FRENTE</th>
-            <th class="text-end">ACUMULADO</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% if fr_rows and fr_rows|length>0 %}
-            {% for r in fr_rows %}
-              <tr>
-                <td>{{ r.data.strftime("%d/%m/%Y") if r.data }}</td>
-
-                <td class="text-end">{{ r.carregado }}</td>
-                <td class="text-end">{{ r.saldo }}</td>
-                <td class="text-end">{{ r.acum_carregado }}</td>
-
-                <td class="text-end">{{ r.rem_grampos }}</td>
-                <td class="text-end">{{ r.frente_grampos }}</td>
-                <td class="text-end">{{ r.acum_grampos }}</td>
-
-                <td class="text-end">{{ r.rem_galochas }}</td>
-                <td class="text-end">{{ r.frente_galochas }}</td>
-                <td class="text-end">{{ r.acum_galochas }}</td>
-
-                <td class="text-end">{{ r.aplicado }}</td>
-                <td class="text-end">{{ r.frente_aplicado }}</td>
-                <td class="text-end">{{ r.acum_aplicado }}</td>
-              </tr>
-            {% endfor %}
-          {% else %}
-            <tr><td colspan="13" class="text-center text-muted">Nenhum dado para a EH selecionada.</td></tr>
-          {% endif %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-</div>
-
-<!-- ==================== DESCARGA E SEGREGAÇÃO DE DORMENTES ==================== -->
-<div class="fx-card" data-collapse>
-  <div class="fx-card-head">
-    <h3 class="collapse-toggle" data-target="#dsd-body"><span>🪵</span><span>Descarga e Segregação de Dormentes</span></h3>
-    <div class="fx-card-tools"><button class="btn-outline collapse-toggle" data-target="#dsd-body">▼</button></div>
-  </div>
-  <div class="fx-card-body" id="dsd-body" style="display:none;">
-    <!-- filtros próprios deste bloco (independentes do topo) -->
-    <form class="row g-3 mb-3" method="get" action="{{ url_for('operacao.producao') }}">
-      <!-- manter seleção global na query + sobrescrever o intervalo específico -->
-      <input type="hidden" name="eh" value="{{ sel_eh or '' }}">
-      <input type="hidden" name="fr" value="{{ sel_fr or '' }}">
-      <input type="hidden" name="dt" value="{{ sel_dt or '' }}">
-      <input type="hidden" name="maq" value="{{ sel_maq or '' }}">
-
-      <div class="col-12 col-md-3">
-        <label class="form-label small muted">Início</label>
-        <input type="date" name="dsd_ini" class="form-control" value="{{ dsd_ini or '' }}">
-      </div>
-      <div class="col-12 col-md-3">
-        <label class="form-label small muted">Fim</label>
-        <input type="date" name="dsd_fim" class="form-control" value="{{ dsd_fim or '' }}">
-      </div>
-      <div class="col-12 col-md-3 d-flex align-items-end">
-        <button type="submit" class="btn-icon">Aplicar</button>
-      </div>
     </form>
 
-    <div class="table-responsive">
-      <table class="table table-sm align-middle tbl">
-        <thead>
-          <tr>
-            <th rowspan="2">DATA</th>
-
-            <th colspan="2" class="text-center">DESCARREGAMENTO (VELHO)</th>
-            <th colspan="2" class="text-center">DESCARREGAMENTO (NOVO)</th>
-            <th colspan="3" class="text-center">SEGREGAÇÃO (NOVO)</th>
-            <th colspan="3" class="text-center">SEGREGAÇÃO (VELHO)</th>
-          </tr>
-          <tr>
-            <th class="text-end">NOVO</th>
-            <th class="text-end">ACUMULADO</th>
-
-            <th class="text-end">VELHO</th>
-            <th class="text-end">ACUMULADO</th>
-
-            <th class="text-end">NOVO</th>
-            <th class="text-end">ACUMULADO</th>
-            <th>EH/PÁTIO</th>
-
-            <th class="text-end">VELHO</th>
-            <th class="text-end">ACUMULADO</th>
-            <th>EH/PÁTIO</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% if dsd_rows and dsd_rows|length>0 %}
-            {% for r in dsd_rows %}
-              <tr>
-                <td>{{ r.data.strftime("%d/%m/%Y") if r.data }}</td>
-
-                <td class="text-end">{{ r.desc_velho_exec }}</td>
-                <td class="text-end">{{ r.desc_velho_acum }}</td>
-
-                <td class="text-end">{{ r.desc_novo_exec }}</td>
-                <td class="text-end">{{ r.desc_novo_acum }}</td>
-
-                <td class="text-end">{{ r.segr_novo_exec }}</td>
-                <td class="text-end">{{ r.segr_novo_acum }}</td>
-                <td>{{ r.segr_novo_eh_nome }}</td>
-
-                <td class="text-end">{{ r.segr_velho_exec }}</td>
-                <td class="text-end">{{ r.segr_velho_acum }}</td>
-                <td>{{ r.segr_velho_eh_nome }}</td>
-              </tr>
-            {% endfor %}
-          {% else %}
-            <tr><td colspan="12" class="text-center text-muted">Selecione um intervalo para exibir.</td></tr>
-          {% endif %}
-        </tbody>
-      </table>
+    <!-- Tabela Renovação + Gráfico -->
+    <div class="row">
+        <div class="col-md-5">
+            <div class="table-responsive">
+                <table class="table table-bordered table-striped align-middle text-center">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>DATA</th>
+                            <th>PREVISTO<br>DIA</th>
+                            <th>PREVISTO<br>TOTAL</th>
+                            <th>REALIZADO<br>DIA</th>
+                            <th>REALIZADO<br>TOTAL</th>
+                            <th>DIF.</th>
+                            <th>ATRASO</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for d in dados %}
+                            {% set d_data = d.data.strip() %}
+                            {% set filtro_data = data_partdiaria.strip() %}
+                            {% set destaque = 'background-color: #E2EFDA;' if d_data == filtro_data else '' %}
+                            <tr>
+                                <td style="{{ destaque }}">
+                                    {{ d.data.split('-')[2] }}-{{ d.data.split('-')[1] }}-{{ d.data.split('-')[0] }}
+                                </td>
+                                <td style="{{ destaque }}">{{ d.previsto_dia }}</td>
+                                <td style="{{ destaque }}">{{ d.previsto_total }}</td>
+                                <td style="{{ destaque }}">{{ d.realizado_dia }}</td>
+                                <td style="{{ destaque }}">{{ d.realizado_total }}</td>
+                                <td style="{{ destaque }}">{{ d.diferenca }}</td>
+                                <td style="{{ destaque }}">{{ d.atraso }} /dia</td>
+                            </tr>
+                        {% endfor %}
+                        {% if not dados %}
+                            <tr><td colspan="7">Nenhum registro encontrado para esta EH.</td></tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="col-md-7">
+            <canvas id="graficoProducao"></canvas>
+        </div>
     </div>
-  </div>
-</div>
 
-<!-- ========== Scripts: collapses + charts (proteção quando não há dados) ========== -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
+    <!-- Faixa de separação -->
+    <hr class="my-4">
+
+    <!-- Resumo Parte Diária -->
+    <div class="row">
+        <div class="col-md-5">
+            <div class="table-responsive md-3">
+                <table class="table table-bordered table-striped align-middle text-center">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>EVENTO</th>
+                            <th>INÍCIO</th>
+                            <th>FIM</th>
+                            <th>DURAÇÃO</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in dados_partdiaria %}
+                        <tr>
+                            <td>{{ item.atividade }}</td>
+                            <td>{{ item.hora_inicio }}</td>
+                            <td>{{ item.hora_fim }}</td>
+                            <td>
+                                {{ item.duracao|int // 60 }}:
+                                {% if item.duracao|int % 60 < 10 %}0{% endif %}
+                                {{ item.duracao|int % 60 }}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        {% if not dados_partdiaria %}
+                        <tr><td colspan="4">Nenhum registro para o equipamento P190-66001 na data selecionada.</td></tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="col-md-7">
+            <canvas id="graficoPartDiaria"></canvas>
+        </div>
+    </div>
+
+    <!-- Faixa de separação -->
+    <hr class="my-4">
+
+    <!-- Tabela Consolidada - Frentes Diversas -->
+    <div class="table-responsive tabela-fixa">
+        <table class="table table-bordered table-striped text-center align-middle">
+            <thead class="table-dark">
+                <tr>
+                    <th rowspan="2">DATA</th>
+                    <th colspan="4">CARREGAMENTO E DESCARREGAMENTO</th>
+                    <th colspan="3">REMOÇÃO GRAMPOS</th>
+                    <th colspan="3">REMOÇÃO GALOCHAS</th>
+                    <th colspan="2">PREGAÇÃO</th>
+                    <th colspan="2">SEGREGAÇÃO</th>
+                </tr>
+                <tr>
+                    <th>CARREGADO</th>
+                    <th>SALDO</th>
+                    <th>ACUMULADO</th>
+                    <th>DESC. VELHO / NOVO</th>
+                    <th>REMOÇÃO</th>
+                    <th>FRENTE ABERTA</th>
+                    <th>ACUMULADO</th>
+                    <th>REMOÇÃO</th>
+                    <th>FRENTE ABERTA</th>
+                    <th>ACUMULADO</th>
+                    <th>APLICADO</th>
+                    <th>ABERTO</th>
+                    <th>DMTs RUINS</th>
+                    <th>DMTs BONS</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for linha in dados_resumo_frentes %}
+                    {% set linha_data = linha.data.strip() %}
+                    {% set filtro_data = data_partdiaria.strip() %}
+                    {% set destaque = 'background-color: #E2EFDA;' if linha_data == filtro_data else '' %}
+                    <tr>
+                        <td style="{{ destaque }}">
+                            {{ linha.data.split('-')[2] }}-{{ linha.data.split('-')[1] }}-{{ linha.data.split('-')[0] }}
+                        </td>
+                        <td style="{{ destaque }}">{{ linha.carregado }}</td>
+                        <td style="{{ destaque }}">{{ linha.saldo }}</td>
+                        <td style="{{ destaque }}">{{ linha.acumulado_carregado }}</td>
+                        <td style="{{ destaque }}">{{ linha.desc_velho }} / {{ linha.desc_novo }}</td>
+                        <td style="{{ destaque }}">{{ linha.rem_grampos }}</td>
+                        <td style="{{ destaque }}">{{ linha.fa_grampos }}</td>
+                        <td style="{{ destaque }}">{{ linha.acum_rem_grampos }}</td>
+                        <td style="{{ destaque }}">{{ linha.rem_galochas }}</td>
+                        <td style="{{ destaque }}">{{ linha.fa_galochas }}</td>
+                        <td style="{{ destaque }}">{{ linha.acum_rem_galochas }}</td>
+                        <td style="{{ destaque }}">{{ linha.aplicado }}</td>
+                        <td style="{{ destaque }}">{{ linha.aberto }}</td>
+                        <td style="{{ destaque }}">{{ linha.seg_ruins }}</td>
+                        <td style="{{ destaque }}">{{ linha.seg_bons }}</td>
+                    </tr>
+                {% endfor %}
+                {% if not dados_resumo_frentes %}
+                    <tr><td colspan="15">Nenhum dado disponível para as frentes selecionadas.</td></tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Faixa de separação para os gráficos da frente 02 -->
+    <hr class="my-4">
+
+    <!-- Gráficos Frente 02: Barras + Bateria -->
+    <div class="row">
+        <div class="col-md-7">
+            <canvas id="graficoBarraCarregamento"></canvas>
+        </div>
+        <div class="col-md-5">
+            <canvas id="graficoBateriaCarregamento"></canvas>
+        </div>
+    </div>
+
+    <!-- Faixa de separação final -->
+    <hr class="my-4">
+
+    <!-- Gráficos de Percentuais por Frente (Gauges) -->
+    <div class="gauge-container">
+        {% for frente, item in percentuais_graficos.items() %}
+        <div class="gauge-item">
+            <canvas id="gauge_{{ loop.index }}"></canvas>
+            <img src="{{ url_for('static', filename='icones/' + item.icone) }}" alt="ícone">
+            <div class="gauge-label">{{ item.titulo }}</div>
+        </div>
+        {% endfor %}
+    </div>
+
+</div> <!-- /.container -->
+
+<!-- Scripts dos gráficos -->
 <script>
-  // Collapse simples (sem fechar ao aplicar filtros)
-  document.querySelectorAll('.collapse-toggle').forEach(btn=>{
-    btn.addEventListener('click', (e)=>{
-      const tid = btn.getAttribute('data-target');
-      if (!tid) return;
-      const el = document.querySelector(tid);
-      if (!el) return;
-      el.style.display = (el.style.display==='none' || el.style.display==='') ? 'block' : 'none';
+    // === Gráfico de Produção (Renovação) ===
+    const dadosRen = {{ dados | tojson }};
+    const labelsRen = dadosRen.map(d => d.data);
+    const previstoDia = dadosRen.map(d => d.previsto_dia);
+    const previstoTotal = dadosRen.map(d => d.previsto_total);
+    const realizadoDia = dadosRen.map(d => d.realizado_dia);
+    const realizadoTotal = dadosRen.map(d => d.realizado_total);
+
+    new Chart(document.getElementById('graficoProducao').getContext('2d'), {
+        type: 'bar',
+        data: {
+            labels: labelsRen,
+            datasets: [
+                {
+                    label: 'PREVISTO DIA',
+                    data: previstoDia,
+                    backgroundColor: 'rgba(0, 123, 255, 0.5)',
+                    borderColor: 'rgba(0, 123, 255, 1)',
+                    borderWidth: 1,
+                    yAxisID: 'y'
+                },
+                {
+                    label: 'REALIZADO DIA',
+                    data: realizadoDia,
+                    backgroundColor: 'rgba(40, 167, 69, 0.5)',
+                    borderColor: 'rgba(40, 167, 69, 1)',
+                    borderWidth: 1,
+                    yAxisID: 'y'
+                },
+                {
+                    label: 'PREVISTO TOTAL',
+                    data: previstoTotal,
+                    type: 'line',
+                    borderColor: 'orange',
+                    backgroundColor: 'transparent',
+                    borderWidth: 2,
+                    pointRadius: 3,
+                    yAxisID: 'y1'
+                },
+                {
+                    label: 'REALIZADO TOTAL',
+                    data: realizadoTotal,
+                    type: 'line',
+                    borderColor: 'orangered',
+                    backgroundColor: 'transparent',
+                    borderWidth: 2,
+                    pointRadius: 3,
+                    yAxisID: 'y1'
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'bottom' },
+                title: { display: true, text: 'ACOMPANHAMENTO RENOVAÇÃO P190' }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    position: 'left',
+                    title: { display: true, text: 'Barras (Previsto / Realizado Dia)' }
+                },
+                y1: {
+                    beginAtZero: true,
+                    position: 'right',
+                    grid: { drawOnChartArea: false },
+                    title: { display: true, text: 'Linhas (Total Acumulado)' }
+                }
+            }
+        }
     });
-  });
 
-  // ---------- ACOMPANHAMENTO ----------
-  (function(){
-    const ctx = document.getElementById('accChart');
-    if(!ctx) return;
-
-    const labels   = {{ (chart_prod.labels or []) | tojson }};
-    const prevDia  = {{ (chart_prod.prev_dia or []) | tojson }};
-    const realDia  = {{ (chart_prod.real_dia or []) | tojson }};
-    const prevTot  = {{ (chart_prod.prev_tot or []) | tojson }};
-    const realTot  = {{ (chart_prod.real_tot or []) | tojson }};
-
-    if(labels.length === 0) return;
-
-    new Chart(ctx, {
-      type: 'bar',
-      data: {
-        labels,
-        datasets: [
-          { type:'bar', label:'Previsto Dia',   data:prevDia },
-          { type:'bar', label:'Realizado Dia',  data:realDia },
-          { type:'line',label:'Previsto Total', data:prevTot, tension:.2 },
-          { type:'line',label:'Realizado Total',data:realTot, tension:.2 },
-        ]
-      },
-      options: {
-        responsive:true,
-        maintainAspectRatio:false,
-        scales:{ x:{ grid:{ display:false } }, y:{ beginAtZero:true } },
-        plugins:{ legend:{ position:'bottom' } }
-      }
-    });
-  })();
-
-  // ---------- PART DIÁRIA ----------
-  (function(){
-    const ctx = document.getElementById('pdChart');
-    if(!ctx) return;
-
-    const labels = {{ (pd_graf.labels or []) | tojson }};
-    const mins   = {{ (pd_graf.minutos or []) | tojson }};
-
-    if(labels.length === 0) return;
-
-    // Converter minutos em "HH:MM" apenas para exibir nos tooltips
-    function hhmm(total){
-      const h = Math.floor(total/60), m = Math.floor(total%60);
-      return (h<10?'0':'')+h+':' + (m<10?'0':'')+m;
+    // === Funções comuns ===
+    function formatMinToTime(min) {
+        const h = Math.floor(min / 60);
+        const m = min % 60;
+        return h.toString().padStart(2, '0') + ':' + m.toString().padStart(2, '0');
     }
 
-    new Chart(ctx, {
-      type: 'bar',
-      data: { labels, datasets: [{ label:'Horas no dia', data: mins }] },
-      options: {
-        responsive:true,
-        maintainAspectRatio:false,
-        scales:{ x:{ grid:{ display:false } }, y:{ beginAtZero:true } },
-        plugins:{
-          legend:{ display:false },
-          tooltip:{ callbacks:{ label:(c)=> ' ' + hhmm(c.parsed.y||0) } }
-        }
-      }
+    // === Gráfico Parte Diária ===
+    {% if grafico_atividades is defined %}
+        const partLabels = {{ grafico_atividades.labels | tojson }};
+        const partTempos = {{ grafico_atividades.tempos | tojson }};
+    {% else %}
+        const partLabels = [];
+        const partTempos = [];
+    {% endif %}
+
+    new Chart(document.getElementById('graficoPartDiaria').getContext('2d'), {
+        type: 'bar',
+        data: {
+            labels: partLabels,
+            datasets: [{
+                label: 'Duração por atividade',
+                data: partTempos,
+                backgroundColor: 'orange',
+                borderColor: 'black',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                title: {
+                    display: true,
+                    text: 'RESUMO PART DIÁRIA RENOVADORA P190'
+                },
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(ctx) {
+                            return formatMinToTime(ctx.parsed.y);
+                        }
+                    }
+                },
+                datalabels: {
+                    display: true,
+                    color: 'black',
+                    anchor: 'end',
+                    align: 'top',
+                    font: {
+                        weight: 'bold',
+                        size: 10
+                    },
+                    formatter: function(value) {
+                        return formatMinToTime(value);
+                    }
+                }
+            },
+            scales: {
+                y: { beginAtZero: true }
+            }
+        },
+        plugins: [ChartDataLabels]
     });
-  })();
+
+    // === Gráfico de Barras + Linhas - Frente 02 ===
+    const barraData = {{ grafico_barra_carregamento | tojson }};
+    const labels02 = barraData.map(d => d.data);
+    const planejadoDia02 = barraData.map(d => d.planejado);
+    const executadoDia02 = barraData.map(d => d.executado);
+    const acumuladoPlan02 = barraData.map(d => d.acumulado_planejado);
+    const acumuladoExec02 = barraData.map(d => d.acumulado_executado);
+
+    new Chart(document.getElementById('graficoBarraCarregamento').getContext('2d'), {
+        type: 'bar',
+        data: {
+            labels: labels02,
+            datasets: [
+                {
+                    label: 'PREVISTO DIA',
+                    data: planejadoDia02,
+                    backgroundColor: 'rgba(255, 193, 7, 0.6)',
+                    borderColor: 'rgba(255, 193, 7, 1)',
+                    borderWidth: 1,
+                    yAxisID: 'y'
+                },
+                {
+                    label: 'REALIZADO DIA',
+                    data: executadoDia02,
+                    backgroundColor: 'rgba(76, 175, 80, 0.6)',
+                    borderColor: 'rgba(76, 175, 80, 1)',
+                    borderWidth: 1,
+                    yAxisID: 'y'
+                },
+                {
+                    label: 'ACUMULADO PREVISTO',
+                    data: acumuladoPlan02,
+                    type: 'line',
+                    borderColor: 'orange',
+                    backgroundColor: 'transparent',
+                    borderWidth: 2,
+                    pointRadius: 3,
+                    yAxisID: 'y1'
+                },
+                {
+                    label: 'ACUMULADO EXECUTADO',
+                    data: acumuladoExec02,
+                    type: 'line',
+                    borderColor: 'green',
+                    backgroundColor: 'transparent',
+                    borderWidth: 2,
+                    pointRadius: 3,
+                    yAxisID: 'y1'
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'bottom' },
+                title: { display: true, text: 'ACOMPANHAMENTO CARREGAMENTO NOVO' }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: { display: true, text: 'Valores Diários' }
+                },
+                y1: {
+                    beginAtZero: true,
+                    position: 'right',
+                    grid: { drawOnChartArea: false },
+                    title: { display: true, text: 'Acumulados' }
+                }
+            }
+        }
+    });
+
+    // === Gráfico de Bateria - Frente 02 ===
+    const bateria = {{ grafico_bateria_carregamento | tojson }};
+    const total = bateria.planejado_total || 1;
+    const acumPlan = bateria.planejado_acumulado || 0;
+    const acumExec = bateria.executado_acumulado || 0;
+
+    const percPlan = Math.min((acumPlan / total) * 100, 100);
+    const percExec = Math.min((acumExec / total) * 100, 100);
+
+    new Chart(document.getElementById('graficoBateriaCarregamento').getContext('2d'), {
+        type: 'bar',
+        data: {
+            labels: [''],
+            datasets: [
+                {
+                    label: `Planejado (${acumPlan} / ${total})`,
+                    data: [percPlan],
+                    backgroundColor: 'rgba(255, 193, 7, 0.8)',
+                    barThickness: 30
+                },
+                {
+                    label: `Executado (${acumExec} / ${total})`,
+                    data: [percExec],
+                    backgroundColor: 'rgba(76, 175, 80, 0.9)',
+                    barThickness: 30
+                }
+            ]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'bottom' },
+                title: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: ctx => `${ctx.dataset.label}: ${ctx.raw.toFixed(1)}%`
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    stacked: false,
+                    beginAtZero: true,
+                    max: 100,
+                    title: { display: true, text: '%' }
+                },
+                y: { stacked: false }
+            }
+        }
+    });
+
+    // === Gauges de Percentual por Frente ===
+    {% for frente, item in percentuais_graficos.items() %}
+    const ctxGauge{{ loop.index }} = document.getElementById('gauge_{{ loop.index }}').getContext('2d');
+    new Chart(ctxGauge{{ loop.index }}, {
+        type: 'doughnut',
+        data: {
+            labels: ['Executado', 'Planejado'],
+            datasets: [{
+                data: [{{ item.percentual_executado }}, {{ 100 - item.percentual_executado }}],
+                backgroundColor: [
+                    'rgba(40, 167, 69, 0.85)',
+                    'rgba(255, 193, 7, 0.4)'
+                ],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            cutout: '65%',
+            responsive: true,
+            plugins: {
+                legend: { display: false },
+                title: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return context.label + ': ' + context.raw.toFixed(1) + '%';
+                        }
+                    }
+                },
+                datalabels: {
+                    display: true,
+                    color: '#000',
+                    font: { weight: 'bold', size: 14 },
+                    formatter: function(value, context) {
+                        return context.dataIndex === 0 ? value.toFixed(1) + '%' : '';
+                    }
+                }
+            }
+        },
+        plugins: [ChartDataLabels]
+    });
+    {% endfor %}
 </script>
 
 {% endblock %}
