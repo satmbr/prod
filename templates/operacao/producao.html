@@ -135,9 +135,9 @@
                     </thead>
                     <tbody>
                         {% for d in dados %}
-                            {% set d_data = d.data.strip() %}
-                            {% set filtro_data = data_partdiaria.strip() %}
-                            {% set destaque = 'background-color: #E2EFDA;' if d_data == filtro_data else '' %}
+                            {% set d_data = d.data|string %}
+                            {% set filtro_data = data_partdiaria|string %}
+                            {% set destaque = 'background-color: #E2EFDA;' if d_data == filtro_data and d_data != '' else '' %}
                             <tr>
                                 <td style="{{ destaque }}">
                                     {{ d.data.split('-')[2] }}-{{ d.data.split('-')[1] }}-{{ d.data.split('-')[0] }}
@@ -237,9 +237,9 @@
             </thead>
             <tbody>
                 {% for linha in dados_resumo_frentes %}
-                    {% set linha_data = linha.data.strip() %}
-                    {% set filtro_data = data_partdiaria.strip() %}
-                    {% set destaque = 'background-color: #E2EFDA;' if linha_data == filtro_data else '' %}
+                    {% set linha_data = linha.data|string %}
+                    {% set filtro_data = data_partdiaria|string %}
+                    {% set destaque = 'background-color: #E2EFDA;' if linha_data == filtro_data and linha_data != '' else '' %}
                     <tr>
                         <td style="{{ destaque }}">
                             {{ linha.data.split('-')[2] }}-{{ linha.data.split('-')[1] }}-{{ linha.data.split('-')[0] }}
@@ -284,6 +284,7 @@
     <hr class="my-4">
 
     <!-- Gráficos de Percentuais por Frente (Gauges) -->
+    {% if percentuais_graficos is defined %}
     <div class="gauge-container">
         {% for frente, item in percentuais_graficos.items() %}
         <div class="gauge-item">
@@ -293,6 +294,7 @@
         </div>
         {% endfor %}
     </div>
+    {% endif %}
 
 </div> <!-- /.container -->
 
@@ -388,223 +390,238 @@
         const partTempos = [];
     {% endif %}
 
-    new Chart(document.getElementById('graficoPartDiaria').getContext('2d'), {
-        type: 'bar',
-        data: {
-            labels: partLabels,
-            datasets: [{
-                label: 'Duração por atividade',
-                data: partTempos,
-                backgroundColor: 'orange',
-                borderColor: 'black',
-                borderWidth: 1
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                title: {
-                    display: true,
-                    text: 'RESUMO PART DIÁRIA RENOVADORA P190'
-                },
-                legend: { display: false },
-                tooltip: {
-                    callbacks: {
-                        label: function(ctx) {
-                            return formatMinToTime(ctx.parsed.y);
+    if (document.getElementById('graficoPartDiaria')) {
+        new Chart(document.getElementById('graficoPartDiaria').getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: partLabels,
+                datasets: [{
+                    label: 'Duração por atividade',
+                    data: partTempos,
+                    backgroundColor: 'orange',
+                    borderColor: 'black',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'RESUMO PART DIÁRIA RENOVADORA P190'
+                    },
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(ctx) {
+                                return formatMinToTime(ctx.parsed.y);
+                            }
+                        }
+                    },
+                    datalabels: {
+                        display: true,
+                        color: 'black',
+                        anchor: 'end',
+                        align: 'top',
+                        font: {
+                            weight: 'bold',
+                            size: 10
+                        },
+                        formatter: function(value) {
+                            return formatMinToTime(value);
                         }
                     }
                 },
-                datalabels: {
-                    display: true,
-                    color: 'black',
-                    anchor: 'end',
-                    align: 'top',
-                    font: {
-                        weight: 'bold',
-                        size: 10
-                    },
-                    formatter: function(value) {
-                        return formatMinToTime(value);
-                    }
+                scales: {
+                    y: { beginAtZero: true }
                 }
             },
-            scales: {
-                y: { beginAtZero: true }
-            }
-        },
-        plugins: [ChartDataLabels]
-    });
+            plugins: [ChartDataLabels]
+        });
+    }
 
     // === Gráfico de Barras + Linhas - Frente 02 ===
-    const barraData = {{ grafico_barra_carregamento | tojson }};
-    const labels02 = barraData.map(d => d.data);
-    const planejadoDia02 = barraData.map(d => d.planejado);
-    const executadoDia02 = barraData.map(d => d.executado);
-    const acumuladoPlan02 = barraData.map(d => d.acumulado_planejado);
-    const acumuladoExec02 = barraData.map(d => d.acumulado_executado);
+    const barraData = {{ grafico_barra_carregamento | tojson | default('[]') }};
+    const labels02 = Array.isArray(barraData) ? barraData.map(d => d.data) : [];
+    const planejadoDia02 = Array.isArray(barraData) ? barraData.map(d => d.planejado) : [];
+    const executadoDia02 = Array.isArray(barraData) ? barraData.map(d => d.executado) : [];
+    const acumuladoPlan02 = Array.isArray(barraData) ? barraData.map(d => d.acumulado_planejado) : [];
+    const acumuladoExec02 = Array.isArray(barraData) ? barraData.map(d => d.acumulado_executado) : [];
 
-    new Chart(document.getElementById('graficoBarraCarregamento').getContext('2d'), {
-        type: 'bar',
-        data: {
-            labels: labels02,
-            datasets: [
-                {
-                    label: 'PREVISTO DIA',
-                    data: planejadoDia02,
-                    backgroundColor: 'rgba(255, 193, 7, 0.6)',
-                    borderColor: 'rgba(255, 193, 7, 1)',
-                    borderWidth: 1,
-                    yAxisID: 'y'
-                },
-                {
-                    label: 'REALIZADO DIA',
-                    data: executadoDia02,
-                    backgroundColor: 'rgba(76, 175, 80, 0.6)',
-                    borderColor: 'rgba(76, 175, 80, 1)',
-                    borderWidth: 1,
-                    yAxisID: 'y'
-                },
-                {
-                    label: 'ACUMULADO PREVISTO',
-                    data: acumuladoPlan02,
-                    type: 'line',
-                    borderColor: 'orange',
-                    backgroundColor: 'transparent',
-                    borderWidth: 2,
-                    pointRadius: 3,
-                    yAxisID: 'y1'
-                },
-                {
-                    label: 'ACUMULADO EXECUTADO',
-                    data: acumuladoExec02,
-                    type: 'line',
-                    borderColor: 'green',
-                    backgroundColor: 'transparent',
-                    borderWidth: 2,
-                    pointRadius: 3,
-                    yAxisID: 'y1'
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { position: 'bottom' },
-                title: { display: true, text: 'ACOMPANHAMENTO CARREGAMENTO NOVO' }
+    if (document.getElementById('graficoBarraCarregamento')) {
+        new Chart(document.getElementById('graficoBarraCarregamento').getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: labels02,
+                datasets: [
+                    {
+                        label: 'PREVISTO DIA',
+                        data: planejadoDia02,
+                        backgroundColor: 'rgba(255, 193, 7, 0.6)',
+                        borderColor: 'rgba(255, 193, 7, 1)',
+                        borderWidth: 1,
+                        yAxisID: 'y'
+                    },
+                    {
+                        label: 'REALIZADO DIA',
+                        data: executadoDia02,
+                        backgroundColor: 'rgba(76, 175, 80, 0.6)',
+                        borderColor: 'rgba(76, 175, 80, 1)',
+                        borderWidth: 1,
+                        yAxisID: 'y'
+                    },
+                    {
+                        label: 'ACUMULADO PREVISTO',
+                        data: acumuladoPlan02,
+                        type: 'line',
+                        borderColor: 'orange',
+                        backgroundColor: 'transparent',
+                        borderWidth: 2,
+                        pointRadius: 3,
+                        yAxisID: 'y1'
+                    },
+                    {
+                        label: 'ACUMULADO EXECUTADO',
+                        data: acumuladoExec02,
+                        type: 'line',
+                        borderColor: 'green',
+                        backgroundColor: 'transparent',
+                        borderWidth: 2,
+                        pointRadius: 3,
+                        yAxisID: 'y1'
+                    }
+                ]
             },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    title: { display: true, text: 'Valores Diários' }
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'bottom' },
+                    title: { display: true, text: 'ACOMPANHAMENTO CARREGAMENTO NOVO' }
                 },
-                y1: {
-                    beginAtZero: true,
-                    position: 'right',
-                    grid: { drawOnChartArea: false },
-                    title: { display: true, text: 'Acumulados' }
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: { display: true, text: 'Valores Diários' }
+                    },
+                    y1: {
+                        beginAtZero: true,
+                        position: 'right',
+                        grid: { drawOnChartArea: false },
+                        title: { display: true, text: 'Acumulados' }
+                    }
                 }
             }
-        }
-    });
+        });
+    }
 
     // === Gráfico de Bateria - Frente 02 ===
-    const bateria = {{ grafico_bateria_carregamento | tojson }};
-    const total = bateria.planejado_total || 1;
-    const acumPlan = bateria.planejado_acumulado || 0;
-    const acumExec = bateria.executado_acumulado || 0;
+    const bateria = {{ grafico_bateria_carregamento | tojson | default('null') }};
+    let total = 1, acumPlan = 0, acumExec = 0;
+
+    if (bateria && typeof bateria === 'object') {
+        total = bateria.planejado_total || 1;
+        acumPlan = bateria.planejado_acumulado || 0;
+        acumExec = bateria.executado_acumulado || 0;
+    }
 
     const percPlan = Math.min((acumPlan / total) * 100, 100);
     const percExec = Math.min((acumExec / total) * 100, 100);
 
-    new Chart(document.getElementById('graficoBateriaCarregamento').getContext('2d'), {
-        type: 'bar',
-        data: {
-            labels: [''],
-            datasets: [
-                {
-                    label: `Planejado (${acumPlan} / ${total})`,
-                    data: [percPlan],
-                    backgroundColor: 'rgba(255, 193, 7, 0.8)',
-                    barThickness: 30
-                },
-                {
-                    label: `Executado (${acumExec} / ${total})`,
-                    data: [percExec],
-                    backgroundColor: 'rgba(76, 175, 80, 0.9)',
-                    barThickness: 30
-                }
-            ]
-        },
-        options: {
-            indexAxis: 'y',
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { position: 'bottom' },
-                title: { display: false },
-                tooltip: {
-                    callbacks: {
-                        label: ctx => `${ctx.dataset.label}: ${ctx.raw.toFixed(1)}%`
+    if (document.getElementById('graficoBateriaCarregamento')) {
+        new Chart(document.getElementById('graficoBateriaCarregamento').getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: [''],
+                datasets: [
+                    {
+                        label: `Planejado (${acumPlan} / ${total})`,
+                        data: [percPlan],
+                        backgroundColor: 'rgba(255, 193, 7, 0.8)',
+                        barThickness: 30
+                    },
+                    {
+                        label: `Executado (${acumExec} / ${total})`,
+                        data: [percExec],
+                        backgroundColor: 'rgba(76, 175, 80, 0.9)',
+                        barThickness: 30
                     }
-                }
+                ]
             },
-            scales: {
-                x: {
-                    stacked: false,
-                    beginAtZero: true,
-                    max: 100,
-                    title: { display: true, text: '%' }
-                },
-                y: { stacked: false }
-            }
-        }
-    });
-
-    // === Gauges de Percentual por Frente ===
-    {% for frente, item in percentuais_graficos.items() %}
-    const ctxGauge{{ loop.index }} = document.getElementById('gauge_{{ loop.index }}').getContext('2d');
-    new Chart(ctxGauge{{ loop.index }}, {
-        type: 'doughnut',
-        data: {
-            labels: ['Executado', 'Planejado'],
-            datasets: [{
-                data: [{{ item.percentual_executado }}, {{ 100 - item.percentual_executado }}],
-                backgroundColor: [
-                    'rgba(40, 167, 69, 0.85)',
-                    'rgba(255, 193, 7, 0.4)'
-                ],
-                borderWidth: 1
-            }]
-        },
-        options: {
-            cutout: '65%',
-            responsive: true,
-            plugins: {
-                legend: { display: false },
-                title: { display: false },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            return context.label + ': ' + context.raw.toFixed(1) + '%';
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'bottom' },
+                    title: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: ctx => `${ctx.dataset.label}: ${ctx.raw.toFixed(1)}%`
                         }
                     }
                 },
-                datalabels: {
-                    display: true,
-                    color: '#000',
-                    font: { weight: 'bold', size: 14 },
-                    formatter: function(value, context) {
-                        return context.dataIndex === 0 ? value.toFixed(1) + '%' : '';
-                    }
+                scales: {
+                    x: {
+                        stacked: false,
+                        beginAtZero: true,
+                        max: 100,
+                        title: { display: true, text: '%' }
+                    },
+                    y: { stacked: false }
                 }
             }
-        },
-        plugins: [ChartDataLabels]
-    });
+        });
+    }
+
+    // === Gauges de Percentual por Frente ===
+    {% if percentuais_graficos is defined %}
+    {% for frente, item in percentuais_graficos.items() %}
+    (function() {
+        const ctx = document.getElementById('gauge_{{ loop.index }}');
+        if (!ctx) return;
+        new Chart(ctx.getContext('2d'), {
+            type: 'doughnut',
+            data: {
+                labels: ['Executado', 'Planejado'],
+                datasets: [{
+                    data: [{{ item.percentual_executado }}, {{ 100 - item.percentual_executado }}],
+                    backgroundColor: [
+                        'rgba(40, 167, 69, 0.85)',
+                        'rgba(255, 193, 7, 0.4)'
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                cutout: '65%',
+                responsive: true,
+                plugins: {
+                    legend: { display: false },
+                    title: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return context.label + ': ' + context.raw.toFixed(1) + '%';
+                            }
+                        }
+                    },
+                    datalabels: {
+                        display: true,
+                        color: '#000',
+                        font: { weight: 'bold', size: 14 },
+                        formatter: function(value, context) {
+                            return context.dataIndex === 0 ? value.toFixed(1) + '%' : '';
+                        }
+                    }
+                }
+            },
+            plugins: [ChartDataLabels]
+        });
+    })();
     {% endfor %}
+    {% endif %}
 </script>
 
 {% endblock %}
