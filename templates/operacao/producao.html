@@ -76,11 +76,11 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
 
-<div class="container p-1">
+{# ANTES do <div class="container p-1"> que você já tem #}
 
-    <!-- Cabeçalho contrato -->
+<div class="container-fluid p-0">
     <div class="table-responsive mb-3">
-        <table class="table table-bordered align-middle text-center w-100" style="border-color: #007472;">
+        <table class="table table-bordered align-middle text-center w-100 m-0" style="border-color: #007472;">
             <tr>
                 <td rowspan="2" style="width: 15%;">
                     <img src="{{ url_for('static', filename='vale-logo.png') }}" alt="Logo Vale" style="height: 40px;">
@@ -99,6 +99,12 @@
             </tr>
         </table>
     </div>
+</div>
+
+<div class="container p-1">
+    <!-- daqui pra baixo fica TODO o resto da página (filtros, tabelas, gráficos, etc) -->
+
+<div class="container p-1">
 
     <!-- Filtros -->
     <form method="GET" class="row g-2 mb-3">
