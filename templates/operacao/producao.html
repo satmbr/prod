@@ -70,6 +70,21 @@
     .linha-destaque {
         background-color: #E2EFDA !important;
     }
+	body {
+        font-size: 0.78rem;
+    }
+    /* ... seu CSS que já existe ... */
+
+    /* Cabeçalho ocupando 100% da largura da tela (full-bleed) */
+    .header-full {
+        width: 100vw;             /* largura da janela */
+        position: relative;
+        left: 50%;
+        right: 50%;
+        margin-left: -50vw;       /* “sai” do container central */
+        margin-right: -50vw;
+        padding: 0;
+    }
 </style>
 
 <!-- Chart.js e plugin -->
@@ -78,7 +93,7 @@
 
 {# ANTES do <div class="container p-1"> que você já tem #}
 
-<div class="container-fluid p-0">
+<div class="header-full">
     <div class="table-responsive mb-3">
         <table class="table table-bordered align-middle text-center w-100 m-0" style="border-color: #007472;">
             <tr>
