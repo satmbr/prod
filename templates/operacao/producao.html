@@ -442,7 +442,7 @@
     }
 
     // === Gráfico de Barras + Linhas - Frente 02 ===
-    const barraData = {{ grafico_barra_carregamento | tojson | default('[]') }};
+    const barraData = {{ grafico_barra_carregamento | default([], true) | tojson }};
     const labels02 = Array.isArray(barraData) ? barraData.map(d => d.data) : [];
     const planejadoDia02 = Array.isArray(barraData) ? barraData.map(d => d.planejado) : [];
     const executadoDia02 = Array.isArray(barraData) ? barraData.map(d => d.executado) : [];
@@ -517,7 +517,7 @@
     }
 
     // === Gráfico de Bateria - Frente 02 ===
-    const bateria = {{ grafico_bateria_carregamento | tojson | default('null') }};
+    const bateria = {{ grafico_bateria_carregamento | default({}, true) | tojson }};
     let total = 1, acumPlan = 0, acumExec = 0;
 
     if (bateria && typeof bateria === 'object') {
