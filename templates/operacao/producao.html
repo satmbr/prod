@@ -301,7 +301,7 @@
 <!-- Scripts dos gráficos -->
 <script>
     // === Gráfico de Produção (Renovação) ===
-    const dadosRen = {{ dados | tojson }};
+    const dadosRen = {{ dados | default([], true) | tojson }};
     const labelsRen = dadosRen.map(d => d.data);
     const previstoDia = dadosRen.map(d => d.previsto_dia);
     const previstoTotal = dadosRen.map(d => d.previsto_total);
