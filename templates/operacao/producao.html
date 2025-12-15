@@ -123,13 +123,16 @@
     <!-- Filtros -->
     <form method="GET" class="row g-2 mb-3">
         <div class="col-md-4">
-            <label for="eh_id" class="form-label fw-semibold">Selecionar EH:</label>
-            <select name="eh_id" id="eh_id" class="form-select" onchange="this.form.submit()">
-                {% for eh in ehs %}
-                    <option value="{{ eh.id }}" {% if eh.id == eh_id %}selected{% endif %}>{{ eh.nome }}</option>
-                {% endfor %}
-            </select>
-        </div>
+			<label for="eh" class="form-label fw-semibold">Selecionar EH:</label>
+			<select name="eh" id="eh" class="form-select form-select-sm" onchange="this.form.submit()">
+				<option value="">-- selecione --</option>
+				{% for eh in eh_list %}
+					<option value="{{ eh.id }}"
+						{% if sel_eh and sel_eh|string == eh.id|string %}selected{% endif %}>{{ eh.eh }}
+					</option>
+				{% endfor %}
+			</select>
+		</div>
         <div class="col-md-2">
             <label for="data_partdiaria" class="form-label fw-semibold">Selecionar Data:</label>
             <input type="date" name="data_partdiaria" id="data_partdiaria"
