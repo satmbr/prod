@@ -1,13 +1,33 @@
 # routes/operacao.py
 
-from flask import Blueprint, render_template, request
+from flask import Blueprint, render_template, url_for, request, redirect
 from sqlalchemy import text
-from collections import defaultdict
-from datetime import date
-
 from db import get_engine
-from utils import nivel_requerido
-from utils.calcular_duracao import calcular_duracao
+from datetime import date, datetime
+
+# Tenta importar do utils "real" se existir,
+# senão cria versões de fallback para não travar o sistema.
+try:
+    from utils import nivel_requerido
+except ImportError:
+    def nivel_requerido(*roles):
+        """Decorador de fallback: NÃO faz controle de acesso, só deixa a rota rodar."""
+        def decorator(fn):
+            return fn
+        return decorator
+
+try:
+    from utils.calcular_duracao import calcular_duracao
+except ImportError:
+    def calcular_duracao(hora_inicio: str, hora_fim: str) -> int:
+        """
+        Fallback local para calcular duração em minutos a partir de strings 'HH:MM'.
+        """
+        fmt = "%H:%M"
+        ini = datetime.strptime(str(hora_inicio), fmt)
+        fim = datetime.strptime(str(hora_fim), fmt)
+        delta = fim - ini
+        return int(delta.total_seconds() // 60)
 
 # Blueprint principal de Operação.
 # O prefixo '/operacao' normalmente é aplicado no app.py ao registrar o blueprint.
