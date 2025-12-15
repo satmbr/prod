@@ -134,10 +134,14 @@
 			</select>
 		</div>
         <div class="col-md-2">
-            <label for="data_partdiaria" class="form-label fw-semibold">Selecionar Data:</label>
-            <input type="date" name="data_partdiaria" id="data_partdiaria"
-                   class="form-control" value="{{ data_partdiaria }}" onchange="this.form.submit()">
-        </div>
+			<label for="dt" class="form-label fw-semibold">Selecionar Data:</label>
+			<input type="date"
+				   name="dt"
+				   id="dt"
+				   class="form-control form-control-sm"
+				   value="{{ sel_dt }}"
+				   onchange="this.form.submit()">
+		</div>
     </form>
 
     <!-- Tabela Renovação + Gráfico -->
