@@ -43,4 +43,17 @@ body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvet
 .table thead th{background:#f6f8fb;text-align:left;font-weight:600;color:#394150}
 .table tr:last-child td{border-bottom:none}
 
+html {
+    /* fator de escala global: 0.75 = 75% */
+    --app-scale: 0.75;
+}
+
+body {
+    transform: scale(var(--app-scale));
+    transform-origin: top left;
+    /* corrige a largura para não “sobrar” espaço em branco à direita */
+    width: calc(100% / var(--app-scale));
+}
+
+
 /* mantém seu grid/botões existentes */
