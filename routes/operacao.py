@@ -39,12 +39,10 @@ bp = Blueprint("operacao", __name__)
 @nivel_requerido("admin", "gerente", "tecnico", "planejador", "visualizador")
 def index():
     """
-    Rota principal do módulo Operação.
-    Apenas redireciona para a visão de produção, pois o base.html
-    usa url_for('operacao.index') no menu.
+    Tela inicial do módulo Operação.
+    Aqui mostramos as opções: Produção, Registro, Cadastro.
     """
-    return redirect(url_for("operacao.producao"))
-
+    return render_template("operacao/index.html")
 
 @bp.route("/producao", methods=["GET"])
 @nivel_requerido("admin", "gerente", "tecnico", "planejador", "visualizador")
