@@ -34,15 +34,38 @@ except ImportError:
 
 bp = Blueprint("operacao", __name__)
 
+def build_operacao_subnav(active=None):
+    """
+    Monta a lista de abas da Operação para o base.html.
+    active pode ser: 'producao', 'registro', 'cadastro' ou None.
+    """
+    return [
+        {
+            "text": "Produção",
+            "href": url_for("operacao.producao"),
+            "active": active == "producao",
+        },
+        {
+            "text": "Registro",
+            "href": url_for("operacao.registro"),
+            "active": active == "registro",
+        },
+        {
+            "text": "Cadastro",
+            "href": url_for("operacao.cadastro"),
+            "active": active == "cadastro",
+        },
+    ]
 
 @bp.route("/")
 @nivel_requerido("admin", "gerente", "tecnico", "planejador", "visualizador")
 def index():
     """
     Tela inicial do módulo Operação.
-    Aqui mostramos as opções: Produção, Registro, Cadastro.
+    Só mostra o subnav com as opções.
     """
-    return render_template("operacao/index.html")
+    subnav_links = build_operacao_subnav(None)
+    return render_template("operacao/index.html", subnav_links=subnav_links)
 
 @bp.route("/producao", methods=["GET"])
 @nivel_requerido("admin", "gerente", "tecnico", "planejador", "visualizador")
@@ -450,7 +473,8 @@ def producao():
                     "percentual_executado": percentual,
                 }
 
-    # Renderiza o template com todos os blocos
+    subnav_links = build_operacao_subnav("producao")
+
     return render_template(
         "operacao/producao.html",
         ehs=ehs,
@@ -464,4 +488,6 @@ def producao():
         grafico_bateria_carregamento=grafico_bateria_carregamento,
         dados_resumo_frentes=dados_resumo_frentes,
         percentuais_graficos=percentuais_graficos,
+        subnav_links=subnav_links,
     )
+
