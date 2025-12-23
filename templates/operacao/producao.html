@@ -92,6 +92,32 @@
         margin-right: -50vw;
         padding: 0;
     }
+    .layout-tabela-grafico {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+        align-items: stretch;
+    }
+    .layout-tabela-grafico .col-tabela {
+        flex: 0 0 55%;
+        min-width: 320px;
+    }
+    .layout-tabela-grafico .col-grafico {
+        flex: 1;
+        min-width: 320px;
+        min-height: 320px;
+    }
+
+    /* Em telas pequenas empilha (mobile) */
+    @media (max-width: 900px) {
+        .layout-tabela-grafico {
+            flex-direction: column;
+        }
+        .layout-tabela-grafico .col-tabela,
+        .layout-tabela-grafico .col-grafico {
+            flex: 1 1 100%;
+        }
+    }
 </style>
 
 <!-- Chart.js e plugin -->
@@ -150,51 +176,52 @@
                    onchange="this.form.submit()">
         </div>
     </form>
+	
+	<!-- Tabela Renovação + Gráfico (lado a lado) -->
+	<div class="layout-tabela-grafico">
+		<div class="col-tabela">
+			<div class="table-responsive">
+				<table class="table table-bordered table-striped align-middle text-center">
+					<thead class="table-dark">
+						<tr>
+							<th>DATA</th>
+							<th>PREVISTO<br>DIA</th>
+							<th>PREVISTO<br>TOTAL</th>
+							<th>REALIZADO<br>DIA</th>
+							<th>REALIZADO<br>TOTAL</th>
+							<th>DIF.</th>
+							<th>ATRASO</th>
+						</tr>
+					</thead>
+					<tbody>
+						{% for d in dados %}
+							{% set d_data = d.data|string %}
+							{% set filtro_data = data_partdiaria|string %}
+							{% set destaque = 'background-color: #E2EFDA;' if d_data == filtro_data and d_data != '' else '' %}
+							<tr>
+								<td style="{{ destaque }}">
+									{{ d.data.split('-')[2] }}-{{ d.data.split('-')[1] }}-{{ d.data.split('-')[0] }}
+								</td>
+								<td style="{{ destaque }}">{{ d.previsto_dia }}</td>
+								<td style="{{ destaque }}">{{ d.previsto_total }}</td>
+								<td style="{{ destaque }}">{{ d.realizado_dia }}</td>
+								<td style="{{ destaque }}">{{ d.realizado_total }}</td>
+								<td style="{{ destaque }}">{{ d.diferenca }}</td>
+								<td style="{{ destaque }}">{{ d.atraso }} /dia</td>
+							</tr>
+						{% endfor %}
+						{% if not dados %}
+							<tr><td colspan="7">Nenhum registro encontrado para esta EH.</td></tr>
+						{% endif %}
+					</tbody>
+				</table>
+			</div>
+		</div>
 
-    <!-- Tabela Renovação + Gráfico -->
-    <div class="row">
-        <div class="col-md-5">
-            <div class="table-responsive">
-                <table class="table table-bordered table-striped align-middle text-center">
-                    <thead class="table-dark">
-                        <tr>
-                            <th>DATA</th>
-                            <th>PREVISTO<br>DIA</th>
-                            <th>PREVISTO<br>TOTAL</th>
-                            <th>REALIZADO<br>DIA</th>
-                            <th>REALIZADO<br>TOTAL</th>
-                            <th>DIF.</th>
-                            <th>ATRASO</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for d in dados %}
-                            {% set d_data = d.data|string %}
-                            {% set filtro_data = data_partdiaria|string %}
-                            {% set destaque = 'background-color: #E2EFDA;' if d_data == filtro_data and d_data != '' else '' %}
-                            <tr>
-                                <td style="{{ destaque }}">
-                                    {{ d.data.split('-')[2] }}-{{ d.data.split('-')[1] }}-{{ d.data.split('-')[0] }}
-                                </td>
-                                <td style="{{ destaque }}">{{ d.previsto_dia }}</td>
-                                <td style="{{ destaque }}">{{ d.previsto_total }}</td>
-                                <td style="{{ destaque }}">{{ d.realizado_dia }}</td>
-                                <td style="{{ destaque }}">{{ d.realizado_total }}</td>
-                                <td style="{{ destaque }}">{{ d.diferenca }}</td>
-                                <td style="{{ destaque }}">{{ d.atraso }} /dia</td>
-                            </tr>
-                        {% endfor %}
-                        {% if not dados %}
-                            <tr><td colspan="7">Nenhum registro encontrado para esta EH.</td></tr>
-                        {% endif %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-        <div class="col-md-7">
-            <canvas id="graficoProducao"></canvas>
-        </div>
-    </div>
+		<div class="col-grafico">
+			<canvas id="graficoProducao"></canvas>
+		</div>
+	</div>
 
     <!-- Faixa de separação -->
     <hr class="my-4">
