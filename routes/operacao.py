@@ -132,20 +132,31 @@ def producao():
         dados_partdiaria = []
         grafico_atividades = None
         if sel_dt_pd:
+            from sqlalchemy import text  # (garanta que este import já está no topo do arquivo)
+
+            # ...
+
             sql_pd = text("""
                 SELECT
-                    atividade,
-                    to_char(hora_inicio, 'HH24:MI') AS hora_inicio,
-                    to_char(hora_fim, 'HH24:MI')    AS hora_fim,
-                    EXTRACT(EPOCH FROM (hora_fim - hora_inicio)) / 60 AS duracao
-                FROM part_diaria
-                WHERE data = :data_pd
-                  AND equipamento_tag = 'P190-66001'
-                ORDER BY hora_inicio
+                    a.nome AS atividade,
+                    to_char(pd.hora_inicio, 'HH24:MI') AS hora_inicio,
+                    to_char(pd.hora_fim,   'HH24:MI')  AS hora_fim,
+                    EXTRACT(EPOCH FROM (pd.hora_fim - pd.hora_inicio)) / 60 AS duracao
+                FROM parte_diaria pd
+                JOIN maquina   m ON m.id = pd.maquina_id
+                JOIN atividade a ON a.id = pd.atividade_id
+                WHERE pd.data = :data_pd
+                  AND m.tag   = 'P190-66001'
+                ORDER BY pd.hora_inicio
             """)
-            dados_partdiaria = conn.execute(
-                sql_pd, {"data_pd": sel_dt_pd}
-            ).mappings().all()
+
+            try:
+                dados_partdiaria = conn.execute(
+                    sql_pd, {"data_pd": sel_dt_pd}
+                ).mappings().all()
+            except Exception:
+                # Se a tabela ainda não existir no Postgres, não quebra a página
+                dados_partdiaria = []
 
             # para gráfico: labels e tempos em minutos
             labels_pd = [r["atividade"] for r in dados_partdiaria]
