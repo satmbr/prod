@@ -77,7 +77,7 @@ def producao():
         # Lista de EHs para o filtro
         # ------------------------
         ehs = conn.execute(
-            text("SELECT id, nome FROM prumat_eh ORDER BY nome")
+            text("SELECT id, eh AS nome FROM entre_house ORDER BY eh")
         ).mappings().all()
 
         if eh_id:
