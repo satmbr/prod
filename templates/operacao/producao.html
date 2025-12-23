@@ -82,16 +82,14 @@
         background-color: #E2EFDA !important;
     }
 
-    /* Cabeçalho ocupando 100% da largura da tela (full-bleed) */
-    .header-full {
-        width: 100vw;
-        position: relative;
-        left: 50%;
-        right: 50%;
-        margin-left: -50vw;
-        margin-right: -50vw;
-        padding: 0;
-    }
+    /* Cabeçalho ocupando 100% da largura útil (já considerando o scale do body) */
+	.header-full {
+		width: 100%;
+		position: static;      /* não empurra mais pra fora */
+		margin: 0;             /* sem margens negativas */
+		padding: 0;
+	}
+
     .layout-tabela-grafico {
         display: flex;
         flex-wrap: wrap;
