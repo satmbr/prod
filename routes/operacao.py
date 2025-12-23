@@ -1,493 +1,567 @@
-# routes/operacao.py
-
-from flask import Blueprint, render_template, request, redirect, url_for
+from flask import Blueprint, render_template, url_for, request, redirect
 from sqlalchemy import text
-from collections import defaultdict
-from datetime import date, datetime
-
 from db import get_engine
-
-# Tenta importar decorador e função reais, se existirem;
-# se não existirem no Railway, usamos fallbacks simples.
-try:
-    from utils import nivel_requerido
-except ImportError:
-    def nivel_requerido(*roles):
-        """Decorador de fallback: não faz controle de acesso, apenas retorna a função original."""
-        def decorator(fn):
-            return fn
-        return decorator
-
-try:
-    from utils.calcular_duracao import calcular_duracao
-except ImportError:
-    def calcular_duracao(hora_inicio: str, hora_fim: str) -> int:
-        """
-        Fallback local para calcular duração em minutos a partir de strings 'HH:MM'.
-        """
-        fmt = "%H:%M"
-        ini = datetime.strptime(str(hora_inicio), fmt)
-        fim = datetime.strptime(str(hora_fim), fmt)
-        delta = fim - ini
-        return int(delta.total_seconds() // 60)
-
+from datetime import date
 
 bp = Blueprint("operacao", __name__)
 
-def build_operacao_subnav(active=None):
-    """
-    Monta a lista de abas da Operação para o base.html.
-    active pode ser: 'producao', 'registro', 'cadastro' ou None.
-    """
+# ----------------------------
+# Helpers
+# ----------------------------
+def _subnav(active: str):
     return [
-        {
-            "text": "Produção",
-            "href": url_for("operacao.producao"),
-            "active": active == "producao",
-        },
-        {
-            "text": "Registro",
-            "href": url_for("operacao.registro"),
-            "active": active == "registro",
-        },
-        {
-            "text": "Cadastro",
-            "href": url_for("operacao.cadastro"),
-            "active": active == "cadastro",
-        },
+        {"text": "Produção", "href": url_for("operacao.producao"), "active": active == "producao"},
+        {"text": "Registro",  "href": url_for("operacao.registro"),  "active": active == "registro"},
+        {"text": "Cadastro",  "href": url_for("operacao.cadastro"),  "active": active == "cadastro"},
     ]
 
-@bp.route("/")
-@nivel_requerido("admin", "gerente", "tecnico", "planejador", "visualizador")
-def index():
-    """
-    Tela inicial do módulo Operação.
-    Só mostra o subnav com as opções.
-    """
-    subnav_links = build_operacao_subnav(None)
-    return render_template("operacao/index.html", subnav_links=subnav_links)
 
-@bp.route("/producao", methods=["GET"])
-@nivel_requerido("admin", "gerente", "tecnico", "planejador", "visualizador")
+def _fetch_listas():
+    """Carrega listas de EH e Frentes para selects."""
+    with get_engine().connect() as conn:
+        eh = conn.execute(text("SELECT id, eh FROM entre_house ORDER BY eh")).mappings().all()
+        fr = conn.execute(text("SELECT id, frente FROM frente_equipe ORDER BY frente")).mappings().all()
+    return eh, fr
+
+
+# ----------------------------
+# GET raiz Operação
+# ----------------------------
+@bp.get("/")
+def index():
+    return render_template("operacao/index.html", subnav_links=_subnav(""))
+
+
+# ----------------------------------------------------------------
+# PRODUÇÃO
+# ----------------------------------------------------------------
+@bp.get("/producao")
 def producao():
     """
-    Visão de produção (renovação, parte diária, frentes e gauges).
-
-    Adaptação da lógica antiga para a nova estrutura com SQLAlchemy + get_engine(),
-    mantendo a compatibilidade com o template templates/operacao/producao.html.
+    Tela de Produção resumida para a nova estrutura/layout.
+    Mostra:
+      - tabela + gráfico de acompanhamento da frente principal (renovação)
+      - resumo da PartDiaria da renovadora P190-66001
+      - tabela consolidada de frentes 02/03/04...
+      - gráficos frente 02 (barras + 'bateria')
+      - gauges percentuais por frente
     """
-    engine = get_engine()
 
-    # Filtros vindos da URL
-    eh_id = request.args.get("eh_id", type=int)
-    data_partdiaria = request.args.get("data_partdiaria")
+    # Filtros básicos (seguindo sua lógica original)
+    sel_eh = request.args.get("eh") or request.args.get("eh_id")  # id entre_house
+    sel_fr = request.args.get("fr")                # id frente_equipe
+    sel_dt = request.args.get("dt") or date.today().isoformat()
+    sel_dt_obj = date.fromisoformat(sel_dt)
 
-    # Estruturas padrão para o template
-    ehs = []
-    dados = []                      # tabela de renovação (frente 01)
-    dados_partdiaria = []           # tabela da parte diária P190-66001
-    grafico_atividades = {"labels": [], "tempos": []}
-    dados_carregamento = []         # tabela auxiliar de carregamento
-    grafico_barra_carregamento = [] # gráfico barras/linhas frente 02
-    grafico_bateria_carregamento = {}
-    dados_resumo_frentes = []       # tabela consolidada de frentes
-    percentuais_graficos = {}       # dados dos gauges
+    sel_maq   = request.args.get("maq")            # id máquina
+    sel_dt_pd = request.args.get("dt_pd") or sel_dt
 
-    with engine.connect() as conn:
-        # ------------------------
-        # Lista de EHs para o filtro
-        # ------------------------
-        ehs = conn.execute(
-            text("SELECT id, eh AS nome FROM entre_house ORDER BY eh")
-        ).mappings().all()
+    # Intervalo específico para "Descarga & Segregação"
+    dsd_i = request.args.get("dsd_ini")
+    dsd_f = request.args.get("dsd_fim")
 
-        if eh_id:
-            # ================================================
-            # BLOCO 1 — Preparação de dados por frente / data
-            # ================================================
-            frentes_interessadas = [
-                "01 - Renovação",
-                "02 - Carregamento_novo",
-                "03 - Remoção_grampos",
-                "04 - Remoção_galochas",
-                "05 - Descarregamento_velho",
-                "06 - Aplicação_grampos",
-                "07 - Segregação_bons",
-                "08 - Segregação_ruins",
-                "09 - Descarregamento_novo",
-            ]
+    # começo do mês para gerar a série diária (evita usar ::cast no SQL)
+    start_month = sel_dt_obj.replace(day=1)
 
-            # Mapeia nomes de frentes para chaves numéricas internas
-            frentes_map = {nome: idx + 1 for idx, nome in enumerate(frentes_interessadas)}
+    with get_engine().connect() as conn:
+        # -------- listas para selects --------
+        eh_list = conn.execute(text(
+            "SELECT id, eh FROM entre_house ORDER BY eh"
+        )).mappings().all()
 
-            # Busca toda a produção dessa EH (todas as frentes) e organiza por data
-            registros_frentes = conn.execute(
-                text(
-                    """
-                    SELECT f.nome AS frente, p.data, p.executado
-                    FROM prumat_producao p
-                    JOIN prumat_frente_producao f ON p.frente_id = f.id
-                    WHERE p.eh_id = :eh_id
-                    ORDER BY p.data
-                    """
+        fr_list = conn.execute(text(
+            "SELECT id, frente FROM frente_equipe ORDER BY frente"
+        )).mappings().all()
+
+        maq_list = conn.execute(text("""
+            SELECT id, tag, descricao
+            FROM maquina
+            WHERE ativo IS TRUE
+            ORDER BY tag
+        """)).mappings().all()
+
+        # ============================================================
+        # BLOCO 1 — ACOMPANHAMENTO (frente principal)
+        # ============================================================
+        dados_renovacao = []
+        if sel_eh and sel_fr:
+            sql_acomp = text("""
+                WITH dias AS (
+                    SELECT gs::date AS d
+                    FROM generate_series(:dini, :dfim, interval '1 day') gs
                 ),
-                {"eh_id": eh_id},
+                pl AS (
+                    SELECT data::date AS data, SUM(planejado) AS planejado
+                    FROM producao_planejada
+                    WHERE eh_id = :eh AND frente_id = :fr
+                    GROUP BY data::date
+                ),
+                rl AS (
+                    SELECT data::date AS data, SUM(realizado) AS realizado
+                    FROM producao_realizada
+                    WHERE eh_id = :eh AND frente_id = :fr
+                    GROUP BY data::date
+                )
+                SELECT
+                    dias.d                              AS data,
+                    COALESCE(pl.planejado, 0)::float    AS previsto_dia,
+                    COALESCE(rl.realizado, 0)::float    AS realizado_dia,
+                    SUM(COALESCE(pl.planejado, 0)) OVER (ORDER BY dias.d)::float   AS previsto_total,
+                    SUM(COALESCE(rl.realizado, 0)) OVER (ORDER BY dias.d)::float   AS realizado_total,
+                    (
+                        SUM(COALESCE(rl.realizado, 0)) OVER (ORDER BY dias.d)
+                      - SUM(COALESCE(pl.planejado, 0)) OVER (ORDER BY dias.d)
+                    )::float AS diferenca,
+                    (
+                        SUM(COALESCE(pl.planejado, 0)) OVER (ORDER BY dias.d)
+                      - SUM(COALESCE(rl.realizado, 0)) OVER (ORDER BY dias.d)
+                    )::float AS atraso
+                FROM dias
+                LEFT JOIN pl ON pl.data = dias.d
+                LEFT JOIN rl ON rl.data = dias.d
+                ORDER BY dias.d
+            """)
+            dados_renovacao = conn.execute(
+                sql_acomp,
+                {"dini": start_month, "dfim": sel_dt_obj, "eh": sel_eh, "fr": sel_fr},
             ).mappings().all()
 
-            por_data = defaultdict(lambda: {k: 0 for k in frentes_map.values()})
-            acumulados = {k: 0 for k in frentes_map.values()}
-            datas_presentes = set()
-
-            for row in registros_frentes:
-                frente = row["frente"]
-                data_row = row["data"]
-                valor = row["executado"] or 0
-
-                if frente not in frentes_map:
-                    continue
-
-                chave = frentes_map[frente]
-                por_data[data_row][chave] += valor
-                acumulados[chave] += valor
-                por_data[data_row]["acum_" + str(chave)] = acumulados[chave]
-                datas_presentes.add(data_row)
-
-            datas_ordenadas = sorted(datas_presentes)
-
-            # ==================================================
-            # BLOCO 2 — Renovação (frente 01) - tabela principal
-            # ==================================================
-            registros_renovacao = conn.execute(
-                text(
-                    """
-                    SELECT p.data, p.planejado, p.executado
-                    FROM prumat_producao p
-                    JOIN prumat_frente_producao f ON p.frente_id = f.id
-                    WHERE p.eh_id = :eh_id AND f.nome = '01 - Renovação'
-                    ORDER BY p.data
-                    """
-                ),
-                {"eh_id": eh_id},
+        # ============================================================
+        # BLOCO 2 — PART DIÁRIA P190-66001
+        # ============================================================
+        dados_partdiaria = []
+        grafico_atividades = None
+        if sel_dt_pd:
+            sql_pd = text("""
+                SELECT
+                    atividade,
+                    to_char(hora_inicio, 'HH24:MI') AS hora_inicio,
+                    to_char(hora_fim, 'HH24:MI')    AS hora_fim,
+                    EXTRACT(EPOCH FROM (hora_fim - hora_inicio)) / 60 AS duracao
+                FROM part_diaria
+                WHERE data = :data_pd
+                  AND equipamento_tag = 'P190-66001'
+                ORDER BY hora_inicio
+            """)
+            dados_partdiaria = conn.execute(
+                sql_pd, {"data_pd": sel_dt_pd}
             ).mappings().all()
 
-            previsto_total = 0
-            realizado_total = 0
-            renovacao_por_data = {}
-
-            for r in registros_renovacao:
-                previsto = r["planejado"] or 0
-                executado = r["executado"] or 0
-                previsto_total += previsto
-                realizado_total += executado
-                diferenca = realizado_total - previsto_total
-                atraso = round(diferenca / 850, 2) if diferenca != 0 else 0
-
-                data_str = str(r["data"])
-                dados.append(
-                    {
-                        "data": data_str,
-                        "previsto_dia": previsto,
-                        "previsto_total": previsto_total,
-                        "realizado_dia": executado,
-                        "realizado_total": realizado_total,
-                        "diferenca": diferenca,
-                        "atraso": atraso,
-                    }
-                )
-                renovacao_por_data[r["data"]] = realizado_total
-
-            # ============================================
-            # BLOCO 3 — Cálculos para resumo de frentes
-            # ============================================
-            # Carregamento (Frente 02)
-            saldo_carregamento = 0
-            acumulado_carregado_por_data = {}
-            saldo_por_data = {}
-
-            for d in datas_ordenadas:
-                carregado = por_data[d].get(frentes_map.get("02 - Carregamento_novo"), 0)
-                renovado = por_data[d].get(frentes_map.get("01 - Renovação"), 0)
-
-                saldo_carregamento += carregado - renovado
-                acumulado_anterior = (
-                    list(acumulado_carregado_por_data.values())[-1]
-                    if acumulado_carregado_por_data
-                    else 0
-                )
-                acumulado_carregado_por_data[d] = acumulado_anterior + carregado
-                saldo_por_data[d] = saldo_carregamento
-
-            # Remoção de grampos (Frente 03)
-            saldo_rem_grampos = 0
-            acumulado_rem_grampos_por_data = {}
-            fa_rem_grampos_por_data = {}
-
-            for d in datas_ordenadas:
-                removido = por_data[d].get(frentes_map.get("03 - Remoção_grampos"), 0)
-                renovado = por_data[d].get(frentes_map.get("01 - Renovação"), 0)
-
-                saldo_rem_grampos += removido - renovado
-                acumulado_anterior = (
-                    list(acumulado_rem_grampos_por_data.values())[-1]
-                    if acumulado_rem_grampos_por_data
-                    else 0
-                )
-                acumulado_rem_grampos_por_data[d] = acumulado_anterior + removido
-                fa_rem_grampos_por_data[d] = saldo_rem_grampos
-
-            # Remoção de galochas (Frente 04)
-            saldo_rem_galochas = 0
-            acumulado_rem_galochas_por_data = {}
-            fa_rem_galochas_por_data = {}
-
-            for d in datas_ordenadas:
-                removido = por_data[d].get(frentes_map.get("04 - Remoção_galochas"), 0)
-                renovado = por_data[d].get(frentes_map.get("01 - Renovação"), 0)
-
-                saldo_rem_galochas += removido - renovado
-                acumulado_anterior = (
-                    list(acumulado_rem_galochas_por_data.values())[-1]
-                    if acumulado_rem_galochas_por_data
-                    else 0
-                )
-                acumulado_rem_galochas_por_data[d] = acumulado_anterior + removido
-                fa_rem_galochas_por_data[d] = saldo_rem_galochas
-
-            # Aplicação de grampos (Frente 06)
-            saldo_aplicado_grampos = 0
-            acumulado_aplicados_por_data = {}
-            aberto_aplicacao_por_data = {}
-
-            for d in datas_ordenadas:
-                aplicado = por_data[d].get(frentes_map.get("06 - Aplicação_grampos"), 0)
-                renovado = por_data[d].get(frentes_map.get("01 - Renovação"), 0)
-
-                saldo_aplicado_grampos += renovado - aplicado
-                acumulado_anterior = (
-                    list(acumulado_aplicados_por_data.values())[-1]
-                    if acumulado_aplicados_por_data
-                    else 0
-                )
-                acumulado_aplicados_por_data[d] = acumulado_anterior + aplicado
-                aberto_aplicacao_por_data[d] = saldo_aplicado_grampos
-
-            # Montagem da tabela consolidada (Resumo Frentes)
-            for d in datas_ordenadas:
-                rem_grampos = por_data[d].get(frentes_map.get("03 - Remoção_grampos"), 0)
-                acum_rem_grampos = acumulado_rem_grampos_por_data.get(d, 0)
-                fa_grampos = fa_rem_grampos_por_data.get(d, 0)
-
-                rem_galochas = por_data[d].get(frentes_map.get("04 - Remoção_galochas"), 0)
-                acum_rem_galochas = acumulado_rem_galochas_por_data.get(d, 0)
-                fa_galochas = fa_rem_galochas_por_data.get(d, 0)
-
-                aplicado = por_data[d].get(frentes_map.get("06 - Aplicação_grampos"), 0)
-                acumulado_aplicado = acumulado_aplicados_por_data.get(d, 0)
-                aberto = aberto_aplicacao_por_data.get(d, 0)
-
-                linha = {
-                    "data": str(d),
-                    "carregado": por_data[d].get(
-                        frentes_map.get("02 - Carregamento_novo"), 0
-                    ),
-                    "saldo": saldo_por_data.get(d, 0),
-                    "acumulado_carregado": acumulado_carregado_por_data.get(d, 0),
-                    "desc_velho": por_data[d].get(
-                        frentes_map.get("05 - Descarregamento_velho"), 0
-                    ),
-                    "desc_novo": por_data[d].get(
-                        frentes_map.get("09 - Descarregamento_novo"), 0
-                    ),
-                    "rem_grampos": rem_grampos,
-                    "fa_grampos": fa_grampos,
-                    "acum_rem_grampos": acum_rem_grampos,
-                    "rem_galochas": rem_galochas,
-                    "fa_galochas": fa_galochas,
-                    "acum_rem_galochas": acum_rem_galochas,
-                    "aplicado": aplicado,
-                    "aberto": aberto,
-                    "seg_ruins": por_data[d].get(
-                        frentes_map.get("08 - Segregação_ruins"), 0
-                    ),
-                    "seg_bons": por_data[d].get(
-                        frentes_map.get("07 - Segregação_bons"), 0
-                    ),
-                }
-                dados_resumo_frentes.append(linha)
-
-            # ===================================================
-            # BLOCO 4 — Carregamento Novo (frente 02) + bateria
-            # ===================================================
-            registros_02 = conn.execute(
-                text(
-                    """
-                    SELECT p.data, p.planejado, p.executado
-                    FROM prumat_producao p
-                    JOIN prumat_frente_producao f ON p.frente_id = f.id
-                    WHERE p.eh_id = :eh_id AND f.nome = '02 - Carregamento_novo'
-                    ORDER BY p.data
-                    """
-                ),
-                {"eh_id": eh_id},
-            ).mappings().all()
-
-            acumulado_02 = 0
-            acumulado_planejado_02 = 0
-            plane_total_02 = 0
-
-            for r in registros_02:
-                data_row = r["data"]
-                previsto = r["planejado"] or 0
-                executado = r["executado"] or 0
-                acumulado_02 += executado
-                acumulado_planejado_02 += previsto
-                plane_total_02 += previsto
-                realizado_renovacao = renovacao_por_data.get(data_row, 0)
-
-                # Descarregamento velho na mesma data (frente 05)
-                desc_row = conn.execute(
-                    text(
-                        """
-                        SELECT p.executado
-                        FROM prumat_producao p
-                        JOIN prumat_frente_producao f ON p.frente_id = f.id
-                        WHERE p.eh_id = :eh_id
-                          AND f.nome = '05 - Descarregamento_velho'
-                          AND p.data = :data
-                        """
-                    ),
-                    {"eh_id": eh_id, "data": data_row},
-                ).mappings().first()
-
-                descarregado = desc_row["executado"] if desc_row else 0
-
-                dados_carregamento.append(
-                    {
-                        "data": str(data_row),
-                        "previsto": previsto,
-                        "carregado": executado,
-                        "acumulado": acumulado_02,
-                        "disponivel": acumulado_02 - realizado_renovacao,
-                        "descarregado": descarregado,
-                    }
-                )
-
-                grafico_barra_carregamento.append(
-                    {
-                        "data": str(data_row),
-                        "planejado": previsto,
-                        "executado": executado,
-                        "acumulado_planejado": acumulado_planejado_02,
-                        "acumulado_executado": acumulado_02,
-                    }
-                )
-
-            if registros_02 and data_partdiaria:
-                registros_filtrados = [
-                    r for r in registros_02 if str(r["data"]) <= str(data_partdiaria)
-                ]
-                acumulado_plan = sum(r["planejado"] or 0 for r in registros_filtrados)
-                acumulado_exec = sum(r["executado"] or 0 for r in registros_filtrados)
-
-                grafico_bateria_carregamento = {
-                    "planejado_total": plane_total_02,
-                    "planejado_acumulado": acumulado_plan,
-                    "executado_acumulado": acumulado_exec,
-                }
-
-            # ==============================================
-            # BLOCO 5 — Parte Diária P190-66001 (tabela + gráfico)
-            # ==============================================
-            if data_partdiaria:
-                partes = conn.execute(
-                    text(
-                        """
-                        SELECT
-                            pd.hora_inicio,
-                            pd.hora_fim,
-                            a.nome AS atividade
-                        FROM prumat_parte_diaria pd
-                        JOIN prumat_atividades a ON pd.atividade_id = a.id
-                        JOIN prumat_equipamentos e ON pd.equipamento_id = e.id
-                        WHERE e.tag = 'P190-66001'
-                          AND pd.data = :data_pd
-                        ORDER BY pd.hora_inicio
-                        """
-                    ),
-                    {"data_pd": data_partdiaria},
-                ).mappings().all()
-
-                total_por_atividade = {}
-
-                for p in partes:
-                    duracao = calcular_duracao(p["hora_inicio"], p["hora_fim"])
-                    dados_partdiaria.append(
-                        {
-                            "atividade": p["atividade"],
-                            "hora_inicio": p["hora_inicio"],
-                            "hora_fim": p["hora_fim"],
-                            "duracao": duracao,
-                        }
-                    )
-                    total_por_atividade[p["atividade"]] = (
-                        total_por_atividade.get(p["atividade"], 0) + duracao
-                    )
-
-                grafico_atividades = {
-                    "labels": list(total_por_atividade.keys()),
-                    "tempos": list(total_por_atividade.values()),
-                }
-
-            # ====================================
-            # BLOCO 6 — Percentuais por Frente (gauges)
-            # ====================================
-            frentes_icones = {
-                "01 - Renovação": ("trem_amarelo.png", "Renovação Dormentes"),
-                "02 - Carregamento_novo": ("pa_garfada2.png", "Carregamento Novo"),
-                "03 - Remoção_grampos": ("trilho_vertical_madeira.png", "Remoção Grampos"),
-                "04 - Remoção_galochas": ("trilho_horizontal_madeira.png", "Remoção Galochas"),
-                "06 - Aplicação_grampos": ("trilho_vertical_concreto.png", "Aplicação Grampos"),
-                "09 - Descarregamento_novo": ("pa_garfada.png", "Descarregamento Novo"),
+            # para gráfico: labels e tempos em minutos
+            labels_pd = [r["atividade"] for r in dados_partdiaria]
+            tempos_pd = [float(r["duracao"] or 0) for r in dados_partdiaria]
+            grafico_atividades = {
+                "labels": labels_pd,
+                "tempos": tempos_pd,
             }
 
-            for frente, (icone, titulo) in frentes_icones.items():
-                registros = conn.execute(
-                    text(
-                        """
-                        SELECT p.planejado, p.executado
-                        FROM prumat_producao p
-                        JOIN prumat_frente_producao f ON p.frente_id = f.id
-                        WHERE p.eh_id = :eh_id AND f.nome = :frente
-                        """
-                    ),
-                    {"eh_id": eh_id, "frente": frente},
-                ).mappings().all()
+        # ============================================================
+        # BLOCO 3 — RESUMO FRENTES (Carregamento, Remoção, Pregação etc.)
+        # ============================================================
+        dados_resumo_frentes = []
+        grafico_barra_carregamento = []
+        grafico_bateria_carregamento = {}
 
-                total_plan = sum(r["planejado"] or 0 for r in registros)
-                total_exec = sum(r["executado"] or 0 for r in registros)
-                percentual = round((total_exec / total_plan) * 100, 1) if total_plan else 0
+        if sel_eh:
+            # base de frentes: exemplo genérico, adapte aos campos reais da tabela producao_frentes
+            fr_sql = text("""
+                WITH base AS (
+                    SELECT
+                        data::date AS data,
+                        COALESCE(carregado, 0)      AS r1,
+                        COALESCE(saldo, 0)          AS r2,
+                        COALESCE(rem_grampos, 0)    AS r3,
+                        COALESCE(rem_galochas, 0)   AS r4,
+                        COALESCE(aplicado, 0)       AS r6,
+                        COALESCE(seg_ruins, 0)      AS r7,
+                        COALESCE(seg_bons, 0)       AS r8,
+                        COALESCE(desc_velho, 0)     AS desc_v,
+                        COALESCE(desc_novo, 0)      AS desc_n
+                    FROM producao_frentes
+                    WHERE eh_id = :eh
+                )
+                SELECT
+                    data,
+                    r1::float                       AS carregado,
+                    (r1 - r2)::float                AS saldo,
+                    (SUM(r1) OVER (ORDER BY data))::float AS acumulado_carregado,
+                    desc_v::float                   AS desc_velho,
+                    desc_n::float                   AS desc_novo,
+                    r3::float                       AS rem_grampos,
+                    (r3 - r2)::float                AS fa_grampos,
+                    (SUM(r3) OVER (ORDER BY data))::float AS acum_rem_grampos,
+                    r4::float                       AS rem_galochas,
+                    (r4 - r2)::float                AS fa_galochas,
+                    (SUM(r4) OVER (ORDER BY data))::float AS acum_rem_galochas,
+                    r6::float                       AS aplicado,
+                    (SUM(r1) OVER (ORDER BY data) - SUM(r6) OVER (ORDER BY data))::float AS frente_aplicado,
+                    (SUM(r6) OVER (ORDER BY data))::float AS acum_aplicado,
+                    r7::float                       AS seg_ruins,
+                    r8::float                       AS seg_bons
+                FROM base
+                ORDER BY data
+            """)
+            frentes_rows = conn.execute(fr_sql, {"eh": sel_eh}).mappings().all()
+            dados_resumo_frentes = frentes_rows
 
-                percentuais_graficos[frente] = {
-                    "icone": icone,
-                    "titulo": titulo,
-                    "percentual_executado": percentual,
+            # Frente 02 – assumindo que no seu modelo o "carregado" seja a frente 02
+            grafico_barra_carregamento = [
+                {
+                    "data": str(r["data"]),
+                    "planejado": float(r["carregado"] or 0),
+                    "executado": float(r["aplicado"] or 0),
+                    "acumulado_planejado": float(r["acumulado_carregado"] or 0),
+                    "acumulado_executado": float(r["acum_aplicado"] or 0),
                 }
+                for r in frentes_rows
+            ]
 
-    subnav_links = build_operacao_subnav("producao")
+            # Bateria – usa o total planejado (soma carregado) e acumulados até a data filtrada
+            total_planejado = sum(float(r["carregado"] or 0) for r in frentes_rows)
+            acumulado_planejado = sum(
+                float(r["carregado"] or 0)
+                for r in frentes_rows
+                if r["data"] <= sel_dt_obj
+            )
+            acumulado_executado = sum(
+                float(r["aplicado"] or 0)
+                for r in frentes_rows
+                if r["data"] <= sel_dt_obj
+            )
+            grafico_bateria_carregamento = {
+                "planejado_total": total_planejado,
+                "planejado_acumulado": acumulado_planejado,
+                "executado_acumulado": acumulado_executado,
+            }
+
+        # ============================================================
+        # BLOCO 4 — DESCARGA & SEGREGAÇÃO (intervalo próprio)
+        # ============================================================
+        dsd_rows = []
+        if sel_eh and dsd_i and dsd_f:
+            sql_dsd = text("""
+                SELECT *
+                FROM descarga_segregacao
+                WHERE eh_id = :eh
+                  AND data BETWEEN :di AND :df
+                ORDER BY data
+            """)
+            dsd_rows = conn.execute(
+                sql_dsd,
+                {"eh": sel_eh, "di": dsd_i, "df": dsd_f},
+            ).mappings().all()
+
+        # ============================================================
+        # BLOCO 5 — Percentuais para Gauges (uma ideia simplificada)
+        # ============================================================
+        percentuais_graficos = {}
+        if sel_eh:
+            # Exemplo didático: calcula percentuais "executado / planejado" por frente.
+            sql_pct = text("""
+                SELECT
+                    f.id,
+                    f.frente,
+                    COALESCE(SUM(p.realizado), 0) AS realizado,
+                    COALESCE(SUM(pl.planejado), 0) AS planejado
+                FROM frente_equipe f
+                LEFT JOIN producao_realizada p
+                  ON p.frente_id = f.id AND p.eh_id = :eh
+                LEFT JOIN producao_planejada pl
+                  ON pl.frente_id = f.id AND pl.eh_id = :eh
+                GROUP BY f.id, f.frente
+                ORDER BY f.frente
+            """)
+            rows_pct = conn.execute(sql_pct, {"eh": sel_eh}).mappings().all()
+            for idx, r in enumerate(rows_pct, start=1):
+                pla = float(r["planejado"] or 0)
+                exe = float(r["realizado"] or 0)
+                if pla <= 0:
+                    pct = 0.0
+                else:
+                    pct = min((exe / pla) * 100.0, 999.9)
+                # aqui só um exemplo de ícone e título
+                percentuais_graficos[f"frente_{r['id']}"] = {
+                    "titulo": r["frente"],
+                    "percentual_executado": pct,
+                    "icone": f"frente{idx}.png",  # ex.: frente1.png, frente2.png etc.
+                }
 
     return render_template(
         "operacao/producao.html",
-        ehs=ehs,
-        eh_id=eh_id,
-        dados=dados,
-        data_partdiaria=data_partdiaria or "",
+        subnav_links=_subnav("producao"),
+        ehs=eh_list,
+        frentes=fr_list,
+        maquinas=maq_list,
+        sel_eh=sel_eh,
+        sel_fr=sel_fr,
+        sel_dt=sel_dt,
+        sel_maq=sel_maq,
+        sel_dt_pd=sel_dt_pd,
+        dsd_i=dsd_i,
+        dsd_f=dsd_f,
+        dados=dados_renovacao,
         dados_partdiaria=dados_partdiaria,
         grafico_atividades=grafico_atividades,
-        dados_carregamento=dados_carregamento,
+        dados_resumo_frentes=dados_resumo_frentes,
         grafico_barra_carregamento=grafico_barra_carregamento,
         grafico_bateria_carregamento=grafico_bateria_carregamento,
-        dados_resumo_frentes=dados_resumo_frentes,
+        dsd_rows=dsd_rows,
         percentuais_graficos=percentuais_graficos,
-        subnav_links=subnav_links,
+        data_partdiaria=sel_dt_pd,
     )
 
+
+# ----------------------------------------------------------------
+# CADASTRO – EH e FRENTE
+# ----------------------------------------------------------------
+@bp.get("/cadastro")
+def cadastro():
+    eh, fr = _fetch_listas()
+    return render_template(
+        "operacao/cadastro.html",
+        subnav_links=_subnav("cadastro"),
+        lista_eh=eh,
+        lista_frente=fr,
+        msg=request.args.get("msg"),
+    )
+
+
+# ========================= EH =========================
+@bp.post("/cadastro/eh/create")
+def eh_create():
+    eh = (request.form.get("eh") or "").strip()
+    if not eh:
+        return redirect(url_for("operacao.cadastro", msg="Informe a EH."))
+    try:
+        with get_engine().begin() as conn:
+            conn.execute(text("INSERT INTO entre_house (eh) VALUES (:eh)"),
+                         {"eh": eh})
+        return redirect(url_for("operacao.cadastro", msg="EH cadastrada."))
+    except Exception as e:
+        return redirect(url_for("operacao.cadastro", msg=f"Erro ao cadastrar EH: {e}"))
+
+
+@bp.post("/cadastro/eh/update")
+def eh_update():
+    id_ = request.form.get("id")
+    novo = (request.form.get("novo_eh") or "").strip()
+    if not id_ or not novo:
+        return redirect(url_for("operacao.cadastro", msg="Selecione a EH e informe o novo nome."))
+    try:
+        with get_engine().begin() as conn:
+            conn.execute(text("UPDATE entre_house SET eh=:novo WHERE id=:id"),
+                         {"novo": novo, "id": id_})
+        return redirect(url_for("operacao.cadastro", msg="EH atualizada."))
+    except Exception as e:
+        return redirect(url_for("operacao.cadastro", msg=f"Erro ao atualizar EH: {e}"))
+
+
+@bp.post("/cadastro/eh/delete")
+def eh_delete():
+    id_ = request.form.get("id")
+    if not id_:
+        return redirect(url_for("operacao.cadastro", msg="Selecione a EH a excluir."))
+    try:
+        with get_engine().begin() as conn:
+            conn.execute(text("DELETE FROM entre_house WHERE id=:id"), {"id": id_})
+        return redirect(url_for("operacao.cadastro", msg="EH excluída."))
+    except Exception as e:
+        return redirect(url_for("operacao.cadastro", msg=f"Erro ao excluir EH: {e}"))
+
+
+# ========================= FRENTE =========================
+@bp.post("/cadastro/frente/create")
+def frente_create():
+    frente = (request.form.get("frente") or "").strip()
+    if not frente:
+        return redirect(url_for("operacao.cadastro", msg="Informe a Frente."))
+    try:
+        with get_engine().begin() as conn:
+            conn.execute(text("INSERT INTO frente_equipe (frente) VALUES (:frente)"),
+                         {"frente": frente})
+        return redirect(url_for("operacao.cadastro", msg="Frente cadastrada."))
+    except Exception as e:
+        return redirect(url_for("operacao.cadastro", msg=f"Erro ao cadastrar Frente: {e}"))
+
+
+@bp.post("/cadastro/frente/update")
+def frente_update():
+    id_ = request.form.get("id")
+    novo = (request.form.get("nova_frente") or "").strip()
+    if not id_ or not novo:
+        return redirect(url_for("operacao.cadastro", msg="Selecione a Frente e informe o novo nome."))
+    try:
+        with get_engine().begin() as conn:
+            conn.execute(text("UPDATE frente_equipe SET frente=:novo WHERE id=:id"),
+                         {"novo": novo, "id": id_})
+        return redirect(url_for("operacao.cadastro", msg="Frente atualizada."))
+    except Exception as e:
+        return redirect(url_for("operacao.cadastro", msg=f"Erro ao atualizar Frente: {e}"))
+
+
+@bp.post("/cadastro/frente/delete")
+def frente_delete():
+    id_ = request.form.get("id")
+    if not id_:
+        return redirect(url_for("operacao.cadastro", msg="Selecione a Frente a excluir."))
+    try:
+        with get_engine().begin() as conn:
+            conn.execute(text("DELETE FROM frente_equipe WHERE id=:id"), {"id": id_})
+        return redirect(url_for("operacao.cadastro", msg="Frente excluída."))
+    except Exception as e:
+        return redirect(url_for("operacao.cadastro", msg=f"Erro ao excluir Frente: {e}"))
+
+
+# ----------------------------------------------------------------
+# REGISTRO – Planejado / Executado
+# ----------------------------------------------------------------
+@bp.get("/registro")
+def registro():
+    """Tela de Registro com dois segmentos (Executado e Planejado).
+       Ambos iniciam fechados; após salvar, mantemos o segmento aberto via ?open=..."""
+    keep_open = request.args.get("open")  # "realizada" | "planejada" | None
+    feh = request.args.get("feh")
+    ffr = request.args.get("ffr")
+    fdt = request.args.get("fdt")  # filtro opcional por dia (YYYY-MM-DD)
+
+    with get_engine().connect() as conn:
+        eh_list = conn.execute(text("SELECT id, eh FROM entre_house ORDER BY eh")).mappings().all()
+        fr_list = conn.execute(text("SELECT id, frente FROM frente_equipe ORDER BY frente")).mappings().all()
+
+        # Filtros (constroem cláusulas diferentes para cada alias)
+        params = {}
+        where_rlz, where_pln = [], []
+
+        if feh:
+            where_rlz.append("r.eh_id = :feh")
+            where_pln.append("p.eh_id = :feh")
+            params["feh"] = feh
+
+        if ffr:
+            where_rlz.append("r.frente_id = :ffr")
+            where_pln.append("p.frente_id = :ffr")
+            params["ffr"] = ffr
+
+        if fdt:
+            where_rlz.append("r.data = :fdt")
+            where_pln.append("p.data = :fdt")
+            params["fdt"] = fdt
+
+        # Monta WHERE dinâmico
+        where_rlz_sql = ("WHERE " + " AND ".join(where_rlz)) if where_rlz else ""
+        where_pln_sql = ("WHERE " + " AND ".join(where_pln)) if where_pln else ""
+
+        sql_realizada = text(f"""
+            SELECT
+                r.id,
+                r.data,
+                r.realizado,
+                e.eh          AS eh_nome,
+                f.frente      AS frente_nome
+            FROM producao_realizada r
+            JOIN entre_house    e ON e.id = r.eh_id
+            JOIN frente_equipe  f ON f.id = r.frente_id
+            {where_rlz_sql}
+            ORDER BY r.data DESC, e.eh, f.frente
+        """)
+
+        sql_planejada = text(f"""
+            SELECT
+                p.id,
+                p.data,
+                p.planejado,
+                e.eh          AS eh_nome,
+                f.frente      AS frente_nome
+            FROM producao_planejada p
+            JOIN entre_house    e ON e.id = p.eh_id
+            JOIN frente_equipe  f ON f.id = p.frente_id
+            {where_pln_sql}
+            ORDER BY p.data DESC, e.eh, f.frente
+        """)
+
+        lista_rlz = conn.execute(sql_realizada, params).mappings().all()
+        lista_pln = conn.execute(sql_planejada, params).mappings().all()
+
+    return render_template(
+        "operacao/registro.html",
+        subnav_links=_subnav("registro"),
+        eh_list=eh_list,
+        fr_list=fr_list,
+        lista_rlz=lista_rlz,
+        lista_pln=lista_pln,
+        feh=feh,
+        ffr=ffr,
+        fdt=fdt,
+        keep_open=keep_open,
+        msg=request.args.get("msg"),
+    )
+
+
+@bp.post("/registro/realizada")
+def registro_realizada_create():
+    eh_id = request.form.get("eh_id")
+    frente_id = request.form.get("frente_id")
+    data_str = request.form.get("data")
+    realizado = request.form.get("realizado")
+
+    if not (eh_id and frente_id and data_str and realizado):
+        return redirect(url_for("operacao.registro", open="realizada", msg="Preencha todos os campos."))
+
+    with get_engine().begin() as conn:
+        conn.execute(
+            text("""
+                INSERT INTO producao_realizada (eh_id, frente_id, data, realizado)
+                VALUES (:eh, :fr, :dt, :rz)
+            """),
+            {
+                "eh": eh_id,
+                "fr": frente_id,
+                "dt": data_str,
+                "rz": realizado,
+            },
+        )
+
+    return redirect(url_for("operacao.registro", open="realizada", msg="Registro executado salvo."))
+
+
+@bp.post("/registro/planejada")
+def registro_planejada_create():
+    eh_id = request.form.get("eh_id")
+    frente_id = request.form.get("frente_id")
+    data_str = request.form.get("data")
+    planejado = request.form.get("planejado")
+
+    if not (eh_id and frente_id and data_str and planejado):
+        return redirect(url_for("operacao.registro", open="planejada", msg="Preencha todos os campos."))
+
+    with get_engine().begin() as conn:
+        conn.execute(
+            text("""
+                INSERT INTO producao_planejada (eh_id, frente_id, data, planejado)
+                VALUES (:eh, :fr, :dt, :pl)
+            """),
+            {
+                "eh": eh_id,
+                "fr": frente_id,
+                "dt": data_str,
+                "pl": planejado,
+            },
+        )
+
+    return redirect(url_for("operacao.registro", open="planejada", msg="Registro planejado salvo."))
+
+
+@bp.post("/registro/realizada/delete")
+def registro_realizada_delete():
+    rid = request.form.get("id")
+    with get_engine().begin() as conn:
+        conn.execute(text("DELETE FROM producao_realizada WHERE id=:id"), {"id": rid})
+    return redirect(url_for("operacao.registro", open="realizada", msg="Registro executado excluído."))
+
+
+@bp.post("/registro/planejada/delete")
+def registro_planejada_delete():
+    pid = request.form.get("id")
+    with get_engine().begin() as conn:
+        conn.execute(text("DELETE FROM producao_planejada WHERE id=:id"), {"id": pid})
+    return redirect(url_for("operacao.registro", open="planejada", msg="Registro planejado excluído."))
