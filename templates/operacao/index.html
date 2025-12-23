@@ -1,57 +1,8 @@
 {% extends "base.html" %}
+
 {% block title %}Operação{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
-    <h4 class="mb-4">Módulo de Operação</h4>
-
-    <div class="row g-3">
-
-        <!-- Card Produção -->
-        <div class="col-md-4">
-            <div class="card h-100 shadow-sm">
-                <div class="card-body d-flex flex-column">
-                    <h5 class="card-title">Produção</h5>
-                    <p class="card-text small text-muted">
-                        Visão completa da produção: renovação, parte diária, frentes e indicadores.
-                    </p>
-                    <a href="{{ url_for('operacao.producao') }}" class="btn btn-sm btn-primary mt-auto">
-                        Abrir Produção
-                    </a>
-                </div>
-            </div>
-        </div>
-
-        <!-- Card Registro (sem rota ainda, só informativo por enquanto) -->
-        <div class="col-md-4">
-            <div class="card h-100 shadow-sm">
-                <div class="card-body d-flex flex-column">
-                    <h5 class="card-title">Registro</h5>
-                    <p class="card-text small text-muted">
-                        Registro de dados operacionais, apontamentos e ocorrências de campo.
-                    </p>
-                    <button class="btn btn-sm btn-outline-secondary mt-auto" disabled>
-                        Em desenvolvimento
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Card Cadastro (sem rota ainda, só informativo por enquanto) -->
-        <div class="col-md-4">
-            <div class="card h-100 shadow-sm">
-                <div class="card-body d-flex flex-column">
-                    <h5 class="card-title">Cadastro</h5>
-                    <p class="card-text small text-muted">
-                        Manutenção dos cadastros relacionados à operação (EH, frentes etc.).
-                    </p>
-                    <button class="btn btn-sm btn-outline-secondary mt-auto" disabled>
-                        Em desenvolvimento
-                    </button>
-                </div>
-            </div>
-        </div>
-
-    </div>
-</div>
+{# Página propositalmente em branco.
+   O usuário escolhe Produção, Registro ou Cadastro no menu superior. #}
 {% endblock %}
