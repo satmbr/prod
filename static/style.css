@@ -49,6 +49,8 @@ html {
 }
 body {
     transform: scale(var(--app-scale));
-    
+    transform-origin: top left;
+    /* corrige a largura para não “sobrar” espaço em branco à direita */
+    width: calc(100% / var(--app-scale));
 }
 /* mantém seu grid/botões existentes */
