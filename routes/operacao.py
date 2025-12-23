@@ -1,17 +1,19 @@
 # routes/operacao.py
 
-from flask import Blueprint, render_template, url_for, request, redirect
+from flask import Blueprint, render_template, request, redirect, url_for
 from sqlalchemy import text
-from db import get_engine
+from collections import defaultdict
 from datetime import date, datetime
 
-# Tenta importar do utils "real" se existir,
-# senão cria versões de fallback para não travar o sistema.
+from db import get_engine
+
+# Tenta importar decorador e função reais, se existirem;
+# se não existirem no Railway, usamos fallbacks simples.
 try:
     from utils import nivel_requerido
 except ImportError:
     def nivel_requerido(*roles):
-        """Decorador de fallback: NÃO faz controle de acesso, só deixa a rota rodar."""
+        """Decorador de fallback: não faz controle de acesso, apenas retorna a função original."""
         def decorator(fn):
             return fn
         return decorator
@@ -29,25 +31,34 @@ except ImportError:
         delta = fim - ini
         return int(delta.total_seconds() // 60)
 
-# Blueprint principal de Operação.
-# O prefixo '/operacao' normalmente é aplicado no app.py ao registrar o blueprint.
+
 bp = Blueprint("operacao", __name__)
+
+
+@bp.route("/")
+@nivel_requerido("admin", "gerente", "tecnico", "planejador", "visualizador")
+def index():
+    """
+    Rota principal do módulo Operação.
+    Apenas redireciona para a visão de produção, pois o base.html
+    usa url_for('operacao.index') no menu.
+    """
+    return redirect(url_for("operacao.producao"))
 
 
 @bp.route("/producao", methods=["GET"])
 @nivel_requerido("admin", "gerente", "tecnico", "planejador", "visualizador")
 def producao():
-    """Visão de produção (renovação, parte diária, frentes e gauges).
+    """
+    Visão de produção (renovação, parte diária, frentes e gauges).
 
-    Esta função é uma adaptação da lógica antiga (psycopg2) para a nova
-    estrutura com SQLAlchemy + get_engine(), mantendo os mesmos cálculos
-    e o mesmo formato de dados esperado pelo template
-    templates/operacao/producao.html.
+    Adaptação da lógica antiga para a nova estrutura com SQLAlchemy + get_engine(),
+    mantendo a compatibilidade com o template templates/operacao/producao.html.
     """
     engine = get_engine()
 
     # Filtros vindos da URL
-    eh_id = request.args.get("eh_id")
+    eh_id = request.args.get("eh_id", type=int)
     data_partdiaria = request.args.get("data_partdiaria")
 
     # Estruturas padrão para o template
@@ -86,11 +97,9 @@ def producao():
             ]
 
             # Mapeia nomes de frentes para chaves numéricas internas
-            frentes_map = {
-                nome: idx + 1 for idx, nome in enumerate(frentes_interessadas)
-            }
+            frentes_map = {nome: idx + 1 for idx, nome in enumerate(frentes_interessadas)}
 
-            # Busca toda a produção dessa EH (todas as frentes) e filtra em memória
+            # Busca toda a produção dessa EH (todas as frentes) e organiza por data
             registros_frentes = conn.execute(
                 text(
                     """
@@ -354,9 +363,7 @@ def producao():
 
             if registros_02 and data_partdiaria:
                 registros_filtrados = [
-                    r
-                    for r in registros_02
-                    if str(r["data"]) <= str(data_partdiaria)
+                    r for r in registros_02 if str(r["data"]) <= str(data_partdiaria)
                 ]
                 acumulado_plan = sum(r["planejado"] or 0 for r in registros_filtrados)
                 acumulado_exec = sum(r["executado"] or 0 for r in registros_filtrados)
@@ -449,7 +456,7 @@ def producao():
     return render_template(
         "operacao/producao.html",
         ehs=ehs,
-        eh_id=int(eh_id) if eh_id else None,
+        eh_id=eh_id,
         dados=dados,
         data_partdiaria=data_partdiaria or "",
         dados_partdiaria=dados_partdiaria,
