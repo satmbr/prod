@@ -177,11 +177,42 @@ def producao():
                 dados = []
 
         # ------------------------------------------------------------------
-        # BLOCO 2 – Parte Diária (ainda sem tabela 'part_diaria' no Postgres)
-        # Deixamos vazio para não quebrar a página.
+        # BLOCO 2 – Parte Diária (tabela PARTE_DIARIA)
         # ------------------------------------------------------------------
         dados_partdiaria = []
         grafico_atividades = {"labels": [], "tempos": []}
+
+        try:
+            sql_pd = text(
+                """
+                SELECT
+                    atividade,
+                    to_char(hora_inicio, 'HH24:MI') AS hora_inicio,
+                    to_char(hora_fim,   'HH24:MI') AS hora_fim,
+                    EXTRACT(EPOCH FROM (hora_fim - hora_inicio)) / 60 AS duracao
+                FROM parte_diaria
+                WHERE data = :data_pd
+                  AND equipamento_tag = 'P190-66001'
+                ORDER BY hora_inicio
+                """
+            )
+            dados_partdiaria = conn.execute(
+                sql_pd, {"data_pd": data_partdiaria}
+            ).mappings().all()
+
+            labels = []
+            tempos = []
+            for row in dados_partdiaria:
+                labels.append(row["atividade"])
+                # duracao em minutos (float)
+                tempos.append(float(row["duracao"] or 0.0))
+
+            grafico_atividades = {"labels": labels, "tempos": tempos}
+
+        except SQLAlchemyError:
+            # Se der qualquer erro (tabela não existe, etc), mantém vazio
+            dados_partdiaria = []
+            grafico_atividades = {"labels": [], "tempos": []}
 
         # ------------------------------------------------------------------
         # BLOCO 3 – Resumo frentes / gráficos frente 02 / gauges
