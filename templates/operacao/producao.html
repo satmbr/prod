@@ -165,7 +165,7 @@
                     </option>
                 {% endfor %}
             </select>
-            <label for="data_partdiaria" class="form-label fw-semibold">Selecionar Data:</label>
+            <label for="data_partdiaria" class="form-label fw-semibold">Selecionar Data:</label>&nbsp;
             <input type="date"
                    name="data_partdiaria"
                    id="data_partdiaria"
@@ -251,8 +251,8 @@
                         </tr>
                         {% endfor %}
                         {% if not dados_partdiaria %}
-                        <tr><td colspan="4">Nenhum registro para o equipamento P190-66001 na data selecionada.</td></tr>
-                        {% endif %}
+						<tr><td colspan="4">Nenhum registro para a data selecionada.</td></tr>
+						{% endif %}
                     </tbody>
                 </table>
             </div>
