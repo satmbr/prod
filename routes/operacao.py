@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from flask import Blueprint, render_template, request, redirect, url_for
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
@@ -192,67 +192,61 @@ def producao():
             except SQLAlchemyError:
                 dados = []
 
-        # ------------------------------------------------------------------
+                # ------------------------------------------------------------------
         # BLOCO 2 – Parte Diária (tabela PARTE_DIARIA)
         # ------------------------------------------------------------------
         dados_partdiaria = []
         grafico_atividades = {"labels": [], "tempos": []}
 
-        # 2.1 – tenta primeiro só o equipamento P190-66001
+        # 2.1 – Busca TODOS os registros e filtra em Python
         try:
-            sql_pd_p190 = text(
+            sql_pd = text(
                 """
                 SELECT
                     atividade,
                     to_char(hora_inicio, 'HH24:MI') AS hora_inicio,
                     to_char(hora_fim,   'HH24:MI') AS hora_fim,
-                    EXTRACT(EPOCH FROM (hora_fim - hora_inicio)) / 60 AS duracao
+                    EXTRACT(EPOCH FROM (hora_fim - hora_inicio)) / 60 AS duracao,
+                    data::text AS data_str,
+                    equipamento_tag
                 FROM parte_diaria
-                WHERE data::date = :data_pd::date
-                  AND equipamento_tag = 'P190-66001'
-                ORDER BY hora_inicio
+                ORDER BY data, hora_inicio
                 """
             )
-            dados_partdiaria = (
-                conn.execute(sql_pd_p190, {"data_pd": data_partdiaria})
-                .mappings()
-                .all()
-            )
+            rows_pd = conn.execute(sql_pd).mappings().all()
         except SQLAlchemyError:
-            dados_partdiaria = []
+            rows_pd = []
 
-        # 2.2 – se não achar nada com o filtro da máquina,
-        # faz um fallback pegando TODOS os registros da data
-        if not dados_partdiaria:
-            try:
-                sql_pd_all = text(
-                    """
-                    SELECT
-                        atividade,
-                        to_char(hora_inicio, 'HH24:MI') AS hora_inicio,
-                        to_char(hora_fim,   'HH24:MI') AS hora_fim,
-                        EXTRACT(EPOCH FROM (hora_fim - hora_inicio)) / 60 AS duracao
-                    FROM parte_diaria
-                    WHERE data::date = :data_pd::date
-                    ORDER BY hora_inicio
-                    """
-                )
-                dados_partdiaria = (
-                    conn.execute(sql_pd_all, {"data_pd": data_partdiaria})
-                    .mappings()
-                    .all()
-                )
-            except SQLAlchemyError:
-                dados_partdiaria = []
+        # Monta possíveis formatos de data que podem estar no banco
+        alvos_data = {data_partdiaria}  # ex: '2025-12-18'
+        try:
+            d_ref = datetime.strptime(data_partdiaria, "%Y-%m-%d").date()
+            alvos_data.add(d_ref.strftime("%d/%m/%Y"))
+            alvos_data.add(d_ref.strftime("%d-%m-%Y"))
+            alvos_data.add(d_ref.strftime("%Y/%m/%d"))
+        except ValueError:
+            pass
 
-        # Monta dados para o gráfico (seja do P190 ou, no fallback, de todos)
-        labels = []
-        tempos = []
-        for row in dados_partdiaria:
-            labels.append(row["atividade"])
-            tempos.append(float(row["duracao"] or 0.0))
+        # Primeiro: registros da máquina P190-66001 na data selecionada
+        filtrados = [
+            r for r in rows_pd
+            if (str(r.get("data_str", "")).split()[0] in alvos_data)
+            and (str(r.get("equipamento_tag") or "") == "P190-66001")
+        ]
 
+        # Se não houver P190 nesse dia, pega qualquer equipamento desse dia
+        if not filtrados:
+            filtrados = [
+                r for r in rows_pd
+                if str(r.get("data_str", "")).split()[0] in alvos_data
+            ]
+
+        dados_partdiaria = filtrados
+
+        labels = [r["atividade"] for r in filtrados]
+        tempos = [float(r["duracao"] or 0.0) for r in filtrados]
         grafico_atividades = {"labels": labels, "tempos": tempos}
+
 
         # ------------------------------------------------------------------
         # BLOCO 3 – Resumo frentes / gráficos frente 02 / gauges
