@@ -44,17 +44,25 @@ def load_eh_frentes(conn):
 
     # Tabela de EH: entre_house (id, eh)
     try:
-        eh_list = conn.execute(
-            text("SELECT id, eh FROM entre_house ORDER BY eh")
-        ).mappings().all()
+        eh_list = (
+            conn.execute(
+                text("SELECT id, eh FROM entre_house ORDER BY eh")
+            )
+            .mappings()
+            .all()
+        )
     except SQLAlchemyError:
         eh_list = []
 
     # Tabela de Frentes: frente_equipe (id, frente)
     try:
-        fr_list = conn.execute(
-            text("SELECT id, frente FROM frente_equipe ORDER BY frente")
-        ).mappings().all()
+        fr_list = (
+            conn.execute(
+                text("SELECT id, frente FROM frente_equipe ORDER BY frente")
+            )
+            .mappings()
+            .all()
+        )
     except SQLAlchemyError:
         fr_list = []
 
@@ -84,9 +92,17 @@ def producao():
         # 1) Carregar EH a partir de entre_house
         ehs = []
         try:
-            ehs = conn.execute(
-                text("SELECT id, eh AS nome FROM entre_house ORDER BY eh")
-            ).mappings().all()
+            ehs = (
+                conn.execute(
+                    text(
+                        "SELECT id, eh AS nome "
+                        "FROM entre_house "
+                        "ORDER BY eh"
+                    )
+                )
+                .mappings()
+                .all()
+            )
         except SQLAlchemyError:
             ehs = []
 
@@ -182,8 +198,9 @@ def producao():
         dados_partdiaria = []
         grafico_atividades = {"labels": [], "tempos": []}
 
+        # 2.1 – tenta primeiro só o equipamento P190-66001
         try:
-            sql_pd = text(
+            sql_pd_p190 = text(
                 """
                 SELECT
                     atividade,
@@ -196,28 +213,50 @@ def producao():
                 ORDER BY hora_inicio
                 """
             )
-            dados_partdiaria = conn.execute(
-                sql_pd, {"data_pd": data_partdiaria}
-            ).mappings().all()
-
-            labels = []
-            tempos = []
-            for row in dados_partdiaria:
-                labels.append(row["atividade"])
-                # duracao em minutos (float)
-                tempos.append(float(row["duracao"] or 0.0))
-
-            grafico_atividades = {"labels": labels, "tempos": tempos}
-
+            dados_partdiaria = (
+                conn.execute(sql_pd_p190, {"data_pd": data_partdiaria})
+                .mappings()
+                .all()
+            )
         except SQLAlchemyError:
-            # Se der qualquer erro (tabela não existe, etc), mantém vazio
             dados_partdiaria = []
-            grafico_atividades = {"labels": [], "tempos": []}
+
+        # 2.2 – se não achar nada com o filtro da máquina,
+        # faz um fallback pegando TODOS os registros da data
+        if not dados_partdiaria:
+            try:
+                sql_pd_all = text(
+                    """
+                    SELECT
+                        atividade,
+                        to_char(hora_inicio, 'HH24:MI') AS hora_inicio,
+                        to_char(hora_fim,   'HH24:MI') AS hora_fim,
+                        EXTRACT(EPOCH FROM (hora_fim - hora_inicio)) / 60 AS duracao
+                    FROM parte_diaria
+                    WHERE data::date = :data_pd::date
+                    ORDER BY hora_inicio
+                    """
+                )
+                dados_partdiaria = (
+                    conn.execute(sql_pd_all, {"data_pd": data_partdiaria})
+                    .mappings()
+                    .all()
+                )
+            except SQLAlchemyError:
+                dados_partdiaria = []
+
+        # Monta dados para o gráfico (seja do P190 ou, no fallback, de todos)
+        labels = []
+        tempos = []
+        for row in dados_partdiaria:
+            labels.append(row["atividade"])
+            tempos.append(float(row["duracao"] or 0.0))
+
+        grafico_atividades = {"labels": labels, "tempos": tempos}
 
         # ------------------------------------------------------------------
         # BLOCO 3 – Resumo frentes / gráficos frente 02 / gauges
-        # Por enquanto, sem consultas específicas -> listas vazias.
-        # (quando tiver as tabelas prontas, a gente preenche aqui)
+        # (por enquanto ainda em branco)
         # ------------------------------------------------------------------
         dados_resumo_frentes = []
         grafico_barra_carregamento = []
@@ -370,40 +409,48 @@ def registro():
         fdt = request.args.get("fdt") or None
 
         # Lista de realizados
-        lista_rlz = conn.execute(
-            text(
-                """
-                SELECT
-                    r.id,
-                    r.data,
-                    r.realizado,
-                    e.eh       AS eh_nome,
-                    f.frente   AS frente_nome
-                FROM producao_realizada r
-                JOIN entre_house e   ON e.id = r.eh_id
-                JOIN frente_equipe f ON f.id = r.frente_id
-                ORDER BY r.data, e.eh, f.frente
-                """
+        lista_rlz = (
+            conn.execute(
+                text(
+                    """
+                    SELECT
+                        r.id,
+                        r.data,
+                        r.realizado,
+                        e.eh       AS eh_nome,
+                        f.frente   AS frente_nome
+                    FROM producao_realizada r
+                    JOIN entre_house e   ON e.id = r.eh_id
+                    JOIN frente_equipe f ON f.id = r.frente_id
+                    ORDER BY r.data, e.eh, f.frente
+                    """
+                )
             )
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
 
         # Lista de planejados
-        lista_pln = conn.execute(
-            text(
-                """
-                SELECT
-                    p.id,
-                    p.data,
-                    p.planejado,
-                    e.eh       AS eh_nome,
-                    f.frente   AS frente_nome
-                FROM producao_planejada p
-                JOIN entre_house e   ON e.id = p.eh_id
-                JOIN frente_equipe f ON f.id = p.frente_id
-                ORDER BY p.data, e.eh, f.frente
-                """
+        lista_pln = (
+            conn.execute(
+                text(
+                    """
+                    SELECT
+                        p.id,
+                        p.data,
+                        p.planejado,
+                        e.eh       AS eh_nome,
+                        f.frente   AS frente_nome
+                    FROM producao_planejada p
+                    JOIN entre_house e   ON e.id = p.eh_id
+                    JOIN frente_equipe f ON f.id = p.frente_id
+                    ORDER BY p.data, e.eh, f.frente
+                    """
+                )
             )
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
 
     subnav = build_operacao_subnav("registro")
     return render_template(
