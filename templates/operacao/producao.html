@@ -224,9 +224,12 @@
     <!-- Faixa de separação -->
     <hr class="my-4">
 
-    <!-- Resumo Parte Diária -->
-    <div class="row">
-        <div class="col-md-5">
+	    <!-- Faixa de separação -->
+    <hr class="my-4">
+
+    <!-- Resumo Parte Diária (TABELA + GRÁFICO LADO A LADO) -->
+    <div class="layout-tabela-grafico">
+        <div class="col-tabela">
             <div class="table-responsive md-3">
                 <table class="table table-bordered table-striped align-middle text-center">
                     <thead class="table-dark">
@@ -251,13 +254,18 @@
                         </tr>
                         {% endfor %}
                         {% if not dados_partdiaria %}
-						<tr><td colspan="4">Nenhum registro para a data selecionada.</td></tr>
-						{% endif %}
+                        <tr>
+                            <td colspan="4">
+                                Nenhum registro para a data selecionada.
+                            </td>
+                        </tr>
+                        {% endif %}
                     </tbody>
                 </table>
             </div>
         </div>
-        <div class="col-md-7">
+
+        <div class="col-grafico">
             <canvas id="graficoPartDiaria"></canvas>
         </div>
     </div>
