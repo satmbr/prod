@@ -191,7 +191,7 @@ def producao():
                     to_char(hora_fim,   'HH24:MI') AS hora_fim,
                     EXTRACT(EPOCH FROM (hora_fim - hora_inicio)) / 60 AS duracao
                 FROM parte_diaria
-                WHERE data = :data_pd
+                WHERE data::date = :data_pd::date
                   AND equipamento_tag = 'P190-66001'
                 ORDER BY hora_inicio
                 """
