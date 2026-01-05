@@ -1,0 +1,204 @@
+{% extends "base.html" %}
+
+{% block title %}Registro de Colaboradores - PRUMAT{% endblock %}
+
+{% block content %}
+<div class="container mt-3">
+    <h2>Registro de Colaboradores</h2>
+
+    {% if msg %}
+        <div class="alert alert-info py-1 my-2">{{ msg }}</div>
+    {% endif %}
+
+    <form method="post" class="row g-2 mb-4">
+        <!-- Identificação básica -->
+        <div class="col-md-4">
+            <label class="form-label">Nome</label>
+            <input type="text" name="nome" class="form-control form-control-sm" required>
+        </div>
+
+        <div class="col-md-2">
+            <label class="form-label">Matrícula</label>
+            <input type="text" name="matricula" class="form-control form-control-sm" required>
+        </div>
+
+        <div class="col-md-2">
+            <label class="form-label">CPF</label>
+            <input type="text" name="cpf" class="form-control form-control-sm">
+        </div>
+
+        <div class="col-md-2">
+            <label class="form-label">RG</label>
+            <input type="text" name="rg" class="form-control form-control-sm">
+        </div>
+
+        <div class="col-md-2">
+            <label class="form-label">Data Nasc.</label>
+            <input type="date" name="data_nascimento" class="form-control form-control-sm">
+        </div>
+
+        <!-- Documentos -->
+        <div class="col-md-2">
+            <label class="form-label">CNH</label>
+            <input type="text" name="cnh" class="form-control form-control-sm">
+        </div>
+
+        <div class="col-md-2">
+            <label class="form-label">Venc. CNH</label>
+            <input type="date" name="vencimento_cnh" class="form-control form-control-sm">
+        </div>
+
+        <div class="col-md-2">
+            <label class="form-label">CTPS</label>
+            <input type="text" name="ctps" class="form-control form-control-sm">
+        </div>
+
+        <div class="col-md-2">
+            <label class="form-label">PIS</label>
+            <input type="text" name="pis" class="form-control form-control-sm">
+        </div>
+
+        <!-- Dados funcionais -->
+        <div class="col-md-3">
+            <label class="form-label">Função</label>
+            <input type="text" name="funcao" class="form-control form-control-sm">
+        </div>
+
+        <div class="col-md-2">
+            <label class="form-label">Data Admissão</label>
+            <input type="date" name="data_admissao" class="form-control form-control-sm">
+        </div>
+
+        <div class="col-md-2">
+            <label class="form-label">Data Função</label>
+            <input type="date" name="data_funcao" class="form-control form-control-sm">
+        </div>
+
+        <div class="col-md-2">
+            <label class="form-label">Situação Folha</label>
+            <input type="text" name="situacao_folha" class="form-control form-control-sm">
+        </div>
+
+        <div class="col-md-1">
+            <label class="form-label">Mão de Obra</label>
+            <input type="text" name="mao_obra" class="form-control form-control-sm">
+        </div>
+
+        <div class="col-md-2">
+            <label class="form-label">Escala</label>
+            <input type="text" name="escala" class="form-control form-control-sm">
+        </div>
+
+        <div class="col-md-2">
+            <label class="form-label">Horário Início</label>
+            <input type="time" name="horario_inicio" class="form-control form-control-sm">
+        </div>
+
+        <div class="col-md-2">
+            <label class="form-label">Horário Fim</label>
+            <input type="time" name="horario_fim" class="form-control form-control-sm">
+        </div>
+
+        <div class="col-md-2">
+            <label class="form-label">Início Férias</label>
+            <input type="date" name="inicio_ferias" class="form-control form-control-sm">
+        </div>
+
+        <div class="col-md-2">
+            <label class="form-label">Fim Férias</label>
+            <input type="date" name="fim_ferias" class="form-control form-control-sm">
+        </div>
+
+        <!-- Dados pessoais complementares -->
+        <div class="col-md-4">
+            <label class="form-label">Nome da Mãe</label>
+            <input type="text" name="nome_mae" class="form-control form-control-sm">
+        </div>
+
+        <div class="col-md-4">
+            <label class="form-label">Nome do Pai</label>
+            <input type="text" name="nome_pai" class="form-control form-control-sm">
+        </div>
+
+        <div class="col-md-4">
+            <label class="form-label">Cidade de Nascimento</label>
+            <input type="text" name="cidade_nascimento" class="form-control form-control-sm">
+        </div>
+
+        <!-- Endereço -->
+        <div class="col-md-6">
+            <label class="form-label">Endereço</label>
+            <input type="text" name="endereco" class="form-control form-control-sm">
+        </div>
+
+        <div class="col-md-2">
+            <label class="form-label">CEP</label>
+            <input type="text" name="cep" class="form-control form-control-sm">
+        </div>
+
+        <div class="col-md-2">
+            <label class="form-label">Estado Civil</label>
+            <input type="text" name="estado_civil" class="form-control form-control-sm">
+        </div>
+
+        <!-- Contrato / salário / escolaridade -->
+        <div class="col-md-2">
+            <label class="form-label">Salário</label>
+            <input type="number" step="0.01" name="salario" class="form-control form-control-sm">
+        </div>
+
+        <div class="col-md-3">
+            <label class="form-label">Contrato</label>
+            <input type="text" name="contrato" class="form-control form-control-sm">
+        </div>
+
+        <div class="col-md-3">
+            <label class="form-label">Escolaridade</label>
+            <input type="text" name="escolaridade" class="form-control form-control-sm">
+        </div>
+
+        <div class="col-12 mt-2">
+            <button type="submit" class="btn btn-sm btn-primary">
+                Salvar Colaborador
+            </button>
+        </div>
+    </form>
+
+    <!-- Lista de colaboradores (resumo) -->
+    <div class="table-responsive">
+        <table class="table table-sm table-striped table-bordered align-middle">
+            <thead class="table-dark">
+                <tr>
+                    <th>Matrícula</th>
+                    <th>Nome</th>
+                    <th>Função</th>
+                    <th>Situação Folha</th>
+                    <th>Mão de Obra</th>
+                    <th>Escala</th>
+                    <th>Horário</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in colaboradores %}
+                <tr>
+                    <td>{{ c.matricula }}</td>
+                    <td>{{ c.nome }}</td>
+                    <td>{{ c.funcao }}</td>
+                    <td>{{ c.situacao_folha }}</td>
+                    <td>{{ c.mao_obra }}</td>
+                    <td>{{ c.escala }}</td>
+                    <td>
+                        {{ c.horario_inicio if c.horario_inicio }} - {{ c.horario_fim if c.horario_fim }}
+                    </td>
+                </tr>
+                {% endfor %}
+                {% if not colaboradores %}
+                <tr>
+                    <td colspan="7">Nenhum colaborador cadastrado.</td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
