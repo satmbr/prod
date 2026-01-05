@@ -240,13 +240,100 @@ def producao():
         grafico_atividades = {"labels": labels, "tempos": tempos}
 
         # ------------------------------------------------------------------
-        # BLOCO 3 – Resumo frentes / gráficos frente 02 / gauges
-        # (por enquanto ainda em branco)
+        # BLOCO 3 – Resumo frentes (demais frentes da frente_equipe)
         # ------------------------------------------------------------------
         dados_resumo_frentes = []
+        try:
+            sql_resumo = text(
+                """
+                WITH base AS (
+                    SELECT
+                        r.data::date AS data,
+                        -- Carregamento / Descarregamento
+                        SUM(
+                            CASE WHEN f.frente = '02 - Carregamento_novo'
+                                 THEN r.realizado ELSE 0 END
+                        ) AS carregado,
+                        SUM(
+                            CASE WHEN f.frente = '05 - Descarregamento_velho'
+                                 THEN r.realizado ELSE 0 END
+                        ) AS desc_velho,
+                        SUM(
+                            CASE WHEN f.frente = '07 - Descarregamento_novo'
+                                 THEN r.realizado ELSE 0 END
+                        ) AS desc_novo,
+
+                        -- Remoção de Grampos
+                        SUM(
+                            CASE WHEN f.frente = '03 - Remoção_grampos'
+                                 THEN r.realizado ELSE 0 END
+                        ) AS rem_grampos,
+
+                        -- Remoção de Galochas
+                        SUM(
+                            CASE WHEN f.frente = '04 - Remoção_galochas'
+                                 THEN r.realizado ELSE 0 END
+                        ) AS rem_galochas,
+
+                        -- Pregação (aplicação de grampos)
+                        SUM(
+                            CASE WHEN f.frente = '06 - Aplicação_grampos'
+                                 THEN r.realizado ELSE 0 END
+                        ) AS aplicado,
+
+                        -- Segregação
+                        SUM(
+                            CASE WHEN f.frente = '09 - Segregacao_velho'
+                                 THEN r.realizado ELSE 0 END
+                        ) AS seg_ruins,
+                        SUM(
+                            CASE WHEN f.frente = '08 - Segregacao_novo'
+                                 THEN r.realizado ELSE 0 END
+                        ) AS seg_bons
+                    FROM producao_realizada r
+                    JOIN frente_equipe f ON f.id = r.frente_id
+                    WHERE r.eh_id = :eh_id
+                    GROUP BY r.data
+                )
+                SELECT
+                    data,
+                    carregado,
+                    0::float AS saldo,   -- placeholder, podemos ajustar depois
+                    SUM(carregado) OVER (ORDER BY data) AS acumulado_carregado,
+                    desc_velho,
+                    desc_novo,
+
+                    rem_grampos,
+                    rem_grampos AS fa_grampos,  -- por enquanto igual à remoção
+                    SUM(rem_grampos) OVER (ORDER BY data) AS acum_rem_grampos,
+
+                    rem_galochas,
+                    rem_galochas AS fa_galochas,
+                    SUM(rem_galochas) OVER (ORDER BY data) AS acum_rem_galochas,
+
+                    aplicado,
+                    0::float AS aberto, -- placeholder
+
+                    seg_ruins,
+                    seg_bons
+                FROM base
+                ORDER BY data
+                """
+            )
+
+            dados_resumo_frentes = (
+                conn.execute(sql_resumo, {"eh_id": eh_id})
+                .mappings()
+                .all()
+            )
+        except SQLAlchemyError:
+            dados_resumo_frentes = []
+
+        # (mantém estes, por enquanto ainda vazios)
         grafico_barra_carregamento = []
         grafico_bateria_carregamento = {}
         percentuais_graficos = {}
+
 
     subnav = build_operacao_subnav("producao")
 
