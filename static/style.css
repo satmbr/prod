@@ -54,3 +54,13 @@ body {
     width: calc(100% / var(--app-scale));
 }
 /* mantém seu grid/botões existentes */
+/* ====== Tabela consolidada das frentes (operacao/producao) ====== */
+.tabela-frentes {
+    width: 100%;      /* ocupa toda a largura disponível */
+    max-width: 100%;  /* não limita em 1100px como a tabela-fixa */
+    margin: 0;        /* sem centralizar com margens */
+}
+
+.tabela-frentes table {
+    width: 100%;      /* garante que a <table> vá até a borda do wrapper */
+}
