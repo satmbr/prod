@@ -18,6 +18,9 @@ def create_app():
     
     from routes.equipamentos import bp as equipamentos_bp
     app.register_blueprint(equipamentos_bp, url_prefix="/equipamentos")
+    
+    from routes.colaboradores import bp as colaboradores_bp  # ajuste o caminho se preciso
+    app.register_blueprint(colaboradores_bp)
 
     @app.get("/")
     def index():
