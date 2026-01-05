@@ -309,8 +309,14 @@
                     {% set destaque = 'background-color: #E2EFDA;' if linha_data == filtro_data and linha_data != '' else '' %}
                     <tr>
                         <td style="{{ destaque }}">
-                            {{ linha.data.split('-')[2] }}-{{ linha.data.split('-')[1] }}-{{ linha.data.split('-')[0] }}
-                        </td>
+							{# Se vier como string (caso dos outros dados) #}
+							{% if linha.data is string %}
+								{{ linha.data.split('-')[2] }}-{{ linha.data.split('-')[1] }}-{{ linha.data.split('-')[0] }}
+							{# Se vier como datetime.date (caso do resumo de frentes) #}
+							{% else %}
+								{{ linha.data.strftime('%d-%m-%Y') }}
+							{% endif %}
+						</td>
                         <td style="{{ destaque }}">{{ linha.carregado }}</td>
                         <td style="{{ destaque }}">{{ linha.saldo }}</td>
                         <td style="{{ destaque }}">{{ linha.acumulado_carregado }}</td>
