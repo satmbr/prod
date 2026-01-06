@@ -23,7 +23,6 @@ def build_colab_subnav(active: str | None):
             "href": url_for("colaboradores.registro"),
             "active": active == "registro",
         },
-        # Deixei o item Cadastro preparado para uso futuro
         {
             "text": "Cadastro (em breve)",
             "href": "#",
@@ -50,9 +49,6 @@ def registro():
 
     with engine.connect() as conn:
         try:
-            # Ajuste esta consulta se sua tabela tiver nomes diferentes.
-            # Aqui estou assumindo a tabela "colaborador_prumat" com
-            # pelo menos esses campos.
             sql = text(
                 """
                 SELECT
@@ -66,7 +62,9 @@ def registro():
                     situacao_folha,
                     mao_obra,
                     escala,
-                    salario
+                    salario,
+                    telefone,
+                    numero_pix
                 FROM colaborador_prumat
                 ORDER BY nome
                 """
@@ -91,7 +89,6 @@ def registro_create():
     """
     Recebe o POST do formulário de colaboradores/registro.html
     e insere um novo registro em colaborador_prumat.
-    Os nomes dos campos do formulário devem bater com os usados aqui.
     """
 
     form = request.form
@@ -125,11 +122,12 @@ def registro_create():
         "contrato": form.get("contrato", "").strip(),
         "vencimento_cnh": form.get("vencimento_cnh") or None,
         "escolaridade": form.get("escolaridade", "").strip(),
+        "telefone": form.get("telefone", "").strip(),
+        "numero_pix": form.get("numero_pix", "").strip(),
     }
 
-    # Se quiser fazer uma validação mínima:
+    # Validação mínima
     if not dados["nome"] or not dados["matricula"]:
-        # volta pra tela sem gravar
         return redirect(url_for("colaboradores.registro"))
 
     engine = get_engine()
@@ -165,7 +163,9 @@ def registro_create():
                     salario,
                     contrato,
                     vencimento_cnh,
-                    escolaridade
+                    escolaridade,
+                    telefone,
+                    numero_pix
                 )
                 VALUES (
                     :nome,
@@ -195,7 +195,9 @@ def registro_create():
                     :salario,
                     :contrato,
                     :vencimento_cnh,
-                    :escolaridade
+                    :escolaridade,
+                    :telefone,
+                    :numero_pix
                 )
                 """
             )
