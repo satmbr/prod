@@ -48,13 +48,11 @@
         padding-bottom: 0.25rem;
     }
 
-    .form-label {
-        font-size: 0.78rem;
-        margin-bottom: 0.1rem;
-        display: block;
-    }
-
+    /* ---- LINHA DE CAMPO (label + input na mesma linha) ---- */
     .quad-row {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
         margin-bottom: 0.35rem;
     }
 
@@ -62,14 +60,35 @@
         margin-bottom: 0;
     }
 
-    /* >>> AQUI está o ajuste importante <<< */
+    .quad-row .form-label {
+        font-size: 0.78rem;
+        margin-bottom: 0;
+        min-width: 120px;   /* largura fixa do texto do campo */
+        max-width: 150px;
+        white-space: nowrap;
+    }
+
     .quad-card .form-control,
     .quad-card .form-select {
         font-size: 0.8rem;
         padding: 0.18rem 0.35rem;
-        width: 100% !important;      /* força ocupar toda a largura do quadrante */
-        max-width: 100% !important;  /* garante que nada limite */
+        width: 100%;
+        max-width: 100%;
         display: block;
+        flex: 1;            /* campo ocupa todo o resto da linha */
+    }
+
+    /* Em telas pequenas volta a ficar um embaixo do outro */
+    @media (max-width: 768px) {
+        .quad-row {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .quad-row .form-label {
+            min-width: 0;
+            max-width: none;
+        }
     }
 
     .btn-colab {
