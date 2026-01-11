@@ -1,336 +1,339 @@
 {% extends "base.html" %}
-{% block title %}Colaboradores · Registro{% endblock %}
+
+{% block title %}Cadastro de Colaborador{% endblock %}
 
 {% block content %}
 
 <style>
-  .card-form {
-      border-radius: .5rem;
-      border: 1px solid #dee2e6;
-      box-shadow: 0 1px 3px rgba(0,0,0,.05);
-      background: #ffffff;
-  }
-  .card-form .card-body {
-      padding: 1rem 1.25rem;
-  }
-  .form-section-title {
-      font-size: .9rem;
-      font-weight: 600;
-      color: #444;
-      border-left: 4px solid #FFC107;
-      padding-left: .5rem;
-      margin-bottom: .75rem;
-      text-transform: uppercase;
-  }
-  .form-control,
-  .form-select {
-      font-size: .85rem;
-  }
+    .colab-page-title {
+        font-weight: 600;
+        font-size: 1.4rem;
+        margin-bottom: 1.2rem;
+    }
+
+    .quadrant-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-auto-rows: 1fr;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+
+    @media (max-width: 1200px) {
+        .quadrant-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+
+    @media (max-width: 768px) {
+        .quadrant-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .quad-card {
+        border: 1px solid #e0e0e0;
+        border-radius: 6px;
+        background-color: #ffffff;
+        padding: 0.75rem 0.9rem 0.9rem;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+        height: 100%;
+    }
+
+    .quad-title {
+        font-size: 0.90rem;
+        font-weight: 600;
+        margin-bottom: 0.4rem;
+        border-bottom: 2px solid #f1c40f; /* amarelo PRUMAT */
+        padding-bottom: 0.25rem;
+    }
+
+    .form-label {
+        font-size: 0.78rem;
+        margin-bottom: 0.1rem;
+    }
+
+    .form-control,
+    .form-select {
+        font-size: 0.8rem;
+        padding: 0.18rem 0.35rem;
+    }
+
+    .quad-row {
+        margin-bottom: 0.35rem;
+    }
+
+    .quad-row:last-child {
+        margin-bottom: 0;
+    }
+
+    .btn-colab {
+        min-width: 110px;
+    }
 </style>
 
-<div class="container-fluid py-3">
+<div class="container-fluid px-3 py-2">
 
-  <div class="d-flex align-items-center mb-3">
-      <span class="me-2" style="font-size:1.4rem;">👥</span>
-      <h4 class="mb-0">Cadastro de Colaborador</h4>
-  </div>
+    <h2 class="colab-page-title">Cadastro de Colaborador</h2>
 
-  <form method="POST"
-        action="{{ url_for('colaboradores.registro_create') }}"
-        class="needs-validation"
-        novalidate>
+    <form method="POST" action="{{ url_for('colaboradores.registro_create') }}">
 
-    <!-- PRIMEIRA LINHA: DADOS PESSOAIS / DOCUMENTOS + CONTATO -->
-    <div class="row g-3">
+        <div class="quadrant-grid">
 
-      <!-- Coluna esquerda -->
-      <div class="col-lg-6">
+            <!-- 1. DADOS PESSOAIS -->
+            <section class="quad-card">
+                <div class="quad-title">DADOS PESSOAIS</div>
 
-        <!-- Dados pessoais -->
-        <div class="card-form mb-3">
-          <div class="card-body">
-            <div class="form-section-title">Dados pessoais</div>
+                <div class="quad-row">
+                    <label for="nome" class="form-label">Nome *</label>
+                    <input type="text" id="nome" name="nome" class="form-control" required>
+                </div>
 
-            <div class="row g-3">
-              <div class="col-12">
-                <label class="form-label">Nome *</label>
-                <input type="text" name="nome" class="form-control" required>
-              </div>
+                <div class="row quad-row">
+                    <div class="col-6">
+                        <label for="matricula" class="form-label">Matrícula *</label>
+                        <input type="text" id="matricula" name="matricula" class="form-control" required>
+                    </div>
+                    <div class="col-6">
+                        <label for="data_nascimento" class="form-label">Data de Nascimento</label>
+                        <input type="date" id="data_nascimento" name="data_nascimento"
+                               class="form-control">
+                    </div>
+                </div>
 
-              <div class="col-md-6">
-                <label class="form-label">Matrícula *</label>
-                <input type="text" name="matricula" class="form-control" required>
-              </div>
+                <div class="row quad-row">
+                    <div class="col-6">
+                        <label for="estado_civil" class="form-label">Estado Civil</label>
+                        <input type="text" id="estado_civil" name="estado_civil"
+                               class="form-control">
+                    </div>
+                    <div class="col-6">
+                        <label for="escolaridade" class="form-label">Escolaridade</label>
+                        <input type="text" id="escolaridade" name="escolaridade"
+                               class="form-control">
+                    </div>
+                </div>
 
-              <div class="col-md-6">
-                <label class="form-label">Data de Nascimento</label>
-                <input type="date" name="data_nascimento" class="form-control">
-              </div>
+                <div class="row quad-row">
+                    <div class="col-6">
+                        <label for="cpf" class="form-label">CPF</label>
+                        <input type="text" id="cpf" name="cpf" class="form-control">
+                    </div>
+                    <div class="col-6">
+                        <label for="rg" class="form-label">RG</label>
+                        <input type="text" id="rg" name="rg" class="form-control">
+                    </div>
+                </div>
 
-              <div class="col-md-6">
-                <label class="form-label">Estado Civil</label>
-                <input type="text" name="estado_civil" class="form-control">
-              </div>
+                <div class="row quad-row">
+                    <div class="col-6">
+                        <label for="telefone" class="form-label">Telefone</label>
+                        <input type="text" id="telefone" name="telefone"
+                               class="form-control" placeholder="(00) 00000-0000">
+                    </div>
+                    <div class="col-6">
+                        <label for="numero_pix" class="form-label">Número / Chave PIX</label>
+                        <input type="text" id="numero_pix" name="numero_pix"
+                               class="form-control" placeholder="CPF, e-mail, chave aleatória...">
+                    </div>
+                </div>
+            </section>
 
-              <div class="col-md-6">
-                <label class="form-label">Telefone</label>
-                <input type="text" name="telefone" class="form-control" placeholder="(00) 00000-0000">
-              </div>
+            <!-- 2. FAMÍLIA E ESCOLARIDADE -->
+            <section class="quad-card">
+                <div class="quad-title">FAMÍLIA E ESCOLARIDADE</div>
 
-              <div class="col-md-6">
-                <label class="form-label">CPF</label>
-                <input type="text" name="cpf" class="form-control">
-              </div>
+                <div class="quad-row">
+                    <label for="nome_mae" class="form-label">Nome da Mãe</label>
+                    <input type="text" id="nome_mae" name="nome_mae" class="form-control">
+                </div>
 
-              <div class="col-md-6">
-                <label class="form-label">RG</label>
-                <input type="text" name="rg" class="form-control">
-              </div>
+                <div class="quad-row">
+                    <label for="nome_pai" class="form-label">Nome do Pai</label>
+                    <input type="text" id="nome_pai" name="nome_pai" class="form-control">
+                </div>
 
-              <div class="col-md-6">
-                <label class="form-label">Número PIX</label>
-                <input type="text" name="numero_pix" class="form-control" placeholder="Chave PIX">
-              </div>
-            </div>
-          </div>
+                <div class="quad-row">
+                    <label for="cidade_nascimento" class="form-label">Cidade de Nascimento</label>
+                    <input type="text" id="cidade_nascimento" name="cidade_nascimento"
+                           class="form-control">
+                </div>
+            </section>
+
+            <!-- 3. DOCUMENTOS -->
+            <section class="quad-card">
+                <div class="quad-title">DOCUMENTOS</div>
+
+                <div class="row quad-row">
+                    <div class="col-6">
+                        <label for="cnh" class="form-label">CNH</label>
+                        <input type="text" id="cnh" name="cnh" class="form-control">
+                    </div>
+                    <div class="col-6">
+                        <label for="vencimento_cnh" class="form-label">Vencimento CNH</label>
+                        <input type="date" id="vencimento_cnh" name="vencimento_cnh"
+                               class="form-control">
+                    </div>
+                </div>
+
+                <div class="row quad-row">
+                    <div class="col-6">
+                        <label for="ctps" class="form-label">CTPS</label>
+                        <input type="text" id="ctps" name="ctps" class="form-control">
+                    </div>
+                    <div class="col-6">
+                        <label for="pis" class="form-label">PIS</label>
+                        <input type="text" id="pis" name="pis" class="form-control">
+                    </div>
+                </div>
+            </section>
+
+            <!-- 4. ENDEREÇO -->
+            <section class="quad-card">
+                <div class="quad-title">ENDEREÇO</div>
+
+                <div class="quad-row">
+                    <label for="endereco" class="form-label">Endereço</label>
+                    <input type="text" id="endereco" name="endereco"
+                           class="form-control">
+                </div>
+
+                <div class="row quad-row">
+                    <div class="col-5">
+                        <label for="cep" class="form-label">CEP</label>
+                        <input type="text" id="cep" name="cep" class="form-control">
+                    </div>
+                </div>
+            </section>
+
+            <!-- 5. CONTRATO E FUNÇÃO -->
+            <section class="quad-card">
+                <div class="quad-title">CONTRATO E FUNÇÃO</div>
+
+                <div class="quad-row">
+                    <label for="funcao" class="form-label">Função</label>
+                    <input type="text" id="funcao" name="funcao" class="form-control">
+                </div>
+
+                <div class="row quad-row">
+                    <div class="col-6">
+                        <label for="data_admissao" class="form-label">Data de Admissão</label>
+                        <input type="date" id="data_admissao" name="data_admissao"
+                               class="form-control">
+                    </div>
+                    <div class="col-6">
+                        <label for="data_funcao" class="form-label">Data na Função</label>
+                        <input type="date" id="data_funcao" name="data_funcao"
+                               class="form-control">
+                    </div>
+                </div>
+
+                <div class="row quad-row">
+                    <div class="col-6">
+                        <label for="situacao_folha" class="form-label">Situação na Folha</label>
+                        <input type="text" id="situacao_folha" name="situacao_folha"
+                               class="form-control" placeholder="Ativo, afastado, etc.">
+                    </div>
+                    <div class="col-6">
+                        <label for="mao_obra" class="form-label">Mão de Obra</label>
+                        <input type="text" id="mao_obra" name="mao_obra"
+                               class="form-control" placeholder="Própria, terceirizada, etc.">
+                    </div>
+                </div>
+
+                <div class="row quad-row">
+                    <div class="col-6">
+                        <label for="escala" class="form-label">Escala</label>
+                        <input type="text" id="escala" name="escala"
+                               class="form-control" placeholder="Ex.: 5x2, 6x1...">
+                    </div>
+                    <div class="col-6">
+                        <label for="contrato" class="form-label">Contrato</label>
+                        <input type="text" id="contrato" name="contrato"
+                               class="form-control" placeholder="CLT, PJ, aprendiz...">
+                    </div>
+                </div>
+
+                <div class="quad-row">
+                    <label for="salario" class="form-label">Salário</label>
+                    <input type="number" step="0.01" id="salario" name="salario"
+                           class="form-control">
+                </div>
+            </section>
+
+            <!-- 6. JORNADA E FÉRIAS -->
+            <section class="quad-card">
+                <div class="quad-title">JORNADA E FÉRIAS</div>
+
+                <div class="row quad-row">
+                    <div class="col-6">
+                        <label for="horario_inicio" class="form-label">Horário Início</label>
+                        <input type="time" id="horario_inicio" name="horario_inicio"
+                               class="form-control">
+                    </div>
+                    <div class="col-6">
+                        <label for="horario_fim" class="form-label">Horário Fim</label>
+                        <input type="time" id="horario_fim" name="horario_fim"
+                               class="form-control">
+                    </div>
+                </div>
+
+                <div class="row quad-row">
+                    <div class="col-6">
+                        <label for="inicio_ferias" class="form-label">Início Férias</label>
+                        <input type="date" id="inicio_ferias" name="inicio_ferias"
+                               class="form-control">
+                    </div>
+                    <div class="col-6">
+                        <label for="fim_ferias" class="form-label">Fim Férias</label>
+                        <input type="date" id="fim_ferias" name="fim_ferias"
+                               class="form-control">
+                    </div>
+                </div>
+            </section>
+
+        </div> <!-- /.quadrant-grid -->
+
+        <div class="d-flex justify-content-end gap-2 mb-3">
+            <a href="{{ url_for('colaboradores.registro') }}" class="btn btn-outline-secondary btn-sm btn-colab">
+                Cancelar
+            </a>
+            <button type="submit" class="btn btn-primary btn-sm btn-colab">
+                Salvar
+            </button>
         </div>
 
-        <!-- Família e escolaridade -->
-        <div class="card-form mb-3">
-          <div class="card-body">
-            <div class="form-section-title">Família e escolaridade</div>
+    </form>
 
-            <div class="row g-3">
-              <div class="col-12">
-                <label class="form-label">Nome da Mãe</label>
-                <input type="text" name="nome_mae" class="form-control">
-              </div>
-
-              <div class="col-12">
-                <label class="form-label">Nome do Pai</label>
-                <input type="text" name="nome_pai" class="form-control">
-              </div>
-
-              <div class="col-md-6">
-                <label class="form-label">Cidade de Nascimento</label>
-                <input type="text" name="cidade_nascimento" class="form-control">
-              </div>
-
-              <div class="col-md-6">
-                <label class="form-label">Escolaridade</label>
-                <input type="text" name="escolaridade" class="form-control">
-              </div>
-            </div>
-          </div>
-        </div>
-
-      </div> <!-- /col-lg-6 esquerda -->
-
-      <!-- Coluna direita -->
-      <div class="col-lg-6">
-
-        <!-- Documentos -->
-        <div class="card-form mb-3">
-          <div class="card-body">
-            <div class="form-section-title">Documentos</div>
-
-            <div class="row g-3">
-              <div class="col-md-4">
-                <label class="form-label">CNH</label>
-                <input type="text" name="cnh" class="form-control">
-              </div>
-
-              <div class="col-md-4">
-                <label class="form-label">Vencimento CNH</label>
-                <input type="date" name="vencimento_cnh" class="form-control">
-              </div>
-
-              <div class="col-md-4">
-                <label class="form-label">PIS</label>
-                <input type="text" name="pis" class="form-control">
-              </div>
-
-              <div class="col-md-6">
-                <label class="form-label">CTPS</label>
-                <input type="text" name="ctps" class="form-control">
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Endereço -->
-        <div class="card-form mb-3">
-          <div class="card-body">
-            <div class="form-section-title">Endereço</div>
-
-            <div class="row g-3">
-              <div class="col-12">
-                <label class="form-label">Endereço</label>
-                <input type="text" name="endereco" class="form-control">
-              </div>
-
-              <div class="col-md-4">
-                <label class="form-label">CEP</label>
-                <input type="text" name="cep" class="form-control">
-              </div>
-
-              <div class="col-md-4">
-                <label class="form-label">Mão de Obra</label>
-                <input type="text" name="mao_obra" class="form-control" placeholder="Própria, terceirizada, etc.">
-              </div>
-
-              <div class="col-md-4">
-                <label class="form-label">Situação na Folha</label>
-                <input type="text" name="situacao_folha" class="form-control" placeholder="Ativo, afastado, etc.">
-              </div>
-            </div>
-          </div>
-        </div>
-
-      </div> <!-- /col-lg-6 direita -->
-
-    </div> <!-- /row g-3 primeira linha -->
-
-    <!-- SEGUNDA LINHA: CONTRATO/FUNÇÃO & JORNADA/FÉRIAS -->
-    <div class="row g-3 mt-1">
-
-      <div class="col-lg-6">
-
-        <!-- Contrato e função -->
-        <div class="card-form mb-3">
-          <div class="card-body">
-            <div class="form-section-title">Contrato e função</div>
-
-            <div class="row g-3">
-              <div class="col-12">
-                <label class="form-label">Função</label>
-                <input type="text" name="funcao" class="form-control">
-              </div>
-
-              <div class="col-md-6">
-                <label class="form-label">Data Admissão</label>
-                <input type="date" name="data_admissao" class="form-control">
-              </div>
-
-              <div class="col-md-6">
-                <label class="form-label">Data na Função</label>
-                <input type="date" name="data_funcao" class="form-control">
-              </div>
-
-              <div class="col-md-6">
-                <label class="form-label">Escala</label>
-                <input type="text" name="escala" class="form-control" placeholder="Ex.: 5x2, 6x1...">
-              </div>
-
-              <div class="col-md-6">
-                <label class="form-label">Contrato</label>
-                <input type="text" name="contrato" class="form-control" placeholder="CLT, PJ, aprendiz...">
-              </div>
-
-              <div class="col-md-6">
-                <label class="form-label">Salário</label>
-                <input type="number" step="0.01" name="salario" class="form-control">
-              </div>
-            </div>
-          </div>
-        </div>
-
-      </div>
-
-      <div class="col-lg-6">
-
-        <!-- Jornada e férias -->
-        <div class="card-form mb-3">
-          <div class="card-body">
-            <div class="form-section-title">Jornada e férias</div>
-
-            <div class="row g-3">
-              <div class="col-md-6">
-                <label class="form-label">Horário Início</label>
-                <input type="time" name="horario_inicio" class="form-control">
-              </div>
-
-              <div class="col-md-6">
-                <label class="form-label">Horário Fim</label>
-                <input type="time" name="horario_fim" class="form-control">
-              </div>
-
-              <div class="col-md-6">
-                <label class="form-label">Início Férias</label>
-                <input type="date" name="inicio_ferias" class="form-control">
-              </div>
-
-              <div class="col-md-6">
-                <label class="form-label">Fim Férias</label>
-                <input type="date" name="fim_ferias" class="form-control">
-              </div>
-            </div>
-          </div>
-        </div>
-
-      </div>
-
-    </div> <!-- /row segunda linha -->
-
-    <div class="mt-3">
-      <button type="submit" class="btn btn-primary">
-        Salvar
-      </button>
+    {% if colaboradores %}
+    <hr class="my-3">
+    <h6>Colaboradores cadastrados</h6>
+    <div class="table-responsive">
+        <table class="table table-sm table-striped align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>Nome</th>
+                    <th>Matrícula</th>
+                    <th>CPF</th>
+                    <th>Função</th>
+                    <th>Data Admissão</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in colaboradores %}
+                <tr>
+                    <td>{{ c.nome }}</td>
+                    <td>{{ c.matricula }}</td>
+                    <td>{{ c.cpf }}</td>
+                    <td>{{ c.funcao }}</td>
+                    <td>{{ c.data_admissao }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
+    {% endif %}
 
-  </form>
-
-  <!-- LISTA DE COLABORADORES CADASTRADOS -->
-  <hr class="my-4">
-
-  <h5 class="mb-3">Colaboradores cadastrados</h5>
-
-  <div class="table-responsive">
-    <table class="table table-sm table-striped table-hover align-middle">
-      <thead class="table-light">
-        <tr>
-          <th>Matrícula</th>
-          <th>Nome</th>
-          <th>Função</th>
-          <th>Situação</th>
-          <th>Mão de Obra</th>
-          <th>Telefone</th>
-          <th style="width:1%;">Ações</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% if colaboradores %}
-          {% for col in colaboradores %}
-          <tr>
-            <td>{{ col.matricula }}</td>
-            <td>{{ col.nome }}</td>
-            <td>{{ col.funcao }}</td>
-            <td>{{ col.situacao_folha }}</td>
-            <td>{{ col.mao_obra }}</td>
-            <td>{{ col.telefone }}</td>
-            <td class="text-nowrap">
-              <!-- ajusta os endpoints de edição/remoção se já existirem -->
-              <a href="{{ url_for('colaboradores.registro_edit', colaborador_id=col.id) }}"
-                 class="btn btn-sm btn-outline-secondary">Editar</a>
-              <a href="{{ url_for('colaboradores.registro_delete', colaborador_id=col.id) }}"
-                 class="btn btn-sm btn-outline-danger"
-                 onclick="return confirm('Deseja realmente excluir este colaborador?');">
-                 Excluir
-              </a>
-            </td>
-          </tr>
-          {% endfor %}
-        {% else %}
-          <tr>
-            <td colspan="7" class="text-center text-muted">
-              Nenhum colaborador cadastrado até o momento.
-            </td>
-          </tr>
-        {% endif %}
-      </tbody>
-    </table>
-  </div>
-
-</div> <!-- /.container-fluid -->
+</div>
 
 {% endblock %}
