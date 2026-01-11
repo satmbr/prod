@@ -1,476 +1,508 @@
 {# templates/colaboradores/cadastro.html #}
 {% extends "base.html" %}
 
-{% block title %}Cadastro – Tabelas de Colaboradores{% endblock %}
+{% block title %}Cadastro Tabelas Auxiliares - Colaboradores{% endblock %}
 
 {% block content %}
+<div class="container-fluid mt-3">
+    <h4 class="mb-2">Cadastro de Tabelas Auxiliares de Colaboradores</h4>
+    <p class="text-muted small mb-4">
+        Utilize os blocos abaixo para cadastrar valores padrão que serão utilizados
+        no registro de colaboradores (escala, escolaridade, estado civil, função,
+        mão de obra e situação na folha).
+    </p>
 
-<style>
-    /* Layout geral da página */
-    .collab-config-wrap {
-        padding: 0.75rem 1.25rem 1.5rem;
-    }
+    <!-- ===================== CADASTRO (INCLUSÃO) ===================== -->
+    <div class="row g-3 mb-4">
 
-    .collab-config-title {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        font-size: 1.15rem;
-        font-weight: 600;
-        margin-bottom: 0.75rem;
-        color: #4b2e24;
-    }
-
-    .collab-config-title i {
-        font-size: 1.2rem;
-        color: #a6762a;
-    }
-
-    /* Grid de 2 colunas para os 6 quadrantes (3 linhas x 2 colunas) */
-    .collab-config-grid {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 0.75rem;
-    }
-
-    @media (max-width: 992px) {
-        .collab-config-grid {
-            grid-template-columns: 1fr;
-        }
-    }
-
-    /* Card / quadrante */
-    .collab-card {
-        background: #ffffff;
-        border-radius: 6px;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.06);
-        border: 1px solid #e3e6eb;
-        padding: 0.75rem 0.9rem 0.9rem;
-        display: flex;
-        flex-direction: column;
-        height: 100%;
-    }
-
-    .collab-card-header {
-        margin-bottom: 0.55rem;
-    }
-
-    .collab-card-title {
-        font-size: 0.9rem;
-        font-weight: 600;
-        color: #444;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-    }
-
-    .collab-card-title span {
-        border-left: 3px solid #ffc000;
-        padding-left: 0.45rem;
-    }
-
-    .collab-card-header small {
-        font-size: 0.7rem;
-        color: #888;
-        margin-left: 0.45rem;
-        font-weight: 400;
-    }
-
-    /* Formulário dentro do card */
-    .collab-card-form {
-        display: flex;
-        gap: 0.35rem;
-        margin-bottom: 0.55rem;
-    }
-
-    .collab-card-form input[type="text"] {
-        flex: 1 1 auto;
-        font-size: 0.75rem;
-        padding: 0.25rem 0.4rem;
-        height: 1.9rem;
-    }
-
-    .btn-xs {
-        font-size: 0.7rem;
-        padding: 0.25rem 0.6rem;
-        height: 1.9rem;
-        line-height: 1.1;
-    }
-
-    /* Lista (tabela compacta) */
-    .collab-card-table-wrapper {
-        flex: 1 1 auto;
-        overflow-x: auto;
-    }
-
-    .collab-card-table {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 0.72rem;
-    }
-
-    .collab-card-table thead {
-        background-color: #f7f7f7;
-    }
-
-    .collab-card-table th,
-    .collab-card-table td {
-        padding: 0.25rem 0.35rem;
-        border: 1px solid #e3e6eb;
-        white-space: nowrap;
-    }
-
-    .collab-card-table th {
-        font-weight: 600;
-        color: #555;
-    }
-
-    .collab-card-table td:last-child {
-        text-align: center;
-        width: 40px;
-    }
-
-    .collab-card-table .btn-outline-danger.btn-xs {
-        padding: 0.1rem 0.35rem;
-        font-size: 0.65rem;
-    }
-
-    .text-muted-empty {
-        font-size: 0.7rem;
-        color: #999;
-        padding: 0.3rem 0;
-    }
-</style>
-
-<div class="collab-config-wrap">
-
-    <div class="collab-config-title">
-        <i class="bi bi-gear-fill"></i>
-        <span>Cadastro de Tabelas Auxiliares de Colaboradores</span>
-    </div>
-
-    <div class="collab-config-grid">
-
-        {# 1) Escala #}
-        <div class="collab-card">
-            <div class="collab-card-header">
-                <div class="collab-card-title">
-                    <span>Escalas</span>
-                    <small>ex.: 5x2, 6x1...</small>
+        <!-- Escala -->
+        <div class="col-lg-4 col-md-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-header py-2">
+                    <strong>Escala</strong>
                 </div>
-            </div>
-
-            <form class="collab-card-form"
-                  method="POST"
-                  action="{{ url_for('colaboradores.escala_create') }}">
-                <input type="text"
-                       name="descricao"
-                       class="form-control form-control-sm"
-                       placeholder="Nova escala (ex.: 5x2)">
-                <button type="submit" class="btn btn-primary btn-xs">Adicionar</button>
-            </form>
-
-            <div class="collab-card-table-wrapper">
-                {% if lista_escala %}
-                <table class="collab-card-table">
-                    <thead>
-                        <tr>
-                            <th>Escala</th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for item in lista_escala %}
-                        <tr>
-                            <td>{{ item.descricao }}</td>
-                            <td>
-                                <form method="POST"
-                                      action="{{ url_for('colaboradores.cadastro_escala_delete') }}"
-                                      onsubmit="return confirm('Excluir escala &quot;{{ item.descricao }}&quot;?')">
-                                    <input type="hidden" name="id" value="{{ item.id }}">
-                                    <button type="submit"
-                                            class="btn btn-outline-danger btn-xs">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
-                                </form>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-                {% else %}
-                <div class="text-muted-empty">Nenhuma escala cadastrada.</div>
-                {% endif %}
+                <div class="card-body py-3">
+                    <form method="POST"
+                          action="{{ url_for('colaboradores.escala_create') }}"
+                          class="row g-2 align-items-end">
+                        <div class="col-8">
+                            <label for="escala_nome" class="form-label form-label-sm mb-1">
+                                Descrição
+                            </label>
+                            <input type="text"
+                                   id="escala_nome"
+                                   name="nome"
+                                   class="form-control form-control-sm"
+                                   placeholder="Ex.: 5x2, 6x1..."
+                                   required>
+                        </div>
+                        <div class="col-4 text-end">
+                            <button type="submit"
+                                    class="btn btn-sm btn-primary w-100">
+                                Incluir
+                            </button>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
 
-        {# 2) Escolaridade #}
-        <div class="collab-card">
-            <div class="collab-card-header">
-                <div class="collab-card-title">
-                    <span>Escolaridade</span>
-                    <small>Fundamental, Médio, Superior...</small>
+        <!-- Escolaridade -->
+        <div class="col-lg-4 col-md-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-header py-2">
+                    <strong>Escolaridade</strong>
                 </div>
-            </div>
-
-            <form class="collab-card-form"
-                  method="POST"
-                  action="{{ url_for('colaboradores.escolaridade_create') }}">
-                <input type="text"
-                       name="descricao"
-                       class="form-control form-control-sm"
-                       placeholder="Nova escolaridade">
-                <button type="submit" class="btn btn-primary btn-xs">Adicionar</button>
-            </form>
-
-            <div class="collab-card-table-wrapper">
-                {% if lista_escolaridade %}
-                <table class="collab-card-table">
-                    <thead>
-                        <tr>
-                            <th>Escolaridade</th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for item in lista_escolaridade %}
-                        <tr>
-                            <td>{{ item.descricao }}</td>
-                            <td>
-                                <form method="POST"
-                                      action="{{ url_for('colaboradores.cadastro_escolaridade_delete') }}"
-                                      onsubmit="return confirm('Excluir escolaridade &quot;{{ item.descricao }}&quot;?')">
-                                    <input type="hidden" name="id" value="{{ item.id }}">
-                                    <button type="submit"
-                                            class="btn btn-outline-danger btn-xs">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
-                                </form>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-                {% else %}
-                <div class="text-muted-empty">Nenhuma escolaridade cadastrada.</div>
-                {% endif %}
+                <div class="card-body py-3">
+                    <form method="POST"
+                          action="{{ url_for('colaboradores.escolaridade_create') }}"
+                          class="row g-2 align-items-end">
+                        <div class="col-8">
+                            <label for="escolaridade_nome" class="form-label form-label-sm mb-1">
+                                Descrição
+                            </label>
+                            <input type="text"
+                                   id="escolaridade_nome"
+                                   name="nome"
+                                   class="form-control form-control-sm"
+                                   placeholder="Ex.: Médio Completo, Superior..."
+                                   required>
+                        </div>
+                        <div class="col-4 text-end">
+                            <button type="submit"
+                                    class="btn btn-sm btn-primary w-100">
+                                Incluir
+                            </button>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
 
-        {# 3) Estado Civil #}
-        <div class="collab-card">
-            <div class="collab-card-header">
-                <div class="collab-card-title">
-                    <span>Estado Civil</span>
-                    <small>Solteiro, Casado...</small>
+        <!-- Estado Civil -->
+        <div class="col-lg-4 col-md-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-header py-2">
+                    <strong>Estado Civil</strong>
                 </div>
-            </div>
-
-            <form class="collab-card-form"
-                  method="POST"
-                  action="{{ url_for('colaboradores.estado_civil_create') }}">
-                <input type="text"
-                       name="descricao"
-                       class="form-control form-control-sm"
-                       placeholder="Novo estado civil">
-                <button type="submit" class="btn btn-primary btn-xs">Adicionar</button>
-            </form>
-
-            <div class="collab-card-table-wrapper">
-                {% if lista_estado_civil %}
-                <table class="collab-card-table">
-                    <thead>
-                        <tr>
-                            <th>Estado Civil</th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for item in lista_estado_civil %}
-                        <tr>
-                            <td>{{ item.descricao }}</td>
-                            <td>
-                                <form method="POST"
-                                      action="{{ url_for('colaboradores.cadastro_estado_civil_delete') }}"
-                                      onsubmit="return confirm('Excluir estado civil &quot;{{ item.descricao }}&quot;?')">
-                                    <input type="hidden" name="id" value="{{ item.id }}">
-                                    <button type="submit"
-                                            class="btn btn-outline-danger btn-xs">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
-                                </form>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-                {% else %}
-                <div class="text-muted-empty">Nenhum estado civil cadastrado.</div>
-                {% endif %}
+                <div class="card-body py-3">
+                    <form method="POST"
+                          action="{{ url_for('colaboradores.estado_civil_create') }}"
+                          class="row g-2 align-items-end">
+                        <div class="col-8">
+                            <label for="estado_civil_nome" class="form-label form-label-sm mb-1">
+                                Descrição
+                            </label>
+                            <input type="text"
+                                   id="estado_civil_nome"
+                                   name="nome"
+                                   class="form-control form-control-sm"
+                                   placeholder="Ex.: Solteiro, Casado..."
+                                   required>
+                        </div>
+                        <div class="col-4 text-end">
+                            <button type="submit"
+                                    class="btn btn-sm btn-primary w-100">
+                                Incluir
+                            </button>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
 
-        {# 4) Funções #}
-        <div class="collab-card">
-            <div class="collab-card-header">
-                <div class="collab-card-title">
-                    <span>Funções</span>
-                    <small>Cargo / função do colaborador</small>
+        <!-- Função -->
+        <div class="col-lg-4 col-md-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-header py-2">
+                    <strong>Função</strong>
                 </div>
-            </div>
-
-            <form class="collab-card-form"
-                  method="POST"
-                  action="{{ url_for('colaboradores.funcao_create') }}">
-                <input type="text"
-                       name="descricao"
-                       class="form-control form-control-sm"
-                       placeholder="Nova função / cargo">
-                <button type="submit" class="btn btn-primary btn-xs">Adicionar</button>
-            </form>
-
-            <div class="collab-card-table-wrapper">
-                {% if lista_funcao %}
-                <table class="collab-card-table">
-                    <thead>
-                        <tr>
-                            <th>Função</th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for item in lista_funcao %}
-                        <tr>
-                            <td>{{ item.descricao }}</td>
-                            <td>
-                                <form method="POST"
-                                      action="{{ url_for('colaboradores.cadastro_funcao_delete') }}"
-                                      onsubmit="return confirm('Excluir função &quot;{{ item.descricao }}&quot;?')">
-                                    <input type="hidden" name="id" value="{{ item.id }}">
-                                    <button type="submit"
-                                            class="btn btn-outline-danger btn-xs">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
-                                </form>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-                {% else %}
-                <div class="text-muted-empty">Nenhuma função cadastrada.</div>
-                {% endif %}
+                <div class="card-body py-3">
+                    <form method="POST"
+                          action="{{ url_for('colaboradores.funcao_create') }}"
+                          class="row g-2 align-items-end">
+                        <div class="col-8">
+                            <label for="funcao_nome" class="form-label form-label-sm mb-1">
+                                Descrição
+                            </label>
+                            <input type="text"
+                                   id="funcao_nome"
+                                   name="nome"
+                                   class="form-control form-control-sm"
+                                   placeholder="Ex.: Operador, Mecânico..."
+                                   required>
+                        </div>
+                        <div class="col-4 text-end">
+                            <button type="submit"
+                                    class="btn btn-sm btn-primary w-100">
+                                Incluir
+                            </button>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
 
-        {# 5) Mão de Obra #}
-        <div class="collab-card">
-            <div class="collab-card-header">
-                <div class="collab-card-title">
-                    <span>Mão de Obra</span>
-                    <small>Própria, terceirizada...</small>
+        <!-- Mão de Obra -->
+        <div class="col-lg-4 col-md-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-header py-2">
+                    <strong>Mão de Obra</strong>
                 </div>
-            </div>
-
-            <form class="collab-card-form"
-                  method="POST"
-                  action="{{ url_for('colaboradores.mao_obra_create') }}">
-                <input type="text"
-                       name="descricao"
-                       class="form-control form-control-sm"
-                       placeholder="Tipo de mão de obra">
-                <button type="submit" class="btn btn-primary btn-xs">Adicionar</button>
-            </form>
-
-            <div class="collab-card-table-wrapper">
-                {% if lista_mao_obra %}
-                <table class="collab-card-table">
-                    <thead>
-                        <tr>
-                            <th>Mão de Obra</th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for item in lista_mao_obra %}
-                        <tr>
-                            <td>{{ item.descricao }}</td>
-                            <td>
-                                <form method="POST"
-                                      action="{{ url_for('colaboradores.cadastro_mao_obra_delete') }}"
-                                      onsubmit="return confirm('Excluir tipo de mão de obra &quot;{{ item.descricao }}&quot;?')">
-                                    <input type="hidden" name="id" value="{{ item.id }}">
-                                    <button type="submit"
-                                            class="btn btn-outline-danger btn-xs">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
-                                </form>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-                {% else %}
-                <div class="text-muted-empty">Nenhum tipo de mão de obra cadastrado.</div>
-                {% endif %}
+                <div class="card-body py-3">
+                    <form method="POST"
+                          action="{{ url_for('colaboradores.mao_obra_create') }}"
+                          class="row g-2 align-items-end">
+                        <div class="col-8">
+                            <label for="mao_obra_nome" class="form-label form-label-sm mb-1">
+                                Descrição
+                            </label>
+                            <input type="text"
+                                   id="mao_obra_nome"
+                                   name="nome"
+                                   class="form-control form-control-sm"
+                                   placeholder="Ex.: Própria, Terceira..."
+                                   required>
+                        </div>
+                        <div class="col-4 text-end">
+                            <button type="submit"
+                                    class="btn btn-sm btn-primary w-100">
+                                Incluir
+                            </button>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
 
-        {# 6) Situação na Folha #}
-        <div class="collab-card">
-            <div class="collab-card-header">
-                <div class="collab-card-title">
-                    <span>Situação na Folha</span>
-                    <small>Ativo, afastado, férias...</small>
+        <!-- Situação Folha -->
+        <div class="col-lg-4 col-md-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-header py-2">
+                    <strong>Situação na Folha</strong>
                 </div>
-            </div>
-
-            <form class="collab-card-form"
-                  method="POST"
-                  action="{{ url_for('colaboradores.situacao_folha_create') }}">
-                <input type="text"
-                       name="descricao"
-                       class="form-control form-control-sm"
-                       placeholder="Situação na folha (ex.: Ativo)">
-                <button type="submit" class="btn btn-primary btn-xs">Adicionar</button>
-            </form>
-
-            <div class="collab-card-table-wrapper">
-                {% if lista_situacao_folha %}
-                <table class="collab-card-table">
-                    <thead>
-                        <tr>
-                            <th>Situação</th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for item in lista_situacao_folha %}
-                        <tr>
-                            <td>{{ item.descricao }}</td>
-                            <td>
-                                <form method="POST"
-                                      action="{{ url_for('colaboradores.cadastro_situacao_folha_delete') }}"
-                                      onsubmit="return confirm('Excluir situação &quot;{{ item.descricao }}&quot;?')">
-                                    <input type="hidden" name="id" value="{{ item.id }}">
-                                    <button type="submit"
-                                            class="btn btn-outline-danger btn-xs">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
-                                </form>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-                {% else %}
-                <div class="text-muted-empty">Nenhuma situação cadastrada.</div>
-                {% endif %}
+                <div class="card-body py-3">
+                    <form method="POST"
+                          action="{{ url_for('colaboradores.situacao_folha_create') }}"
+                          class="row g-2 align-items-end">
+                        <div class="col-8">
+                            <label for="situacao_folha_nome" class="form-label form-label-sm mb-1">
+                                Descrição
+                            </label>
+                            <input type="text"
+                                   id="situacao_folha_nome"
+                                   name="nome"
+                                   class="form-control form-control-sm"
+                                   placeholder="Ex.: Ativo, Afastado..."
+                                   required>
+                        </div>
+                        <div class="col-4 text-end">
+                            <button type="submit"
+                                    class="btn btn-sm btn-primary w-100">
+                                Incluir
+                            </button>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
 
-    </div> <!-- /.collab-config-grid -->
+    </div> <!-- /row (cadastro) -->
 
-</div> <!-- /.collab-config-wrap -->
+    <!-- ===================== LISTAGEM / VISUALIZAÇÃO / EXCLUSÃO ===================== -->
+    <hr class="my-4">
 
+    <h5 class="mb-3">Tabelas Auxiliares Cadastradas</h5>
+    <p class="text-muted small mb-3">
+        Abaixo você pode visualizar os valores cadastrados em cada tabela auxiliar
+        e excluir itens que não serão mais utilizados.
+    </p>
+
+    <div class="row g-3">
+
+        <!-- Escalas -->
+        <div class="col-lg-4 col-md-6">
+            <div class="card h-100 shadow-sm">
+                <div class="card-header py-2">
+                    <strong>Escalas</strong>
+                </div>
+                <div class="card-body p-2">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th style="width: 70%;">Descrição</th>
+                                    <th class="text-center">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for esc in escalas %}
+                                <tr>
+                                    <td>{{ esc.descricao or esc.nome }}</td>
+                                    <td class="text-center">
+                                        <form method="POST"
+                                              action="{{ url_for('colaboradores.escala_delete') }}"
+                                              class="d-inline">
+                                            <input type="hidden" name="id" value="{{ esc.id }}">
+                                            <button type="submit"
+                                                    class="btn btn-sm btn-outline-danger"
+                                                    onclick="return confirm('Excluir esta escala?');">
+                                                Excluir
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                                {% if escalas|length == 0 %}
+                                <tr>
+                                    <td colspan="2" class="text-center text-muted small">
+                                        Nenhuma escala cadastrada.
+                                    </td>
+                                </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Escolaridades -->
+        <div class="col-lg-4 col-md-6">
+            <div class="card h-100 shadow-sm">
+                <div class="card-header py-2">
+                    <strong>Escolaridades</strong>
+                </div>
+                <div class="card-body p-2">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th style="width: 70%;">Descrição</th>
+                                    <th class="text-center">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for esc in escolaridades %}
+                                <tr>
+                                    <td>{{ esc.descricao or esc.nome }}</td>
+                                    <td class="text-center">
+                                        <form method="POST"
+                                              action="{{ url_for('colaboradores.escolaridade_delete') }}"
+                                              class="d-inline">
+                                            <input type="hidden" name="id" value="{{ esc.id }}">
+                                            <button type="submit"
+                                                    class="btn btn-sm btn-outline-danger"
+                                                    onclick="return confirm('Excluir esta escolaridade?');">
+                                                Excluir
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                                {% if escolaridades|length == 0 %}
+                                <tr>
+                                    <td colspan="2" class="text-center text-muted small">
+                                        Nenhuma escolaridade cadastrada.
+                                    </td>
+                                </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Estados Civis -->
+        <div class="col-lg-4 col-md-6">
+            <div class="card h-100 shadow-sm">
+                <div class="card-header py-2">
+                    <strong>Estados Civis</strong>
+                </div>
+                <div class="card-body p-2">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th style="width: 70%;">Descrição</th>
+                                    <th class="text-center">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for ec in estados_civis %}
+                                <tr>
+                                    <td>{{ ec.descricao or ec.nome }}</td>
+                                    <td class="text-center">
+                                        <form method="POST"
+                                              action="{{ url_for('colaboradores.estado_civil_delete') }}"
+                                              class="d-inline">
+                                            <input type="hidden" name="id" value="{{ ec.id }}">
+                                            <button type="submit"
+                                                    class="btn btn-sm btn-outline-danger"
+                                                    onclick="return confirm('Excluir este estado civil?');">
+                                                Excluir
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                                {% if estados_civis|length == 0 %}
+                                <tr>
+                                    <td colspan="2" class="text-center text-muted small">
+                                        Nenhum estado civil cadastrado.
+                                    </td>
+                                </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Funções -->
+        <div class="col-lg-4 col-md-6">
+            <div class="card h-100 shadow-sm">
+                <div class="card-header py-2">
+                    <strong>Funções</strong>
+                </div>
+                <div class="card-body p-2">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th style="width: 70%;">Descrição</th>
+                                    <th class="text-center">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for fn in funcoes %}
+                                <tr>
+                                    <td>{{ fn.descricao or fn.nome }}</td>
+                                    <td class="text-center">
+                                        <form method="POST"
+                                              action="{{ url_for('colaboradores.funcao_delete') }}"
+                                              class="d-inline">
+                                            <input type="hidden" name="id" value="{{ fn.id }}">
+                                            <button type="submit"
+                                                    class="btn btn-sm btn-outline-danger"
+                                                    onclick="return confirm('Excluir esta função?');">
+                                                Excluir
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                                {% if funcoes|length == 0 %}
+                                <tr>
+                                    <td colspan="2" class="text-center text-muted small">
+                                        Nenhuma função cadastrada.
+                                    </td>
+                                </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mão de Obra -->
+        <div class="col-lg-4 col-md-6">
+            <div class="card h-100 shadow-sm">
+                <div class="card-header py-2">
+                    <strong>Mão de Obra</strong>
+                </div>
+                <div class="card-body p-2">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th style="width: 70%;">Descrição</th>
+                                    <th class="text-center">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for mo in maos_obra %}
+                                <tr>
+                                    <td>{{ mo.descricao or mo.nome }}</td>
+                                    <td class="text-center">
+                                        <form method="POST"
+                                              action="{{ url_for('colaboradores.mao_obra_delete') }}"
+                                              class="d-inline">
+                                            <input type="hidden" name="id" value="{{ mo.id }}">
+                                            <button type="submit"
+                                                    class="btn btn-sm btn-outline-danger"
+                                                    onclick="return confirm('Excluir esta mão de obra?');">
+                                                Excluir
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                                {% if maos_obra|length == 0 %}
+                                <tr>
+                                    <td colspan="2" class="text-center text-muted small">
+                                        Nenhuma mão de obra cadastrada.
+                                    </td>
+                                </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Situação na Folha -->
+        <div class="col-lg-4 col-md-6">
+            <div class="card h-100 shadow-sm">
+                <div class="card-header py-2">
+                    <strong>Situação na Folha</strong>
+                </div>
+                <div class="card-body p-2">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th style="width: 70%;">Descrição</th>
+                                    <th class="text-center">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for sf in situacoes_folha %}
+                                <tr>
+                                    <td>{{ sf.descricao or sf.nome }}</td>
+                                    <td class="text-center">
+                                        <form method="POST"
+                                              action="{{ url_for('colaboradores.situacao_folha_delete') }}"
+                                              class="d-inline">
+                                            <input type="hidden" name="id" value="{{ sf.id }}">
+                                            <button type="submit"
+                                                    class="btn btn-sm btn-outline-danger"
+                                                    onclick="return confirm('Excluir esta situação?');">
+                                                Excluir
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                                {% if situacoes_folha|length == 0 %}
+                                <tr>
+                                    <td colspan="2" class="text-center text-muted small">
+                                        Nenhuma situação cadastrada.
+                                    </td>
+                                </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div> <!-- /row listagem -->
+
+</div> <!-- /container -->
 {% endblock %}
