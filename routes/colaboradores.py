@@ -24,8 +24,8 @@ def build_colab_subnav(active: str | None):
             "active": active == "registro",
         },
         {
-            "text": "Cadastro (em breve)",
-            "href": "#",
+            "text": "Cadastro",
+            "href": url_for("colaboradores.cadastro"),
             "active": active == "cadastro",
         },
     ]
@@ -230,3 +230,236 @@ def registro_delete():
             conn.rollback()
 
     return redirect(url_for("colaboradores.registro"))
+
+
+# -------------------------------------------------------------------
+# /colaboradores/cadastro  (tabelas auxiliares)
+# -------------------------------------------------------------------
+@bp.route("/cadastro", methods=["GET"])
+def cadastro():
+    engine = get_engine()
+
+    escalas = []
+    escolaridades = []
+    estados_civis = []
+    funcoes = []
+    maos_obra = []
+    situacoes_folha = []
+
+    with engine.connect() as conn:
+        try:
+            escalas = (
+                conn.execute(
+                    text(
+                        "SELECT id, nome FROM colab_escala "
+                        "ORDER BY nome"
+                    )
+                )
+                .mappings()
+                .all()
+            )
+        except SQLAlchemyError:
+            escalas = []
+
+        try:
+            escolaridades = (
+                conn.execute(
+                    text(
+                        "SELECT id, nome FROM colab_escolaridade "
+                        "ORDER BY nome"
+                    )
+                )
+                .mappings()
+                .all()
+            )
+        except SQLAlchemyError:
+            escolaridades = []
+
+        try:
+            estados_civis = (
+                conn.execute(
+                    text(
+                        "SELECT id, nome FROM colab_estado_civil "
+                        "ORDER BY nome"
+                    )
+                )
+                .mappings()
+                .all()
+            )
+        except SQLAlchemyError:
+            estados_civis = []
+
+        try:
+            funcoes = (
+                conn.execute(
+                    text(
+                        "SELECT id, nome FROM colab_funcao "
+                        "ORDER BY nome"
+                    )
+                )
+                .mappings()
+                .all()
+            )
+        except SQLAlchemyError:
+            funcoes = []
+
+        try:
+            maos_obra = (
+                conn.execute(
+                    text(
+                        "SELECT id, nome FROM colab_mao_obra "
+                        "ORDER BY nome"
+                    )
+                )
+                .mappings()
+                .all()
+            )
+        except SQLAlchemyError:
+            maos_obra = []
+
+        try:
+            situacoes_folha = (
+                conn.execute(
+                    text(
+                        "SELECT id, nome FROM colab_situacao_folha "
+                        "ORDER BY nome"
+                    )
+                )
+                .mappings()
+                .all()
+            )
+        except SQLAlchemyError:
+            situacoes_folha = []
+
+    subnav = build_colab_subnav("cadastro")
+    return render_template(
+        "colaboradores/cadastro.html",
+        subnav_links=subnav,
+        escalas=escalas,
+        escolaridades=escolaridades,
+        estados_civis=estados_civis,
+        funcoes=funcoes,
+        maos_obra=maos_obra,
+        situacoes_folha=situacoes_folha,
+    )
+
+
+# --------------------------- CREATE AUX TABLES ----------------------
+@bp.route("/cadastro/escala/create", methods=["POST"])
+def escala_create():
+    nome = request.form.get("nome_escala", "").strip()
+    if not nome:
+        return redirect(url_for("colaboradores.cadastro"))
+
+    engine = get_engine()
+    with engine.connect() as conn:
+        try:
+            conn.execute(
+                text("INSERT INTO colab_escala (nome) VALUES (:nome)"),
+                {"nome": nome},
+            )
+            conn.commit()
+        except SQLAlchemyError:
+            conn.rollback()
+
+    return redirect(url_for("colaboradores.cadastro"))
+
+
+@bp.route("/cadastro/escolaridade/create", methods=["POST"])
+def escolaridade_create():
+    nome = request.form.get("nome_escolaridade", "").strip()
+    if not nome:
+        return redirect(url_for("colaboradores.cadastro"))
+
+    engine = get_engine()
+    with engine.connect() as conn:
+        try:
+            conn.execute(
+                text("INSERT INTO colab_escolaridade (nome) VALUES (:nome)"),
+                {"nome": nome},
+            )
+            conn.commit()
+        except SQLAlchemyError:
+            conn.rollback()
+
+    return redirect(url_for("colaboradores.cadastro"))
+
+
+@bp.route("/cadastro/estado_civil/create", methods=["POST"])
+def estado_civil_create():
+    nome = request.form.get("nome_estado_civil", "").strip()
+    if not nome:
+        return redirect(url_for("colaboradores.cadastro"))
+
+    engine = get_engine()
+    with engine.connect() as conn:
+        try:
+            conn.execute(
+                text("INSERT INTO colab_estado_civil (nome) VALUES (:nome)"),
+                {"nome": nome},
+            )
+            conn.commit()
+        except SQLAlchemyError:
+            conn.rollback()
+
+    return redirect(url_for("colaboradores.cadastro"))
+
+
+@bp.route("/cadastro/funcao/create", methods=["POST"])
+def funcao_create():
+    nome = request.form.get("nome_funcao", "").strip()
+    if not nome:
+        return redirect(url_for("colaboradores.cadastro"))
+
+    engine = get_engine()
+    with engine.connect() as conn:
+        try:
+            conn.execute(
+                text("INSERT INTO colab_funcao (nome) VALUES (:nome)"),
+                {"nome": nome},
+            )
+            conn.commit()
+        except SQLAlchemyError:
+            conn.rollback()
+
+    return redirect(url_for("colaboradores.cadastro"))
+
+
+@bp.route("/cadastro/mao_obra/create", methods=["POST"])
+def mao_obra_create():
+    nome = request.form.get("nome_mao_obra", "").strip()
+    if not nome:
+        return redirect(url_for("colaboradores.cadastro"))
+
+    engine = get_engine()
+    with engine.connect() as conn:
+        try:
+            conn.execute(
+                text("INSERT INTO colab_mao_obra (nome) VALUES (:nome)"),
+                {"nome": nome},
+            )
+            conn.commit()
+        except SQLAlchemyError:
+            conn.rollback()
+
+    return redirect(url_for("colaboradores.cadastro"))
+
+
+@bp.route("/cadastro/situacao_folha/create", methods=["POST"])
+def situacao_folha_create():
+    nome = request.form.get("nome_situacao_folha", "").strip()
+    if not nome:
+        return redirect(url_for("colaboradores.cadastro"))
+
+    engine = get_engine()
+    with engine.connect() as conn:
+        try:
+            conn.execute(
+                text("INSERT INTO colab_situacao_folha (nome) VALUES (:nome)"),
+                {"nome": nome},
+            )
+            conn.commit()
+        except SQLAlchemyError:
+            conn.rollback()
+
+    return redirect(url_for("colaboradores.cadastro"))
