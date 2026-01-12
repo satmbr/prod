@@ -8,9 +8,9 @@ from flask import (
     url_for,
 )
 from sqlalchemy import text
-from sqlalchemy.exc import SQLAlchemyError
+    from sqlalchemy.exc import SQLAlchemyError
 
-from utils.db import get_engine
+from db import get_engine  # <== corrigido aqui
 
 bp = Blueprint("colaboradores", __name__, url_prefix="/colaboradores")
 
@@ -221,6 +221,7 @@ def registro():
         return redirect(url_for("colaboradores.registro"))
 
     # GET – carrega lista de colaboradores
+    engine = get_engine()
     with engine.connect() as conn:
         colaboradores = conn.execute(
             text(
@@ -311,14 +312,12 @@ def cadastro():
     return render_template(
         "colaboradores/cadastro.html",
         subnav_links=subnav_links,
-        # listas principais
         escalas=escalas,
         escolaridades=escolaridades,
         estados_civis=estados_civis,
         funcoes=funcoes,
         maos_obra=maos_obra,
         situacoes_folha=situacoes_folha,
-        # aliases usados no template legado
         lista_escala=escalas,
         lista_escolaridade=escolaridades,
         lista_estado_civil=estados_civis,
@@ -338,7 +337,6 @@ def create_aux_generic(table_name: str):
     descricao = (request.form.get("descricao") or "").strip()
 
     if not descricao:
-        # Nada preenchido – apenas volta para a tela
         return redirect(url_for("colaboradores.cadastro"))
 
     engine = get_engine()
