@@ -29,80 +29,68 @@ def build_colab_subnav(active: str | None):
 # Helper: carrega todas as tabelas auxiliares
 # -------------------------------------------------------------------
 def load_auxiliares(conn):
-    escalas = (
-        conn.execute(
-            text(
-                "SELECT id, descricao "
-                "FROM colab_escala "
-                "ORDER BY descricao"
-            )
-        )
-        .mappings()
-        .all()
+    """
+    Carrega todas as tabelas auxiliares de colaboradores
+    e devolve as listas na ordem:
+    escalas, escolaridades, estados_civis,
+    funcoes, maos_obra, situacoes_folha
+    """
+    escalas = conn.execute(
+        text("""
+            SELECT id, nome, descricao
+            FROM colab_escala
+            ORDER BY nome
+        """)
+    ).mappings().all()
+
+    escolaridades = conn.execute(
+        text("""
+            SELECT id, nome
+            FROM colab_escolaridade
+            ORDER BY nome
+        """)
+    ).mappings().all()
+
+    estados_civis = conn.execute(
+        text("""
+            SELECT id, nome
+            FROM colab_estado_civil
+            ORDER BY nome
+        """)
+    ).mappings().all()
+
+    funcoes = conn.execute(
+        text("""
+            SELECT id, nome, codigo, ativo
+            FROM colab_funcao
+            ORDER BY nome
+        """)
+    ).mappings().all()
+
+    maos_obra = conn.execute(
+        text("""
+            SELECT id, nome
+            FROM colab_mao_obra
+            ORDER BY nome
+        """)
+    ).mappings().all()
+
+    situacoes_folha = conn.execute(
+        text("""
+            SELECT id, nome
+            FROM colab_situacao_folha
+            ORDER BY nome
+        """)
+    ).mappings().all()
+
+    return (
+        escalas,
+        escolaridades,
+        estados_civis,
+        funcoes,
+        maos_obra,
+        situacoes_folha,
     )
-
-    escolaridades = (
-        conn.execute(
-            text(
-                "SELECT id, descricao "
-                "FROM colab_escolaridade "
-                "ORDER BY descricao"
-            )
-        )
-        .mappings()
-        .all()
-    )
-
-    estados_civis = (
-        conn.execute(
-            text(
-                "SELECT id, descricao "
-                "FROM colab_estado_civil "
-                "ORDER BY descricao"
-            )
-        )
-        .mappings()
-        .all()
-    )
-
-    funcoes = (
-        conn.execute(
-            text(
-                "SELECT id, descricao "
-                "FROM colab_funcao "
-                "ORDER BY descricao"
-            )
-        )
-        .mappings()
-        .all()
-    )
-
-    maos_obra = (
-        conn.execute(
-            text(
-                "SELECT id, descricao "
-                "FROM colab_mao_obra "
-                "ORDER BY descricao"
-            )
-        )
-        .mappings()
-        .all()
-    )
-
-    situacoes_folha = (
-        conn.execute(
-            text(
-                "SELECT id, descricao "
-                "FROM colab_situacao_folha "
-                "ORDER BY descricao"
-            )
-        )
-        .mappings()
-        .all()
-    )
-
-    return escalas, escolaridades, estados_civis, funcoes, maos_obra, situacoes_folha
-
 
 # -------------------------------------------------------------------
 # /colaboradores/  -> redireciona para Registro
