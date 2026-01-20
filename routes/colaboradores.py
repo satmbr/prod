@@ -1,111 +1,181 @@
+from datetime import datetime
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
-from db import get_engine  # mesmo padrão dos outros módulos (operacao, manutencao)
+from db import get_engine
 
 bp = Blueprint("colaboradores", __name__, url_prefix="/colaboradores")
 
-def build_colab_subnav(active: str | None = None):
-    """
-    Monta os links do sub-menu de colaboradores.
-    """
-    links = [
+
+# ---------------------------------------------------------
+# Helper: sub-menu
+# ---------------------------------------------------------
+def build_colaboradores_subnav(active: str | None):
+    return [
         {
-            "endpoint": "colaboradores.registro",
-            "label": "Registro de Colaboradores",
+            "text": "Registro",
+            "href": url_for("colaboradores.registro"),
             "active": active == "registro",
         },
         {
-            "endpoint": "colaboradores.cadastro",
-            "label": "Cadastro de Tabelas Auxiliares",
+            "text": "Cadastro",
+            "href": url_for("colaboradores.cadastro"),
             "active": active == "cadastro",
         },
     ]
-    return links
 
 
-# -------------------------------------------------------------------
-# /colaboradores/  (página inicial do módulo)
-# -------------------------------------------------------------------
-
-
+# ---------------------------------------------------------
+# /colaboradores/  -> apenas sub-menu
+# ---------------------------------------------------------
 @bp.route("/")
 def index():
-    subnav_links = build_colab_subnav(active=None)
-    return render_template("colaboradores/index.html", subnav_links=subnav_links)
+    subnav = build_colaboradores_subnav(None)
+    return render_template("colaboradores/index.html", subnav_links=subnav)
 
 
-# -------------------------------------------------------------------
-# /colaboradores/registro  (cadastro principal de colaboradores)
-# -------------------------------------------------------------------
-
-
-@bp.route("/registro", methods=["GET", "POST"])
+# ---------------------------------------------------------
+# REGISTRO DO COLABORADOR (tabela principal: colaboradores)
+# ---------------------------------------------------------
+@bp.route("/registro", methods=["GET"])
 def registro():
-    """
-    Tela de registro de colaboradores (tabela principal).
-    GET: lista colaboradores.
-    POST: cria um novo colaborador.
-    """
     engine = get_engine()
+    with engine.connect() as conn:
+        # listas das tabelas auxiliares (para selects do formulário)
+        try:
+            escalas = conn.execute(
+                text("SELECT id, nome FROM colab_escala ORDER BY nome")
+            ).mappings().all()
+        except SQLAlchemyError:
+            escalas = []
 
-    if request.method == "POST":
-        # Coleta dos dados do formulário principal
-        nome = (request.form.get("nome") or "").strip()
-        matricula = (request.form.get("matricula") or "").strip()
-        cpf = (request.form.get("cpf") or "").strip()
-        rg = (request.form.get("rg") or "").strip()
-        telefone = (request.form.get("telefone") or "").strip()
-        numero_pix = (request.form.get("numero_pix") or "").strip()
-        cnh = (request.form.get("cnh") or "").strip()
-        vencimento_cnh = request.form.get("vencimento_cnh") or None
-        ctps = (request.form.get("ctps") or "").strip()
-        pis = (request.form.get("pis") or "").strip()
-        data_nascimento = request.form.get("data_nascimento") or None
-        estado_civil = request.form.get("estado_civil") or None
-        escolaridade = request.form.get("escolaridade") or None
-        nome_mae = (request.form.get("nome_mae") or "").strip()
-        nome_pai = (request.form.get("nome_pai") or "").strip()
-        cidade_nascimento = (request.form.get("cidade_nascimento") or "").strip()
-        endereco = (request.form.get("endereco") or "").strip()
-        cep = (request.form.get("cep") or "").strip()
-        funcao = request.form.get("funcao") or None
-        data_admissao = request.form.get("data_admissao") or None
-        data_funcao = request.form.get("data_funcao") or None
-        situacao_folha = request.form.get("situacao_folha") or None
-        mao_obra = request.form.get("mao_obra") or None
-        escala = request.form.get("escala") or None
-        horario_inicio = request.form.get("horario_inicio") or None
-        horario_fim = request.form.get("horario_fim") or None
-        inicio_ferias = request.form.get("inicio_ferias") or None
-        fim_ferias = request.form.get("fim_ferias") or None
-        salario = request.form.get("salario") or None
-        contrato = (request.form.get("contrato") or "").strip()
+        try:
+            escolaridades = conn.execute(
+                text("SELECT id, nome FROM colab_escolaridade ORDER BY nome")
+            ).mappings().all()
+        except SQLAlchemyError:
+            escolaridades = []
 
-        if not nome or not matricula:
-            # Campos obrigatórios mínimos; apenas recarrega a tela
-            with engine.connect() as conn:
-                colaboradores = conn.execute(
-                    text(
-                        """
-                        SELECT *
-                        FROM colaboradores
-                        ORDER BY nome
-                        """
-                    )
-                ).mappings().all()
+        try:
+            estados_civis = conn.execute(
+                text("SELECT id, nome FROM colab_estado_civil ORDER BY nome")
+            ).mappings().all()
+        except SQLAlchemyError:
+            estados_civis = []
 
-            subnav_links = build_colab_subnav(active="registro")
-            return render_template(
-                "colaboradores/registro.html",
-                subnav_links=subnav_links,
-                colaboradores=colaboradores,
-                erro="Nome e Matrícula são obrigatórios.",
-            )
+        try:
+            funcoes = conn.execute(
+                text("SELECT id, nome FROM colab_funcao ORDER BY nome")
+            ).mappings().all()
+        except SQLAlchemyError:
+            funcoes = []
 
-        # Inserção no banco
-        with engine.begin() as conn:
+        try:
+            maos_obra = conn.execute(
+                text("SELECT id, nome FROM colab_mao_obra ORDER BY nome")
+            ).mappings().all()
+        except SQLAlchemyError:
+            maos_obra = []
+
+        try:
+            situacoes_folha = conn.execute(
+                text("SELECT id, nome FROM colab_situacao_folha ORDER BY nome")
+            ).mappings().all()
+        except SQLAlchemyError:
+            situacoes_folha = []
+
+        # lista de colaboradores já cadastrados
+        try:
+            colaboradores = conn.execute(
+                text(
+                    """
+                    SELECT
+                        c.*,
+                        ec.nome AS estado_civil_nome,
+                        es.nome AS escolaridade_nome,
+                        f.nome  AS funcao_nome,
+                        mo.nome AS mao_obra_nome,
+                        s.nome  AS situacao_folha_nome,
+                        e.nome  AS escala_nome
+                    FROM colaboradores c
+                    LEFT JOIN colab_estado_civil   ec ON ec.id = c.estado_civil_id
+                    LEFT JOIN colab_escolaridade   es ON es.id = c.escolaridade_id
+                    LEFT JOIN colab_funcao         f  ON f.id  = c.funcao_id
+                    LEFT JOIN colab_mao_obra       mo ON mo.id = c.mao_obra_id
+                    LEFT JOIN colab_situacao_folha s  ON s.id  = c.situacao_folha_id
+                    LEFT JOIN colab_escala         e  ON e.id  = c.escala_id
+                    ORDER BY c.nome
+                    """
+                )
+            ).mappings().all()
+        except SQLAlchemyError:
+            colaboradores = []
+
+    subnav = build_colaboradores_subnav("registro")
+    return render_template(
+        "colaboradores/registro.html",
+        subnav_links=subnav,
+        escalas=escalas,
+        escolaridades=escolaridades,
+        estados_civis=estados_civis,
+        funcoes=funcoes,
+        maos_obra=maos_obra,
+        situacoes_folha=situacoes_folha,
+        colaboradores=colaboradores,
+    )
+
+
+@bp.route("/registro/create", methods=["POST"])
+def registro_create():
+    form = request.form
+
+    # campos simples
+    nome = form.get("nome", "").strip()
+    matricula = form.get("matricula", "").strip()
+    cpf = form.get("cpf", "").strip()
+    rg = form.get("rg", "").strip()
+    cnh = form.get("cnh", "").strip()
+    ctps = form.get("ctps", "").strip()
+    pis = form.get("pis", "").strip()
+    telefone = form.get("telefone", "").strip()
+    numero_pix = form.get("numero_pix", "").strip()
+    cidade_nascimento = form.get("cidade_nascimento", "").strip()
+    endereco = form.get("endereco", "").strip()
+    cep = form.get("cep", "").strip()
+    nome_mae = form.get("nome_mae", "").strip()
+    nome_pai = form.get("nome_pai", "").strip()
+    contrato = form.get("contrato", "").strip()
+
+    # chaves estrangeiras (podem vir vazias)
+    estado_civil_id = form.get("estado_civil_id") or None
+    escolaridade_id = form.get("escolaridade_id") or None
+    funcao_id = form.get("funcao_id") or None
+    situacao_folha_id = form.get("situacao_folha_id") or None
+    mao_obra_id = form.get("mao_obra_id") or None
+    escala_id = form.get("escala_id") or None
+
+    # datas / horários (deixamos como string; Postgres converte)
+    data_nascimento = form.get("data_nascimento") or None
+    data_admissao = form.get("data_admissao") or None
+    data_funcao = form.get("data_funcao") or None
+    inicio_ferias = form.get("inicio_ferias") or None
+    fim_ferias = form.get("fim_ferias") or None
+    vencimento_cnh = form.get("vencimento_cnh") or None
+
+    horario_inicio = form.get("horario_inicio") or None
+    horario_fim = form.get("horario_fim") or None
+
+    # valores numéricos
+    salario = form.get("salario") or None
+
+    if not nome or not matricula:
+        flash("Nome e Matrícula são obrigatórios.", "warning")
+        return redirect(url_for("colaboradores.registro"))
+
+    engine = get_engine()
+    with engine.connect() as conn:
+        try:
             conn.execute(
                 text(
                     """
@@ -114,20 +184,14 @@ def registro():
                         matricula,
                         cpf,
                         rg,
-                        telefone,
-                        numero_pix,
                         cnh,
-                        vencimento_cnh,
                         ctps,
                         pis,
+                        telefone,
+                        numero_pix,
                         data_nascimento,
                         estado_civil_id,
                         escolaridade_id,
-                        nome_mae,
-                        nome_pai,
-                        cidade_nascimento,
-                        endereco,
-                        cep,
                         funcao_id,
                         data_admissao,
                         data_funcao,
@@ -138,40 +202,46 @@ def registro():
                         horario_fim,
                         inicio_ferias,
                         fim_ferias,
+                        nome_mae,
+                        nome_pai,
+                        cidade_nascimento,
+                        endereco,
+                        cep,
                         salario,
-                        contrato
+                        contrato,
+                        vencimento_cnh
                     )
                     VALUES (
                         :nome,
                         :matricula,
                         :cpf,
                         :rg,
-                        :telefone,
-                        :numero_pix,
                         :cnh,
-                        :vencimento_cnh,
                         :ctps,
                         :pis,
+                        :telefone,
+                        :numero_pix,
                         :data_nascimento,
-                        :estado_civil,
-                        :escolaridade,
+                        :estado_civil_id,
+                        :escolaridade_id,
+                        :funcao_id,
+                        :data_admissao,
+                        :data_funcao,
+                        :situacao_folha_id,
+                        :mao_obra_id,
+                        :escala_id,
+                        :horario_inicio,
+                        :horario_fim,
+                        :inicio_ferias,
+                        :fim_ferias,
                         :nome_mae,
                         :nome_pai,
                         :cidade_nascimento,
                         :endereco,
                         :cep,
-                        :funcao,
-                        :data_admissao,
-                        :data_funcao,
-                        :situacao_folha,
-                        :mao_obra,
-                        :escala,
-                        :horario_inicio,
-                        :horario_fim,
-                        :inicio_ferias,
-                        :fim_ferias,
                         :salario,
-                        :contrato
+                        :contrato,
+                        :vencimento_cnh
                     )
                     """
                 ),
@@ -180,256 +250,185 @@ def registro():
                     "matricula": matricula,
                     "cpf": cpf,
                     "rg": rg,
-                    "telefone": telefone,
-                    "numero_pix": numero_pix,
                     "cnh": cnh,
-                    "vencimento_cnh": vencimento_cnh,
                     "ctps": ctps,
                     "pis": pis,
+                    "telefone": telefone,
+                    "numero_pix": numero_pix,
                     "data_nascimento": data_nascimento,
-                    "estado_civil": estado_civil,
-                    "escolaridade": escolaridade,
+                    "estado_civil_id": estado_civil_id,
+                    "escolaridade_id": escolaridade_id,
+                    "funcao_id": funcao_id,
+                    "data_admissao": data_admissao,
+                    "data_funcao": data_funcao,
+                    "situacao_folha_id": situacao_folha_id,
+                    "mao_obra_id": mao_obra_id,
+                    "escala_id": escala_id,
+                    "horario_inicio": horario_inicio,
+                    "horario_fim": horario_fim,
+                    "inicio_ferias": inicio_ferias,
+                    "fim_ferias": fim_ferias,
                     "nome_mae": nome_mae,
                     "nome_pai": nome_pai,
                     "cidade_nascimento": cidade_nascimento,
                     "endereco": endereco,
                     "cep": cep,
-                    "funcao": funcao,
-                    "data_admissao": data_admissao,
-                    "data_funcao": data_funcao,
-                    "situacao_folha": situacao_folha,
-                    "mao_obra": mao_obra,
-                    "escala": escala,
-                    "horario_inicio": horario_inicio,
-                    "horario_fim": horario_fim,
-                    "inicio_ferias": inicio_ferias,
-                    "fim_ferias": fim_ferias,
                     "salario": salario,
                     "contrato": contrato,
+                    "vencimento_cnh": vencimento_cnh,
                 },
             )
+            conn.commit()
+            flash("Colaborador cadastrado com sucesso.", "success")
+        except SQLAlchemyError as e:
+            conn.rollback()
+            flash(f"Erro ao salvar colaborador: {e}", "danger")
 
-        return redirect(url_for("colaboradores.registro"))
-
-    # GET – carrega lista de colaboradores
-    engine = get_engine()
-    with engine.connect() as conn:
-        colaboradores = conn.execute(
-            text(
-                """
-                SELECT *
-                FROM colaboradores
-                ORDER BY nome
-                """
-            )
-        ).mappings().all()
-
-    subnav_links = build_colab_subnav(active="registro")
-    return render_template(
-        "colaboradores/registro.html",
-        subnav_links=subnav_links,
-        colaboradores=colaboradores,
-    )
+    return redirect(url_for("colaboradores.registro"))
 
 
-# -------------------------------------------------------------------
-# /colaboradores/cadastro  (tabelas auxiliares)
-# -------------------------------------------------------------------
-
-
+# ---------------------------------------------------------
+# CADASTRO TABELAS AUXILIARES
+# ---------------------------------------------------------
 @bp.route("/cadastro", methods=["GET"])
 def cadastro():
-    """Tela de cadastro das tabelas auxiliares de colaboradores."""
     engine = get_engine()
-
-    escalas = []
-    escolaridades = []
-    estados_civis = []
-    funcoes = []
-    maos_obra = []
-    situacoes_folha = []
-
     with engine.connect() as conn:
-        try:
-            escalas = conn.execute(
-                text("SELECT id, descricao FROM colab_escala ORDER BY descricao")
-            ).mappings().all()
-        except SQLAlchemyError:
-            escalas = []
+        def load_table(sql):
+            try:
+                return conn.execute(text(sql)).mappings().all()
+            except SQLAlchemyError:
+                return []
 
-        try:
-            escolaridades = conn.execute(
-                text(
-                    "SELECT id, descricao FROM colab_escolaridade ORDER BY descricao"
-                )
-            ).mappings().all()
-        except SQLAlchemyError:
-            escolaridades = []
+        escalas = load_table("SELECT id, nome FROM colab_escala ORDER BY nome")
+        escolaridades = load_table("SELECT id, nome FROM colab_escolaridade ORDER BY nome")
+        estados_civis = load_table("SELECT id, nome FROM colab_estado_civil ORDER BY nome")
+        funcoes = load_table("SELECT id, nome FROM colab_funcao ORDER BY nome")
+        maos_obra = load_table("SELECT id, nome FROM colab_mao_obra ORDER BY nome")
+        situacoes_folha = load_table("SELECT id, nome FROM colab_situacao_folha ORDER BY nome")
 
-        try:
-            estados_civis = conn.execute(
-                text(
-                    "SELECT id, descricao FROM colab_estado_civil ORDER BY descricao"
-                )
-            ).mappings().all()
-        except SQLAlchemyError:
-            estados_civis = []
-
-        try:
-            funcoes = conn.execute(
-                text("SELECT id, descricao FROM colab_funcao ORDER BY descricao")
-            ).mappings().all()
-        except SQLAlchemyError:
-            funcoes = []
-
-        try:
-            maos_obra = conn.execute(
-                text("SELECT id, descricao FROM colab_mao_obra ORDER BY descricao")
-            ).mappings().all()
-        except SQLAlchemyError:
-            maos_obra = []
-
-        try:
-            situacoes_folha = conn.execute(
-                text(
-                    "SELECT id, descricao FROM colab_situacao_folha ORDER BY descricao"
-                )
-            ).mappings().all()
-        except SQLAlchemyError:
-            situacoes_folha = []
-
-    subnav_links = build_colab_subnav(active="cadastro")
-
+    subnav = build_colaboradores_subnav("cadastro")
     return render_template(
         "colaboradores/cadastro.html",
-        subnav_links=subnav_links,
+        subnav_links=subnav,
         escalas=escalas,
         escolaridades=escolaridades,
         estados_civis=estados_civis,
         funcoes=funcoes,
         maos_obra=maos_obra,
         situacoes_folha=situacoes_folha,
-        lista_escala=escalas,
-        lista_escolaridade=escolaridades,
-        lista_estado_civil=estados_civis,
-        lista_funcao=funcoes,
-        lista_mao_obra=maos_obra,
-        lista_situacao_folha=situacoes_folha,
     )
 
 
-# -------------------------------------------------------------------
-# Funções auxiliares para criação e exclusão das tabelas auxiliares
-# -------------------------------------------------------------------
-
-
-def create_aux_generic(table_name: str):
-    """Insere um registro em uma tabela auxiliar simples (id, descricao)."""
-    descricao = (request.form.get("descricao") or "").strip()
-
-    if not descricao:
-        return redirect(url_for("colaboradores.cadastro"))
-
+def _simple_create(table: str, nome: str):
+    if not nome:
+        return
     engine = get_engine()
-    with engine.begin() as conn:
+    with engine.connect() as conn:
         conn.execute(
-            text(f"INSERT INTO {table_name} (descricao) VALUES (:descricao)"),
-            {"descricao": descricao},
+            text(f"INSERT INTO {table} (nome) VALUES (:nome)"),
+            {"nome": nome},
         )
+        conn.commit()
 
-    return redirect(url_for("colaboradores.cadastro"))
 
-
-def delete_aux_generic(table_name: str):
-    """Remove um registro de uma tabela auxiliar simples (id, descricao)."""
-    try:
-        registro_id = int(request.form.get("id", "0"))
-    except ValueError:
-        return redirect(url_for("colaboradores.cadastro"))
-
+def _simple_delete(table: str, row_id: str | None):
+    if not row_id:
+        return
     engine = get_engine()
-    with engine.begin() as conn:
+    with engine.connect() as conn:
         conn.execute(
-            text(f"DELETE FROM {table_name} WHERE id = :id"),
-            {"id": registro_id},
+            text(f"DELETE FROM {table} WHERE id = :id"),
+            {"id": row_id},
         )
-
-    return redirect(url_for("colaboradores.cadastro"))
-
-
-# -------------------------- ESCALA ---------------------------------
+        conn.commit()
 
 
+# ---- escala ----
 @bp.route("/cadastro/escala/create", methods=["POST"])
 def escala_create():
-    return create_aux_generic("colab_escala")
+    nome = request.form.get("nome", "").strip()
+    _simple_create("colab_escala", nome)
+    return redirect(url_for("colaboradores.cadastro"))
 
 
 @bp.route("/cadastro/escala/delete", methods=["POST"])
-def cadastro_escala_delete():
-    return delete_aux_generic("colab_escala")
+def escala_delete():
+    rid = request.form.get("id")
+    _simple_delete("colab_escala", rid)
+    return redirect(url_for("colaboradores.cadastro"))
 
 
-# ---------------------- ESCOLARIDADE -------------------------------
-
-
+# ---- escolaridade ----
 @bp.route("/cadastro/escolaridade/create", methods=["POST"])
 def escolaridade_create():
-    return create_aux_generic("colab_escolaridade")
+    nome = request.form.get("nome", "").strip()
+    _simple_create("colab_escolaridade", nome)
+    return redirect(url_for("colaboradores.cadastro"))
 
 
 @bp.route("/cadastro/escolaridade/delete", methods=["POST"])
-def cadastro_escolaridade_delete():
-    return delete_aux_generic("colab_escolaridade")
+def escolaridade_delete():
+    rid = request.form.get("id")
+    _simple_delete("colab_escolaridade", rid)
+    return redirect(url_for("colaboradores.cadastro"))
 
 
-# ---------------------- ESTADO CIVIL -------------------------------
-
-
+# ---- estado civil ----
 @bp.route("/cadastro/estado_civil/create", methods=["POST"])
 def estado_civil_create():
-    return create_aux_generic("colab_estado_civil")
+    nome = request.form.get("nome", "").strip()
+    _simple_create("colab_estado_civil", nome)
+    return redirect(url_for("colaboradores.cadastro"))
 
 
 @bp.route("/cadastro/estado_civil/delete", methods=["POST"])
-def cadastro_estado_civil_delete():
-    return delete_aux_generic("colab_estado_civil")
+def estado_civil_delete():
+    rid = request.form.get("id")
+    _simple_delete("colab_estado_civil", rid)
+    return redirect(url_for("colaboradores.cadastro"))
 
 
-# -------------------------- FUNÇÃO ---------------------------------
-
-
+# ---- função ----
 @bp.route("/cadastro/funcao/create", methods=["POST"])
 def funcao_create():
-    return create_aux_generic("colab_funcao")
+    nome = request.form.get("nome", "").strip()
+    _simple_create("colab_funcao", nome)
+    return redirect(url_for("colaboradores.cadastro"))
 
 
 @bp.route("/cadastro/funcao/delete", methods=["POST"])
-def cadastro_funcao_delete():
-    return delete_aux_generic("colab_funcao")
+def funcao_delete():
+    rid = request.form.get("id")
+    _simple_delete("colab_funcao", rid)
+    return redirect(url_for("colaboradores.cadastro"))
 
 
-# ---------------------- MÃO DE OBRA --------------------------------
-
-
+# ---- mão de obra ----
 @bp.route("/cadastro/mao_obra/create", methods=["POST"])
 def mao_obra_create():
-    return create_aux_generic("colab_mao_obra")
+    nome = request.form.get("nome", "").strip()
+    _simple_create("colab_mao_obra", nome)
+    return redirect(url_for("colaboradores.cadastro"))
 
 
 @bp.route("/cadastro/mao_obra/delete", methods=["POST"])
-def cadastro_mao_obra_delete():
-    return delete_aux_generic("colab_mao_obra")
+def mao_obra_delete():
+    rid = request.form.get("id")
+    _simple_delete("colab_mao_obra", rid)
+    return redirect(url_for("colaboradores.cadastro"))
 
 
-# -------------------- SITUAÇÃO NA FOLHA ----------------------------
-
-
+# ---- situação folha ----
 @bp.route("/cadastro/situacao_folha/create", methods=["POST"])
 def situacao_folha_create():
-    return create_aux_generic("colab_situacao_folha")
+    nome = request.form.get("nome", "").strip()
+    _simple_create("colab_situacao_folha", nome)
+    return redirect(url_for("colaboradores.cadastro"))
 
 
 @bp.route("/cadastro/situacao_folha/delete", methods=["POST"])
-def cadastro_situacao_folha_delete():
-    return delete_aux_generic("colab_situacao_folha")
+def situacao_folha_delete():
+    rid = request.form.get("id")
+    _simple_delete("colab_situacao_folha", rid)
+    return redirect(url_for("colaboradores.cadastro"))
