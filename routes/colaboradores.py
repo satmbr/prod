@@ -1,19 +1,10 @@
-from datetime import datetime
-
-from flask import (
-    Blueprint,
-    render_template,
-    request,
-    redirect,
-    url_for,
-)
+from flask import Blueprint, render_template, request, redirect, url_for, flash
 from sqlalchemy import text
-    from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import SQLAlchemyError
 
-from db import get_engine  # <== corrigido aqui
+from db import get_engine  # mesmo padrão dos outros módulos (operacao, manutencao)
 
 bp = Blueprint("colaboradores", __name__, url_prefix="/colaboradores")
-
 
 def build_colab_subnav(active: str | None = None):
     """
