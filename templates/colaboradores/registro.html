@@ -1,352 +1,444 @@
 {% extends "base.html" %}
 
-{% block title %}Cadastro de Colaborador{% endblock %}
+{% block title %}Cadastro de Tabelas Auxiliares de Colaboradores{% endblock %}
 
 {% block content %}
 
 <style>
-    .colab-page-title {
+    .aux-page-title {
+        font-size: 1.3rem;
         font-weight: 600;
-        font-size: 1.4rem;
-        margin-bottom: 1.2rem;
+        margin-bottom: 0.75rem;
     }
 
-    .quadrant-grid {
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        grid-auto-rows: 1fr;
-        gap: 1rem;
-        margin-bottom: 1.5rem;
+    .aux-section-title {
+        font-size: 1rem;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
     }
 
-    @media (max-width: 1200px) {
-        .quadrant-grid {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-    }
-
-    @media (max-width: 768px) {
-        .quadrant-grid {
-            grid-template-columns: 1fr;
-        }
-    }
-
-    .quad-card {
-        border: 1px solid #e0e0e0;
+    .aux-card {
+        border: 1px solid #ddd;
         border-radius: 6px;
-        background-color: #ffffff;
-        padding: 0.75rem 0.9rem 0.9rem;
-        box-shadow: 0 1px 2px rgba(0,0,0,0.03);
-        height: 100%;
+        padding: 0.75rem 0.9rem;
+        background-color: #fafafa;
+        margin-bottom: 1rem;
     }
 
-    .quad-title {
-        font-size: 0.90rem;
-        font-weight: 600;
-        margin-bottom: 0.4rem;
-        border-bottom: 2px solid #f1c40f;
-        padding-bottom: 0.25rem;
-    }
-
-    /* ---- LINHA DE CAMPO (label + input na mesma linha) ---- */
-    .quad-row {
+    .aux-form-row {
         display: flex;
         align-items: center;
-        gap: 0.5rem;
-        margin-bottom: 0.35rem;
+        gap: 0.35rem;
+        margin-bottom: 0.4rem;
     }
 
-    .quad-row:last-child {
-        margin-bottom: 0;
-    }
-
-    .quad-row .form-label {
-        font-size: 0.78rem;
-        margin-bottom: 0;
-        min-width: 120px;   /* largura fixa do texto do campo */
-        max-width: 150px;
-        white-space: nowrap;
-    }
-
-    .quad-card .form-control,
-    .quad-card .form-select {
+    .aux-form-row label {
+        min-width: 90px;
+        font-weight: 500;
         font-size: 0.8rem;
-        padding: 0.18rem 0.35rem;
+        margin-bottom: 0;
+    }
+
+    .aux-form-row input[type="text"] {
+        flex: 1;
+        font-size: 0.8rem;
+        padding: 0.2rem 0.4rem;
+        height: 28px;
+    }
+
+    .aux-form-row .btn {
+        font-size: 0.8rem;
+        padding: 0.2rem 0.6rem;
+        white-space: nowrap;
+        height: 28px;
+    }
+
+    .aux-table-title {
+        font-weight: 600;
+        font-size: 0.85rem;
+        margin-bottom: 0.3rem;
+    }
+
+    .aux-table-wrapper {
+        max-height: 220px;
+        overflow-y: auto;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        background-color: white;
+        padding: 0.25rem;
+    }
+
+    .aux-table {
         width: 100%;
-        max-width: 100%;
-        display: block;
-        flex: 1;            /* campo ocupa todo o resto da linha */
+        font-size: 0.78rem;
+        border-collapse: collapse;
     }
 
-    /* Em telas pequenas volta a ficar um embaixo do outro */
-    @media (max-width: 768px) {
-        .quad-row {
-            flex-direction: column;
-            align-items: stretch;
-        }
-
-        .quad-row .form-label {
-            min-width: 0;
-            max-width: none;
-        }
+    .aux-table th,
+    .aux-table td {
+        border: 1px solid #ddd;
+        padding: 0.2rem 0.3rem;
+        text-align: left;
+        vertical-align: middle;
     }
 
-    .btn-colab {
-        min-width: 110px;
+    .aux-table th {
+        background-color: #f0f0f0;
+        font-weight: 600;
+    }
+
+    .aux-table td input[type="text"] {
+        width: 100%;
+        font-size: 0.78rem;
+        padding: 0.1rem 0.3rem;
+        height: 24px;
+    }
+
+    .aux-table td .btn {
+        font-size: 0.7rem;
+        padding: 0.1rem 0.4rem;
+        height: 24px;
+    }
+
+    .aux-divider {
+        border-top: 2px solid #007472;
+        margin: 1.5rem 0 1rem 0;
     }
 </style>
 
 <div class="container-fluid px-3 py-2">
+    <h2 class="aux-page-title">Cadastro de Tabelas Auxiliares de Colaboradores</h2>
 
-    <h2 class="colab-page-title">Cadastro de Colaborador</h2>
-
-    <form method="POST" action="{{ url_for('colaboradores.registro_create') }}">
-
-        <div class="quadrant-grid">
-
-            <!-- 1. DADOS PESSOAIS -->
-            <section class="quad-card">
-                <div class="quad-title">DADOS PESSOAIS</div>
-
-                <div class="quad-row">
-                    <label for="nome" class="form-label">Nome *</label>
-                    <input type="text" id="nome" name="nome" class="form-control" required>
-                </div>
-
-                <div class="quad-row">
-                    <label for="matricula" class="form-label">Matrícula *</label>
-                    <input type="text" id="matricula" name="matricula" class="form-control" required>
-                </div>
-
-                <div class="quad-row">
-                    <label for="data_nascimento" class="form-label">Data de Nascimento</label>
-                    <input type="date" id="data_nascimento" name="data_nascimento"
-                           class="form-control">
-                </div>
-
-                <div class="quad-row">
-                    <label for="estado_civil" class="form-label">Estado Civil</label>
-                    <input type="text" id="estado_civil" name="estado_civil"
-                           class="form-control">
-                </div>
-
-                <div class="quad-row">
-                    <label for="escolaridade" class="form-label">Escolaridade</label>
-                    <input type="text" id="escolaridade" name="escolaridade"
-                           class="form-control">
-                </div>
-
-                <div class="quad-row">
-                    <label for="cpf" class="form-label">CPF</label>
-                    <input type="text" id="cpf" name="cpf" class="form-control">
-                </div>
-
-                <div class="quad-row">
-                    <label for="rg" class="form-label">RG</label>
-                    <input type="text" id="rg" name="rg" class="form-control">
-                </div>
-
-                <div class="quad-row">
-                    <label for="telefone" class="form-label">Telefone</label>
-                    <input type="text" id="telefone" name="telefone"
-                           class="form-control" placeholder="(00) 00000-0000">
-                </div>
-
-                <div class="quad-row">
-                    <label for="numero_pix" class="form-label">Número / Chave PIX</label>
-                    <input type="text" id="numero_pix" name="numero_pix"
-                           class="form-control" placeholder="CPF, e-mail, chave aleatória...">
-                </div>
-            </section>
-
-            <!-- 2. FAMÍLIA E ESCOLARIDADE -->
-            <section class="quad-card">
-                <div class="quad-title">FAMÍLIA E ESCOLARIDADE</div>
-
-                <div class="quad-row">
-                    <label for="nome_mae" class="form-label">Nome da Mãe</label>
-                    <input type="text" id="nome_mae" name="nome_mae" class="form-control">
-                </div>
-
-                <div class="quad-row">
-                    <label for="nome_pai" class="form-label">Nome do Pai</label>
-                    <input type="text" id="nome_pai" name="nome_pai" class="form-control">
-                </div>
-
-                <div class="quad-row">
-                    <label for="cidade_nascimento" class="form-label">Cidade de Nascimento</label>
-                    <input type="text" id="cidade_nascimento" name="cidade_nascimento"
-                           class="form-control">
-                </div>
-            </section>
-
-            <!-- 3. DOCUMENTOS -->
-            <section class="quad-card">
-                <div class="quad-title">DOCUMENTOS</div>
-
-                <div class="quad-row">
-                    <label for="cnh" class="form-label">CNH</label>
-                    <input type="text" id="cnh" name="cnh" class="form-control">
-                </div>
-
-                <div class="quad-row">
-                    <label for="vencimento_cnh" class="form-label">Vencimento CNH</label>
-                    <input type="date" id="vencimento_cnh" name="vencimento_cnh"
-                           class="form-control">
-                </div>
-
-                <div class="quad-row">
-                    <label for="ctps" class="form-label">CTPS</label>
-                    <input type="text" id="ctps" name="ctps" class="form-control">
-                </div>
-
-                <div class="quad-row">
-                    <label for="pis" class="form-label">PIS</label>
-                    <input type="text" id="pis" name="pis" class="form-control">
-                </div>
-            </section>
-
-            <!-- 4. ENDEREÇO -->
-            <section class="quad-card">
-                <div class="quad-title">ENDEREÇO</div>
-
-                <div class="quad-row">
-                    <label for="endereco" class="form-label">Endereço</label>
-                    <input type="text" id="endereco" name="endereco"
-                           class="form-control">
-                </div>
-
-                <div class="quad-row">
-                    <label for="cep" class="form-label">CEP</label>
-                    <input type="text" id="cep" name="cep" class="form-control">
-                </div>
-            </section>
-
-            <!-- 5. CONTRATO E FUNÇÃO -->
-            <section class="quad-card">
-                <div class="quad-title">CONTRATO E FUNÇÃO</div>
-
-                <div class="quad-row">
-                    <label for="funcao" class="form-label">Função</label>
-                    <input type="text" id="funcao" name="funcao" class="form-control">
-                </div>
-
-                <div class="quad-row">
-                    <label for="data_admissao" class="form-label">Data de Admissão</label>
-                    <input type="date" id="data_admissao" name="data_admissao"
-                           class="form-control">
-                </div>
-
-                <div class="quad-row">
-                    <label for="data_funcao" class="form-label">Data na Função</label>
-                    <input type="date" id="data_funcao" name="data_funcao"
-                           class="form-control">
-                </div>
-
-                <div class="quad-row">
-                    <label for="situacao_folha" class="form-label">Situação na Folha</label>
-                    <input type="text" id="situacao_folha" name="situacao_folha"
-                           class="form-control" placeholder="Ativo, afastado, etc.">
-                </div>
-
-                <div class="quad-row">
-                    <label for="mao_obra" class="form-label">Mão de Obra</label>
-                    <input type="text" id="mao_obra" name="mao_obra"
-                           class="form-control" placeholder="Própria, terceirizada, etc.">
-                </div>
-
-                <div class="quad-row">
-                    <label for="escala" class="form-label">Escala</label>
-                    <input type="text" id="escala" name="escala"
-                           class="form-control" placeholder="Ex.: 5x2, 6x1...">
-                </div>
-
-                <div class="quad-row">
-                    <label for="contrato" class="form-label">Contrato</label>
-                    <input type="text" id="contrato" name="contrato"
-                           class="form-control" placeholder="CLT, PJ, aprendiz...">
-                </div>
-
-                <div class="quad-row">
-                    <label for="salario" class="form-label">Salário</label>
-                    <input type="number" step="0.01" id="salario" name="salario"
-                           class="form-control">
-                </div>
-            </section>
-
-            <!-- 6. JORNADA E FÉRIAS -->
-            <section class="quad-card">
-                <div class="quad-title">JORNADA E FÉRIAS</div>
-
-                <div class="quad-row">
-                    <label for="horario_inicio" class="form-label">Horário Início</label>
-                    <input type="time" id="horario_inicio" name="horario_inicio"
-                           class="form-control">
-                </div>
-
-                <div class="quad-row">
-                    <label for="horario_fim" class="form-label">Horário Fim</label>
-                    <input type="time" id="horario_fim" name="horario_fim"
-                           class="form-control">
-                </div>
-
-                <div class="quad-row">
-                    <label for="inicio_ferias" class="form-label">Início Férias</label>
-                    <input type="date" id="inicio_ferias" name="inicio_ferias"
-                           class="form-control">
-                </div>
-
-                <div class="quad-row">
-                    <label for="fim_ferias" class="form-label">Fim Férias</label>
-                    <input type="date" id="fim_ferias" name="fim_ferias"
-                           class="form-control">
-                </div>
-            </section>
-
-        </div> <!-- /.quadrant-grid -->
-
-        <div class="d-flex justify-content-end gap-2 mb-3">
-            <button type="button"
-                    class="btn btn-secondary btn-sm btn-colab"
-                    onclick="window.location.href='{{ url_for('colaboradores.registro') }}'">
-                Cancelar
-            </button>
-            <button type="submit" class="btn btn-primary btn-sm btn-colab">
-                Salvar
-            </button>
+    <!-- Linha de formulários de inclusão (6 sessões) -->
+    <div class="row">
+        <!-- ESCALA -->
+        <div class="col-md-4">
+            <div class="aux-card">
+                <div class="aux-section-title">Escala</div>
+                <form method="POST" action="{{ url_for('colaboradores.cadastro_escala_create') }}">
+                    <div class="aux-form-row">
+                        <label for="escala_descricao">Descrição:</label>
+                        <input type="text" id="escala_descricao" name="descricao" required>
+                        <button type="submit" class="btn btn-sm btn-primary">Adicionar</button>
+                    </div>
+                </form>
+            </div>
         </div>
 
-    </form>
+        <!-- ESCOLARIDADE -->
+        <div class="col-md-4">
+            <div class="aux-card">
+                <div class="aux-section-title">Escolaridade</div>
+                <form method="POST" action="{{ url_for('colaboradores.cadastro_escolaridade_create') }}">
+                    <div class="aux-form-row">
+                        <label for="escolaridade_descricao">Descrição:</label>
+                        <input type="text" id="escolaridade_descricao" name="descricao" required>
+                        <button type="submit" class="btn btn-sm btn-primary">Adicionar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
 
-    {% if colaboradores %}
-    <hr class="my-3">
-    <h6>Colaboradores cadastrados</h6>
-    <div class="table-responsive">
-        <table class="table table-sm table-striped align-middle">
-            <thead class="table-light">
-                <tr>
-                    <th>Nome</th>
-                    <th>Matrícula</th>
-                    <th>CPF</th>
-                    <th>Função</th>
-                    <th>Data Admissão</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for c in colaboradores %}
-                <tr>
-                    <td>{{ c.nome }}</td>
-                    <td>{{ c.matricula }}</td>
-                    <td>{{ c.cpf }}</td>
-                    <td>{{ c.funcao }}</td>
-                    <td>{{ c.data_admissao }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+        <!-- ESTADO CIVIL -->
+        <div class="col-md-4">
+            <div class="aux-card">
+                <div class="aux-section-title">Estado Civil</div>
+                <form method="POST" action="{{ url_for('colaboradores.cadastro_estado_civil_create') }}">
+                    <div class="aux-form-row">
+                        <label for="estado_civil_descricao">Descrição:</label>
+                        <input type="text" id="estado_civil_descricao" name="descricao" required>
+                        <button type="submit" class="btn btn-sm btn-primary">Adicionar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
-    {% endif %}
+
+    <div class="row">
+        <!-- FUNÇÃO -->
+        <div class="col-md-4">
+            <div class="aux-card">
+                <div class="aux-section-title">Função</div>
+                <form method="POST" action="{{ url_for('colaboradores.cadastro_funcao_create') }}">
+                    <div class="aux-form-row">
+                        <label for="funcao_descricao">Descrição:</label>
+                        <input type="text" id="funcao_descricao" name="descricao" required>
+                        <button type="submit" class="btn btn-sm btn-primary">Adicionar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- MÃO DE OBRA -->
+        <div class="col-md-4">
+            <div class="aux-card">
+                <div class="aux-section-title">Mão de Obra</div>
+                <form method="POST" action="{{ url_for('colaboradores.cadastro_mao_obra_create') }}">
+                    <div class="aux-form-row">
+                        <label for="mao_obra_descricao">Descrição:</label>
+                        <input type="text" id="mao_obra_descricao" name="descricao" required>
+                        <button type="submit" class="btn btn-sm btn-primary">Adicionar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- SITUAÇÃO FOLHA -->
+        <div class="col-md-4">
+            <div class="aux-card">
+                <div class="aux-section-title">Situação Folha</div>
+                <form method="POST" action="{{ url_for('colaboradores.cadastro_situacao_folha_create') }}">
+                    <div class="aux-form-row">
+                        <label for="situacao_folha_descricao">Descrição:</label>
+                        <input type="text" id="situacao_folha_descricao" name="descricao" required>
+                        <button type="submit" class="btn btn-sm btn-primary">Adicionar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Divisor entre cadastro e visualização/edição -->
+    <div class="aux-divider"></div>
+
+    <!-- Tabelas de visualização / edição / exclusão (6 sessões) -->
+    <div class="row">
+        <!-- Tabela Escala -->
+        <div class="col-md-4">
+            <div class="aux-table-title">Escala - Registros</div>
+            <div class="aux-table-wrapper">
+                <table class="aux-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 60px;">ID</th>
+                            <th>Descrição</th>
+                            <th style="width: 85px;">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in escalas %}
+                        <tr>
+                            <td>{{ item.id }}</td>
+                            <td>
+                                <form method="POST" action="{{ url_for('colaboradores.cadastro_escala_update') }}">
+                                    <input type="hidden" name="id" value="{{ item.id }}">
+                                    <input type="text" name="descricao" value="{{ item.descricao }}">
+                            </td>
+                            <td>
+                                    <button type="submit" class="btn btn-sm btn-success">Salvar</button>
+                                </form>
+                                <form method="POST" action="{{ url_for('colaboradores.cadastro_escala_delete') }}" style="display:inline-block; margin-top: 2px;">
+                                    <input type="hidden" name="id" value="{{ item.id }}">
+                                    <button type="submit" class="btn btn-sm btn-danger">Excluir</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        {% if escalas|length == 0 %}
+                        <tr><td colspan="3">Nenhum registro.</td></tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Tabela Escolaridade -->
+        <div class="col-md-4">
+            <div class="aux-table-title">Escolaridade - Registros</div>
+            <div class="aux-table-wrapper">
+                <table class="aux-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 60px;">ID</th>
+                            <th>Descrição</th>
+                            <th style="width: 85px;">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in escolaridades %}
+                        <tr>
+                            <td>{{ item.id }}</td>
+                            <td>
+                                <form method="POST" action="{{ url_for('colaboradores.cadastro_escolaridade_update') }}">
+                                    <input type="hidden" name="id" value="{{ item.id }}">
+                                    <input type="text" name="descricao" value="{{ item.descricao }}">
+                            </td>
+                            <td>
+                                    <button type="submit" class="btn btn-sm btn-success">Salvar</button>
+                                </form>
+                                <form method="POST" action="{{ url_for('colaboradores.cadastro_escolaridade_delete') }}" style="display:inline-block; margin-top: 2px;">
+                                    <input type="hidden" name="id" value="{{ item.id }}">
+                                    <button type="submit" class="btn btn-sm btn-danger">Excluir</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        {% if escolaridades|length == 0 %}
+                        <tr><td colspan="3">Nenhum registro.</td></tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Tabela Estado Civil -->
+        <div class="col-md-4">
+            <div class="aux-table-title">Estado Civil - Registros</div>
+            <div class="aux-table-wrapper">
+                <table class="aux-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 60px;">ID</th>
+                            <th>Descrição</th>
+                            <th style="width: 85px;">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in estados_civis %}
+                        <tr>
+                            <td>{{ item.id }}</td>
+                            <td>
+                                <form method="POST" action="{{ url_for('colaboradores.cadastro_estado_civil_update') }}">
+                                    <input type="hidden" name="id" value="{{ item.id }}">
+                                    <input type="text" name="descricao" value="{{ item.descricao }}">
+                            </td>
+                            <td>
+                                    <button type="submit" class="btn btn-sm btn-success">Salvar</button>
+                                </form>
+                                <form method="POST" action="{{ url_for('colaboradores.cadastro_estado_civil_delete') }}" style="display:inline-block; margin-top: 2px;">
+                                    <input type="hidden" name="id" value="{{ item.id }}">
+                                    <button type="submit" class="btn btn-sm btn-danger">Excluir</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        {% if estados_civis|length == 0 %}
+                        <tr><td colspan="3">Nenhum registro.</td></tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-3">
+        <!-- Tabela Função -->
+        <div class="col-md-4">
+            <div class="aux-table-title">Função - Registros</div>
+            <div class="aux-table-wrapper">
+                <table class="aux-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 60px;">ID</th>
+                            <th>Descrição</th>
+                            <th style="width: 85px;">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in funcoes %}
+                        <tr>
+                            <td>{{ item.id }}</td>
+                            <td>
+                                <form method="POST" action="{{ url_for('colaboradores.cadastro_funcao_update') }}">
+                                    <input type="hidden" name="id" value="{{ item.id }}">
+                                    <input type="text" name="descricao" value="{{ item.descricao }}">
+                            </td>
+                            <td>
+                                    <button type="submit" class="btn btn-sm btn-success">Salvar</button>
+                                </form>
+                                <form method="POST" action="{{ url_for('colaboradores.cadastro_funcao_delete') }}" style="display:inline-block; margin-top: 2px;">
+                                    <input type="hidden" name="id" value="{{ item.id }}">
+                                    <button type="submit" class="btn btn-sm btn-danger">Excluir</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        {% if funcoes|length == 0 %}
+                        <tr><td colspan="3">Nenhum registro.</td></tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Tabela Mão de Obra -->
+        <div class="col-md-4">
+            <div class="aux-table-title">Mão de Obra - Registros</div>
+            <div class="aux-table-wrapper">
+                <table class="aux-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 60px;">ID</th>
+                            <th>Descrição</th>
+                            <th style="width: 85px;">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in maos_obra %}
+                        <tr>
+                            <td>{{ item.id }}</td>
+                            <td>
+                                <form method="POST" action="{{ url_for('colaboradores.cadastro_mao_obra_update') }}">
+                                    <input type="hidden" name="id" value="{{ item.id }}">
+                                    <input type="text" name="descricao" value="{{ item.descricao }}">
+                            </td>
+                            <td>
+                                    <button type="submit" class="btn btn-sm btn-success">Salvar</button>
+                                </form>
+                                <form method="POST" action="{{ url_for('colaboradores.cadastro_mao_obra_delete') }}" style="display:inline-block; margin-top: 2px;">
+                                    <input type="hidden" name="id" value="{{ item.id }}">
+                                    <button type="submit" class="btn btn-sm btn-danger">Excluir</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        {% if maos_obra|length == 0 %}
+                        <tr><td colspan="3">Nenhum registro.</td></tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Tabela Situação Folha -->
+        <div class="col-md-4">
+            <div class="aux-table-title">Situação Folha - Registros</div>
+            <div class="aux-table-wrapper">
+                <table class="aux-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 60px;">ID</th>
+                            <th>Descrição</th>
+                            <th style="width: 85px;">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in situacoes_folha %}
+                        <tr>
+                            <td>{{ item.id }}</td>
+                            <td>
+                                <form method="POST" action="{{ url_for('colaboradores.cadastro_situacao_folha_update') }}">
+                                    <input type="hidden" name="id" value="{{ item.id }}">
+                                    <input type="text" name="descricao" value="{{ item.descricao }}">
+                            </td>
+                            <td>
+                                    <button type="submit" class="btn btn-sm btn-success">Salvar</button>
+                                </form>
+                                <form method="POST" action="{{ url_for('colaboradores.cadastro_situacao_folha_delete') }}" style="display:inline-block; margin-top: 2px%;">
+                                    <input type="hidden" name="id" value="{{ item.id }}">
+                                    <button type="submit" class="btn btn-sm btn-danger">Excluir</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        {% if situacoes_folha|length == 0 %}
+                        <tr><td colspan="3">Nenhum registro.</td></tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
 
 </div>
-
 {% endblock %}
