@@ -61,6 +61,20 @@
     {% endif %}
 
     <h5 class="mb-3">Cadastro de Tabelas Auxiliares de Colaboradores</h5>
+		<div class="mb-3">
+		<ul class="nav nav-pills">
+			<li class="nav-item">
+				<a class="nav-link" href="{{ url_for('colaboradores.registro') }}">
+					Registro de Colaboradores
+				</a>
+			</li>
+			<li class="nav-item">
+				<a class="nav-link active" href="{{ url_for('colaboradores.cadastro') }}">
+					Tabelas Auxiliares
+				</a>
+			</li>
+		</ul>
+	</div>
 
     <!-- 6 QUADRANTES DE CADASTRO -->
     <div class="aux-grid mb-4">
@@ -71,13 +85,12 @@
                 <span class="aux-card-title">Escalas</span>
             </div>
             <div class="card-body aux-card-body">
-                <form method="POST"
-                      action="{{ url_for('colaboradores.cadastro_escala_create') }}">
+                <form method="post" action="{{ url_for('colaboradores.escala_create') }}">
                     <div class="input-group input-group-sm mb-2">
                         <span class="input-group-text">Descrição</span>
                         <input type="text"
                                class="form-control"
-                               name="descricao"
+                               name="nome"
                                placeholder="Ex.: 5x2 / 6x1"
                                required>
                         <button type="submit" class="btn btn-primary btn-sm">
@@ -94,13 +107,12 @@
                 <span class="aux-card-title">Escolaridade</span>
             </div>
             <div class="card-body aux-card-body">
-                <form method="POST"
-                      action="{{ url_for('colaboradores.cadastro_escolaridade_create') }}">
+                <form method="post" action="{{ url_for('colaboradores.escolaridade_create') }}">
                     <div class="input-group input-group-sm mb-2">
                         <span class="input-group-text">Descrição</span>
                         <input type="text"
                                class="form-control"
-                               name="descricao"
+                               name="nome"
                                placeholder="Ex.: Ensino Médio Completo"
                                required>
                         <button type="submit" class="btn btn-primary btn-sm">
@@ -117,13 +129,12 @@
                 <span class="aux-card-title">Estado Civil</span>
             </div>
             <div class="card-body aux-card-body">
-                <form method="POST"
-                      action="{{ url_for('colaboradores.cadastro_estado_civil_create') }}">
+                <form method="post" action="{{ url_for('colaboradores.estado_civil_create') }}">
                     <div class="input-group input-group-sm mb-2">
                         <span class="input-group-text">Descrição</span>
                         <input type="text"
                                class="form-control"
-                               name="descricao"
+                               name="nome"
                                placeholder="Ex.: Solteiro(a), Casado(a)"
                                required>
                         <button type="submit" class="btn btn-primary btn-sm">
@@ -140,13 +151,12 @@
                 <span class="aux-card-title">Funções</span>
             </div>
             <div class="card-body aux-card-body">
-                <form method="POST"
-                      action="{{ url_for('colaboradores.cadastro_funcao_create') }}">
+               <form method="post" action="{{ url_for('colaboradores.funcao_create') }}">
                     <div class="input-group input-group-sm mb-2">
                         <span class="input-group-text">Descrição</span>
                         <input type="text"
                                class="form-control"
-                               name="descricao"
+                               name="nome"
                                placeholder="Ex.: Operador de Máquina, Técnico"
                                required>
                         <button type="submit" class="btn btn-primary btn-sm">
@@ -163,13 +173,12 @@
                 <span class="aux-card-title">Mão de Obra</span>
             </div>
             <div class="card-body aux-card-body">
-                <form method="POST"
-                      action="{{ url_for('colaboradores.cadastro_mao_obra_create') }}">
+                <form method="post" action="{{ url_for('colaboradores.mao_obra_create') }}">
                     <div class="input-group input-group-sm mb-2">
                         <span class="input-group-text">Descrição</span>
                         <input type="text"
                                class="form-control"
-                               name="descricao"
+                               name="nome"
                                placeholder="Ex.: Própria, Terceira"
                                required>
                         <button type="submit" class="btn btn-primary btn-sm">
@@ -186,13 +195,12 @@
                 <span class="aux-card-title">Situação na Folha</span>
             </div>
             <div class="card-body aux-card-body">
-                <form method="POST"
-                      action="{{ url_for('colaboradores.cadastro_situacao_folha_create') }}">
+                <form method="post" action="{{ url_for('colaboradores.situacao_folha_create') }}">
                     <div class="input-group input-group-sm mb-2">
                         <span class="input-group-text">Descrição</span>
                         <input type="text"
                                class="form-control"
-                               name="descricao"
+                               name="nome"
                                placeholder="Ex.: Ativo, Afastado, Férias"
                                required>
                         <button type="submit" class="btn btn-primary btn-sm">
@@ -229,10 +237,9 @@
                         {% for esc in escalas %}
                         <tr>
                             <td>{{ esc.id }}</td>
-                            <td>{{ esc.nome_escala }}</td>
+                            <td>{{ esc.nome }}</td>
                             <td>
-                                <form method="POST"
-                                      action="{{ url_for('colaboradores.cadastro_escala_delete') }}"
+                                <form method="post" action="{{ url_for('colaboradores.escala_delete') }}"
                                       onsubmit="return confirm('Excluir esta escala?');">
                                     <input type="hidden" name="id" value="{{ esc.id }}">
                                     <button type="submit" class="btn btn-sm btn-outline-danger">
@@ -267,10 +274,9 @@
                         {% for esc in escolaridades %}
                         <tr>
                             <td>{{ esc.id }}</td>
-                            <td>{{ esc.nome_escolaridade }}</td>
+                            <td>{{ esc.nome }}</td>
                             <td>
-                                <form method="POST"
-                                      action="{{ url_for('colaboradores.cadastro_escolaridade_delete') }}"
+                                <form method="post" action="{{ url_for('colaboradores.escolaridade_delete') }}"
                                       onsubmit="return confirm('Excluir esta escolaridade?');">
                                     <input type="hidden" name="id" value="{{ esc.id }}">
                                     <button type="submit" class="btn btn-sm btn-outline-danger">
@@ -305,10 +311,9 @@
                         {% for ec in estados_civis %}
                         <tr>
                             <td>{{ ec.id }}</td>
-                            <td>{{ ec.nome_estado_civil }}</td>
+                            <td>{{ ec.nome }}</td>
                             <td>
-                                <form method="POST"
-                                      action="{{ url_for('colaboradores.cadastro_estado_civil_delete') }}"
+                                <form method="post" action="{{ url_for('colaboradores.estado_civil_delete') }}"
                                       onsubmit="return confirm('Excluir este estado civil?');">
                                     <input type="hidden" name="id" value="{{ ec.id }}">
                                     <button type="submit" class="btn btn-sm btn-outline-danger">
@@ -343,11 +348,10 @@
                         {% for fn in funcoes %}
                         <tr>
                             <td>{{ fn.id }}</td>
-                            <td>{{ fn.nome_funcao }}</td>
+                            <td>{{ fn.nome }}</td>
                             <td>
-                                <form method="POST"
-                                      action="{{ url_for('colaboradores.cadastro_funcao_delete') }}"
-                                      onsubmit="return confirm('Excluir esta função?');">
+                               <form method="post" action="{{ url_for('colaboradores.funcao_delete') }}"
+                                     onsubmit="return confirm('Excluir esta função?');">
                                     <input type="hidden" name="id" value="{{ fn.id }}">
                                     <button type="submit" class="btn btn-sm btn-outline-danger">
                                         Excluir
@@ -381,10 +385,9 @@
                         {% for mo in maos_obra %}
                         <tr>
                             <td>{{ mo.id }}</td>
-                            <td>{{ mo.nome_mao_obra }}</td>
+                            <td>{{ mo.nome }}</td>
                             <td>
-                                <form method="POST"
-                                      action="{{ url_for('colaboradores.cadastro_mao_obra_delete') }}"
+                                <form method="post" action="{{ url_for('colaboradores.mao_obra_delete') }}"
                                       onsubmit="return confirm('Excluir esta mão de obra?');">
                                     <input type="hidden" name="id" value="{{ mo.id }}">
                                     <button type="submit" class="btn btn-sm btn-outline-danger">
@@ -419,10 +422,9 @@
                         {% for sf in situacoes_folha %}
                         <tr>
                             <td>{{ sf.id }}</td>
-                            <td>{{ sf.nome_situacao }}</td>
+                            <td>{{ sf.nome }}</td>
                             <td>
-                                <form method="POST"
-                                      action="{{ url_for('colaboradores.cadastro_situacao_folha_delete') }}"
+                                <form method="post" action="{{ url_for('colaboradores.situacao_folha_delete') }}"
                                       onsubmit="return confirm('Excluir esta situação?');">
                                     <input type="hidden" name="id" value="{{ sf.id }}">
                                     <button type="submit" class="btn btn-sm btn-outline-danger">
