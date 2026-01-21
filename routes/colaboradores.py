@@ -11,7 +11,8 @@ from flask import (
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
-from utils.db import get_engine
+from db import get_engine  # <<< AQUI: usando db, não utils.db
+
 
 bp = Blueprint("colaboradores", __name__, url_prefix="/colaboradores")
 
