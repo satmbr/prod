@@ -3,6 +3,7 @@ import os
 
 def create_app():
     app = Flask(__name__)
+    app.config["SECRET_KEY"] = "uma-string-bem-secreta-aqui"
 
     # injeta o nome do usuário em todos os templates
     @app.context_processor
