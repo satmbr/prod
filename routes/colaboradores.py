@@ -8,121 +8,155 @@ from db import get_engine
 bp = Blueprint("colaboradores", __name__, url_prefix="/colaboradores")
 
 
-# -------------------------------------------------------------------
-# Helpers
-# -------------------------------------------------------------------
-def _safe_int(value):
-    """Converte string para int ou retorna None se vazio."""
+# -----------------------------------------
+# Helpers de navegação (sub-menu)
+# -----------------------------------------
+def build_colaboradores_subnav(active: str | None):
+    """
+    Monta os links do sub-menu:
+    - Registro (lista geral de colaboradores)
+    - Cadastro (tabelas auxiliares)
+    """
+    return [
+        {
+            "text": "Registro",
+            "href": url_for("colaboradores.registro"),
+            "active": active == "registro",
+        },
+        {
+            "text": "Cadastro de Tabelas Auxiliares",
+            "href": url_for("colaboradores.cadastro"),
+            "active": active == "cadastro",
+        },
+    ]
+
+
+# -----------------------------------------
+# Helpers para carregar tabelas auxiliares
+# -----------------------------------------
+def _get_aux_list(conn, table_name: str):
+    """
+    Lê uma tabela auxiliar simples (id, nome[, descricao]) de forma genérica.
+    """
     try:
-        if value is None or str(value).strip() == "":
-            return None
-        return int(value)
-    except (TypeError, ValueError):
-        return None
-
-
-def _safe_str(value):
-    """Normaliza strings, retornando None se vier vazia."""
-    if value is None:
-        return None
-    value = str(value).strip()
-    return value or None
+        result = conn.execute(
+            text(
+                f"""
+                SELECT id, nome
+                FROM {table_name}
+                ORDER BY nome
+                """
+            )
+        ).mappings().all()
+        return result
+    except SQLAlchemyError:
+        return []
 
 
 def load_auxiliares(conn):
     """
-    Carrega listas das tabelas auxiliares de colaboradores.
-    Retorna tupla na ordem:
-      (escalas, escolaridades, estados_civis, funcoes, maos_obra, situacoes_folha)
+    Carrega todas as tabelas auxiliares necessárias:
+    - colab_escolaridade
+    - colab_estado_civil
+    - colab_funcao
+    - colab_mao_obra
+    - colab_escala
+    - colab_situacao_folha
     """
-    escalas = conn.execute(
-        text("SELECT id, nome FROM colab_escala ORDER BY nome")
-    ).mappings().all()
+    escolaridades = _get_aux_list(conn, "colab_escolaridade")
+    estados_civis = _get_aux_list(conn, "colab_estado_civil")
+    funcoes = _get_aux_list(conn, "colab_funcao")
+    maos_obra = _get_aux_list(conn, "colab_mao_obra")
+    escalas = _get_aux_list(conn, "colab_escala")
+    situacoes_folha = _get_aux_list(conn, "colab_situacao_folha")
 
-    escolaridades = conn.execute(
-        text("SELECT id, nome FROM colab_escolaridade ORDER BY nome")
-    ).mappings().all()
-
-    estados_civis = conn.execute(
-        text("SELECT id, nome FROM colab_estado_civil ORDER BY nome")
-    ).mappings().all()
-
-    funcoes = conn.execute(
-        text(
-            "SELECT id, nome, codigo, ativo FROM colab_funcao "
-            "ORDER BY nome"
-        )
-    ).mappings().all()
-
-    maos_obra = conn.execute(
-        text("SELECT id, nome FROM colab_mao_obra ORDER BY nome")
-    ).mappings().all()
-
-    situacoes_folha = conn.execute(
-        text("SELECT id, nome FROM colab_situacao_folha ORDER BY nome")
-    ).mappings().all()
-
-    return escalas, escolaridades, estados_civis, funcoes, maos_obra, situacoes_folha
+    return (
+        escolaridades,
+        estados_civis,
+        funcoes,
+        maos_obra,
+        escalas,
+        situacoes_folha,
+    )
 
 
-# -------------------------------------------------------------------
-# Rotas principais
-# -------------------------------------------------------------------
+# -----------------------------------------
+# /colaboradores/  -> tela índice
+# -----------------------------------------
 @bp.route("/")
-def root():
-    """Redireciona para o registro por padrão."""
-    return redirect(url_for("colaboradores.registro"))
+def index():
+    """
+    Página inicial do módulo Colaboradores.
+    Mostra apenas um texto orientando o uso do sub-menu.
+    """
+    subnav = build_colaboradores_subnav(None)
+    return render_template(
+        "colaboradores/index.html",
+        subnav_links=subnav,
+    )
 
 
+# -----------------------------------------
+# /colaboradores/registro  (CRUD principal)
+# -----------------------------------------
 @bp.route("/registro", methods=["GET"])
 def registro():
-    """
-    Tela principal de cadastro de colaboradores.
-    Exibe o formulário + grid com colaboradores já registrados.
-    """
     engine = get_engine()
     with engine.connect() as conn:
-        # tabelas auxiliares para os <select>
         (
-            escalas,
             escolaridades,
             estados_civis,
             funcoes,
             maos_obra,
+            escalas,
             situacoes_folha,
         ) = load_auxiliares(conn)
 
-        # lista de colaboradores já cadastrados
+        # Lista de colaboradores (join com tabelas auxiliares)
         colaboradores = conn.execute(
             text(
                 """
                 SELECT
-                    c.*,
-                    es.nome  AS escala_nome,
-                    esc.nome AS escolaridade_nome,
-                    ec.nome  AS estado_civil_nome,
-                    f.nome   AS funcao_nome,
-                    mo.nome  AS mao_obra_nome,
-                    sf.nome  AS situacao_folha_nome
+                    c.id,
+                    c.nome,
+                    c.matricula,
+                    c.cpf,
+                    c.rg,
+                    c.cnh,
+                    c.ctps,
+                    c.pis,
+                    c.data_nascimento,
+                    c.data_admissao,
+                    c.data_funcao,
+                    esc.nome  AS escolaridade_nome,
+                    ec.nome   AS estado_civil_nome,
+                    f.nome    AS funcao_nome,
+                    mo.nome   AS mao_obra_nome,
+                    e.nome    AS escala_nome,
+                    sf.nome   AS situacao_folha_nome,
+                    c.telefone,
+                    c.numero_pix
                 FROM colaborador_prumat c
-                LEFT JOIN colab_escala         es  ON es.id  = c.escala_id
-                LEFT JOIN colab_escolaridade   esc ON esc.id = c.escolaridade_id
-                LEFT JOIN colab_estado_civil   ec  ON ec.id  = c.estado_civil_id
-                LEFT JOIN colab_funcao         f   ON f.id   = c.funcao_id
-                LEFT JOIN colab_mao_obra       mo  ON mo.id  = c.mao_obra_id
-                LEFT JOIN colab_situacao_folha sf  ON sf.id  = c.situacao_folha_id
+                LEFT JOIN colab_escolaridade  esc ON esc.id = c.escolaridade_id
+                LEFT JOIN colab_estado_civil  ec  ON ec.id  = c.estado_civil_id
+                LEFT JOIN colab_funcao        f   ON f.id   = c.funcao_id
+                LEFT JOIN colab_mao_obra      mo  ON mo.id  = c.mao_obra_id
+                LEFT JOIN colab_escala        e   ON e.id   = c.escala_id
+                LEFT JOIN colab_situacao_folha sf ON sf.id  = c.situacao_folha_id
                 ORDER BY c.nome
                 """
             )
         ).mappings().all()
 
+    subnav = build_colaboradores_subnav("registro")
     return render_template(
         "colaboradores/registro.html",
-        escalas=escalas,
+        subnav_links=subnav,
         escolaridades=escolaridades,
         estados_civis=estados_civis,
         funcoes=funcoes,
         maos_obra=maos_obra,
+        escalas=escalas,
         situacoes_folha=situacoes_folha,
         colaboradores=colaboradores,
     )
@@ -130,211 +164,250 @@ def registro():
 
 @bp.route("/registro/create", methods=["POST"])
 def registro_create():
-    """
-    Recebe o POST do formulário de colaborador_prumat.
-    """
     form = request.form
 
-    # Campos texto simples
-    nome = _safe_str(form.get("nome"))
-    matricula = _safe_str(form.get("matricula"))
-    cpf = _safe_str(form.get("cpf"))
-    rg = _safe_str(form.get("rg"))
-    cnh = _safe_str(form.get("cnh"))
-    ctps = _safe_str(form.get("ctps"))
-    pis = _safe_str(form.get("pis"))
-    mae = _safe_str(form.get("mae"))
-    pai = _safe_str(form.get("pai"))
-    cidade_nascimento = _safe_str(form.get("cidade_nascimento"))
-    endereco = _safe_str(form.get("endereco"))
-    cep = _safe_str(form.get("cep"))
-    contrato = _safe_str(form.get("contrato"))
-    telefone = _safe_str(form.get("telefone"))
-    numero_pix = _safe_str(form.get("numero_pix"))
+    nome = form.get("nome") or None
+    matricula = form.get("matricula") or None
+    cpf = form.get("cpf") or None
+    rg = form.get("rg") or None
+    cnh = form.get("cnh") or None
+    ctps = form.get("ctps") or None
+    pis = form.get("pis") or None
 
-    # Datas e horários (vão como strings; o Postgres converte)
-    data_nascimento = _safe_str(form.get("data_nascimento"))
-    data_admissao = _safe_str(form.get("data_admissao"))
-    data_funcao = _safe_str(form.get("data_funcao"))
-    inicio_ferias = _safe_str(form.get("inicio_ferias"))
-    fim_ferias = _safe_str(form.get("fim_ferias"))
-    vencimento_cnh = _safe_str(form.get("vencimento_cnh"))
-    horario_inicio = _safe_str(form.get("horario_inicio"))
-    horario_fim = _safe_str(form.get("horario_fim"))
+    data_nascimento = form.get("data_nascimento") or None
+    data_admissao = form.get("data_admissao") or None
+    data_funcao = form.get("data_funcao") or None
 
-    # FKs (inteiros)
-    funcao_id = _safe_int(form.get("funcao_id"))
-    situacao_folha_id = _safe_int(form.get("situacao_folha_id"))
-    mao_obra_id = _safe_int(form.get("mao_obra_id"))
-    escala_id = _safe_int(form.get("escala_id"))
-    estado_civil_id = _safe_int(form.get("estado_civil_id"))
-    escolaridade_id = _safe_int(form.get("escolaridade_id"))
+    funcao_id = form.get("funcao_id") or None
+    situacao_folha_id = form.get("situacao_folha_id") or None
+    mao_obra_id = form.get("mao_obra_id") or None
+    escala_id = form.get("escala_id") or None
 
-    # Numérico
-    salario_str = _safe_str(form.get("salario"))
-    if salario_str:
-        salario_str = salario_str.replace(".", "").replace(",", ".")
-    salario = float(salario_str) if salario_str else None
+    horario_inicio = form.get("horario_inicio") or None
+    horario_fim = form.get("horario_fim") or None
+    inicio_ferias = form.get("inicio_ferias") or None
+    fim_ferias = form.get("fim_ferias") or None
 
-    # Campos mínimos
-    if not nome or not matricula:
-        flash("Nome e matrícula são obrigatórios.", "warning")
-        return redirect(url_for("colaboradores.registro"))
+    mae = form.get("mae") or None
+    pai = form.get("pai") or None
+    cidade_nascimento = form.get("cidade_nascimento") or None
+    endereco = form.get("endereco") or None
+    cep = form.get("cep") or None
+    estado_civil_id = form.get("estado_civil_id") or None
+
+    salario = form.get("salario") or None
+    contrato = form.get("contrato") or None
+    vencimento_cnh = form.get("vencimento_cnh") or None
+    escolaridade_id = form.get("escolaridade_id") or None
+
+    telefone = form.get("telefone") or None
+    numero_pix = form.get("numero_pix") or None
 
     engine = get_engine()
-    with engine.connect() as conn:
-        try:
-            conn.execute(
-                text(
-                    """
-                    INSERT INTO colaborador_prumat (
-                        nome,
-                        matricula,
-                        cpf,
-                        rg,
-                        cnh,
-                        ctps,
-                        pis,
-                        data_nascimento,
-                        funcao_id,
-                        data_admissao,
-                        data_funcao,
-                        situacao_folha_id,
-                        mao_obra_id,
-                        escala_id,
-                        horario_inicio,
-                        horario_fim,
-                        inicio_ferias,
-                        fim_ferias,
-                        mae,
-                        pai,
-                        cidade_nascimento,
-                        endereco,
-                        cep,
-                        estado_civil_id,
-                        salario,
-                        contrato,
-                        vencimento_cnh,
-                        escolaridade_id,
-                        telefone,
-                        numero_pix
-                    )
-                    VALUES (
-                        :nome,
-                        :matricula,
-                        :cpf,
-                        :rg,
-                        :cnh,
-                        :ctps,
-                        :pis,
-                        :data_nascimento,
-                        :funcao_id,
-                        :data_admissao,
-                        :data_funcao,
-                        :situacao_folha_id,
-                        :mao_obra_id,
-                        :escala_id,
-                        :horario_inicio,
-                        :horario_fim,
-                        :inicio_ferias,
-                        :fim_ferias,
-                        :mae,
-                        :pai,
-                        :cidade_nascimento,
-                        :endereco,
-                        :cep,
-                        :estado_civil_id,
-                        :salario,
-                        :contrato,
-                        :vencimento_cnh,
-                        :escolaridade_id,
-                        :telefone,
-                        :numero_pix
-                    )
-                    """
-                ),
-                {
-                    "nome": nome,
-                    "matricula": matricula,
-                    "cpf": cpf,
-                    "rg": rg,
-                    "cnh": cnh,
-                    "ctps": ctps,
-                    "pis": pis,
-                    "data_nascimento": data_nascimento,
-                    "funcao_id": funcao_id,
-                    "data_admissao": data_admissao,
-                    "data_funcao": data_funcao,
-                    "situacao_folha_id": situacao_folha_id,
-                    "mao_obra_id": mao_obra_id,
-                    "escala_id": escala_id,
-                    "horario_inicio": horario_inicio,
-                    "horario_fim": horario_fim,
-                    "inicio_ferias": inicio_ferias,
-                    "fim_ferias": fim_ferias,
-                    "mae": mae,
-                    "pai": pai,
-                    "cidade_nascimento": cidade_nascimento,
-                    "endereco": endereco,
-                    "cep": cep,
-                    "estado_civil_id": estado_civil_id,
-                    "salario": salario,
-                    "contrato": contrato,
-                    "vencimento_cnh": vencimento_cnh,
-                    "escolaridade_id": escolaridade_id,
-                    "telefone": telefone,
-                    "numero_pix": numero_pix,
-                },
+    try:
+        with engine.begin() as conn:
+            insert_sql = text(
+                """
+                INSERT INTO colaborador_prumat (
+                    nome,
+                    matricula,
+                    cpf,
+                    rg,
+                    cnh,
+                    ctps,
+                    pis,
+                    data_nascimento,
+                    funcao_id,
+                    data_admissao,
+                    data_funcao,
+                    situacao_folha_id,
+                    mao_obra_id,
+                    escala_id,
+                    horario_inicio,
+                    horario_fim,
+                    inicio_ferias,
+                    fim_ferias,
+                    nome_mae,
+                    nome_pai,
+                    cidade_nascimento,
+                    endereco,
+                    cep,
+                    estado_civil_id,
+                    salario,
+                    contrato,
+                    vencimento_cnh,
+                    escolaridade_id,
+                    telefone,
+                    numero_pix
+                )
+                VALUES (
+                    :nome,
+                    :matricula,
+                    :cpf,
+                    :rg,
+                    :cnh,
+                    :ctps,
+                    :pis,
+                    :data_nascimento,
+                    :funcao_id,
+                    :data_admissao,
+                    :data_funcao,
+                    :situacao_folha_id,
+                    :mao_obra_id,
+                    :escala_id,
+                    :horario_inicio,
+                    :horario_fim,
+                    :inicio_ferias,
+                    :fim_ferias,
+                    :mae,
+                    :pai,
+                    :cidade_nascimento,
+                    :endereco,
+                    :cep,
+                    :estado_civil_id,
+                    :salario,
+                    :contrato,
+                    :vencimento_cnh,
+                    :escolaridade_id,
+                    :telefone,
+                    :numero_pix
+                )
+                """
             )
-            conn.commit()
-            flash("Colaborador cadastrado com sucesso.", "success")
-        except SQLAlchemyError as exc:
-            conn.rollback()
-            print("Erro ao inserir colaborador:", exc)
-            flash("Erro ao salvar colaborador.", "danger")
+
+            params = {
+                "nome": nome,
+                "matricula": matricula,
+                "cpf": cpf,
+                "rg": rg,
+                "cnh": cnh,
+                "ctps": ctps,
+                "pis": pis,
+                "data_nascimento": data_nascimento,
+                "funcao_id": funcao_id,
+                "data_admissao": data_admissao,
+                "data_funcao": data_funcao,
+                "situacao_folha_id": situacao_folha_id,
+                "mao_obra_id": mao_obra_id,
+                "escala_id": escala_id,
+                "horario_inicio": horario_inicio,
+                "horario_fim": horario_fim,
+                "inicio_ferias": inicio_ferias,
+                "fim_ferias": fim_ferias,
+                "mae": mae,
+                "pai": pai,
+                "cidade_nascimento": cidade_nascimento,
+                "endereco": endereco,
+                "cep": cep,
+                "estado_civil_id": estado_civil_id,
+                "salario": salario,
+                "contrato": contrato,
+                "vencimento_cnh": vencimento_cnh,
+                "escolaridade_id": escolaridade_id,
+                "telefone": telefone,
+                "numero_pix": numero_pix,
+            }
+
+            conn.execute(insert_sql, params)
+
+        flash("Colaborador cadastrado com sucesso.", "success")
+    except SQLAlchemyError as e:
+        flash(f"Erro ao salvar colaborador: {e}", "danger")
 
     return redirect(url_for("colaboradores.registro"))
 
 
-# -------------------------------------------------------------------
-# CADASTRO DE TABELAS AUXILIARES
-# -------------------------------------------------------------------
+@bp.route("/registro/delete", methods=["POST"])
+def registro_delete():
+    cid = request.form.get("id")
+    if not cid:
+        return redirect(url_for("colaboradores.registro"))
+
+    engine = get_engine()
+    try:
+        with engine.begin() as conn:
+            conn.execute(
+                text("DELETE FROM colaborador_prumat WHERE id = :id"),
+                {"id": cid},
+            )
+        flash("Colaborador excluído com sucesso.", "success")
+    except SQLAlchemyError as e:
+        flash(f"Erro ao excluir colaborador: {e}", "danger")
+
+    return redirect(url_for("colaboradores.registro"))
+
+
+# -----------------------------------------
+# /colaboradores/cadastro  (tabelas auxiliares)
+# -----------------------------------------
 @bp.route("/cadastro", methods=["GET"])
 def cadastro():
-    """
-    Tela de manutenção das tabelas auxiliares de colaboradores.
-    O layout principal vem do template; aqui só carregamos os dados.
-    """
     engine = get_engine()
     with engine.connect() as conn:
         escalas = conn.execute(
-            text("SELECT id, nome, descricao FROM colab_escala ORDER BY nome")
+            text(
+                """
+                SELECT id, nome, descricao
+                FROM colab_escala
+                ORDER BY nome
+                """
+            )
         ).mappings().all()
 
         escolaridades = conn.execute(
-            text("SELECT id, nome FROM colab_escolaridade ORDER BY nome")
+            text(
+                """
+                SELECT id, nome
+                FROM colab_escolaridade
+                ORDER BY nome
+                """
+            )
         ).mappings().all()
 
         estados_civis = conn.execute(
-            text("SELECT id, nome FROM colab_estado_civil ORDER BY nome")
+            text(
+                """
+                SELECT id, nome
+                FROM colab_estado_civil
+                ORDER BY nome
+                """
+            )
         ).mappings().all()
 
         funcoes = conn.execute(
             text(
-                "SELECT id, nome, codigo, ativo FROM colab_funcao ORDER BY nome"
+                """
+                SELECT id, nome, codigo, ativo
+                FROM colab_funcao
+                ORDER BY nome
+                """
             )
         ).mappings().all()
 
         maos_obra = conn.execute(
-            text("SELECT id, nome FROM colab_mao_obra ORDER BY nome")
+            text(
+                """
+                SELECT id, nome
+                FROM colab_mao_obra
+                ORDER BY nome
+                """
+            )
         ).mappings().all()
 
         situacoes_folha = conn.execute(
-            text("SELECT id, nome FROM colab_situacao_folha ORDER BY nome")
+            text(
+                """
+                SELECT id, nome
+                FROM colab_situacao_folha
+                ORDER BY nome
+                """
+            )
         ).mappings().all()
 
+    subnav = build_colaboradores_subnav("cadastro")
     return render_template(
         "colaboradores/cadastro.html",
+        subnav_links=subnav,
         escalas=escalas,
         escolaridades=escolaridades,
         estados_civis=estados_civis,
@@ -344,127 +417,124 @@ def cadastro():
     )
 
 
-# ---- ESCALA -------------------------------------------------------
+# ------- CRUD colab_escala -------
 @bp.route("/cadastro/escala/create", methods=["POST"])
 def escala_create():
-    nome = _safe_str(request.form.get("nome"))
-    descricao = _safe_str(request.form.get("descricao"))
+    nome = request.form.get("nome") or None
+    descricao = request.form.get("descricao") or None
 
     if not nome:
         return redirect(url_for("colaboradores.cadastro"))
 
     engine = get_engine()
-    with engine.connect() as conn:
+    with engine.begin() as conn:
         conn.execute(
             text(
-                "INSERT INTO colab_escala (nome, descricao) VALUES (:nome, :descricao)"
+                """
+                INSERT INTO colab_escala (nome, descricao)
+                VALUES (:nome, :descricao)
+                """
             ),
             {"nome": nome, "descricao": descricao},
         )
-        conn.commit()
 
     return redirect(url_for("colaboradores.cadastro"))
 
 
 @bp.route("/cadastro/escala/delete", methods=["POST"])
 def escala_delete():
-    esc_id = _safe_int(request.form.get("id"))
-    if not esc_id:
+    eid = request.form.get("id")
+    if not eid:
         return redirect(url_for("colaboradores.cadastro"))
 
     engine = get_engine()
-    with engine.connect() as conn:
+    with engine.begin() as conn:
         conn.execute(
-            text("DELETE FROM colab_escala WHERE id = :id"), {"id": esc_id}
+            text("DELETE FROM colab_escala WHERE id = :id"),
+            {"id": eid},
         )
-        conn.commit()
 
     return redirect(url_for("colaboradores.cadastro"))
 
 
-# ---- ESCOLARIDADE -------------------------------------------------
+# ------- CRUD colab_escolaridade -------
 @bp.route("/cadastro/escolaridade/create", methods=["POST"])
 def escolaridade_create():
-    nome = _safe_str(request.form.get("nome"))
+    nome = request.form.get("nome") or None
     if not nome:
         return redirect(url_for("colaboradores.cadastro"))
 
     engine = get_engine()
-    with engine.connect() as conn:
+    with engine.begin() as conn:
         conn.execute(
             text("INSERT INTO colab_escolaridade (nome) VALUES (:nome)"),
             {"nome": nome},
         )
-        conn.commit()
 
     return redirect(url_for("colaboradores.cadastro"))
 
 
 @bp.route("/cadastro/escolaridade/delete", methods=["POST"])
 def escolaridade_delete():
-    esc_id = _safe_int(request.form.get("id"))
-    if not esc_id:
+    eid = request.form.get("id")
+    if not eid:
         return redirect(url_for("colaboradores.cadastro"))
 
     engine = get_engine()
-    with engine.connect() as conn:
+    with engine.begin() as conn:
         conn.execute(
             text("DELETE FROM colab_escolaridade WHERE id = :id"),
-            {"id": esc_id},
+            {"id": eid},
         )
-        conn.commit()
 
     return redirect(url_for("colaboradores.cadastro"))
 
 
-# ---- ESTADO CIVIL -------------------------------------------------
+# ------- CRUD colab_estado_civil -------
 @bp.route("/cadastro/estado_civil/create", methods=["POST"])
 def estado_civil_create():
-    nome = _safe_str(request.form.get("nome"))
+    nome = request.form.get("nome") or None
     if not nome:
         return redirect(url_for("colaboradores.cadastro"))
 
     engine = get_engine()
-    with engine.connect() as conn:
+    with engine.begin() as conn:
         conn.execute(
             text("INSERT INTO colab_estado_civil (nome) VALUES (:nome)"),
             {"nome": nome},
         )
-        conn.commit()
 
     return redirect(url_for("colaboradores.cadastro"))
 
 
 @bp.route("/cadastro/estado_civil/delete", methods=["POST"])
 def estado_civil_delete():
-    est_id = _safe_int(request.form.get("id"))
-    if not est_id:
+    eid = request.form.get("id")
+    if not eid:
         return redirect(url_for("colaboradores.cadastro"))
 
     engine = get_engine()
-    with engine.connect() as conn:
+    with engine.begin() as conn:
         conn.execute(
             text("DELETE FROM colab_estado_civil WHERE id = :id"),
-            {"id": est_id},
+            {"id": eid},
         )
-        conn.commit()
 
     return redirect(url_for("colaboradores.cadastro"))
 
 
-# ---- FUNÇÃO -------------------------------------------------------
+# ------- CRUD colab_funcao -------
 @bp.route("/cadastro/funcao/create", methods=["POST"])
 def funcao_create():
-    nome = _safe_str(request.form.get("nome"))
-    codigo = _safe_str(request.form.get("codigo"))
-    ativo_val = request.form.get("ativo")
-    ativo = True if ativo_val in ("on", "true", "1") else False
+    nome = request.form.get("nome") or None
+    codigo = request.form.get("codigo") or None
+    ativo = request.form.get("ativo") == "on"
 
     if not nome:
         return redirect(url_for("colaboradores.cadastro"))
 
     engine = get_engine()
-    with engine.connect() as conn:
+    with engine.begin() as conn:
         conn.execute(
             text(
                 """
@@ -474,91 +544,87 @@ def funcao_create():
             ),
             {"nome": nome, "codigo": codigo, "ativo": ativo},
         )
-        conn.commit()
 
     return redirect(url_for("colaboradores.cadastro"))
 
 
 @bp.route("/cadastro/funcao/delete", methods=["POST"])
 def funcao_delete():
-    fun_id = _safe_int(request.form.get("id"))
-    if not fun_id:
+    fid = request.form.get("id")
+    if not fid:
         return redirect(url_for("colaboradores.cadastro"))
 
     engine = get_engine()
-    with engine.connect() as conn:
+    with engine.begin() as conn:
         conn.execute(
-            text("DELETE FROM colab_funcao WHERE id = :id"), {"id": fun_id}
+            text("DELETE FROM colab_funcao WHERE id = :id"),
+            {"id": fid},
         )
-        conn.commit()
 
     return redirect(url_for("colaboradores.cadastro"))
 
 
-# ---- MÃO DE OBRA --------------------------------------------------
+# ------- CRUD colab_mao_obra -------
 @bp.route("/cadastro/mao_obra/create", methods=["POST"])
 def mao_obra_create():
-    nome = _safe_str(request.form.get("nome"))
+    nome = request.form.get("nome") or None
     if not nome:
         return redirect(url_for("colaboradores.cadastro"))
 
     engine = get_engine()
-    with engine.connect() as conn:
+    with engine.begin() as conn:
         conn.execute(
             text("INSERT INTO colab_mao_obra (nome) VALUES (:nome)"),
             {"nome": nome},
         )
-        conn.commit()
 
     return redirect(url_for("colaboradores.cadastro"))
 
 
 @bp.route("/cadastro/mao_obra/delete", methods=["POST"])
 def mao_obra_delete():
-    mo_id = _safe_int(request.form.get("id"))
-    if not mo_id:
+    mid = request.form.get("id")
+    if not mid:
         return redirect(url_for("colaboradores.cadastro"))
 
     engine = get_engine()
-    with engine.connect() as conn:
+    with engine.begin() as conn:
         conn.execute(
-            text("DELETE FROM colab_mao_obra WHERE id = :id"), {"id": mo_id}
+            text("DELETE FROM colab_mao_obra WHERE id = :id"),
+            {"id": mid},
         )
-        conn.commit()
 
     return redirect(url_for("colaboradores.cadastro"))
 
 
-# ---- SITUAÇÃO FOLHA -----------------------------------------------
+# ------- CRUD colab_situacao_folha -------
 @bp.route("/cadastro/situacao_folha/create", methods=["POST"])
 def situacao_folha_create():
-    nome = _safe_str(request.form.get("nome"))
+    nome = request.form.get("nome") or None
     if not nome:
         return redirect(url_for("colaboradores.cadastro"))
 
     engine = get_engine()
-    with engine.connect() as conn:
+    with engine.begin() as conn:
         conn.execute(
             text("INSERT INTO colab_situacao_folha (nome) VALUES (:nome)"),
             {"nome": nome},
         )
-        conn.commit()
 
     return redirect(url_for("colaboradores.cadastro"))
 
 
 @bp.route("/cadastro/situacao_folha/delete", methods=["POST"])
 def situacao_folha_delete():
-    sit_id = _safe_int(request.form.get("id"))
-    if not sit_id:
+    sid = request.form.get("id")
+    if not sid:
         return redirect(url_for("colaboradores.cadastro"))
 
     engine = get_engine()
-    with engine.connect() as conn:
+    with engine.begin() as conn:
         conn.execute(
             text("DELETE FROM colab_situacao_folha WHERE id = :id"),
-            {"id": sit_id},
+            {"id": sid},
         )
-        conn.commit()
 
     return redirect(url_for("colaboradores.cadastro"))
