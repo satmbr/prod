@@ -68,7 +68,10 @@
 		<hr style="margin:16px 0;">
 
 		<div id="pd-lote-area">
-		  <h4 style="margin-bottom:10px;">Lançamentos pendentes</h4>
+		  <h4 style="margin-bottom:10px;">
+			Lançamentos pendentes
+			<span id="pd-contador" style="font-size:14px; color:#666;">(0 itens)</span>
+		  </h4>
 
 		  <div style="overflow:auto;">
 			<table class="table" id="pd-lote-tabela">
@@ -287,8 +290,9 @@
   const pdLancamentos = [];
 
   function pdRenderTabela() {
-    const body = document.getElementById("pd-lote-body");
-    const hidden = document.getElementById("pd_lancamentos_json");
+	const body = document.getElementById("pd-lote-body");
+	const hidden = document.getElementById("pd_lancamentos_json");
+	const contador = document.getElementById("pd-contador");
 
     body.innerHTML = "";
 
@@ -316,7 +320,8 @@
         body.appendChild(tr);
       });
     }
-
+	
+	contador.textContent = `(${pdLancamentos.length} ${pdLancamentos.length === 1 ? "item" : "itens"})`;
     hidden.value = JSON.stringify(pdLancamentos);
   }
   
