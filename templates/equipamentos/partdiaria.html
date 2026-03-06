@@ -343,6 +343,21 @@
       return;
     }
 	
+	const duplicado = pdLancamentos.some(function (l) {
+	  return (
+		l.data === data &&
+		l.maquina_id === maquinaId &&
+		l.atividade_id === atividadeId &&
+		l.hora_inicio === horaInicio &&
+		l.hora_fim === horaFim
+	  );
+	});
+
+	if (duplicado) {
+	  alert("Esse lançamento já foi adicionado à lista.");
+	  return;
+	}
+	
     const item = {
       data: data,
       maquina_id: maquinaId,
