@@ -93,7 +93,8 @@
 
 		  <form method="post" action="{{ url_for('equipamentos.part_create_lote') }}" id="pd-salvar-tudo-form">
 			<input type="hidden" name="lancamentos_json" id="pd_lancamentos_json">
-			<div class="field align-end" style="margin-top:12px;">
+			<div class="field align-end" style="margin-top:12px; display:flex; gap:8px; justify-content:flex-end;">
+			  <button class="btn" type="button" id="btn-limpar-lista">Limpar lista</button>
 			  <button class="btn primary" type="button" id="btn-salvar-tudo">Salvar tudo</button>
 			</div>
 		  </form>
