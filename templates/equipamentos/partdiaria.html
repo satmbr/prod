@@ -395,9 +395,10 @@
     pdRenderTabela();
 
     document.getElementById("pd_atividade_id").value = "";
-    document.getElementById("pd_hora_inicio").value = "";
-    document.getElementById("pd_hora_fim").value = "";
-    document.getElementById("pd_obs").value = "";
+	document.getElementById("pd_hora_inicio").value = horaFim;
+	document.getElementById("pd_hora_fim").value = "";
+	document.getElementById("pd_obs").value = "";
+	document.getElementById("pd_atividade_id").focus();
   });
   
   document.getElementById("btn-limpar-lista").addEventListener("click", function () {
