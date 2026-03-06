@@ -315,7 +315,7 @@ def part_create_lote():
 
                 conn.execute(text("""
                     INSERT INTO parte_diaria
-                        (data, maquina_id, atividade_id, hora_inicio, hora_fim, observacao)
+                        (data, maquina_id, atividade_id, hora_inicio, hora_fim, obs)
                     VALUES
                         (:d, :m, :a, :hi, :hf, :obs)
                 """), {
