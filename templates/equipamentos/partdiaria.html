@@ -91,7 +91,7 @@
 			</table>
 		  </div>
 
-		  <form method="post" action="#" id="pd-salvar-tudo-form" onsubmit="return false;">
+		  <form method="post" action="{{ url_for('equipamentos.part_create_lote') }}" id="pd-salvar-tudo-form">
 			<input type="hidden" name="lancamentos_json" id="pd_lancamentos_json">
 			<div class="field align-end" style="margin-top:12px;">
 			  <button class="btn primary" type="button" id="btn-salvar-tudo">Salvar tudo</button>
@@ -358,7 +358,16 @@
     document.getElementById("pd_hora_fim").value = "";
     document.getElementById("pd_obs").value = "";
   });
+  
+  document.getElementById("btn-salvar-tudo").addEventListener("click", function () {
+  if (pdLancamentos.length === 0) {
+    alert("Adicione pelo menos um lançamento antes de salvar.");
+    return;
+  }
 
+  document.getElementById("pd_lancamentos_json").value = JSON.stringify(pdLancamentos);
+  document.getElementById("pd-salvar-tudo-form").submit();
+  });
   pdRenderTabela();
 </script>
 {% endblock %}
