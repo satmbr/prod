@@ -282,4 +282,83 @@
     });
   });
 </script>
+<script>
+  const pdLancamentos = [];
+
+  function pdRenderTabela() {
+    const body = document.getElementById("pd-lote-body");
+    const hidden = document.getElementById("pd_lancamentos_json");
+
+    body.innerHTML = "";
+
+    if (pdLancamentos.length === 0) {
+      body.innerHTML = `
+        <tr id="pd-lote-vazio">
+          <td colspan="7">Nenhum lançamento adicionado ainda.</td>
+        </tr>
+      `;
+    } else {
+      pdLancamentos.forEach((item, index) => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${item.data}</td>
+          <td>${item.maquina_label}</td>
+          <td>${item.atividade_label}</td>
+          <td>${item.hora_inicio}</td>
+          <td>${item.hora_fim}</td>
+          <td>${item.obs || ""}</td>
+          <td>
+            <button type="button" class="btn" onclick="pdRemoverLancamento(${index})">Remover</button>
+          </td>
+        `;
+        body.appendChild(tr);
+      });
+    }
+
+    hidden.value = JSON.stringify(pdLancamentos);
+  }
+
+  function pdRemoverLancamento(index) {
+    pdLancamentos.splice(index, 1);
+    pdRenderTabela();
+  }
+
+  document.getElementById("btn-add-lancamento").addEventListener("click", function () {
+    const data = document.getElementById("pd_data").value;
+    const maquina = document.getElementById("pd_maquina_id");
+    const atividade = document.getElementById("pd_atividade_id");
+    const horaInicio = document.getElementById("pd_hora_inicio").value;
+    const horaFim = document.getElementById("pd_hora_fim").value;
+    const obs = document.getElementById("pd_obs").value.trim();
+
+    const maquinaId = maquina.value;
+    const atividadeId = atividade.value;
+
+    if (!data || !maquinaId || !atividadeId || !horaInicio || !horaFim) {
+      alert("Preencha Data, Máquina, Atividade, Início e Fim.");
+      return;
+    }
+
+    const item = {
+      data: data,
+      maquina_id: maquinaId,
+      maquina_label: maquina.options[maquina.selectedIndex].text,
+      atividade_id: atividadeId,
+      atividade_label: atividade.options[atividade.selectedIndex].text,
+      hora_inicio: horaInicio,
+      hora_fim: horaFim,
+      obs: obs
+    };
+
+    pdLancamentos.push(item);
+    pdRenderTabela();
+
+    document.getElementById("pd_atividade_id").value = "";
+    document.getElementById("pd_hora_inicio").value = "";
+    document.getElementById("pd_hora_fim").value = "";
+    document.getElementById("pd_obs").value = "";
+  });
+
+  pdRenderTabela();
+</script>
 {% endblock %}
