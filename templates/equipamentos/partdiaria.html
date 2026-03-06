@@ -338,7 +338,11 @@
       alert("Preencha Data, Máquina, Atividade, Início e Fim.");
       return;
     }
-
+	if (horaInicio >= horaFim) {
+      alert("A hora de início deve ser menor que a hora de fim.");
+      return;
+    }
+	
     const item = {
       data: data,
       maquina_id: maquinaId,
