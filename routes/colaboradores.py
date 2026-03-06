@@ -16,6 +16,19 @@ from db import get_engine  # usa o mesmo helper do restante do sistema
 
 bp = Blueprint("colaboradores", __name__, url_prefix="/colaboradores")
 
+def build_colaboradores_subnav(active: str | None):
+    return [
+        {
+            "text": "Registro",
+            "href": url_for("colaboradores.registro"),
+            "active": active == "registro",
+        },
+        {
+            "text": "Cadastro",
+            "href": url_for("colaboradores.cadastro"),
+            "active": active == "cadastro",
+        },
+    ]
 
 # ---------------------------------------------------------------------
 # Funções auxiliares
@@ -128,7 +141,10 @@ def parse_date(value: str):
 # ---------------------------------------------------------------------
 @bp.route("/")
 def index():
-    return render_template("colaboradores/index.html")
+    return render_template(
+        "colaboradores/index.html",
+        subnav_links=build_colaboradores_subnav(None),
+    )
 
 
 # ---------------------------------------------------------------------
@@ -201,6 +217,7 @@ def registro():
         maos_obra=maos_obra,
         situacoes_folha=situacoes_folha,
         colaboradores=colaboradores,
+        subnav_links=build_colaboradores_subnav("registro"),
     )
 
 
@@ -353,6 +370,7 @@ def cadastro():
         funcoes=funcoes,
         maos_obra=maos_obra,
         situacoes_folha=situacoes_folha,
+        subnav_links=build_colaboradores_subnav("cadastro"),
     )
 
 
