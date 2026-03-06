@@ -2,6 +2,7 @@ from flask import Blueprint, render_template, url_for, request, redirect
 from sqlalchemy import text
 from db import get_engine
 from datetime import date
+import json
 
 bp = Blueprint("equipamentos", __name__)
 
@@ -283,6 +284,52 @@ def part_create():
         return redirect(url_for("equipamentos.partdiaria", msg="Lançamento salvo."))
     except Exception as e:
         return redirect(url_for("equipamentos.partdiaria", msg=f"Erro ao salvar: {e}"))
+        
+@bp.post("/partdiaria/create_lote")
+def part_create_lote():
+    raw = request.form.get("lancamentos_json", "").strip()
+
+    if not raw:
+        return redirect(url_for("equipamentos.partdiaria", msg="Nenhum lançamento foi enviado."))
+
+    try:
+        itens = json.loads(raw)
+    except Exception:
+        return redirect(url_for("equipamentos.partdiaria", msg="JSON de lançamentos inválido."))
+
+    if not isinstance(itens, list) or not itens:
+        return redirect(url_for("equipamentos.partdiaria", msg="Nenhum lançamento válido foi informado."))
+
+    try:
+        with get_engine().begin() as conn:
+            for item in itens:
+                data = (item.get("data") or "").strip()
+                maquina_id = item.get("maquina_id")
+                atividade_id = item.get("atividade_id")
+                hora_inicio = (item.get("hora_inicio") or "").strip()
+                hora_fim = (item.get("hora_fim") or "").strip()
+                obs = (item.get("obs") or "").strip()
+
+                if not data or not maquina_id or not atividade_id or not hora_inicio or not hora_fim:
+                    continue
+
+                conn.execute(text("""
+                    INSERT INTO parte_diaria
+                        (data, maquina_id, atividade_id, hora_inicio, hora_fim, observacao)
+                    VALUES
+                        (:d, :m, :a, :hi, :hf, :obs)
+                """), {
+                    "d": data,
+                    "m": maquina_id,
+                    "a": atividade_id,
+                    "hi": hora_inicio,
+                    "hf": hora_fim,
+                    "obs": obs
+                })
+
+        return redirect(url_for("equipamentos.partdiaria", msg="Lançamentos salvos com sucesso."))
+    except Exception as e:
+        return redirect(url_for("equipamentos.partdiaria", msg=f"Erro ao salvar lote: {e}"))
 
 @bp.post("/partdiaria/item/update")
 def part_update():
