@@ -379,6 +379,21 @@
     document.getElementById("pd_obs").value = "";
   });
   
+  document.getElementById("btn-limpar-lista").addEventListener("click", function () {
+	  if (pdLancamentos.length === 0) {
+		alert("A lista já está vazia.");
+		return;
+	  }
+
+	  const confirmar = confirm("Deseja limpar todos os lançamentos pendentes?");
+	  if (!confirmar) {
+		return;
+	  }
+
+	  pdLancamentos.length = 0;
+	  pdRenderTabela();
+	});
+  
   document.getElementById("btn-salvar-tudo").addEventListener("click", function () {
   if (pdLancamentos.length === 0) {
     alert("Adicione pelo menos um lançamento antes de salvar.");
