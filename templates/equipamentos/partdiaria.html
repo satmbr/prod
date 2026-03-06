@@ -380,6 +380,19 @@
 	  return;
 	}
 	
+	const conflitoHorario = pdLancamentos.some(function (l) {
+	  if (l.data !== data || l.maquina_id !== maquinaId) {
+		return false;
+	  }
+
+	  return horaInicio < l.hora_fim && horaFim > l.hora_inicio;
+	});
+
+	if (conflitoHorario) {
+	  alert("Existe conflito de horário para essa máquina nessa mesma data.");
+	  return;
+	}	
+	
     const item = {
       data: data,
       maquina_id: maquinaId,
