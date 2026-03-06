@@ -391,8 +391,15 @@
       obs: obs
     };
 
-    pdLancamentos.push(item);
-    pdRenderTabela();
+	pdLancamentos.push(item);
+
+	pdLancamentos.sort(function (a, b) {
+	  const chaveA = `${a.data}|${a.maquina_id}|${a.hora_inicio}`;
+	  const chaveB = `${b.data}|${b.maquina_id}|${b.hora_inicio}`;
+	  return chaveA.localeCompare(chaveB);
+	});
+
+	pdRenderTabela();
 
     document.getElementById("pd_atividade_id").value = "";
 	document.getElementById("pd_hora_inicio").value = horaFim;
