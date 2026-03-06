@@ -308,9 +308,10 @@
           <td>${item.hora_inicio}</td>
           <td>${item.hora_fim}</td>
           <td>${item.obs || ""}</td>
-          <td>
-            <button type="button" class="btn" onclick="pdRemoverLancamento(${index})">Remover</button>
-          </td>
+          <td style="display:flex; gap:6px;">
+			 <button type="button" class="btn" onclick="pdEditarLancamento(${index})">Editar</button>
+			 <button type="button" class="btn" onclick="pdRemoverLancamento(${index})">Remover</button>
+		  </td>
         `;
         body.appendChild(tr);
       });
@@ -318,7 +319,22 @@
 
     hidden.value = JSON.stringify(pdLancamentos);
   }
+  
+  function pdEditarLancamento(index) {
+	  const item = pdLancamentos[index];
+	  if (!item) return;
 
+	  document.getElementById("pd_data").value = item.data;
+	  document.getElementById("pd_maquina_id").value = item.maquina_id;
+	  document.getElementById("pd_atividade_id").value = item.atividade_id;
+	  document.getElementById("pd_hora_inicio").value = item.hora_inicio;
+	  document.getElementById("pd_hora_fim").value = item.hora_fim;
+	  document.getElementById("pd_obs").value = item.obs || "";
+
+	  pdLancamentos.splice(index, 1);
+	  pdRenderTabela();
+  }
+  
   function pdRemoverLancamento(index) {
     pdLancamentos.splice(index, 1);
     pdRenderTabela();
