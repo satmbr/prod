@@ -1,700 +1,1056 @@
-{# templates/operacao/producao.html #}
 {% extends "base.html" %}
-
-{% block title %}Produção PRUMAT{% endblock %}
+{% block title %}Operação · Produção{% endblock %}
 
 {% block content %}
+<div class="page-wrap">
 
-<style>
-    body {
-        font-size: 0.78rem;
+  <style>
+    .prod-toolbar{
+      display:grid;
+      grid-template-columns: 1fr 1fr auto;
+      gap:10px;
+      align-items:end;
     }
 
-    select, input, button {
-        font-size: 0.7rem;
-        padding: 0.25rem 0.45rem;
+    .prod-toolbar .field > span{
+      display:block;
+      margin-bottom:4px;
+      font-weight:600;
+      color:#394150;
     }
 
-    .table th, .table td {
-        padding: 0.1rem 0.3rem;
-        font-size: 0.65rem;
-        white-space: nowrap;
+    .prod-toolbar .field input,
+    .prod-toolbar .field select{
+      width:100%;
     }
 
-    .table.table {
-        width: 100%;
-        margin-left: 0;
+    .prod-actions{
+      display:flex;
+      gap:6px;
+      align-items:end;
+      flex-wrap:wrap;
     }
 
-    .tabela-fixa {
-        width: 100%;
-        max-width: 1100px;
-        margin: 0 auto;
+    .prod-hero{
+      display:grid;
+      grid-template-columns: 1.3fr .9fr;
+      gap:10px;
+      align-items:stretch;
     }
 
-    canvas#graficoProducao,
-    canvas#graficoPartDiaria {
-        height: 300px !important;
-        max-height: 320px;
+    .hero-card{
+      border:1px solid var(--pru-border);
+      border-radius:8px;
+      background:linear-gradient(180deg, #fbfdff 0%, #f5f9fc 100%);
+      padding:10px;
+      min-height:72px;
+      display:flex;
+      flex-direction:column;
+      justify-content:center;
     }
 
-    .gauge-container {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 24px;
-        justify-content: center;
-        margin-top: 40px;
+    .hero-title{
+      font-size:10px;
+      font-weight:700;
+      letter-spacing:.05em;
+      color:#6b7a8d;
+      text-transform:uppercase;
+      margin-bottom:4px;
     }
 
-    .gauge-item {
-        position: relative;
-        width: 140px;
-        height: 140px;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
+    .hero-value{
+      font-size:14px;
+      font-weight:700;
+      color:var(--pru-blue);
+      line-height:1.15;
     }
 
-    .gauge-item canvas {
-        width: 100% !important;
-        height: 100% !important;
+    .hero-sub{
+      color:#5d6b7c;
+      margin-top:3px;
+      font-size:10px;
     }
 
-    .gauge-item img {
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        width: 36px;
-        height: 36px;
-        transform: translate(-50%, -50%);
-        z-index: 5;
-        pointer-events: none;
+    .layout-tabela-grafico{
+      display:grid;
+      grid-template-columns: minmax(420px, 1.05fr) minmax(320px, .95fr);
+      gap:10px;
+      align-items:stretch;
     }
 
-    .gauge-label {
-        text-align: center;
-        font-weight: bold;
-        font-size: 0.75rem;
-        margin-top: 6px;
+    .col-tabela,
+    .col-grafico{
+      min-width:0;
     }
 
-    .linha-destaque {
-        background-color: #E2EFDA !important;
+    .chart-card{
+      border:1px solid var(--pru-border);
+      border-radius:8px;
+      background:#fff;
+      padding:8px;
+      height:100%;
+      min-height:300px;
+      box-shadow:var(--pru-shadow);
     }
 
-    /* Cabeçalho ocupando 100% da largura útil (já considerando o scale do body) */
-	.header-full {
-		width: 100%;
-		position: static;      /* não empurra mais pra fora */
-		margin: 0;             /* sem margens negativas */
-		padding: 0;
-	}
-
-    .layout-tabela-grafico {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 16px;
-        align-items: stretch;
-    }
-    .layout-tabela-grafico .col-tabela {
-        flex: 0 0 55%;
-        min-width: 320px;
-    }
-    .layout-tabela-grafico .col-grafico {
-        flex: 1;
-        min-width: 320px;
-        min-height: 320px;
+    .chart-card.chart-sm{
+      min-height:260px;
     }
 
-    /* Em telas pequenas empilha (mobile) */
-    @media (max-width: 900px) {
-        .layout-tabela-grafico {
-            flex-direction: column;
-        }
-        .layout-tabela-grafico .col-tabela,
-        .layout-tabela-grafico .col-grafico {
-            flex: 1 1 100%;
-        }
+    .chart-card.chart-lg{
+      min-height:340px;
     }
-</style>
 
-<!-- Chart.js e plugin -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+    .chart-title{
+      font-size:11px;
+      font-weight:700;
+      color:var(--pru-blue);
+      margin-bottom:8px;
+    }
 
-<!-- Cabeçalho contrato full-width -->
-<div class="header-full">
-    <div class="table-responsive mb-3">
-        <table class="table table-bordered align-middle text-center w-100 m-0"
-               style="border-color: #007472;">
-            <tr>
-                <td rowspan="2" style="width: 15%;">
-                    <img src="{{ url_for('static', filename='vale-logo.png') }}"
-                         alt="Logo Vale" style="height: 40px;">
-                </td>
-                <td><strong>CONTRATO</strong></td>
-                <td>5900124188</td>
-                <td><strong>EMPRESA</strong></td>
-                <td>PRUMAT</td>
-                <td rowspan="2" style="width: 15%;">
-                    <img src="{{ url_for('static', filename='prumat-logo.png') }}"
-                         alt="Logo PRUMAT" style="height: 40px;">
-                </td>
-            </tr>
-            <tr>
-                <td><strong>ESCOPO</strong></td>
-                <td colspan="3">Operação e Manutenção Renovadora P-190 EFVM</td>
-            </tr>
-        </table>
-    </div>
-</div>
+    .chart-wrap{
+      position:relative;
+      width:100%;
+      height:calc(100% - 20px);
+      min-height:240px;
+    }
 
-<div class="container p-1">
+    .chart-wrap.chart-wrap-lg{
+      min-height:290px;
+    }
 
-    <!-- Filtros -->
-    <form method="GET" class="row g-2 mb-3">
-        <div class="col-md-4"><br>
-            <label for="eh_id" class="form-label fw-semibold">Selecionar EH:</label>&nbsp;
-            <select name="eh_id" id="eh_id" class="form-select form-select-sm"
-                    onchange="this.form.submit()">
-                <option value="">-- selecione --</option>
-                {% for eh in ehs %}
-                    <option value="{{ eh.id }}"
-                        {% if eh_id is not none and eh_id == eh.id %}selected{% endif %}>
-                        {{ eh.nome }}
-                    </option>
-                {% endfor %}
+    .table-card{
+      border:1px solid var(--pru-border);
+      border-radius:8px;
+      background:#fff;
+      padding:8px;
+      box-shadow:var(--pru-shadow);
+      height:100%;
+    }
+
+    .table-card-title{
+      font-size:11px;
+      font-weight:700;
+      color:var(--pru-blue);
+      margin-bottom:8px;
+    }
+
+    .linha-destaque{
+      background-color:#E2EFDA !important;
+    }
+
+    .prod-table th,
+    .prod-table td{
+      text-align:center;
+      white-space:nowrap;
+    }
+
+    .prod-table td.text-left,
+    .prod-table th.text-left{
+      text-align:left;
+    }
+
+    .summary-grid{
+      display:grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap:10px;
+    }
+
+    .summary-item{
+      border:1px solid var(--pru-border);
+      border-radius:8px;
+      background:#fff;
+      padding:8px;
+      box-shadow:var(--pru-shadow);
+    }
+
+    .summary-item .k{
+      font-size:10px;
+      color:#6b7a8d;
+      text-transform:uppercase;
+      letter-spacing:.04em;
+      font-weight:700;
+      margin-bottom:4px;
+    }
+
+    .summary-item .v{
+      font-size:14px;
+      color:var(--pru-blue);
+      font-weight:700;
+    }
+
+    .gauge-container{
+      display:grid;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap:12px;
+      margin-top:2px;
+    }
+
+    .gauge-item{
+      position:relative;
+      border:1px solid var(--pru-border);
+      border-radius:8px;
+      background:#fff;
+      padding:10px 8px 8px;
+      box-shadow:var(--pru-shadow);
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      min-height:180px;
+    }
+
+    .gauge-item .gauge-canvas-wrap{
+      width:100px;
+      height:100px;
+      position:relative;
+      margin-bottom:8px;
+    }
+
+    .gauge-item canvas{
+      width:100% !important;
+      height:100% !important;
+    }
+
+    .gauge-item img{
+      position:absolute;
+      top:50%;
+      left:50%;
+      width:26px;
+      height:26px;
+      transform:translate(-50%, -50%);
+      z-index:5;
+      pointer-events:none;
+    }
+
+    .gauge-label{
+      text-align:center;
+      font-weight:700;
+      font-size:10px;
+      color:var(--pru-blue);
+      line-height:1.2;
+    }
+
+    .duo-charts{
+      display:grid;
+      grid-template-columns: 1.15fr .85fr;
+      gap:10px;
+      align-items:stretch;
+    }
+
+    .brand-strip{
+      display:grid;
+      grid-template-columns: auto 1fr auto;
+      gap:10px;
+      align-items:center;
+      border:1px solid var(--pru-border);
+      border-radius:8px;
+      background:linear-gradient(180deg, #fff 0%, #f8fbff 100%);
+      padding:8px 10px;
+      box-shadow:var(--pru-shadow);
+    }
+
+    .brand-strip img{
+      height:22px;
+      width:auto;
+      object-fit:contain;
+      display:block;
+    }
+
+    .brand-strip-center{
+      min-width:0;
+    }
+
+    .brand-strip-top{
+      display:flex;
+      gap:8px;
+      align-items:center;
+      flex-wrap:wrap;
+      margin-bottom:3px;
+    }
+
+    .brand-badge{
+      display:inline-flex;
+      align-items:center;
+      min-height:20px;
+      padding:2px 7px;
+      border-radius:999px;
+      background:#edf3f8;
+      border:1px solid var(--pru-border);
+      color:var(--pru-blue);
+      font-size:9px;
+      font-weight:700;
+      text-transform:uppercase;
+      letter-spacing:.04em;
+    }
+
+    .brand-scope{
+      font-size:11px;
+      color:#445366;
+      line-height:1.2;
+      font-weight:600;
+    }
+
+    @media (max-width: 1100px){
+      .prod-hero,
+      .layout-tabela-grafico,
+      .duo-charts,
+      .summary-grid{
+        grid-template-columns:1fr;
+      }
+    }
+
+    @media (max-width: 780px){
+      .prod-toolbar{
+        grid-template-columns:1fr;
+      }
+
+      .prod-actions{
+        justify-content:stretch;
+      }
+
+      .prod-actions .btn{
+        flex:1 1 auto;
+      }
+
+      .brand-strip{
+        grid-template-columns:1fr;
+        justify-items:start;
+      }
+    }
+  </style>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+
+  <section class="zone">
+    <header class="zone-head" data-target="#op-prod-filtros">
+      <div class="zone-left">
+        <span class="zone-icon">📈</span>
+        <div class="zone-title">Produção · Acompanhamento Geral</div>
+      </div>
+      <div class="zone-actions">
+        <button type="button" class="icon-btn" aria-label="Seção de filtros">
+          <svg viewBox="0 0 24 24" width="16" height="16">
+            <path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/>
+          </svg>
+        </button>
+        <button type="button" class="icon-btn caret">▾</button>
+      </div>
+    </header>
+
+    <div class="zone-body" id="op-prod-filtros">
+      <div class="brand-strip" style="margin-bottom:10px;">
+        <img src="{{ url_for('static', filename='vale-logo.png') }}" alt="Vale">
+        <div class="brand-strip-center">
+          <div class="brand-strip-top">
+            <span class="brand-badge">Contrato 5900124188</span>
+            <span class="brand-badge">Empresa PRUMAT</span>
+          </div>
+          <div class="brand-scope">Operação e manutenção da renovadora P-190 · EFVM</div>
+        </div>
+        <img src="{{ url_for('static', filename='logo-prumat.png') }}" alt="PRUMAT">
+      </div>
+
+      <form method="GET">
+        <div class="prod-toolbar">
+          <label class="field">
+            <span>EH</span>
+            <select name="eh_id" id="eh_id">
+              <option value="">-- selecione --</option>
+              {% for eh in ehs %}
+                <option value="{{ eh.id }}" {% if eh_id is not none and eh_id == eh.id %}selected{% endif %}>
+                  {{ eh.nome }}
+                </option>
+              {% endfor %}
             </select>
-            <label for="data_partdiaria" class="form-label fw-semibold">Selecionar Data:</label>&nbsp;
+          </label>
+
+          <label class="field">
+            <span>Data de referência</span>
             <input type="date"
                    name="data_partdiaria"
                    id="data_partdiaria"
-                   class="form-control form-control-sm"
-                   value="{{ data_partdiaria }}"
-                   onchange="this.form.submit()">
+                   value="{{ data_partdiaria }}">
+          </label>
+
+          <div class="prod-actions">
+            <button class="btn primary" type="submit">🔄 Atualizar</button>
+          </div>
         </div>
-    </form>
-	
-	<!-- Tabela Renovação + Gráfico (lado a lado) -->
-	<div class="layout-tabela-grafico">
-		<div class="col-tabela">
-			<div class="table-responsive">
-				<table class="table table-bordered table-striped align-middle text-center">
-					<thead class="table-dark">
-						<tr>
-							<th>DATA</th>
-							<th>PREVISTO<br>DIA</th>
-							<th>PREVISTO<br>TOTAL</th>
-							<th>REALIZADO<br>DIA</th>
-							<th>REALIZADO<br>TOTAL</th>
-							<th>DIF.</th>
-							<th>ATRASO</th>
-						</tr>
-					</thead>
-					<tbody>
-						{% for d in dados %}
-							{% set d_data = d.data|string %}
-							{% set filtro_data = data_partdiaria|string %}
-							{% set destaque = 'background-color: #E2EFDA;' if d_data == filtro_data and d_data != '' else '' %}
-							<tr>
-								<td style="{{ destaque }}">
-									{{ d.data.split('-')[2] }}-{{ d.data.split('-')[1] }}-{{ d.data.split('-')[0] }}
-								</td>
-								<td style="{{ destaque }}">{{ d.previsto_dia }}</td>
-								<td style="{{ destaque }}">{{ d.previsto_total }}</td>
-								<td style="{{ destaque }}">{{ d.realizado_dia }}</td>
-								<td style="{{ destaque }}">{{ d.realizado_total }}</td>
-								<td style="{{ destaque }}">{{ d.diferenca }}</td>
-								<td style="{{ destaque }}">{{ d.atraso }} /dia</td>
-							</tr>
-						{% endfor %}
-						{% if not dados %}
-							<tr><td colspan="7">Nenhum registro encontrado para esta EH.</td></tr>
-						{% endif %}
-					</tbody>
-				</table>
-			</div>
-		</div>
+      </form>
 
-		<div class="col-grafico">
-			<canvas id="graficoProducao"></canvas>
-		</div>
-	</div>
+      <div class="prod-hero" style="margin-top:10px;">
+        <div class="hero-card">
+          <div class="hero-title">Escopo</div>
+          <div class="hero-value">Renovação P190 · Produção e Parte Diária</div>
+          <div class="hero-sub">EH selecionada: {% for eh in ehs %}{% if eh_id == eh.id %}{{ eh.nome }}{% endif %}{% endfor %}</div>
+        </div>
 
-    <!-- Faixa de separação -->
-    <hr class="my-4">
+        <div class="summary-grid">
+          <div class="summary-item">
+            <div class="k">Datas na série</div>
+            <div class="v">{{ dados|length }}</div>
+          </div>
+          <div class="summary-item">
+            <div class="k">Eventos do dia</div>
+            <div class="v">{{ dados_partdiaria|length }}</div>
+          </div>
+          <div class="summary-item">
+            <div class="k">Frentes resumidas</div>
+            <div class="v">{{ dados_resumo_frentes|length }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
 
-	    <!-- Faixa de separação -->
-    <hr class="my-4">
+  <section class="zone">
+    <header class="zone-head" data-target="#op-renovacao">
+      <div class="zone-left">
+        <span class="zone-icon">🚆</span>
+        <div class="zone-title">01 · Renovação</div>
+      </div>
+      <div class="zone-actions">
+        <button type="button" class="icon-btn" aria-label="Seção renovação">
+          <svg viewBox="0 0 24 24" width="16" height="16">
+            <path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/>
+          </svg>
+        </button>
+        <button type="button" class="icon-btn caret">▾</button>
+      </div>
+    </header>
 
-    <!-- Resumo Parte Diária (TABELA + GRÁFICO LADO A LADO) -->
-    <div class="layout-tabela-grafico">
+    <div class="zone-body" id="op-renovacao">
+      <div class="layout-tabela-grafico">
         <div class="col-tabela">
-            <div class="table-responsive md-3">
-                <table class="table table-bordered table-striped align-middle text-center">
-                    <thead class="table-dark">
-                        <tr>
-                            <th>EVENTO</th>
-                            <th>INÍCIO</th>
-                            <th>FIM</th>
-                            <th>DURAÇÃO</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for item in dados_partdiaria %}
-                        <tr>
-                            <td>{{ item.atividade }}</td>
-                            <td>{{ item.hora_inicio }}</td>
-                            <td>{{ item.hora_fim }}</td>
-                            <td>
-                                {{ item.duracao|int // 60 }}:
-                                {% if item.duracao|int % 60 < 10 %}0{% endif %}
-                                {{ item.duracao|int % 60 }}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                        {% if not dados_partdiaria %}
-                        <tr>
-                            <td colspan="4">
-                                Nenhum registro para a data selecionada.
-                            </td>
-                        </tr>
-                        {% endif %}
-                    </tbody>
-                </table>
+          <div class="table-card">
+            <div class="table-card-title">Planejado x realizado</div>
+            <div class="table-wrap">
+              <table class="table prod-table">
+                <thead>
+                  <tr>
+                    <th>Data</th>
+                    <th>Prev. dia</th>
+                    <th>Prev. total</th>
+                    <th>Real. dia</th>
+                    <th>Real. total</th>
+                    <th>Dif.</th>
+                    <th>Atraso</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for d in dados %}
+                    {% set d_data = d.data|string %}
+                    {% set filtro_data = data_partdiaria|string %}
+                    {% set destaque = 'linha-destaque' if d_data == filtro_data and d_data != '' else '' %}
+                    <tr class="{{ destaque }}">
+                      <td>
+                        {{ d.data.split('-')[2] }}-{{ d.data.split('-')[1] }}-{{ d.data.split('-')[0] }}
+                      </td>
+                      <td>{{ d.previsto_dia }}</td>
+                      <td>{{ d.previsto_total }}</td>
+                      <td>{{ d.realizado_dia }}</td>
+                      <td>{{ d.realizado_total }}</td>
+                      <td>{{ d.diferenca }}</td>
+                      <td>{{ d.atraso }} /dia</td>
+                    </tr>
+                  {% endfor %}
+                  {% if not dados %}
+                    <tr><td colspan="7">Nenhum registro encontrado para esta EH.</td></tr>
+                  {% endif %}
+                </tbody>
+              </table>
             </div>
+          </div>
         </div>
 
         <div class="col-grafico">
-            <canvas id="graficoPartDiaria"></canvas>
+          <div class="chart-card chart-lg">
+            <div class="chart-title">Gráfico de acompanhamento</div>
+            <div class="chart-wrap chart-wrap-lg">
+              <canvas id="graficoProducao"></canvas>
+            </div>
+          </div>
         </div>
+      </div>
     </div>
+  </section>
 
-    <!-- Faixa de separação -->
-    <hr class="my-4">
+  <section class="zone">
+    <header class="zone-head" data-target="#op-partdiaria">
+      <div class="zone-left">
+        <span class="zone-icon">🕒</span>
+        <div class="zone-title">Parte Diária · P190-66001</div>
+      </div>
+      <div class="zone-actions">
+        <button type="button" class="icon-btn" aria-label="Seção parte diária">
+          <svg viewBox="0 0 24 24" width="16" height="16">
+            <path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/>
+          </svg>
+        </button>
+        <button type="button" class="icon-btn caret">▾</button>
+      </div>
+    </header>
 
-    <!-- Tabela Consolidada - Frentes Diversas -->
-    <div class="table-responsive tabela-frentes">
-		<table class="table table-bordered table-striped text-center align-middle">
-            <thead class="table-dark">
-                <tr>
-                    <th rowspan="2">DATA</th>
-                    <th colspan="4">CARREGAMENTO E DESCARREGAMENTO</th>
-                    <th colspan="3">REMOÇÃO GRAMPOS</th>
-                    <th colspan="3">REMOÇÃO GALOCHAS</th>
-                    <th colspan="2">PREGAÇÃO</th>
-                    <th colspan="2">SEGREGAÇÃO</th>
-                </tr>
-                <tr>
-                    <th>CARREGADO</th>
-                    <th>SALDO</th>
-                    <th>ACUMULADO</th>
-                    <th>DESC. VELHO / NOVO</th>
-                    <th>REMOÇÃO</th>
-                    <th>FRENTE ABERTA</th>
-                    <th>ACUMULADO</th>
-                    <th>REMOÇÃO</th>
-                    <th>FRENTE ABERTA</th>
-                    <th>ACUMULADO</th>
-                    <th>APLICADO</th>
-                    <th>ABERTO</th>
-                    <th>DMTs RUINS</th>
-                    <th>DMTs BONS</th>
-                </tr>
+    <div class="zone-body" id="op-partdiaria">
+      <div class="layout-tabela-grafico">
+        <div class="col-tabela">
+          <div class="table-card">
+            <div class="table-card-title">Eventos do dia</div>
+            <div class="table-wrap">
+              <table class="table prod-table">
+                <thead>
+                  <tr>
+                    <th class="text-left">Evento</th>
+                    <th>Início</th>
+                    <th>Fim</th>
+                    <th>Duração</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for item in dados_partdiaria %}
+                    <tr>
+                      <td class="text-left">{{ item.atividade }}</td>
+                      <td>{{ item.hora_inicio }}</td>
+                      <td>{{ item.hora_fim }}</td>
+                      <td>
+                        {{ item.duracao|int // 60 }}:{% if item.duracao|int % 60 < 10 %}0{% endif %}{{ item.duracao|int % 60 }}
+                      </td>
+                    </tr>
+                  {% endfor %}
+                  {% if not dados_partdiaria %}
+                    <tr>
+                      <td colspan="4">Nenhum registro para a data selecionada.</td>
+                    </tr>
+                  {% endif %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-grafico">
+          <div class="chart-card chart-lg">
+            <div class="chart-title">Tempo por atividade</div>
+            <div class="chart-wrap chart-wrap-lg">
+              <canvas id="graficoPartDiaria"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="zone">
+    <header class="zone-head" data-target="#op-frentes">
+      <div class="zone-left">
+        <span class="zone-icon">📦</span>
+        <div class="zone-title">Frentes Diversas · Resumo Consolidado</div>
+      </div>
+      <div class="zone-actions">
+        <button type="button" class="icon-btn" aria-label="Seção frentes">
+          <svg viewBox="0 0 24 24" width="16" height="16">
+            <path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/>
+          </svg>
+        </button>
+        <button type="button" class="icon-btn caret">▾</button>
+      </div>
+    </header>
+
+    <div class="zone-body" id="op-frentes">
+      <div class="table-card">
+        <div class="table-card-title">Carregamento, remoções, pregação e segregação</div>
+        <div class="table-wrap">
+          <table class="table prod-table">
+            <thead>
+              <tr>
+                <th rowspan="2">Data</th>
+                <th colspan="4">Carregamento e descarregamento</th>
+                <th colspan="3">Remoção grampos</th>
+                <th colspan="3">Remoção galochas</th>
+                <th colspan="2">Pregação</th>
+                <th colspan="2">Segregação</th>
+              </tr>
+              <tr>
+                <th>Carregado</th>
+                <th>Saldo</th>
+                <th>Acumulado</th>
+                <th>Desc. velho / novo</th>
+                <th>Remoção</th>
+                <th>Frente aberta</th>
+                <th>Acumulado</th>
+                <th>Remoção</th>
+                <th>Frente aberta</th>
+                <th>Acumulado</th>
+                <th>Aplicado</th>
+                <th>Aberto</th>
+                <th>DMTs ruins</th>
+                <th>DMTs bons</th>
+              </tr>
             </thead>
             <tbody>
-                {% for linha in dados_resumo_frentes %}
-                    {% set linha_data = linha.data|string %}
-                    {% set filtro_data = data_partdiaria|string %}
-                    {% set destaque = 'background-color: #E2EFDA;' if linha_data == filtro_data and linha_data != '' else '' %}
-                    <tr>
-                        <td style="{{ destaque }}">
-							{# Se vier como string (caso dos outros dados) #}
-							{% if linha.data is string %}
-								{{ linha.data.split('-')[2] }}-{{ linha.data.split('-')[1] }}-{{ linha.data.split('-')[0] }}
-							{# Se vier como datetime.date (caso do resumo de frentes) #}
-							{% else %}
-								{{ linha.data.strftime('%d-%m-%Y') }}
-							{% endif %}
-						</td>
-                        <td style="{{ destaque }}">{{ linha.carregado }}</td>
-                        <td style="{{ destaque }}">{{ linha.saldo }}</td>
-                        <td style="{{ destaque }}">{{ linha.acumulado_carregado }}</td>
-                        <td style="{{ destaque }}">{{ linha.desc_velho }} / {{ linha.desc_novo }}</td>
-                        <td style="{{ destaque }}">{{ linha.rem_grampos }}</td>
-                        <td style="{{ destaque }}">{{ linha.fa_grampos }}</td>
-                        <td style="{{ destaque }}">{{ linha.acum_rem_grampos }}</td>
-                        <td style="{{ destaque }}">{{ linha.rem_galochas }}</td>
-                        <td style="{{ destaque }}">{{ linha.fa_galochas }}</td>
-                        <td style="{{ destaque }}">{{ linha.acum_rem_galochas }}</td>
-                        <td style="{{ destaque }}">{{ linha.aplicado }}</td>
-                        <td style="{{ destaque }}">{{ linha.aberto }}</td>
-                        <td style="{{ destaque }}">{{ linha.seg_ruins }}</td>
-                        <td style="{{ destaque }}">{{ linha.seg_bons }}</td>
-                    </tr>
-                {% endfor %}
-                {% if not dados_resumo_frentes %}
-                    <tr><td colspan="15">Nenhum dado disponível para as frentes selecionadas.</td></tr>
-                {% endif %}
+              {% for linha in dados_resumo_frentes %}
+                {% set linha_data = linha.data|string %}
+                {% set filtro_data = data_partdiaria|string %}
+                {% set destaque = 'linha-destaque' if linha_data == filtro_data and linha_data != '' else '' %}
+                <tr class="{{ destaque }}">
+                  <td>
+                    {% if linha.data is string %}
+                      {{ linha.data.split('-')[2] }}-{{ linha.data.split('-')[1] }}-{{ linha.data.split('-')[0] }}
+                    {% else %}
+                      {{ linha.data.strftime('%d-%m-%Y') }}
+                    {% endif %}
+                  </td>
+                  <td>{{ linha.carregado }}</td>
+                  <td>{{ linha.saldo }}</td>
+                  <td>{{ linha.acumulado_carregado }}</td>
+                  <td>{{ linha.desc_velho }} / {{ linha.desc_novo }}</td>
+                  <td>{{ linha.rem_grampos }}</td>
+                  <td>{{ linha.fa_grampos }}</td>
+                  <td>{{ linha.acum_rem_grampos }}</td>
+                  <td>{{ linha.rem_galochas }}</td>
+                  <td>{{ linha.fa_galochas }}</td>
+                  <td>{{ linha.acum_rem_galochas }}</td>
+                  <td>{{ linha.aplicado }}</td>
+                  <td>{{ linha.aberto }}</td>
+                  <td>{{ linha.seg_ruins }}</td>
+                  <td>{{ linha.seg_bons }}</td>
+                </tr>
+              {% endfor %}
+              {% if not dados_resumo_frentes %}
+                <tr><td colspan="15">Nenhum dado disponível para as frentes selecionadas.</td></tr>
+              {% endif %}
             </tbody>
-        </table>
-    </div>
+          </table>
+        </div>
+      </div>
 
-    <!-- Faixa de separação para os gráficos da frente 02 -->
-    <hr class="my-4">
-
-    <!-- Gráficos Frente 02: Barras + Bateria -->
-    <div class="row">
-        <div class="col-md-7">
+      <div class="duo-charts" style="margin-top:10px;">
+        <div class="chart-card chart-sm">
+          <div class="chart-title">02 · Carregamento novo</div>
+          <div class="chart-wrap">
             <canvas id="graficoBarraCarregamento"></canvas>
+          </div>
         </div>
-        <div class="col-md-5">
+
+        <div class="chart-card chart-sm">
+          <div class="chart-title">Bateria de avanço</div>
+          <div class="chart-wrap">
             <canvas id="graficoBateriaCarregamento"></canvas>
+          </div>
         </div>
+      </div>
     </div>
+  </section>
 
-    <!-- Faixa de separação final -->
-    <hr class="my-4">
+  {% if percentuais_graficos is defined and percentuais_graficos %}
+  <section class="zone">
+    <header class="zone-head" data-target="#op-gauges">
+      <div class="zone-left">
+        <span class="zone-icon">🎯</span>
+        <div class="zone-title">Percentuais por Frente</div>
+      </div>
+      <div class="zone-actions">
+        <button type="button" class="icon-btn" aria-label="Seção percentuais">
+          <svg viewBox="0 0 24 24" width="16" height="16">
+            <path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/>
+          </svg>
+        </button>
+        <button type="button" class="icon-btn caret">▾</button>
+      </div>
+    </header>
 
-    <!-- Gráficos de Percentuais por Frente (Gauges) -->
-    {% if percentuais_graficos is defined %}
-    <div class="gauge-container">
+    <div class="zone-body" id="op-gauges">
+      <div class="gauge-container">
         {% for frente, item in percentuais_graficos.items() %}
-        <div class="gauge-item">
-            <canvas id="gauge_{{ loop.index }}"></canvas>
-            <img src="{{ url_for('static', filename='icones/' + item.icone) }}" alt="ícone">
+          <div class="gauge-item">
+            <div class="gauge-canvas-wrap">
+              <canvas id="gauge_{{ loop.index }}"></canvas>
+              <img src="{{ url_for('static', filename='icones/' + item.icone) }}" alt="ícone">
+            </div>
             <div class="gauge-label">{{ item.titulo }}</div>
-        </div>
+          </div>
         {% endfor %}
+      </div>
     </div>
-    {% endif %}
+  </section>
+  {% endif %}
 
-</div> <!-- /.container -->
+</div>
 
-<!-- Scripts dos gráficos -->
 <script>
-    // === Gráfico de Produção (Renovação) ===
-    const dadosRen = {{ dados | default([], true) | tojson }};
-    const labelsRen = dadosRen.map(d => d.data);
-    const previstoDia = dadosRen.map(d => d.previsto_dia);
-    const previstoTotal = dadosRen.map(d => d.previsto_total);
-    const realizadoDia = dadosRen.map(d => d.realizado_dia);
-    const realizadoTotal = dadosRen.map(d => d.realizado_total);
+  const zoneStorageKey = "operacao_producao_zone_state";
 
-    new Chart(document.getElementById('graficoProducao').getContext('2d'), {
-        type: 'bar',
-        data: {
-            labels: labelsRen,
-            datasets: [
-                {
-                    label: 'PREVISTO DIA',
-                    data: previstoDia,
-                    backgroundColor: 'rgba(0, 123, 255, 0.5)',
-                    borderColor: 'rgba(0, 123, 255, 1)',
-                    borderWidth: 1,
-                    yAxisID: 'y'
-                },
-                {
-                    label: 'REALIZADO DIA',
-                    data: realizadoDia,
-                    backgroundColor: 'rgba(40, 167, 69, 0.5)',
-                    borderColor: 'rgba(40, 167, 69, 1)',
-                    borderWidth: 1,
-                    yAxisID: 'y'
-                },
-                {
-                    label: 'PREVISTO TOTAL',
-                    data: previstoTotal,
-                    type: 'line',
-                    borderColor: 'orange',
-                    backgroundColor: 'transparent',
-                    borderWidth: 2,
-                    pointRadius: 3,
-                    yAxisID: 'y1'
-                },
-                {
-                    label: 'REALIZADO TOTAL',
-                    data: realizadoTotal,
-                    type: 'line',
-                    borderColor: 'orangered',
-                    backgroundColor: 'transparent',
-                    borderWidth: 2,
-                    pointRadius: 3,
-                    yAxisID: 'y1'
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { position: 'bottom' },
-                title: { display: true, text: 'ACOMPANHAMENTO RENOVAÇÃO P190' }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    position: 'left',
-                    title: { display: true, text: 'Barras (Previsto / Realizado Dia)' }
-                },
-                y1: {
-                    beginAtZero: true,
-                    position: 'right',
-                    grid: { drawOnChartArea: false },
-                    title: { display: true, text: 'Linhas (Total Acumulado)' }
-                }
-            }
-        }
+  function getZoneState() {
+    try {
+      return JSON.parse(localStorage.getItem(zoneStorageKey) || "{}");
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function setZoneState(state) {
+    localStorage.setItem(zoneStorageKey, JSON.stringify(state));
+  }
+
+  function setZoneOpen(sel, open) {
+    const body = document.querySelector(sel);
+    const head = document.querySelector(`.zone-head[data-target="${sel}"]`);
+    const caret = head ? head.querySelector(".caret") : null;
+    if (!body) return;
+
+    if (open) {
+      body.classList.remove("collapsed");
+      if (caret) caret.textContent = "▴";
+    } else {
+      body.classList.add("collapsed");
+      if (caret) caret.textContent = "▾";
+    }
+  }
+
+  document.querySelectorAll(".zone-head").forEach(h => {
+    const sel = h.getAttribute("data-target");
+    const state = getZoneState();
+    const saved = state[sel];
+
+    if (saved === true) {
+      setZoneOpen(sel, true);
+    } else if (saved === false) {
+      setZoneOpen(sel, false);
+    } else {
+      const body = document.querySelector(sel);
+      const caret = h.querySelector(".caret");
+      if (body && !body.classList.contains("collapsed")) {
+        if (caret) caret.textContent = "▴";
+      } else {
+        if (caret) caret.textContent = "▾";
+      }
+    }
+
+    h.addEventListener("click", (e) => {
+      if (e.target.closest(".icon-btn") && !e.target.closest(".caret")) return;
+
+      const body = document.querySelector(sel);
+      if (!body) return;
+
+      const willOpen = body.classList.contains("collapsed");
+      setZoneOpen(sel, willOpen);
+
+      const state = getZoneState();
+      state[sel] = willOpen;
+      setZoneState(state);
     });
-
-    // === Funções comuns ===
-    function formatMinToTime(min) {
-        const h = Math.floor(min / 60);
-        const m = min % 60;
-        return h.toString().padStart(2, '0') + ':' + m.toString().padStart(2, '0');
-    }
-
-    // === Gráfico Parte Diária ===
-    {% if grafico_atividades is defined %}
-        const partLabels = {{ grafico_atividades.labels | tojson }};
-        const partTempos = {{ grafico_atividades.tempos | tojson }};
-    {% else %}
-        const partLabels = [];
-        const partTempos = [];
-    {% endif %}
-
-    if (document.getElementById('graficoPartDiaria')) {
-        new Chart(document.getElementById('graficoPartDiaria').getContext('2d'), {
-            type: 'bar',
-            data: {
-                labels: partLabels,
-                datasets: [{
-                    label: 'Duração por atividade',
-                    data: partTempos,
-                    backgroundColor: 'orange',
-                    borderColor: 'black',
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    title: {
-                        display: true,
-                        text: 'RESUMO PART DIÁRIA RENOVADORA P190'
-                    },
-                    legend: { display: false },
-                    tooltip: {
-                        callbacks: {
-                            label: function(ctx) {
-                                return formatMinToTime(ctx.parsed.y);
-                            }
-                        }
-                    },
-                    datalabels: {
-                        display: true,
-                        color: 'black',
-                        anchor: 'end',
-                        align: 'top',
-                        font: {
-                            weight: 'bold',
-                            size: 10
-                        },
-                        formatter: function(value) {
-                            return formatMinToTime(value);
-                        }
-                    }
-                },
-                scales: {
-                    y: { beginAtZero: true }
-                }
-            },
-            plugins: [ChartDataLabels]
-        });
-    }
-
-    // === Gráfico de Barras + Linhas - Frente 02 ===
-    const barraData = {{ grafico_barra_carregamento | default([], true) | tojson }};
-    const labels02 = Array.isArray(barraData) ? barraData.map(d => d.data) : [];
-    const planejadoDia02 = Array.isArray(barraData) ? barraData.map(d => d.planejado) : [];
-    const executadoDia02 = Array.isArray(barraData) ? barraData.map(d => d.executado) : [];
-    const acumuladoPlan02 = Array.isArray(barraData) ? barraData.map(d => d.acumulado_planejado) : [];
-    const acumuladoExec02 = Array.isArray(barraData) ? barraData.map(d => d.acumulado_executado) : [];
-
-    if (document.getElementById('graficoBarraCarregamento')) {
-        new Chart(document.getElementById('graficoBarraCarregamento').getContext('2d'), {
-            type: 'bar',
-            data: {
-                labels: labels02,
-                datasets: [
-                    {
-                        label: 'PREVISTO DIA',
-                        data: planejadoDia02,
-                        backgroundColor: 'rgba(255, 193, 7, 0.6)',
-                        borderColor: 'rgba(255, 193, 7, 1)',
-                        borderWidth: 1,
-                        yAxisID: 'y'
-                    },
-                    {
-                        label: 'REALIZADO DIA',
-                        data: executadoDia02,
-                        backgroundColor: 'rgba(76, 175, 80, 0.6)',
-                        borderColor: 'rgba(76, 175, 80, 1)',
-                        borderWidth: 1,
-                        yAxisID: 'y'
-                    },
-                    {
-                        label: 'ACUMULADO PREVISTO',
-                        data: acumuladoPlan02,
-                        type: 'line',
-                        borderColor: 'orange',
-                        backgroundColor: 'transparent',
-                        borderWidth: 2,
-                        pointRadius: 3,
-                        yAxisID: 'y1'
-                    },
-                    {
-                        label: 'ACUMULADO EXECUTADO',
-                        data: acumuladoExec02,
-                        type: 'line',
-                        borderColor: 'green',
-                        backgroundColor: 'transparent',
-                        borderWidth: 2,
-                        pointRadius: 3,
-                        yAxisID: 'y1'
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { position: 'bottom' },
-                    title: { display: true, text: 'ACOMPANHAMENTO CARREGAMENTO NOVO' }
-                },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        title: { display: true, text: 'Valores Diários' }
-                    },
-                    y1: {
-                        beginAtZero: true,
-                        position: 'right',
-                        grid: { drawOnChartArea: false },
-                        title: { display: true, text: 'Acumulados' }
-                    }
-                }
-            }
-        });
-    }
-
-    // === Gráfico de Bateria - Frente 02 ===
-    const bateria = {{ grafico_bateria_carregamento | default({}, true) | tojson }};
-    let total = 1, acumPlan = 0, acumExec = 0;
-
-    if (bateria && typeof bateria === 'object') {
-        total = bateria.planejado_total || 1;
-        acumPlan = bateria.planejado_acumulado || 0;
-        acumExec = bateria.executado_acumulado || 0;
-    }
-
-    const percPlan = Math.min((acumPlan / total) * 100, 100);
-    const percExec = Math.min((acumExec / total) * 100, 100);
-
-    if (document.getElementById('graficoBateriaCarregamento')) {
-        new Chart(document.getElementById('graficoBateriaCarregamento').getContext('2d'), {
-            type: 'bar',
-            data: {
-                labels: [''],
-                datasets: [
-                    {
-                        label: `Planejado (${acumPlan} / ${total})`,
-                        data: [percPlan],
-                        backgroundColor: 'rgba(255, 193, 7, 0.8)',
-                        barThickness: 30
-                    },
-                    {
-                        label: `Executado (${acumExec} / ${total})`,
-                        data: [percExec],
-                        backgroundColor: 'rgba(76, 175, 80, 0.9)',
-                        barThickness: 30
-                    }
-                ]
-            },
-            options: {
-                indexAxis: 'y',
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { position: 'bottom' },
-                    title: { display: false },
-                    tooltip: {
-                        callbacks: {
-                            label: ctx => `${ctx.dataset.label}: ${ctx.raw.toFixed(1)}%`
-                        }
-                    }
-                },
-                scales: {
-                    x: {
-                        stacked: false,
-                        beginAtZero: true,
-                        max: 100,
-                        title: { display: true, text: '%' }
-                    },
-                    y: { stacked: false }
-                }
-            }
-        });
-    }
-
-    // === Gauges de Percentual por Frente ===
-    {% if percentuais_graficos is defined %}
-    {% for frente, item in percentuais_graficos.items() %}
-    (function() {
-        const ctx = document.getElementById('gauge_{{ loop.index }}');
-        if (!ctx) return;
-        new Chart(ctx.getContext('2d'), {
-            type: 'doughnut',
-            data: {
-                labels: ['Executado', 'Planejado'],
-                datasets: [{
-                    data: [{{ item.percentual_executado }}, {{ 100 - item.percentual_executado }}],
-                    backgroundColor: [
-                        'rgba(40, 167, 69, 0.85)',
-                        'rgba(255, 193, 7, 0.4)'
-                    ],
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                cutout: '65%',
-                responsive: true,
-                plugins: {
-                    legend: { display: false },
-                    title: { display: false },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                return context.label + ': ' + context.raw.toFixed(1) + '%';
-                            }
-                        }
-                    },
-                    datalabels: {
-                        display: true,
-                        color: '#000',
-                        font: { weight: 'bold', size: 14 },
-                        formatter: function(value, context) {
-                            return context.dataIndex === 0 ? value.toFixed(1) + '%' : '';
-                        }
-                    }
-                }
-            },
-            plugins: [ChartDataLabels]
-        });
-    })();
-    {% endfor %}
-    {% endif %}
+  });
 </script>
 
+<script>
+  const dadosRen = {{ dados | default([], true) | tojson }};
+  const labelsRen = dadosRen.map(d => d.data);
+  const previstoDia = dadosRen.map(d => d.previsto_dia);
+  const previstoTotal = dadosRen.map(d => d.previsto_total);
+  const realizadoDia = dadosRen.map(d => d.realizado_dia);
+  const realizadoTotal = dadosRen.map(d => d.realizado_total);
+
+  if (document.getElementById('graficoProducao')) {
+    new Chart(document.getElementById('graficoProducao').getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels: labelsRen,
+        datasets: [
+          {
+            label: 'Previsto dia',
+            data: previstoDia,
+            backgroundColor: 'rgba(0, 123, 255, 0.5)',
+            borderColor: 'rgba(0, 123, 255, 1)',
+            borderWidth: 1,
+            yAxisID: 'y'
+          },
+          {
+            label: 'Realizado dia',
+            data: realizadoDia,
+            backgroundColor: 'rgba(40, 167, 69, 0.5)',
+            borderColor: 'rgba(40, 167, 69, 1)',
+            borderWidth: 1,
+            yAxisID: 'y'
+          },
+          {
+            label: 'Previsto total',
+            data: previstoTotal,
+            type: 'line',
+            borderColor: 'orange',
+            backgroundColor: 'transparent',
+            borderWidth: 2,
+            pointRadius: 3,
+            yAxisID: 'y1'
+          },
+          {
+            label: 'Realizado total',
+            data: realizadoTotal,
+            type: 'line',
+            borderColor: 'orangered',
+            backgroundColor: 'transparent',
+            borderWidth: 2,
+            pointRadius: 3,
+            yAxisID: 'y1'
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'bottom' }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            position: 'left'
+          },
+          y1: {
+            beginAtZero: true,
+            position: 'right',
+            grid: { drawOnChartArea: false }
+          }
+        }
+      }
+    });
+  }
+
+  function formatMinToTime(min) {
+    const h = Math.floor(min / 60);
+    const m = min % 60;
+    return h.toString().padStart(2, '0') + ':' + m.toString().padStart(2, '0');
+  }
+
+  {% if grafico_atividades is defined %}
+    const partLabels = {{ grafico_atividades.labels | tojson }};
+    const partTempos = {{ grafico_atividades.tempos | tojson }};
+  {% else %}
+    const partLabels = [];
+    const partTempos = [];
+  {% endif %}
+
+  if (document.getElementById('graficoPartDiaria')) {
+    new Chart(document.getElementById('graficoPartDiaria').getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels: partLabels,
+        datasets: [{
+          label: 'Duração por atividade',
+          data: partTempos,
+          backgroundColor: 'orange',
+          borderColor: 'black',
+          borderWidth: 1
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: function(ctx) {
+                return formatMinToTime(ctx.parsed.y);
+              }
+            }
+          },
+          datalabels: {
+            display: true,
+            color: 'black',
+            anchor: 'end',
+            align: 'top',
+            font: {
+              weight: 'bold',
+              size: 10
+            },
+            formatter: function(value) {
+              return formatMinToTime(value);
+            }
+          }
+        },
+        scales: {
+          y: { beginAtZero: true }
+        }
+      },
+      plugins: [ChartDataLabels]
+    });
+  }
+
+  const barraData = {{ grafico_barra_carregamento | default([], true) | tojson }};
+  const labels02 = Array.isArray(barraData) ? barraData.map(d => d.data) : [];
+  const planejadoDia02 = Array.isArray(barraData) ? barraData.map(d => d.planejado) : [];
+  const executadoDia02 = Array.isArray(barraData) ? barraData.map(d => d.executado) : [];
+  const acumuladoPlan02 = Array.isArray(barraData) ? barraData.map(d => d.acumulado_planejado) : [];
+  const acumuladoExec02 = Array.isArray(barraData) ? barraData.map(d => d.acumulado_executado) : [];
+
+  if (document.getElementById('graficoBarraCarregamento')) {
+    new Chart(document.getElementById('graficoBarraCarregamento').getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels: labels02,
+        datasets: [
+          {
+            label: 'Previsto dia',
+            data: planejadoDia02,
+            backgroundColor: 'rgba(255, 193, 7, 0.6)',
+            borderColor: 'rgba(255, 193, 7, 1)',
+            borderWidth: 1,
+            yAxisID: 'y'
+          },
+          {
+            label: 'Realizado dia',
+            data: executadoDia02,
+            backgroundColor: 'rgba(76, 175, 80, 0.6)',
+            borderColor: 'rgba(76, 175, 80, 1)',
+            borderWidth: 1,
+            yAxisID: 'y'
+          },
+          {
+            label: 'Acumulado previsto',
+            data: acumuladoPlan02,
+            type: 'line',
+            borderColor: 'orange',
+            backgroundColor: 'transparent',
+            borderWidth: 2,
+            pointRadius: 3,
+            yAxisID: 'y1'
+          },
+          {
+            label: 'Acumulado executado',
+            data: acumuladoExec02,
+            type: 'line',
+            borderColor: 'green',
+            backgroundColor: 'transparent',
+            borderWidth: 2,
+            pointRadius: 3,
+            yAxisID: 'y1'
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'bottom' }
+        },
+        scales: {
+          y: {
+            beginAtZero: true
+          },
+          y1: {
+            beginAtZero: true,
+            position: 'right',
+            grid: { drawOnChartArea: false }
+          }
+        }
+      }
+    });
+  }
+
+  const bateria = {{ grafico_bateria_carregamento | default({}, true) | tojson }};
+  let total = 1, acumPlan = 0, acumExec = 0;
+
+  if (bateria && typeof bateria === 'object') {
+    total = bateria.planejado_total || 1;
+    acumPlan = bateria.planejado_acumulado || 0;
+    acumExec = bateria.executado_acumulado || 0;
+  }
+
+  const percPlan = Math.min((acumPlan / total) * 100, 100);
+  const percExec = Math.min((acumExec / total) * 100, 100);
+
+  if (document.getElementById('graficoBateriaCarregamento')) {
+    new Chart(document.getElementById('graficoBateriaCarregamento').getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels: [''],
+        datasets: [
+          {
+            label: `Planejado (${acumPlan} / ${total})`,
+            data: [percPlan],
+            backgroundColor: 'rgba(255, 193, 7, 0.8)',
+            barThickness: 24
+          },
+          {
+            label: `Executado (${acumExec} / ${total})`,
+            data: [percExec],
+            backgroundColor: 'rgba(76, 175, 80, 0.9)',
+            barThickness: 24
+          }
+        ]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'bottom' },
+          tooltip: {
+            callbacks: {
+              label: ctx => `${ctx.dataset.label}: ${ctx.raw.toFixed(1)}%`
+            }
+          }
+        },
+        scales: {
+          x: {
+            stacked: false,
+            beginAtZero: true,
+            max: 100,
+            title: { display: true, text: '%' }
+          },
+          y: { stacked: false }
+        }
+      }
+    });
+  }
+
+  {% if percentuais_graficos is defined %}
+  {% for frente, item in percentuais_graficos.items() %}
+  (function() {
+    const ctx = document.getElementById('gauge_{{ loop.index }}');
+    if (!ctx) return;
+
+    new Chart(ctx.getContext('2d'), {
+      type: 'doughnut',
+      data: {
+        labels: ['Executado', 'Planejado'],
+        datasets: [{
+          data: [{{ item.percentual_executado }}, {{ 100 - item.percentual_executado }}],
+          backgroundColor: [
+            'rgba(40, 167, 69, 0.85)',
+            'rgba(255, 193, 7, 0.4)'
+          ],
+          borderWidth: 1
+        }]
+      },
+      options: {
+        cutout: '65%',
+        responsive: true,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                return context.label + ': ' + context.raw.toFixed(1) + '%';
+              }
+            }
+          },
+          datalabels: {
+            display: true,
+            color: '#000',
+            font: { weight: 'bold', size: 12 },
+            formatter: function(value, context) {
+              return context.dataIndex === 0 ? value.toFixed(1) + '%' : '';
+            }
+          }
+        }
+      },
+      plugins: [ChartDataLabels]
+    });
+  })();
+  {% endfor %}
+  {% endif %}
+</script>
 {% endblock %}
