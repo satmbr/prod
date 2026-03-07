@@ -1,8 +1,11 @@
-from flask import Blueprint, render_template, url_for, request, redirect
+from flask import Blueprint, render_template, url_for, request, redirect, Response
 from sqlalchemy import text
 from db import get_engine
 from datetime import date
 import json
+import csv
+import io
+
 
 bp = Blueprint("equipamentos", __name__)
 
@@ -271,6 +274,84 @@ def partdiaria():
                            atividades=atividades,
                            today=date.today().isoformat(),
                            msg=request.args.get("msg"))
+
+@bp.get("/partdiaria/export")
+def part_export():
+    filtros = {
+        "ini": request.args.get("ini", "").strip(),
+        "fim": request.args.get("fim", "").strip(),
+        "maq": request.args.get("maq", "").strip(),
+        "act": request.args.get("act", "").strip(),
+    }
+
+    where = []
+    params = {}
+
+    if filtros["ini"]:
+        where.append("pd.data >= :ini")
+        params["ini"] = filtros["ini"]
+
+    if filtros["fim"]:
+        where.append("pd.data <= :fim")
+        params["fim"] = filtros["fim"]
+
+    if filtros["maq"]:
+        where.append("pd.maquina_id = :maq")
+        params["maq"] = filtros["maq"]
+
+    if filtros["act"]:
+        where.append("pd.atividade_id = :act")
+        params["act"] = filtros["act"]
+
+    if not where:
+        return redirect(url_for("equipamentos.partdiaria", msg="Aplique pelo menos um filtro antes de exportar."))
+
+    wh = "WHERE " + " AND ".join(where)
+
+    with get_engine().connect() as conn:
+        rows = conn.execute(text(f"""
+            SELECT
+                pd.id,
+                pd.data,
+                to_char(pd.hora_inicio, 'HH24:MI') AS hora_inicio,
+                to_char(pd.hora_fim, 'HH24:MI')    AS hora_fim,
+                pd.obs,
+                m.tag AS maquina_tag,
+                m.descricao AS maquina_desc,
+                a.nome AS atividade_nome
+            FROM parte_diaria pd
+            JOIN maquina   m ON m.id = pd.maquina_id
+            JOIN atividade a ON a.id = pd.atividade_id
+            {wh}
+            ORDER BY pd.data DESC, pd.hora_inicio ASC
+        """), params).mappings().all()
+
+    output = io.StringIO()
+    writer = csv.writer(output, delimiter=";")
+    writer.writerow(["ID", "Data", "Máquina", "Descrição Máquina", "Atividade", "Início", "Fim", "Obs"])
+
+    for r in rows:
+        writer.writerow([
+            r["id"],
+            r["data"],
+            r["maquina_tag"],
+            r["maquina_desc"],
+            r["atividade_nome"],
+            r["hora_inicio"],
+            r["hora_fim"],
+            r["obs"] or "",
+        ])
+
+    csv_data = output.getvalue()
+    output.close()
+
+    return Response(
+        csv_data,
+        mimetype="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": 'attachment; filename="parte_diaria_filtrada.csv"'
+        },
+    )
 
 # ---------- CRUD Parte Diária ----------
 @bp.post("/partdiaria/create")
