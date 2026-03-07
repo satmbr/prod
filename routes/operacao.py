@@ -193,14 +193,13 @@ def producao():
                 dados = []
 
         # ------------------------------------------------------------------
-        # BLOCO 2 – Parte Diária (tabela parte_diaria + joins)
+        # BLOCO 2 – Parte Diária (filtrando direto no SQL)
         # ------------------------------------------------------------------
         dados_partdiaria = []
         grafico_atividades = {"labels": [], "tempos": []}
 
         try:
-            # Busca TODAS as partes diárias com join em máquina e atividade
-            sql_pd_all = text(
+            sql_pd_p190 = text(
                 """
                 SELECT
                     a.nome AS atividade,
@@ -212,27 +211,51 @@ def producao():
                 FROM parte_diaria pd
                 JOIN maquina   m ON m.id = pd.maquina_id
                 JOIN atividade a ON a.id = pd.atividade_id
-                ORDER BY pd.data, pd.hora_inicio
+                WHERE pd.data = :data_ref
+                  AND m.tag = :tag_maquina
+                ORDER BY pd.hora_inicio
                 """
             )
-            rows_pd = conn.execute(sql_pd_all).mappings().all()
+
+            rows_pd = conn.execute(
+                sql_pd_p190,
+                {
+                    "data_ref": data_partdiaria,
+                    "tag_maquina": "P190-66001",
+                }
+            ).mappings().all()
+
+            # Se não houver registros da P190 na data,
+            # busca qualquer máquina apenas nessa mesma data
+            if not rows_pd:
+                sql_pd_data = text(
+                    """
+                    SELECT
+                        a.nome AS atividade,
+                        m.tag  AS tag,
+                        pd.data,
+                        to_char(pd.hora_inicio, 'HH24:MI') AS hora_inicio,
+                        to_char(pd.hora_fim,   'HH24:MI') AS hora_fim,
+                        EXTRACT(EPOCH FROM (pd.hora_fim - pd.hora_inicio)) / 60 AS duracao
+                    FROM parte_diaria pd
+                    JOIN maquina   m ON m.id = pd.maquina_id
+                    JOIN atividade a ON a.id = pd.atividade_id
+                    WHERE pd.data = :data_ref
+                    ORDER BY m.tag, pd.hora_inicio
+                    """
+                )
+
+                rows_pd = conn.execute(
+                    sql_pd_data,
+                    {
+                        "data_ref": data_partdiaria,
+                    }
+                ).mappings().all()
+
+            dados_partdiaria = list(rows_pd)
+
         except SQLAlchemyError:
-            rows_pd = []
-
-        # Filtra por data (comparando só os 10 primeiros caracteres) e pela P190
-        dados_partdiaria = [
-            r
-            for r in rows_pd
-            if str(r.get("data"))[:10] == data_partdiaria
-            and r.get("tag") == "P190-66001"
-        ]
-
-        # Se não houver registros da P190, mas existir algo na data,
-        # mostra todos da data (qualquer máquina)
-        if not dados_partdiaria:
-            dados_partdiaria = [
-                r for r in rows_pd if str(r.get("data"))[:10] == data_partdiaria
-            ]
+            dados_partdiaria = []
 
         # Monta dados para o gráfico
         labels = [r["atividade"] for r in dados_partdiaria]
