@@ -4,170 +4,253 @@
 {% block content %}
 <div class="page-wrap">
 
+  <style>
+    .toolbar-row{
+      display:grid;
+      grid-template-columns: 1.1fr 1.6fr 1.2fr .8fr .8fr 1.2fr auto;
+      gap:12px;
+      align-items:end;
+    }
+    .toolbar-row.toolbar-5{
+      grid-template-columns: .9fr .9fr 1.3fr 1.1fr auto;
+    }
+    .toolbar-row.toolbar-3{
+      grid-template-columns: 1.4fr 1.4fr auto;
+    }
+    .toolbar-actions{
+      display:flex;
+      gap:8px;
+      align-items:end;
+      flex-wrap:wrap;
+      justify-content:flex-start;
+    }
+    .toolbar-actions .btn,
+    .toolbar-actions a.btn{
+      white-space:nowrap;
+    }
+    .field > span{
+      display:block;
+      margin-bottom:6px;
+      font-weight:600;
+      color:#394150;
+    }
+    .field input,
+    .field select{
+      width:100%;
+      min-height:38px;
+      padding:7px 10px;
+      border:1px solid #cfd6df;
+      border-radius:8px;
+      background:#fff;
+      box-sizing:border-box;
+    }
+    .zone-icon{
+      font-size:16px;
+      line-height:1;
+    }
+    .section-note{
+      padding:14px;
+      border:1px dashed #cfd8e3;
+      border-radius:10px;
+      background:#f8fbff;
+      color:#35516b;
+    }
+    .section-note.warn{
+      background:#fffaf5;
+      color:#7a5a2b;
+    }
+    .pd-summary{
+      display:flex;
+      gap:14px;
+      align-items:center;
+      flex-wrap:wrap;
+      margin-bottom:10px;
+    }
+    .pd-summary-title{
+      font-weight:700;
+      color:#2f3640;
+    }
+    .pd-summary-meta{
+      font-size:14px;
+      color:#666;
+    }
+    .inline-actions{
+      display:flex;
+      gap:8px;
+      align-items:center;
+      flex-wrap:wrap;
+    }
+    .row-actions{
+      display:flex;
+      gap:8px;
+      align-items:center;
+      flex-wrap:wrap;
+    }
+    .btn{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap:6px;
+      min-height:38px;
+      padding:8px 12px;
+      border:1px solid #bfc8d4;
+      border-radius:8px;
+      background:#f7f9fc;
+      color:#28323f;
+      text-decoration:none;
+      cursor:pointer;
+      box-sizing:border-box;
+    }
+    .btn:hover{
+      filter:brightness(.98);
+    }
+    .btn.primary{
+      background:#16324F;
+      border-color:#16324F;
+      color:#fff;
+    }
+    .btn.success{
+      background:#234d20;
+      border-color:#234d20;
+      color:#fff;
+    }
+    .btn.warning{
+      background:#8a5a00;
+      border-color:#8a5a00;
+      color:#fff;
+    }
+    .btn.info{
+      background:#235d8a;
+      border-color:#235d8a;
+      color:#fff;
+    }
+    .btn.danger{
+      background:#8b1e1e;
+      border-color:#8b1e1e;
+      color:#fff;
+    }
+    .table td .field-inline,
+    .table td input,
+    .table td select{
+      width:100%;
+      box-sizing:border-box;
+    }
+    .table th,
+    .table td{
+      vertical-align:middle;
+    }
+    .table .acoes-col{
+      min-width:210px;
+    }
+
+    @media (max-width: 1200px){
+      .toolbar-row{
+        grid-template-columns: repeat(2, minmax(220px, 1fr));
+      }
+      .toolbar-row.toolbar-5,
+      .toolbar-row.toolbar-3{
+        grid-template-columns: repeat(2, minmax(220px, 1fr));
+      }
+      .toolbar-actions{
+        grid-column: 1 / -1;
+      }
+    }
+
+    @media (max-width: 700px){
+      .toolbar-row,
+      .toolbar-row.toolbar-5,
+      .toolbar-row.toolbar-3{
+        grid-template-columns: 1fr;
+      }
+      .toolbar-actions{
+        justify-content:stretch;
+      }
+      .toolbar-actions .btn,
+      .toolbar-actions a.btn{
+        flex:1 1 auto;
+      }
+    }
+  </style>
+
   <!-- ==================== LANÇAR PARTE DIÁRIA ==================== -->
-	<section class="zone">
-	  <header class="zone-head" data-target="#pd-lancar">
-		<div class="zone-left"><span class="zone-icon">💡</span><div class="zone-title">Lançar Parte Diária</div></div>
-		<div class="zone-actions">
-		  <button type="button" class="icon-btn">
-			<svg viewBox="0 0 24 24" width="16" height="16">
-			  <path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/>
-			</svg>
-		  </button>
-		  <button type="button" class="icon-btn caret">▾</button>
-		</div>
-	  </header>
+  <section class="zone">
+    <header class="zone-head" data-target="#pd-lancar">
+      <div class="zone-left">
+        <span class="zone-icon">📝</span>
+        <div class="zone-title">Lançar Parte Diária</div>
+      </div>
+      <div class="zone-actions">
+        <button type="button" class="icon-btn" aria-label="Seção de lançamento">
+          <svg viewBox="0 0 24 24" width="16" height="16">
+            <path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/>
+          </svg>
+        </button>
+        <button type="button" class="icon-btn caret">▾</button>
+      </div>
+    </header>
 
-	  <div class="zone-body collapsed" id="pd-lancar">
-		<form id="pd-lote-form" method="post" action="#" class="grid grid-6" onsubmit="return false;">
-		  <label class="field">
-			<span>Data *</span>
-			<input required type="date" name="data" id="pd_data" value="{{ today }}">
-		  </label>
+    <div class="zone-body collapsed" id="pd-lancar">
+      <form id="pd-lote-form" method="post" action="#" onsubmit="return false;">
+        <div class="toolbar-row">
+          <label class="field">
+            <span>Data *</span>
+            <input required type="date" name="data" id="pd_data" value="{{ today }}">
+          </label>
 
-		  <label class="field">
-			<span>Máquina *</span>
-			<select required name="maquina_id" id="pd_maquina_id">
-			  <option value="">-- selecione --</option>
-			  {% for m in maquinas %}
-				<option value="{{ m.id }}">{{ m.tag }} — {{ m.descricao }}</option>
-			  {% endfor %}
-			</select>
-		  </label>
+          <label class="field">
+            <span>Máquina *</span>
+            <select required name="maquina_id" id="pd_maquina_id">
+              <option value="">-- selecione --</option>
+              {% for m in maquinas %}
+                <option value="{{ m.id }}">{{ m.tag }} — {{ m.descricao }}</option>
+              {% endfor %}
+            </select>
+          </label>
 
-		  <label class="field">
-			<span>Atividade *</span>
-			<select required name="atividade_id" id="pd_atividade_id">
-			  <option value="">-- selecione --</option>
-			  {% for a in atividades %}
-				<option value="{{ a.id }}">{{ a.nome }}</option>
-			  {% endfor %}
-			</select>
-		  </label>
+          <label class="field">
+            <span>Atividade *</span>
+            <select required name="atividade_id" id="pd_atividade_id">
+              <option value="">-- selecione --</option>
+              {% for a in atividades %}
+                <option value="{{ a.id }}">{{ a.nome }}</option>
+              {% endfor %}
+            </select>
+          </label>
 
-		  <label class="field">
-			<span>Início *</span>
-			<input required type="time" name="hora_inicio" id="pd_hora_inicio">
-		  </label>
+          <label class="field">
+            <span>Início *</span>
+            <input required type="time" name="hora_inicio" id="pd_hora_inicio">
+          </label>
 
-		  <label class="field">
-			<span>Fim *</span>
-			<input required type="time" name="hora_fim" id="pd_hora_fim">
-		  </label>
+          <label class="field">
+            <span>Fim *</span>
+            <input required type="time" name="hora_fim" id="pd_hora_fim">
+          </label>
 
-		  <label class="field">
-			<span>Obs</span>
-			<input type="text" name="obs" id="pd_obs" placeholder="Opcional">
-		  </label>
+          <label class="field">
+            <span>Obs</span>
+            <input type="text" name="obs" id="pd_obs" placeholder="Opcional">
+          </label>
 
-		  <div class="field align-end">
-			<button class="btn primary" type="button" id="btn-add-lancamento">Adicionar à lista</button>
-		  </div>
-		</form>
+          <div class="toolbar-actions">
+            <button class="btn primary" type="button" id="btn-add-lancamento">➕ Adicionar à lista</button>
+          </div>
+        </div>
+      </form>
 
-		<hr style="margin:16px 0;">
+      <hr style="margin:18px 0;">
 
-		<div id="pd-lote-area">
-			<h4 style="margin-bottom:10px; display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
-			  <span>
-				Lançamentos pendentes
-				<span id="pd-contador" style="font-size:14px; color:#666;">(0 itens)</span>
-			  </span>
-			  <span id="pd-total-duracao" style="font-size:14px; color:#666;">Total: 0min</span>
-			</h4>
-
-		  <div style="overflow:auto;">
-			<table class="table" id="pd-lote-tabela">
-			  <thead>
-				<tr>
-				  <th>Data</th>
-				  <th>Máquina</th>
-				  <th>Atividade</th>
-				  <th>Início</th>
-				  <th>Fim</th>
-				  <th>Duração</th>
-				  <th>Obs</th>
-				  <th>Ações</th>
-				</tr>
-			  </thead>
-			  <tbody id="pd-lote-body">
-				<tr id="pd-lote-vazio">
-				  <td colspan="8">Nenhum lançamento adicionado ainda.</td>
-				</tr>
-			  </tbody>
-			</table>
-		  </div>
-
-		  <form method="post" action="{{ url_for('equipamentos.part_create_lote') }}" id="pd-salvar-tudo-form">
-			<input type="hidden" name="lancamentos_json" id="pd_lancamentos_json">
-			<div class="field align-end" style="margin-top:12px; display:flex; gap:8px; justify-content:flex-end;">
-			  <button class="btn" type="button" id="btn-limpar-lista">Limpar lista</button>
-			  <button class="btn primary" type="button" id="btn-salvar-tudo">Salvar tudo</button>
-			</div>
-		  </form>
-		</div>
-	  </div>
-	</section>
-
-<!-- ==================== CONSULTAR / EDITAR / EXCLUIR ==================== -->
-<section class="zone">
-  <header class="zone-head" data-target="#pd-listar">
-    <div class="zone-left"><span class="zone-icon">💡</span><div class="zone-title">Consultar / Editar / Excluir</div></div>
-    <div class="zone-actions">
-      <button type="button" class="icon-btn"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/></svg></button>
-      <button type="button" class="icon-btn caret">▾</button>
-    </div>
-  </header>
-
-  <div class="zone-body collapsed" id="pd-listar">
-
-    <form method="get" action="{{ url_for('equipamentos.partdiaria') }}" class="grid grid-5">
-      <label class="field">
-        <span>De</span>
-        <input type="date" name="ini" value="{{ filtros.ini or '' }}">
-      </label>
-      <label class="field">
-        <span>Até</span>
-        <input type="date" name="fim" value="{{ filtros.fim or '' }}">
-      </label>
-      <label class="field">
-        <span>Máquina</span>
-        <select name="maq">
-          <option value="">(todas)</option>
-          {% for m in maquinas %}
-            <option value="{{ m.id }}" {{ 'selected' if filtros.maq and filtros.maq|string == m.id|string else '' }}>
-              {{ m.tag }} — {{ m.descricao }}
-            </option>
-          {% endfor %}
-        </select>
-      </label>
-      <label class="field">
-        <span>Atividade</span>
-        <select name="act">
-          <option value="">(todas)</option>
-          {% for a in atividades %}
-            <option value="{{ a.id }}" {{ 'selected' if filtros.act and filtros.act|string == a.id|string else '' }}>
-              {{ a.nome }}
-            </option>
-          {% endfor %}
-        </select>
-      </label>
-	  <div class="field align-end" style="display:flex; gap:8px; flex-wrap:wrap;">
-		<button class="btn" type="submit">Aplicar Filtros</button>
-		<button class="btn" type="submit" formaction="{{ url_for('equipamentos.part_export') }}">Exportar</button>
-		<a class="btn" href="{{ url_for('equipamentos.partdiaria') }}">Limpar</a>
-	  </div>
-    </form>
-
-    <div style="margin-top:12px">
-      {% if not tem_filtro %}
-        <div class="empty-state" style="padding:14px; border:1px dashed #cfd8e3; border-radius:10px; background:#f8fbff; color:#35516b;">
-          Aplique pelo menos um filtro para consultar os lançamentos.
+      <div id="pd-lote-area">
+        <div class="pd-summary">
+          <div class="pd-summary-title">
+            Lançamentos pendentes
+            <span id="pd-contador" class="pd-summary-meta">(0 itens)</span>
+          </div>
+          <div id="pd-total-duracao" class="pd-summary-meta">Total: 0min</div>
         </div>
 
-      {% elif resultados %}
         <div style="overflow:auto;">
-          <table class="table">
+          <table class="table" id="pd-lote-tabela">
             <thead>
               <tr>
                 <th>Data</th>
@@ -175,120 +258,270 @@
                 <th>Atividade</th>
                 <th>Início</th>
                 <th>Fim</th>
+                <th>Duração</th>
                 <th>Obs</th>
-                <th style="width:200px">Ações</th>
+                <th class="acoes-col">Ações</th>
               </tr>
             </thead>
-            <tbody>
-              {% for r in resultados %}
-                <tr>
-                  <form method="post" action="{{ url_for('equipamentos.part_update') }}">
-                    <input type="hidden" name="id" value="{{ r.id }}">
-					<input type="hidden" name="ini" value="{{ filtros.ini or '' }}">
-					<input type="hidden" name="fim" value="{{ filtros.fim or '' }}">
-					<input type="hidden" name="maq" value="{{ filtros.maq or '' }}">
-					<input type="hidden" name="act" value="{{ filtros.act or '' }}">
-                    <td><input type="date" name="data" value="{{ r.data }}"></td>
-                    <td>{{ r.maquina_tag }} — {{ r.maquina_desc }}</td>
-                    <td>
-                      <select name="atividade_id" required>
-                        {% for a in atividades %}
-                          <option value="{{ a.id }}" {{ 'selected' if a.id == r.atividade_id else '' }}>{{ a.nome }}</option>
-                        {% endfor %}
-                      </select>
-                    </td>
-                    <td><input type="time" name="hora_inicio" value="{{ r.hora_inicio }}"></td>
-                    <td><input type="time" name="hora_fim" value="{{ r.hora_fim }}"></td>
-                    <td><input type="text" name="obs" value="{{ r.obs or '' }}"></td>
-                    <td style="display:flex; gap:8px; align-items:center;">
-                      <button class="btn" type="submit">Salvar</button>
-                  </form>
-
-                  <form method="post" action="{{ url_for('equipamentos.part_delete') }}" style="display:inline;" onsubmit="return confirm('Excluir lançamento?');">
-                    <input type="hidden" name="id" value="{{ r.id }}">
-					<input type="hidden" name="ini" value="{{ filtros.ini or '' }}">
-					<input type="hidden" name="fim" value="{{ filtros.fim or '' }}">
-					<input type="hidden" name="maq" value="{{ filtros.maq or '' }}">
-					<input type="hidden" name="act" value="{{ filtros.act or '' }}">
-                    <button class="btn danger" type="submit">Excluir</button>
-                  </form>
-                    </td>
-                </tr>
-              {% endfor %}
+            <tbody id="pd-lote-body">
+              <tr id="pd-lote-vazio">
+                <td colspan="8">Nenhum lançamento adicionado ainda.</td>
+              </tr>
             </tbody>
           </table>
         </div>
 
-      {% else %}
-        <div class="empty-state" style="padding:14px; border:1px dashed #cfd8e3; border-radius:10px; background:#fffaf5; color:#7a5a2b;">
-          Nenhum lançamento encontrado com os filtros informados.
-        </div>
-      {% endif %}
+        <form method="post" action="{{ url_for('equipamentos.part_create_lote') }}" id="pd-salvar-tudo-form" style="margin-top:12px;">
+          <input type="hidden" name="lancamentos_json" id="pd_lancamentos_json">
+          <div class="toolbar-actions" style="justify-content:flex-end;">
+            <button class="btn warning" type="button" id="btn-limpar-lista">🧹 Limpar lista</button>
+            <button class="btn success" type="button" id="btn-salvar-tudo">💾 Salvar tudo</button>
+          </div>
+        </form>
+      </div>
     </div>
+  </section>
 
-  </div>
-</section>
+  <!-- ==================== CONSULTAR / EDITAR / EXCLUIR ==================== -->
+  <section class="zone">
+    <header class="zone-head" data-target="#pd-listar">
+      <div class="zone-left">
+        <span class="zone-icon">🔎</span>
+        <div class="zone-title">Consultar / Editar / Excluir</div>
+      </div>
+      <div class="zone-actions">
+        <button type="button" class="icon-btn" aria-label="Seção de consulta">
+          <svg viewBox="0 0 24 24" width="16" height="16">
+            <path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/>
+          </svg>
+        </button>
+        <button type="button" class="icon-btn caret">▾</button>
+      </div>
+    </header>
+
+    <div class="zone-body collapsed" id="pd-listar">
+      <form method="get" action="{{ url_for('equipamentos.partdiaria') }}">
+        <div class="toolbar-row toolbar-5">
+          <label class="field">
+            <span>De</span>
+            <input type="date" name="ini" value="{{ filtros.ini or '' }}">
+          </label>
+
+          <label class="field">
+            <span>Até</span>
+            <input type="date" name="fim" value="{{ filtros.fim or '' }}">
+          </label>
+
+          <label class="field">
+            <span>Máquina</span>
+            <select name="maq">
+              <option value="">(todas)</option>
+              {% for m in maquinas %}
+                <option value="{{ m.id }}" {{ 'selected' if filtros.maq and filtros.maq|string == m.id|string else '' }}>
+                  {{ m.tag }} — {{ m.descricao }}
+                </option>
+              {% endfor %}
+            </select>
+          </label>
+
+          <label class="field">
+            <span>Atividade</span>
+            <select name="act">
+              <option value="">(todas)</option>
+              {% for a in atividades %}
+                <option value="{{ a.id }}" {{ 'selected' if filtros.act and filtros.act|string == a.id|string else '' }}>
+                  {{ a.nome }}
+                </option>
+              {% endfor %}
+            </select>
+          </label>
+
+          <div class="toolbar-actions">
+            <button class="btn primary" type="submit">🔍 Aplicar Filtros</button>
+            <button class="btn info" type="submit" formaction="{{ url_for('equipamentos.part_export') }}">📤 Exportar</button>
+            <a class="btn warning" href="{{ url_for('equipamentos.partdiaria') }}">🧹 Limpar</a>
+          </div>
+        </div>
+      </form>
+
+      <div style="margin-top:14px;">
+        {% if not tem_filtro %}
+          <div class="section-note">
+            Aplique pelo menos um filtro para consultar os lançamentos.
+          </div>
+
+        {% elif resultados %}
+          <div style="overflow:auto;">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Data</th>
+                  <th>Máquina</th>
+                  <th>Atividade</th>
+                  <th>Início</th>
+                  <th>Fim</th>
+                  <th>Obs</th>
+                  <th class="acoes-col">Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for r in resultados %}
+                  <tr>
+                    <form method="post" action="{{ url_for('equipamentos.part_update') }}">
+                      <input type="hidden" name="id" value="{{ r.id }}">
+                      <input type="hidden" name="ini" value="{{ filtros.ini or '' }}">
+                      <input type="hidden" name="fim" value="{{ filtros.fim or '' }}">
+                      <input type="hidden" name="maq" value="{{ filtros.maq or '' }}">
+                      <input type="hidden" name="act" value="{{ filtros.act or '' }}">
+
+                      <td><input type="date" name="data" value="{{ r.data }}"></td>
+                      <td>{{ r.maquina_tag }} — {{ r.maquina_desc }}</td>
+                      <td>
+                        <select name="atividade_id" required>
+                          {% for a in atividades %}
+                            <option value="{{ a.id }}" {{ 'selected' if a.id == r.atividade_id else '' }}>{{ a.nome }}</option>
+                          {% endfor %}
+                        </select>
+                      </td>
+                      <td><input type="time" name="hora_inicio" value="{{ r.hora_inicio }}"></td>
+                      <td><input type="time" name="hora_fim" value="{{ r.hora_fim }}"></td>
+                      <td><input type="text" name="obs" value="{{ r.obs or '' }}"></td>
+                      <td>
+                        <div class="row-actions">
+                          <button class="btn success" type="submit">💾 Salvar</button>
+                    </form>
+
+                    <form method="post" action="{{ url_for('equipamentos.part_delete') }}" style="display:inline;" onsubmit="return confirm('Excluir lançamento?');">
+                      <input type="hidden" name="id" value="{{ r.id }}">
+                      <input type="hidden" name="ini" value="{{ filtros.ini or '' }}">
+                      <input type="hidden" name="fim" value="{{ filtros.fim or '' }}">
+                      <input type="hidden" name="maq" value="{{ filtros.maq or '' }}">
+                      <input type="hidden" name="act" value="{{ filtros.act or '' }}">
+                          <button class="btn danger" type="submit">🗑️ Excluir</button>
+                    </form>
+                        </div>
+                      </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+
+        {% else %}
+          <div class="section-note warn">
+            Nenhum lançamento encontrado com os filtros informados.
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </section>
 
   <!-- ==================== ATIVIDADES (CRUD) ==================== -->
   <section class="zone">
     <header class="zone-head" data-target="#act-cadastrar">
-      <div class="zone-left"><span class="zone-icon">💡</span><div class="zone-title">Cadastro de Atividade</div></div>
-      <div class="zone-actions"><button type="button" class="icon-btn"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/></svg></button><button type="button" class="icon-btn caret">▾</button></div>
+      <div class="zone-left">
+        <span class="zone-icon">➕</span>
+        <div class="zone-title">Cadastro de Atividade</div>
+      </div>
+      <div class="zone-actions">
+        <button type="button" class="icon-btn">
+          <svg viewBox="0 0 24 24" width="16" height="16">
+            <path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/>
+          </svg>
+        </button>
+        <button type="button" class="icon-btn caret">▾</button>
+      </div>
     </header>
     <div class="zone-body collapsed" id="act-cadastrar">
-      <form method="post" action="{{ url_for('equipamentos.act_create') }}" class="grid grid-3">
-        <label class="field">
-          <span>Nome *</span>
-          <input required name="nome" type="text" placeholder="ex.: Operação">
-        </label>
-        <div class="field align-end"><button class="btn primary" type="submit">Salvar</button></div>
+      <form method="post" action="{{ url_for('equipamentos.act_create') }}">
+        <div class="toolbar-row toolbar-3">
+          <label class="field">
+            <span>Nome *</span>
+            <input required name="nome" type="text" placeholder="ex.: Operação">
+          </label>
+          <div></div>
+          <div class="toolbar-actions">
+            <button class="btn success" type="submit">💾 Salvar</button>
+          </div>
+        </div>
       </form>
     </div>
   </section>
 
   <section class="zone">
     <header class="zone-head" data-target="#act-editar">
-      <div class="zone-left"><span class="zone-icon">💡</span><div class="zone-title">Editar Atividade</div></div>
-      <div class="zone-actions"><button type="button" class="icon-btn"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/></svg></button><button type="button" class="icon-btn caret">▾</button></div>
+      <div class="zone-left">
+        <span class="zone-icon">✏️</span>
+        <div class="zone-title">Editar Atividade</div>
+      </div>
+      <div class="zone-actions">
+        <button type="button" class="icon-btn">
+          <svg viewBox="0 0 24 24" width="16" height="16">
+            <path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/>
+          </svg>
+        </button>
+        <button type="button" class="icon-btn caret">▾</button>
+      </div>
     </header>
     <div class="zone-body collapsed" id="act-editar">
-      <form method="post" action="{{ url_for('equipamentos.act_update') }}" class="grid grid-3">
-        <label class="field">
-          <span>Atividade *</span>
-          <select required name="id">
-            <option value="">-- selecione --</option>
-            {% for a in atividades %}
-              <option value="{{ a.id }}">{{ a.nome }}</option>
-            {% endfor %}
-          </select>
-        </label>
-        <label class="field">
-          <span>Novo Nome</span>
-          <input name="nome" type="text" placeholder="(opcional)">
-        </label>
-        <div class="field align-end"><button class="btn" type="submit">Atualizar</button></div>
+      <form method="post" action="{{ url_for('equipamentos.act_update') }}">
+        <div class="toolbar-row toolbar-3">
+          <label class="field">
+            <span>Atividade *</span>
+            <select required name="id">
+              <option value="">-- selecione --</option>
+              {% for a in atividades %}
+                <option value="{{ a.id }}">{{ a.nome }}</option>
+              {% endfor %}
+            </select>
+          </label>
+
+          <label class="field">
+            <span>Novo Nome</span>
+            <input name="nome" type="text" placeholder="(opcional)">
+          </label>
+
+          <div class="toolbar-actions">
+            <button class="btn info" type="submit">🔄 Atualizar</button>
+          </div>
+        </div>
       </form>
     </div>
   </section>
 
   <section class="zone">
     <header class="zone-head" data-target="#act-excluir">
-      <div class="zone-left"><span class="zone-icon">💡</span><div class="zone-title">Excluir Atividade</div></div>
-      <div class="zone-actions"><button type="button" class="icon-btn"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/></svg></button><button type="button" class="icon-btn caret">▾</button></div>
+      <div class="zone-left">
+        <span class="zone-icon">🗑️</span>
+        <div class="zone-title">Excluir Atividade</div>
+      </div>
+      <div class="zone-actions">
+        <button type="button" class="icon-btn">
+          <svg viewBox="0 0 24 24" width="16" height="16">
+            <path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/>
+          </svg>
+        </button>
+        <button type="button" class="icon-btn caret">▾</button>
+      </div>
     </header>
     <div class="zone-body collapsed" id="act-excluir">
-      <form method="post" action="{{ url_for('equipamentos.act_delete') }}" class="grid grid-2">
-        <label class="field">
-          <span>Atividade *</span>
-          <select required name="id">
-            <option value="">-- selecione --</option>
-            {% for a in atividades %}
-              <option value="{{ a.id }}">{{ a.nome }}</option>
-            {% endfor %}
-          </select>
-        </label>
-        <div class="field align-end">
-          <button class="btn danger" type="submit" onclick="return confirm('Excluir atividade? Se houver parte diária usando, a exclusão será bloqueada.');">Excluir</button>
+      <form method="post" action="{{ url_for('equipamentos.act_delete') }}">
+        <div class="toolbar-row toolbar-3">
+          <label class="field">
+            <span>Atividade *</span>
+            <select required name="id">
+              <option value="">-- selecione --</option>
+              {% for a in atividades %}
+                <option value="{{ a.id }}">{{ a.nome }}</option>
+              {% endfor %}
+            </select>
+          </label>
+
+          <div></div>
+
+          <div class="toolbar-actions">
+            <button class="btn danger" type="submit" onclick="return confirm('Excluir atividade? Se houver parte diária usando, a exclusão será bloqueada.');">🗑️ Excluir</button>
+          </div>
         </div>
       </form>
     </div>
@@ -364,45 +597,46 @@
     });
   });
 </script>
+
 <script>
   const pdLancamentos = [];
 
-	function pdDuracaoEmMinutos(inicio, fim) {
-	  const [hi, mi] = inicio.split(":").map(Number);
-	  const [hf, mf] = fim.split(":").map(Number);
+  function pdDuracaoEmMinutos(inicio, fim) {
+    const [hi, mi] = inicio.split(":").map(Number);
+    const [hf, mf] = fim.split(":").map(Number);
 
-	  const minutosInicio = hi * 60 + mi;
-	  const minutosFim = hf * 60 + mf;
-	  return Math.max(0, minutosFim - minutosInicio);
-	}
+    const minutosInicio = hi * 60 + mi;
+    const minutosFim = hf * 60 + mf;
+    return Math.max(0, minutosFim - minutosInicio);
+  }
 
-	function pdCalcularDuracao(inicio, fim) {
-	  const [hi, mi] = inicio.split(":").map(Number);
-	  const [hf, mf] = fim.split(":").map(Number);
+  function pdCalcularDuracao(inicio, fim) {
+    const [hi, mi] = inicio.split(":").map(Number);
+    const [hf, mf] = fim.split(":").map(Number);
 
-	  const minutosInicio = hi * 60 + mi;
-	  const minutosFim = hf * 60 + mf;
-	  const diff = minutosFim - minutosInicio;
+    const minutosInicio = hi * 60 + mi;
+    const minutosFim = hf * 60 + mf;
+    const diff = minutosFim - minutosInicio;
 
-	  if (diff <= 0) return "-";
+    if (diff <= 0) return "-";
 
-	  const horas = Math.floor(diff / 60);
-	  const minutos = diff % 60;
+    const horas = Math.floor(diff / 60);
+    const minutos = diff % 60;
 
-	  if (horas > 0 && minutos > 0) {
-		return `${horas}h ${minutos}min`;
-	  }
-	  if (horas > 0) {
-		return `${horas}h`;
-	  }
-	  return `${minutos}min`;
-	}
+    if (horas > 0 && minutos > 0) {
+      return `${horas}h ${minutos}min`;
+    }
+    if (horas > 0) {
+      return `${horas}h`;
+    }
+    return `${minutos}min`;
+  }
 
-	function pdRenderTabela() {
-	  const body = document.getElementById("pd-lote-body");
-	  const hidden = document.getElementById("pd_lancamentos_json");
-	  const contador = document.getElementById("pd-contador");
-	  const totalDuracao = document.getElementById("pd-total-duracao");
+  function pdRenderTabela() {
+    const body = document.getElementById("pd-lote-body");
+    const hidden = document.getElementById("pd_lancamentos_json");
+    const contador = document.getElementById("pd-contador");
+    const totalDuracao = document.getElementById("pd-total-duracao");
 
     body.innerHTML = "";
 
@@ -417,56 +651,59 @@
         const tr = document.createElement("tr");
         tr.innerHTML = `
           <td>${item.data}</td>
-		  <td>${item.maquina_label}</td>
-		  <td>${item.atividade_label}</td>
-		  <td>${item.hora_inicio}</td>
-		  <td>${item.hora_fim}</td>
-		  <td>${pdCalcularDuracao(item.hora_inicio, item.hora_fim)}</td>
-		  <td>${item.obs || ""}</td>
-          <td style="display:flex; gap:6px;">
-			 <button type="button" class="btn" onclick="pdEditarLancamento(${index})">Editar</button>
-			 <button type="button" class="btn" onclick="pdRemoverLancamento(${index})">Remover</button>
-		  </td>
+          <td>${item.maquina_label}</td>
+          <td>${item.atividade_label}</td>
+          <td>${item.hora_inicio}</td>
+          <td>${item.hora_fim}</td>
+          <td>${pdCalcularDuracao(item.hora_inicio, item.hora_fim)}</td>
+          <td>${item.obs || ""}</td>
+          <td>
+            <div class="row-actions">
+              <button type="button" class="btn info" onclick="pdEditarLancamento(${index})">✏️ Editar</button>
+              <button type="button" class="btn danger" onclick="pdRemoverLancamento(${index})">🗑️ Remover</button>
+            </div>
+          </td>
         `;
         body.appendChild(tr);
       });
     }
-	
-	contador.textContent = `(${pdLancamentos.length} ${pdLancamentos.length === 1 ? "item" : "itens"})`;
-	
-	const totalMinutos = pdLancamentos.reduce(function (acc, item) {
-	  return acc + pdDuracaoEmMinutos(item.hora_inicio, item.hora_fim);
-	}, 0);
 
-	const horas = Math.floor(totalMinutos / 60);
-	const minutos = totalMinutos % 60;
+    contador.textContent = `(${pdLancamentos.length} ${pdLancamentos.length === 1 ? "item" : "itens"})`;
 
-	if (horas > 0 && minutos > 0) {
-	  totalDuracao.textContent = `Total: ${horas}h ${minutos}min`;
-	} else if (horas > 0) {
-	  totalDuracao.textContent = `Total: ${horas}h`;
-	} else {
-	  totalDuracao.textContent = `Total: ${minutos}min`;
-	}	
-	
+    const totalMinutos = pdLancamentos.reduce(function (acc, item) {
+      return acc + pdDuracaoEmMinutos(item.hora_inicio, item.hora_fim);
+    }, 0);
+
+    const horas = Math.floor(totalMinutos / 60);
+    const minutos = totalMinutos % 60;
+
+    if (horas > 0 && minutos > 0) {
+      totalDuracao.textContent = `Total: ${horas}h ${minutos}min`;
+    } else if (horas > 0) {
+      totalDuracao.textContent = `Total: ${horas}h`;
+    } else {
+      totalDuracao.textContent = `Total: ${minutos}min`;
+    }
+
     hidden.value = JSON.stringify(pdLancamentos);
   }
-  
+
   function pdEditarLancamento(index) {
-	  const item = pdLancamentos[index];
-	  if (!item) return;
+    const item = pdLancamentos[index];
+    if (!item) return;
 
-	  document.getElementById("pd_data").value = item.data;
-	  document.getElementById("pd_maquina_id").value = item.maquina_id;
-	  document.getElementById("pd_atividade_id").value = item.atividade_id;
-	  document.getElementById("pd_hora_inicio").value = item.hora_inicio;
-	  document.getElementById("pd_hora_fim").value = item.hora_fim;
-	  document.getElementById("pd_obs").value = item.obs || "";
+    document.getElementById("pd_data").value = item.data;
+    document.getElementById("pd_maquina_id").value = item.maquina_id;
+    document.getElementById("pd_atividade_id").value = item.atividade_id;
+    document.getElementById("pd_hora_inicio").value = item.hora_inicio;
+    document.getElementById("pd_hora_fim").value = item.hora_fim;
+    document.getElementById("pd_obs").value = item.obs || "";
 
-	  pdLancamentos.splice(index, 1);
-	  pdRenderTabela();
+    pdLancamentos.splice(index, 1);
+    pdRenderTabela();
+    document.getElementById("pd_atividade_id").focus();
   }
-  
+
   function pdRemoverLancamento(index) {
     pdLancamentos.splice(index, 1);
     pdRenderTabela();
@@ -487,39 +724,39 @@
       alert("Preencha Data, Máquina, Atividade, Início e Fim.");
       return;
     }
-	if (horaInicio >= horaFim) {
+
+    if (horaInicio >= horaFim) {
       alert("A hora de início deve ser menor que a hora de fim.");
       return;
     }
-	
-	const duplicado = pdLancamentos.some(function (l) {
-	  return (
-		l.data === data &&
-		l.maquina_id === maquinaId &&
-		l.atividade_id === atividadeId &&
-		l.hora_inicio === horaInicio &&
-		l.hora_fim === horaFim
-	  );
-	});
 
-	if (duplicado) {
-	  alert("Esse lançamento já foi adicionado à lista.");
-	  return;
-	}
-	
-	const conflitoHorario = pdLancamentos.some(function (l) {
-	  if (l.data !== data || l.maquina_id !== maquinaId) {
-		return false;
-	  }
+    const duplicado = pdLancamentos.some(function (l) {
+      return (
+        l.data === data &&
+        l.maquina_id === maquinaId &&
+        l.atividade_id === atividadeId &&
+        l.hora_inicio === horaInicio &&
+        l.hora_fim === horaFim
+      );
+    });
 
-	  return horaInicio < l.hora_fim && horaFim > l.hora_inicio;
-	});
+    if (duplicado) {
+      alert("Esse lançamento já foi adicionado à lista.");
+      return;
+    }
 
-	if (conflitoHorario) {
-	  alert("Existe conflito de horário para essa máquina nessa mesma data.");
-	  return;
-	}	
-	
+    const conflitoHorario = pdLancamentos.some(function (l) {
+      if (l.data !== data || l.maquina_id !== maquinaId) {
+        return false;
+      }
+      return horaInicio < l.hora_fim && horaFim > l.hora_inicio;
+    });
+
+    if (conflitoHorario) {
+      alert("Existe conflito de horário para essa máquina nessa mesma data.");
+      return;
+    }
+
     const item = {
       data: data,
       maquina_id: maquinaId,
@@ -531,47 +768,48 @@
       obs: obs
     };
 
-	pdLancamentos.push(item);
+    pdLancamentos.push(item);
 
-	pdLancamentos.sort(function (a, b) {
-	  const chaveA = `${a.data}|${a.maquina_id}|${a.hora_inicio}`;
-	  const chaveB = `${b.data}|${b.maquina_id}|${b.hora_inicio}`;
-	  return chaveA.localeCompare(chaveB);
-	});
+    pdLancamentos.sort(function (a, b) {
+      const chaveA = `${a.data}|${a.maquina_id}|${a.hora_inicio}`;
+      const chaveB = `${b.data}|${b.maquina_id}|${b.hora_inicio}`;
+      return chaveA.localeCompare(chaveB);
+    });
 
-	pdRenderTabela();
+    pdRenderTabela();
 
     document.getElementById("pd_atividade_id").value = "";
-	document.getElementById("pd_hora_inicio").value = horaFim;
-	document.getElementById("pd_hora_fim").value = "";
-	document.getElementById("pd_obs").value = "";
-	document.getElementById("pd_atividade_id").focus();
+    document.getElementById("pd_hora_inicio").value = horaFim;
+    document.getElementById("pd_hora_fim").value = "";
+    document.getElementById("pd_obs").value = "";
+    document.getElementById("pd_atividade_id").focus();
   });
-  
+
   document.getElementById("btn-limpar-lista").addEventListener("click", function () {
-	  if (pdLancamentos.length === 0) {
-		alert("A lista já está vazia.");
-		return;
-	  }
+    if (pdLancamentos.length === 0) {
+      alert("A lista já está vazia.");
+      return;
+    }
 
-	  const confirmar = confirm("Deseja limpar todos os lançamentos pendentes?");
-	  if (!confirmar) {
-		return;
-	  }
+    const confirmar = confirm("Deseja limpar todos os lançamentos pendentes?");
+    if (!confirmar) {
+      return;
+    }
 
-	  pdLancamentos.length = 0;
-	  pdRenderTabela();
-	});
-  
-  document.getElementById("btn-salvar-tudo").addEventListener("click", function () {
-  if (pdLancamentos.length === 0) {
-    alert("Adicione pelo menos um lançamento antes de salvar.");
-    return;
-  }
-
-  document.getElementById("pd_lancamentos_json").value = JSON.stringify(pdLancamentos);
-  document.getElementById("pd-salvar-tudo-form").submit();
+    pdLancamentos.length = 0;
+    pdRenderTabela();
   });
+
+  document.getElementById("btn-salvar-tudo").addEventListener("click", function () {
+    if (pdLancamentos.length === 0) {
+      alert("Adicione pelo menos um lançamento antes de salvar.");
+      return;
+    }
+
+    document.getElementById("pd_lancamentos_json").value = JSON.stringify(pdLancamentos);
+    document.getElementById("pd-salvar-tudo-form").submit();
+  });
+
   pdRenderTabela();
 </script>
 {% endblock %}
