@@ -4,32 +4,162 @@
 {% block content %}
 <div class="page-wrap">
 
+  <style>
+    .toolbar-row{
+      display:grid;
+      gap:12px;
+      align-items:end;
+    }
+    .toolbar-row.toolbar-2{
+      grid-template-columns: 1.5fr auto;
+    }
+    .toolbar-row.toolbar-3{
+      grid-template-columns: 1.2fr 1.3fr auto;
+    }
+
+    .toolbar-actions{
+      display:flex;
+      gap:8px;
+      align-items:end;
+      flex-wrap:wrap;
+      justify-content:flex-start;
+    }
+
+    .toolbar-actions .btn,
+    .toolbar-actions a.btn{
+      white-space:nowrap;
+    }
+
+    .field > span{
+      display:block;
+      margin-bottom:6px;
+      font-weight:600;
+      color:#394150;
+    }
+
+    .field input,
+    .field select{
+      width:100%;
+      min-height:38px;
+      padding:7px 10px;
+      border:1px solid #cfd6df;
+      border-radius:8px;
+      background:#fff;
+      box-sizing:border-box;
+    }
+
+    .zone-icon{
+      font-size:16px;
+      line-height:1;
+    }
+
+    .btn{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap:6px;
+      min-height:38px;
+      padding:8px 12px;
+      border:1px solid #bfc8d4;
+      border-radius:8px;
+      background:#f7f9fc;
+      color:#28323f;
+      text-decoration:none;
+      cursor:pointer;
+      box-sizing:border-box;
+    }
+
+    .btn:hover{
+      filter:brightness(.98);
+    }
+
+    .btn.primary{
+      background:#16324F;
+      border-color:#16324F;
+      color:#fff;
+    }
+
+    .btn.success{
+      background:#234d20;
+      border-color:#234d20;
+      color:#fff;
+    }
+
+    .btn.info{
+      background:#235d8a;
+      border-color:#235d8a;
+      color:#fff;
+    }
+
+    .btn.danger,
+    .btn.btn-danger{
+      background:#8b1e1e;
+      border-color:#8b1e1e;
+      color:#fff;
+    }
+
+    .help{
+      margin:12px 0 0;
+      padding:10px 12px;
+      border:1px dashed #cfd8e3;
+      border-radius:10px;
+      background:#f8fbff;
+      color:#35516b;
+      font-size:14px;
+    }
+
+    @media (max-width: 1100px){
+      .toolbar-row.toolbar-2,
+      .toolbar-row.toolbar-3{
+        grid-template-columns: repeat(2, minmax(220px, 1fr));
+      }
+
+      .toolbar-actions{
+        grid-column: 1 / -1;
+      }
+    }
+
+    @media (max-width: 700px){
+      .toolbar-row.toolbar-2,
+      .toolbar-row.toolbar-3{
+        grid-template-columns: 1fr;
+      }
+
+      .toolbar-actions .btn,
+      .toolbar-actions a.btn{
+        flex:1 1 auto;
+      }
+    }
+  </style>
+
   <!-- ====== EH ====== -->
   <section class="zone">
     <header class="zone-head" data-target="#eh-cadastrar">
       <div class="zone-left">
-        <span class="zone-icon">💡</span>
+        <span class="zone-icon">🧱</span>
         <div class="zone-title">Cadastro de EH</div>
       </div>
       <div class="zone-actions">
-        <!-- ícone “duas janelas” -->
-        <button type="button" class="icon-btn" aria-label="Opções">
-          <svg viewBox="0 0 24 24" width="16" height="16"><path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/></svg>
+        <button type="button" class="icon-btn" aria-label="Seção de cadastro de EH">
+          <svg viewBox="0 0 24 24" width="16" height="16">
+            <path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/>
+          </svg>
         </button>
-        <!-- seta recolher -->
         <button type="button" class="icon-btn caret" aria-label="Recolher/Expandir">▾</button>
       </div>
     </header>
     <div class="zone-body collapsed" id="eh-cadastrar">
-      <form method="post" action="{{ url_for('operacao.eh_create') }}" class="grid grid-2">
-        <label class="field">
-          <span>EH *</span>
-          <input required name="eh" type="text" placeholder="ex.: EH-001">
-		  <button class="btn primary" type="submit">Salvar</button>
-        </label>
-        <!-- <div class="field align-end">
-          <button class="btn primary" type="submit">Salvar</button>
-        </div> -->
+      <form method="post" action="{{ url_for('operacao.eh_create') }}">
+        <div class="toolbar-row toolbar-2">
+          <label class="field">
+            <span>EH *</span>
+            <input required name="eh" type="text" placeholder="ex.: EH-001">
+          </label>
+
+          <div class="toolbar-actions">
+            <button class="btn success" type="submit">💾 Salvar</button>
+          </div>
+        </div>
       </form>
     </div>
   </section>
@@ -37,33 +167,40 @@
   <section class="zone">
     <header class="zone-head" data-target="#eh-editar">
       <div class="zone-left">
-        <span class="zone-icon">💡</span>
+        <span class="zone-icon">✏️</span>
         <div class="zone-title">Editar EH</div>
       </div>
       <div class="zone-actions">
-        <button type="button" class="icon-btn"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/></svg></button>
+        <button type="button" class="icon-btn" aria-label="Seção de edição de EH">
+          <svg viewBox="0 0 24 24" width="16" height="16">
+            <path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/>
+          </svg>
+        </button>
         <button type="button" class="icon-btn caret">▾</button>
       </div>
     </header>
     <div class="zone-body collapsed" id="eh-editar">
-      <form method="post" action="{{ url_for('operacao.eh_update') }}" class="grid grid-3">
-        <label class="field">
-          <span>Selecionar EH *</span>
-          <select required name="id">
-            <option value="">-- selecione --</option>
-            {% for e in lista_eh %}
-              <option value="{{ e.id }}">{{ e.eh }}</option>
-            {% endfor %}
-          </select>
-        </label>
-        <label class="field">
-          <span>Novo nome *</span>
-          <input required name="novo_eh" type="text" placeholder="ex.: EH-001A">
-		  <button class="btn" type="submit">Atualizar</button>
-        </label>
-        <!-- <div class="field align-end">
-          <button class="btn" type="submit">Atualizar</button>
-        </div> -->
+      <form method="post" action="{{ url_for('operacao.eh_update') }}">
+        <div class="toolbar-row toolbar-3">
+          <label class="field">
+            <span>Selecionar EH *</span>
+            <select required name="id">
+              <option value="">-- selecione --</option>
+              {% for e in lista_eh %}
+                <option value="{{ e.id }}">{{ e.eh }}</option>
+              {% endfor %}
+            </select>
+          </label>
+
+          <label class="field">
+            <span>Novo nome *</span>
+            <input required name="novo_eh" type="text" placeholder="ex.: EH-001A">
+          </label>
+
+          <div class="toolbar-actions">
+            <button class="btn info" type="submit">🔄 Atualizar</button>
+          </div>
+        </div>
       </form>
     </div>
   </section>
@@ -71,35 +208,38 @@
   <section class="zone">
     <header class="zone-head" data-target="#eh-excluir">
       <div class="zone-left">
-        <span class="zone-icon">💡</span>
+        <span class="zone-icon">🗑️</span>
         <div class="zone-title">Excluir EH</div>
       </div>
       <div class="zone-actions">
-        <button type="button" class="icon-btn"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/></svg></button>
+        <button type="button" class="icon-btn" aria-label="Seção de exclusão de EH">
+          <svg viewBox="0 0 24 24" width="16" height="16">
+            <path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/>
+          </svg>
+        </button>
         <button type="button" class="icon-btn caret">▾</button>
       </div>
     </header>
     <div class="zone-body collapsed" id="eh-excluir">
-      <form method="post" action="{{ url_for('operacao.eh_delete') }}" class="grid grid-2">
-        <label class="field">
-          <span>Selecionar EH *</span>
-          <select required name="id">
-            <option value="">-- selecione --</option>
-            {% for e in lista_eh %}
-              <option value="{{ e.id }}">{{ e.eh }}</option>
-            {% endfor %}
-          </select>
-		  <button class="btn danger" type="submit"
-            onclick="return confirm('Excluir EH selecionada? Se houver uso em produção, a exclusão pode falhar.');">
-            Excluir
-          </button>
-        </label>
-        <!-- <div class="field align-end">
-          <button class="btn danger" type="submit"
-            onclick="return confirm('Excluir EH selecionada? Se houver uso em produção, a exclusão pode falhar.');">
-            Excluir
-          </button>
-        </div> -->
+      <form method="post" action="{{ url_for('operacao.eh_delete') }}">
+        <div class="toolbar-row toolbar-2">
+          <label class="field">
+            <span>Selecionar EH *</span>
+            <select required name="id">
+              <option value="">-- selecione --</option>
+              {% for e in lista_eh %}
+                <option value="{{ e.id }}">{{ e.eh }}</option>
+              {% endfor %}
+            </select>
+          </label>
+
+          <div class="toolbar-actions">
+            <button class="btn danger" type="submit"
+              onclick="return confirm('Excluir EH selecionada? Se houver uso em produção, a exclusão pode falhar.');">
+              🗑️ Excluir
+            </button>
+          </div>
+        </div>
       </form>
       <p class="help">Observação: se a EH estiver referenciada em produção, o banco bloqueará a exclusão.</p>
     </div>
@@ -109,24 +249,30 @@
   <section class="zone">
     <header class="zone-head" data-target="#frente-cadastrar">
       <div class="zone-left">
-        <span class="zone-icon">💡</span>
+        <span class="zone-icon">🚧</span>
         <div class="zone-title">Cadastro de Frente</div>
       </div>
       <div class="zone-actions">
-        <button type="button" class="icon-btn"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/></svg></button>
+        <button type="button" class="icon-btn" aria-label="Seção de cadastro de frente">
+          <svg viewBox="0 0 24 24" width="16" height="16">
+            <path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/>
+          </svg>
+        </button>
         <button type="button" class="icon-btn caret">▾</button>
       </div>
     </header>
     <div class="zone-body collapsed" id="frente-cadastrar">
-      <form method="post" action="{{ url_for('operacao.frente_create') }}" class="grid grid-2">
-        <label class="field">
-          <span>Frente *</span>
-          <input required name="frente" type="text" placeholder="ex.: 01 - Renovação">
-		  <button class="btn primary" type="submit">Salvar</button>
-        </label>
-        <!-- <div class="field align-end">
-          <button class="btn primary" type="submit">Salvar</button>
-        </div> -->
+      <form method="post" action="{{ url_for('operacao.frente_create') }}">
+        <div class="toolbar-row toolbar-2">
+          <label class="field">
+            <span>Frente *</span>
+            <input required name="frente" type="text" placeholder="ex.: 01 - Renovação">
+          </label>
+
+          <div class="toolbar-actions">
+            <button class="btn success" type="submit">💾 Salvar</button>
+          </div>
+        </div>
       </form>
     </div>
   </section>
@@ -134,33 +280,40 @@
   <section class="zone">
     <header class="zone-head" data-target="#frente-editar">
       <div class="zone-left">
-        <span class="zone-icon">💡</span>
+        <span class="zone-icon">🛠️</span>
         <div class="zone-title">Editar Frente</div>
       </div>
       <div class="zone-actions">
-        <button type="button" class="icon-btn"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/></svg></button>
+        <button type="button" class="icon-btn" aria-label="Seção de edição de frente">
+          <svg viewBox="0 0 24 24" width="16" height="16">
+            <path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/>
+          </svg>
+        </button>
         <button type="button" class="icon-btn caret">▾</button>
       </div>
     </header>
     <div class="zone-body collapsed" id="frente-editar">
-      <form method="post" action="{{ url_for('operacao.frente_update') }}" class="grid grid-3">
-        <label class="field">
-          <span>Selecionar Frente *</span>
-          <select required name="id">
-            <option value="">-- selecione --</option>
-            {% for f in lista_frente %}
-              <option value="{{ f.id }}">{{ f.frente }}</option>
-            {% endfor %}
-          </select>
-        </label>
-        <label class="field">
-          <span>Novo nome *</span>
-          <input required name="nova_frente" type="text" placeholder="ex.: 01 - Renovação (A)">
-		  <button class="btn" type="submit">Atualizar</button>
-        </label>
-        <!-- <div class="field align-end">
-          <button class="btn" type="submit">Atualizar</button>
-        </div> -->
+      <form method="post" action="{{ url_for('operacao.frente_update') }}">
+        <div class="toolbar-row toolbar-3">
+          <label class="field">
+            <span>Selecionar Frente *</span>
+            <select required name="id">
+              <option value="">-- selecione --</option>
+              {% for f in lista_frente %}
+                <option value="{{ f.id }}">{{ f.frente }}</option>
+              {% endfor %}
+            </select>
+          </label>
+
+          <label class="field">
+            <span>Novo nome *</span>
+            <input required name="nova_frente" type="text" placeholder="ex.: 01 - Renovação (A)">
+          </label>
+
+          <div class="toolbar-actions">
+            <button class="btn info" type="submit">🔄 Atualizar</button>
+          </div>
+        </div>
       </form>
     </div>
   </section>
@@ -168,35 +321,38 @@
   <section class="zone">
     <header class="zone-head" data-target="#frente-excluir">
       <div class="zone-left">
-        <span class="zone-icon">💡</span>
+        <span class="zone-icon">❌</span>
         <div class="zone-title">Excluir Frente</div>
       </div>
       <div class="zone-actions">
-        <button type="button" class="icon-btn"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/></svg></button>
+        <button type="button" class="icon-btn" aria-label="Seção de exclusão de frente">
+          <svg viewBox="0 0 24 24" width="16" height="16">
+            <path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/>
+          </svg>
+        </button>
         <button type="button" class="icon-btn caret">▾</button>
       </div>
     </header>
     <div class="zone-body collapsed" id="frente-excluir">
-      <form method="post" action="{{ url_for('operacao.frente_delete') }}" class="grid grid-2">
-        <label class="field">
-          <span>Selecionar Frente *</span>
-          <select required name="id">
-            <option value="">-- selecione --</option>
-            {% for f in lista_frente %}
-              <option value="{{ f.id }}">{{ f.frente }}</option>
-            {% endfor %}
-          </select>
-		  <button class="btn danger" type="submit"
-            onclick="return confirm('Excluir Frente selecionada? Se houver uso em produção, a exclusão pode falhar.');">
-            Excluir
-          </button>
-        </label>
-        <!-- <div class="field align-end">
-          <button class="btn danger" type="submit"
-            onclick="return confirm('Excluir Frente selecionada? Se houver uso em produção, a exclusão pode falhar.');">
-            Excluir
-          </button>
-        </div> -->
+      <form method="post" action="{{ url_for('operacao.frente_delete') }}">
+        <div class="toolbar-row toolbar-2">
+          <label class="field">
+            <span>Selecionar Frente *</span>
+            <select required name="id">
+              <option value="">-- selecione --</option>
+              {% for f in lista_frente %}
+                <option value="{{ f.id }}">{{ f.frente }}</option>
+              {% endfor %}
+            </select>
+          </label>
+
+          <div class="toolbar-actions">
+            <button class="btn danger" type="submit"
+              onclick="return confirm('Excluir Frente selecionada? Se houver uso em produção, a exclusão pode falhar.');">
+              🗑️ Excluir
+            </button>
+          </div>
+        </div>
       </form>
       <p class="help">Observação: se a Frente estiver referenciada, o banco bloqueará a exclusão.</p>
     </div>
@@ -205,19 +361,70 @@
   {% if msg %}
     <div class="alert">{{ msg }}</div>
   {% endif %}
-
 </div>
 
 <script>
-  // Toggle das zonas: clica no cabeçalho para recolher/expandir
-  document.querySelectorAll('.zone-head').forEach(h => {
-    h.addEventListener('click', (e) => {
-      if (e.target.closest('.icon-btn') && !e.target.closest('.caret')) return;
-      const sel = h.getAttribute('data-target');
+  const zoneStorageKey = "operacao_cadastro_zone_state";
+
+  function getZoneState() {
+    try {
+      return JSON.parse(localStorage.getItem(zoneStorageKey) || "{}");
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function setZoneState(state) {
+    localStorage.setItem(zoneStorageKey, JSON.stringify(state));
+  }
+
+  function setZoneOpen(sel, open) {
+    const body = document.querySelector(sel);
+    const head = document.querySelector(`.zone-head[data-target="${sel}"]`);
+    const caret = head ? head.querySelector(".caret") : null;
+
+    if (!body) return;
+
+    if (open) {
+      body.classList.remove("collapsed");
+      if (caret) caret.textContent = "▴";
+    } else {
+      body.classList.add("collapsed");
+      if (caret) caret.textContent = "▾";
+    }
+  }
+
+  document.querySelectorAll(".zone-head").forEach(h => {
+    const sel = h.getAttribute("data-target");
+    const state = getZoneState();
+    const saved = state[sel];
+
+    if (saved === true) {
+      setZoneOpen(sel, true);
+    } else if (saved === false) {
+      setZoneOpen(sel, false);
+    } else {
       const body = document.querySelector(sel);
-      const caret = h.querySelector('.caret');
-      if (body) body.classList.toggle('collapsed');
-      if (caret) caret.textContent = (caret.textContent.trim() === '▴') ? '▾' : '▴';
+      const caret = h.querySelector(".caret");
+      if (body && !body.classList.contains("collapsed")) {
+        if (caret) caret.textContent = "▴";
+      } else {
+        if (caret) caret.textContent = "▾";
+      }
+    }
+
+    h.addEventListener("click", (e) => {
+      if (e.target.closest(".icon-btn") && !e.target.closest(".caret")) return;
+
+      const body = document.querySelector(sel);
+      if (!body) return;
+
+      const willOpen = body.classList.contains("collapsed");
+      setZoneOpen(sel, willOpen);
+
+      const state = getZoneState();
+      state[sel] = willOpen;
+      setZoneState(state);
     });
   });
 </script>
