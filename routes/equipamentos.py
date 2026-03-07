@@ -345,11 +345,13 @@ def part_export():
     csv_data = output.getvalue()
     output.close()
 
+    nome_arquivo = f"parte_diaria_filtrada_{date.today().isoformat()}.csv"
+
     return Response(
         csv_data,
         mimetype="text/csv; charset=utf-8",
         headers={
-            "Content-Disposition": 'attachment; filename="parte_diaria_filtrada.csv"'
+            "Content-Disposition": f'attachment; filename="{nome_arquivo}"'
         },
     )
 
