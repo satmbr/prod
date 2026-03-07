@@ -71,35 +71,35 @@
       font-size:10px;
     }
 
-    .layout-tabela-grafico{
-      display:grid;
-      grid-template-columns: minmax(420px, 1.05fr) minmax(320px, .95fr);
-      gap:10px;
-      align-items:stretch;
-    }
+	.layout-tabela-grafico{
+	  display:grid;
+	  grid-template-columns: minmax(360px, 1.15fr) minmax(260px, .85fr);
+	  gap:8px;
+	  align-items:start;
+	}
 
     .col-tabela,
     .col-grafico{
       min-width:0;
     }
 
-    .chart-card{
-      border:1px solid var(--pru-border);
-      border-radius:8px;
-      background:#fff;
-      padding:8px;
-      height:100%;
-      min-height:300px;
-      box-shadow:var(--pru-shadow);
-    }
+	.chart-card{
+	  border:1px solid var(--pru-border);
+	  border-radius:8px;
+	  background:#fff;
+	  padding:6px;
+	  height:auto;
+	  min-height:auto;
+	  box-shadow:var(--pru-shadow);
+	}
 
-    .chart-card.chart-sm{
-      min-height:260px;
-    }
+	.chart-card.chart-sm{
+	  height:220px;
+	}
 
-    .chart-card.chart-lg{
-      min-height:340px;
-    }
+	.chart-card.chart-lg{
+	  height:250px;
+	}
 
     .chart-title{
       font-size:11px;
@@ -108,25 +108,40 @@
       margin-bottom:8px;
     }
 
-    .chart-wrap{
-      position:relative;
-      width:100%;
-      height:calc(100% - 20px);
-      min-height:240px;
-    }
+	.chart-wrap{
+	  position:relative;
+	  width:100%;
+	  height:190px;
+	  min-height:190px;
+	  max-height:190px;
+	}
 
-    .chart-wrap.chart-wrap-lg{
-      min-height:290px;
-    }
+	.chart-wrap.chart-wrap-lg{
+	  height:210px;
+	  min-height:210px;
+	  max-height:210px;
+	}
+	
+	.chart-wrap canvas{
+	  width:100% !important;
+	  height:100% !important;
+	  display:block;
+	}	
 
-    .table-card{
-      border:1px solid var(--pru-border);
-      border-radius:8px;
-      background:#fff;
-      padding:8px;
-      box-shadow:var(--pru-shadow);
-      height:100%;
-    }
+	.table-card{
+	  border:1px solid var(--pru-border);
+	  border-radius:8px;
+	  background:#fff;
+	  padding:6px;
+	  box-shadow:var(--pru-shadow);
+	  height:auto;
+	}
+	
+	.prod-table th,
+	.prod-table td{
+	  padding:4px 5px !important;
+	  font-size:9px !important;
+	}	
 
     .table-card-title{
       font-size:11px;
