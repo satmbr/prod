@@ -134,6 +134,49 @@
       margin-bottom:14px;
     }
 
+    /* ===== PADRÃO COMPACTO IGUAL AO OPERACAO/PRODUCAO ===== */
+    #colab-dados-pessoais.zone-body,
+    #colab-lista.zone-body{
+      padding:6px;
+    }
+
+    .zone-head[data-target="#colab-dados-pessoais"],
+    .zone-head[data-target="#colab-lista"]{
+      padding:5px 7px;
+    }
+
+    .zone-head[data-target="#colab-dados-pessoais"] .zone-title,
+    .zone-head[data-target="#colab-lista"] .zone-title{
+      font-size:10px;
+    }
+
+    .zone-head[data-target="#colab-dados-pessoais"] .zone-icon,
+    .zone-head[data-target="#colab-lista"] .zone-icon{
+      width:18px;
+      height:18px;
+      min-width:18px;
+      font-size:9px;
+      border-radius:6px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+    }
+
+    .zone-head[data-target="#colab-dados-pessoais"] .icon-btn,
+    .zone-head[data-target="#colab-lista"] .icon-btn{
+      width:18px;
+      height:18px;
+      min-width:18px;
+      border-radius:6px;
+      padding:0;
+    }
+
+    .zone-head[data-target="#colab-dados-pessoais"] .icon-btn svg,
+    .zone-head[data-target="#colab-lista"] .icon-btn svg{
+      width:9px;
+      height:9px;
+    }
+
     @media (max-width: 1200px){
       .toolbar-row.toolbar-2,
       .toolbar-row.toolbar-3,
@@ -176,6 +219,7 @@
         <button type="button" class="icon-btn caret">▾</button>
       </div>
     </header>
+
     <div class="zone-body collapsed" id="colab-dados-pessoais">
       <p class="subtitle-soft">Preencha as informações básicas do colaborador.</p>
 
@@ -244,7 +288,6 @@
           <div></div>
         </div>
 
-        <!-- FAMÍLIA E ORIGEM -->
         <div class="section-note">Família e origem</div>
 
         <div class="toolbar-row toolbar-3" style="margin-top:12px;">
@@ -264,7 +307,6 @@
           </label>
         </div>
 
-        <!-- DOCUMENTOS -->
         <div class="section-note">Documentos</div>
 
         <div class="toolbar-row toolbar-4" style="margin-top:12px;">
@@ -289,7 +331,6 @@
           </label>
         </div>
 
-        <!-- ENDEREÇO -->
         <div class="section-note">Endereço</div>
 
         <div class="toolbar-row toolbar-2" style="margin-top:12px;">
@@ -304,7 +345,6 @@
           </label>
         </div>
 
-        <!-- CONTRATO E FUNÇÃO -->
         <div class="section-note">Contrato e função</div>
 
         <div class="toolbar-row toolbar-4" style="margin-top:12px;">
@@ -371,7 +411,6 @@
           </label>
         </div>
 
-        <!-- JORNADA E FÉRIAS -->
         <div class="section-note">Jornada e férias</div>
 
         <div class="toolbar-row toolbar-4" style="margin-top:12px;">
