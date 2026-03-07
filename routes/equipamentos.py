@@ -222,37 +222,51 @@ def partdiaria():
     }
     where = []
     params = {}
-    if filtros["ini"]:
-        where.append("pd.data >= :ini"); params["ini"] = filtros["ini"]
-    if filtros["fim"]:
-        where.append("pd.data <= :fim"); params["fim"] = filtros["fim"]
-    if filtros["maq"]:
-        where.append("pd.maquina_id = :maq"); params["maq"] = filtros["maq"]
-    if filtros["act"]:
-        where.append("pd.atividade_id = :act"); params["act"] = filtros["act"]
-    wh = ("WHERE " + " AND ".join(where)) if where else ""
 
-    with get_engine().connect() as conn:
-        resultados = conn.execute(text(f"""
-            SELECT pd.id, pd.data,
-                   to_char(pd.hora_inicio, 'HH24:MI') AS hora_inicio,
-                   to_char(pd.hora_fim, 'HH24:MI')    AS hora_fim,
-                   pd.obs, pd.maquina_id, pd.atividade_id,
-                   m.tag AS maquina_tag, m.descricao AS maquina_desc,
-                   a.nome AS atividade_nome
-            FROM parte_diaria pd
-            JOIN maquina   m ON m.id = pd.maquina_id
-            JOIN atividade a ON a.id = pd.atividade_id
-            {wh}
-            ORDER BY pd.data DESC, pd.hora_inicio ASC
-            LIMIT 500
-        """), params).mappings().all()
+    if filtros["ini"]:
+        where.append("pd.data >= :ini")
+        params["ini"] = filtros["ini"]
+
+    if filtros["fim"]:
+        where.append("pd.data <= :fim")
+        params["fim"] = filtros["fim"]
+
+    if filtros["maq"]:
+        where.append("pd.maquina_id = :maq")
+        params["maq"] = filtros["maq"]
+
+    if filtros["act"]:
+        where.append("pd.atividade_id = :act")
+        params["act"] = filtros["act"]
+
+    tem_filtro = bool(where)
+    resultados = []
+
+    if tem_filtro:
+        wh = "WHERE " + " AND ".join(where)
+
+        with get_engine().connect() as conn:
+            resultados = conn.execute(text(f"""
+                SELECT pd.id, pd.data,
+                       to_char(pd.hora_inicio, 'HH24:MI') AS hora_inicio,
+                       to_char(pd.hora_fim, 'HH24:MI')    AS hora_fim,
+                       pd.obs, pd.maquina_id, pd.atividade_id,
+                       m.tag AS maquina_tag, m.descricao AS maquina_desc,
+                       a.nome AS atividade_nome
+                FROM parte_diaria pd
+                JOIN maquina   m ON m.id = pd.maquina_id
+                JOIN atividade a ON a.id = pd.atividade_id
+                {wh}
+                ORDER BY pd.data DESC, pd.hora_inicio ASC
+                LIMIT 500
+            """), params).mappings().all()
 
     maquinas, atividades = _listas_basicas()
     return render_template("equipamentos/partdiaria.html",
                            subnav_links=_subnav("partdiaria"),
                            filtros=filtros,
                            resultados=resultados,
+                           tem_filtro=tem_filtro,
                            maquinas=maquinas,
                            atividades=atividades,
                            today=date.today().isoformat(),
