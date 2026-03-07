@@ -5,6 +5,360 @@
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>{% block title %}PRUMAT{% endblock %}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+
+  <style>
+    :root{
+      --pru-blue:#16324F;
+      --pru-blue-2:#21486f;
+      --pru-blue-3:#2d5d8d;
+      --pru-yellow:#f2c200;
+      --pru-bg:#f4f7fb;
+      --pru-surface:#ffffff;
+      --pru-border:#d9e1ea;
+      --pru-text:#273240;
+      --pru-muted:#667487;
+      --pru-shadow:0 10px 24px rgba(18, 39, 61, .08);
+      --pru-radius:14px;
+      --pru-radius-sm:10px;
+    }
+
+    *{ box-sizing:border-box; }
+
+    html, body{
+      margin:0;
+      padding:0;
+      background:var(--pru-bg);
+      color:var(--pru-text);
+      font-family:Arial, Helvetica, sans-serif;
+    }
+
+    a{
+      color:inherit;
+      text-decoration:none;
+    }
+
+    .header{
+      position:sticky;
+      top:0;
+      z-index:1000;
+      background:linear-gradient(180deg, #16324F 0%, #1d3e61 100%);
+      box-shadow:0 3px 14px rgba(0,0,0,.10);
+    }
+
+    .header-top{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:18px;
+      padding:14px 22px 12px;
+    }
+
+    .brand{
+      display:flex;
+      align-items:center;
+      gap:14px;
+      min-width:0;
+    }
+
+    .brand img{
+      height:42px;
+      width:auto;
+      display:block;
+      object-fit:contain;
+    }
+
+    .brand-title{
+      color:#fff;
+      font-weight:700;
+      letter-spacing:.02em;
+      font-size:18px;
+    }
+
+    .nav-right{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      flex-wrap:wrap;
+    }
+
+    .header-nav{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      padding:0 22px 12px;
+      gap:14px;
+    }
+
+    .nav-left{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      flex-wrap:wrap;
+    }
+
+    .nav-link,
+    .home-icon{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      min-height:38px;
+      padding:8px 12px;
+      border-radius:999px;
+      color:#eef4fa;
+      transition:.18s ease;
+      border:1px solid transparent;
+      font-size:14px;
+      font-weight:600;
+      letter-spacing:.01em;
+    }
+
+    .nav-link:hover,
+    .home-icon:hover{
+      background:rgba(255,255,255,.10);
+      border-color:rgba(255,255,255,.14);
+    }
+
+    .home-icon{
+      width:40px;
+      padding:0;
+      background:rgba(255,255,255,.10);
+      border-color:rgba(255,255,255,.10);
+    }
+
+    .home-icon svg{
+      width:18px;
+      height:18px;
+      fill:#fff;
+      display:block;
+    }
+
+    .divider{
+      height:4px;
+      background:linear-gradient(90deg, var(--pru-yellow) 0%, #ffdc4d 100%);
+    }
+
+    .subnav{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      flex-wrap:wrap;
+      padding:10px 22px 12px;
+      background:#edf3f8;
+      border-bottom:1px solid var(--pru-border);
+    }
+
+    .subnav-link{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      min-height:36px;
+      padding:7px 14px;
+      border-radius:999px;
+      background:#fff;
+      border:1px solid var(--pru-border);
+      color:var(--pru-blue);
+      font-size:14px;
+      font-weight:600;
+      transition:.18s ease;
+    }
+
+    .subnav-link:hover{
+      background:#f7fbff;
+      border-color:#bfd0e0;
+    }
+
+    .subnav-link.active{
+      background:var(--pru-blue);
+      border-color:var(--pru-blue);
+      color:#fff;
+      box-shadow:0 6px 16px rgba(22,50,79,.18);
+    }
+
+    main{
+      padding:22px;
+    }
+
+    .page-wrap{
+      max-width:1500px;
+      margin:0 auto;
+      display:flex;
+      flex-direction:column;
+      gap:18px;
+    }
+
+    .zone{
+      background:var(--pru-surface);
+      border:1px solid var(--pru-border);
+      border-radius:var(--pru-radius);
+      overflow:hidden;
+      box-shadow:var(--pru-shadow);
+    }
+
+    .zone-head{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:16px;
+      padding:14px 18px;
+      background:linear-gradient(180deg, #fbfdff 0%, #f3f7fb 100%);
+      border-bottom:1px solid var(--pru-border);
+      cursor:pointer;
+      user-select:none;
+    }
+
+    .zone-left{
+      display:flex;
+      align-items:center;
+      gap:12px;
+      min-width:0;
+    }
+
+    .zone-icon{
+      width:34px;
+      height:34px;
+      min-width:34px;
+      border-radius:10px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      background:#eaf1f7;
+      color:var(--pru-blue);
+      font-size:16px;
+      box-shadow:inset 0 0 0 1px #d6e0ea;
+    }
+
+    .zone-title{
+      font-size:16px;
+      font-weight:700;
+      color:var(--pru-blue);
+      letter-spacing:.01em;
+    }
+
+    .zone-actions{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      flex-shrink:0;
+    }
+
+    .icon-btn{
+      width:34px;
+      height:34px;
+      border-radius:10px;
+      border:1px solid var(--pru-border);
+      background:#fff;
+      color:var(--pru-blue);
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      cursor:pointer;
+      transition:.18s ease;
+    }
+
+    .icon-btn:hover{
+      background:#f7fbff;
+      border-color:#bfd0e0;
+    }
+
+    .zone-body{
+      padding:18px;
+      background:#fff;
+    }
+
+    .zone-body.collapsed{
+      display:none;
+    }
+
+    .alert{
+      padding:12px 14px;
+      border-radius:12px;
+      border:1px solid #c9d7e6;
+      background:#eef6ff;
+      color:#204564;
+      box-shadow:var(--pru-shadow);
+    }
+
+    .table{
+      width:100%;
+      border-collapse:separate;
+      border-spacing:0;
+      background:#fff;
+      border:1px solid var(--pru-border);
+      border-radius:12px;
+      overflow:hidden;
+    }
+
+    .table thead th{
+      background:#f5f8fb;
+      color:#445366;
+      font-size:13px;
+      font-weight:700;
+      text-align:left;
+      padding:12px 12px;
+      border-bottom:1px solid var(--pru-border);
+      white-space:nowrap;
+    }
+
+    .table tbody td{
+      padding:11px 12px;
+      border-bottom:1px solid #edf1f5;
+      font-size:14px;
+      color:#2c3948;
+      background:#fff;
+    }
+
+    .table tbody tr:last-child td{
+      border-bottom:none;
+    }
+
+    .table tbody tr:hover td{
+      background:#fbfdff;
+    }
+
+    .num{
+      text-align:right;
+      font-variant-numeric:tabular-nums;
+    }
+
+    .container-fluid{
+      padding:0 !important;
+      margin:0 !important;
+    }
+
+    @media (max-width: 900px){
+      .header-top,
+      .header-nav,
+      .subnav,
+      main{
+        padding-left:14px;
+        padding-right:14px;
+      }
+
+      .header-top,
+      .header-nav{
+        flex-direction:column;
+        align-items:flex-start;
+      }
+
+      .nav-right,
+      .nav-left,
+      .subnav{
+        width:100%;
+      }
+
+      .brand img{
+        height:36px;
+      }
+
+      .zone-head{
+        padding:12px 14px;
+      }
+
+      .zone-body{
+        padding:14px;
+      }
+    }
+  </style>
 </head>
 <body>
 
@@ -14,9 +368,10 @@
       <img src="{{ url_for('static', filename='logo-prumat.png') }}" alt="Consórcio PRUMAT">
       <!--<div class="brand-title">Consórcio PRUMAT</div>-->
     </div>
+
     <div class="nav-right">
       <a class="nav-link" href="#user">{{ current_user_name }}</a>
-      <a class="nav-link" href="#help">HELP</a>
+      <a class="nav-link" href="#help">Help</a>
     </div>
   </div>
 
@@ -26,19 +381,16 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2 12h3v9h6v-6h2v6h6v-9h3z"/></svg>
       </a>
 
-      <!-- MENU PRINCIPAL (fixo) -->
-	  <a class="nav-link" href="{{ url_for('operacao.index') }}">Operação</a>
+      <a class="nav-link" href="{{ url_for('operacao.index') }}">Operação</a>
       <a class="nav-link" href="#manutencao">Manutenção</a>
       <a class="nav-link" href="{{ url_for('equipamentos.index') }}">Equipamentos</a>
       <a class="nav-link" href="#pdr">PDR</a>
-	  <a class="nav-link" href="{{ url_for('colaboradores.registro') }}">Colaboradores</a>
+      <a class="nav-link" href="{{ url_for('colaboradores.registro') }}">Colaboradores</a>
     </div>
   </nav>
 
-  <!-- Linha amarela -->
   <div class="divider"></div>
 
-  <!-- SUBLINKS: aparecem SOMENTE quando a view envia 'subnav_links' (Operação e filhos) -->
   {% if subnav_links %}
   <div class="subnav">
     {% for item in subnav_links %}
