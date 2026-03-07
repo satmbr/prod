@@ -4,15 +4,143 @@
 {% block content %}
 <div class="page-wrap">
 
+  <style>
+    .toolbar-row{
+      display:grid;
+      gap:12px;
+      align-items:end;
+    }
+    .toolbar-row.toolbar-5{
+      grid-template-columns: 1.1fr 1.2fr .9fr 1fr auto;
+    }
+    .toolbar-row.toolbar-4{
+      grid-template-columns: 1.1fr 1.2fr .9fr auto;
+    }
+    .toolbar-actions{
+      display:flex;
+      gap:8px;
+      align-items:end;
+      flex-wrap:wrap;
+      justify-content:flex-start;
+    }
+    .toolbar-actions .btn,
+    .toolbar-actions a.btn{
+      white-space:nowrap;
+    }
+    .field > span{
+      display:block;
+      margin-bottom:6px;
+      font-weight:600;
+      color:#394150;
+    }
+    .field input,
+    .field select{
+      width:100%;
+      min-height:38px;
+      padding:7px 10px;
+      border:1px solid #cfd6df;
+      border-radius:8px;
+      background:#fff;
+      box-sizing:border-box;
+    }
+    .zone-icon{
+      font-size:16px;
+      line-height:1;
+    }
+    .btn{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap:6px;
+      min-height:38px;
+      padding:8px 12px;
+      border:1px solid #bfc8d4;
+      border-radius:8px;
+      background:#f7f9fc;
+      color:#28323f;
+      text-decoration:none;
+      cursor:pointer;
+      box-sizing:border-box;
+    }
+    .btn:hover{
+      filter:brightness(.98);
+    }
+    .btn.primary{
+      background:#16324F;
+      border-color:#16324F;
+      color:#fff;
+    }
+    .btn.success{
+      background:#234d20;
+      border-color:#234d20;
+      color:#fff;
+    }
+    .btn.info{
+      background:#235d8a;
+      border-color:#235d8a;
+      color:#fff;
+    }
+    .btn.danger,
+    .btn.btn-danger{
+      background:#8b1e1e;
+      border-color:#8b1e1e;
+      color:#fff;
+    }
+    .subtle-filter{
+      margin-top:14px;
+      padding-top:14px;
+      border-top:1px solid #e3e8ef;
+    }
+    .section-note{
+      margin-top:12px;
+      padding:10px 12px;
+      border:1px dashed #cfd8e3;
+      border-radius:10px;
+      background:#f8fbff;
+      color:#35516b;
+      font-size:14px;
+    }
+    .row-actions{
+      display:flex;
+      gap:8px;
+      align-items:center;
+      flex-wrap:wrap;
+    }
+    .table .acoes-col{
+      min-width:140px;
+    }
+
+    @media (max-width: 1200px){
+      .toolbar-row.toolbar-5,
+      .toolbar-row.toolbar-4{
+        grid-template-columns: repeat(2, minmax(220px, 1fr));
+      }
+      .toolbar-actions{
+        grid-column:1 / -1;
+      }
+    }
+
+    @media (max-width: 700px){
+      .toolbar-row.toolbar-5,
+      .toolbar-row.toolbar-4{
+        grid-template-columns: 1fr;
+      }
+      .toolbar-actions .btn,
+      .toolbar-actions a.btn{
+        flex:1 1 auto;
+      }
+    }
+  </style>
+
   <!-- ==================== SEGMENTO 1 · REGISTRO EXECUTADO ==================== -->
   <section class="zone">
     <header class="zone-head" data-target="#z-executado">
       <div class="zone-left">
-        <span class="zone-icon">💡</span>
+        <span class="zone-icon">✅</span>
         <div class="zone-title">Registro Executado</div>
       </div>
       <div class="zone-actions">
-        <button type="button" class="icon-btn">
+        <button type="button" class="icon-btn" aria-label="Seção de executado">
           <svg viewBox="0 0 24 24" width="16" height="16">
             <path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/>
           </svg>
@@ -21,76 +149,79 @@
       </div>
     </header>
 
-    <!-- começa FECHADO; se keep_open == 'realizada', removemos 'collapsed' via JS -->
     <div class="zone-body collapsed" id="z-executado">
-      <form class="grid grid-5" method="post" action="{{ url_for('operacao.registro_realizada_create') }}">
-        <label class="field">
-          <span>EH *</span>
-          <select name="eh_id" required>
-            <option value="">-- selecione --</option>
-            {% for e in eh_list %}
-              <option value="{{ e.id }}" {{ 'selected' if feh and feh|string == e.id|string else '' }}>{{ e.eh }}</option>
-            {% endfor %}
-          </select>
-        </label>
+      <form method="post" action="{{ url_for('operacao.registro_realizada_create') }}">
+        <div class="toolbar-row toolbar-5">
+          <label class="field">
+            <span>EH *</span>
+            <select name="eh_id" required>
+              <option value="">-- selecione --</option>
+              {% for e in eh_list %}
+                <option value="{{ e.id }}" {{ 'selected' if feh and feh|string == e.id|string else '' }}>{{ e.eh }}</option>
+              {% endfor %}
+            </select>
+          </label>
 
-        <label class="field">
-          <span>Frente *</span>
-          <select name="frente_id" required>
-            <option value="">-- selecione --</option>
-            {% for f in fr_list %}
-              <option value="{{ f.id }}" {{ 'selected' if ffr and ffr|string == f.id|string else '' }}>{{ f.frente }}</option>
-            {% endfor %}
-          </select>
-        </label>
+          <label class="field">
+            <span>Frente *</span>
+            <select name="frente_id" required>
+              <option value="">-- selecione --</option>
+              {% for f in fr_list %}
+                <option value="{{ f.id }}" {{ 'selected' if ffr and ffr|string == f.id|string else '' }}>{{ f.frente }}</option>
+              {% endfor %}
+            </select>
+          </label>
 
-        <label class="field">
-          <span>Data *</span>
-          <input type="date" name="data" value="{{ fdt or '' }}" required>
-        </label>
+          <label class="field">
+            <span>Data *</span>
+            <input type="date" name="data" value="{{ fdt or '' }}" required>
+          </label>
 
-        <label class="field">
-          <span>Executado (dia) *</span>
-          <input type="number" name="realizado" min="0" step="1" placeholder="Qtd do dia" required>
-		  <button class="btn" type="submit">Salvar</button>
-        </label>
+          <label class="field">
+            <span>Executado (dia) *</span>
+            <input type="number" name="realizado" min="0" step="1" placeholder="Qtd do dia" required>
+          </label>
 
-        <div class="field align-end">
-          <!--<button class="btn" type="submit">Salvar</button>-->
+          <div class="toolbar-actions">
+            <button class="btn success" type="submit">💾 Salvar</button>
+          </div>
         </div>
       </form>
 
-      <!-- Filtro simples da lista -->
-      <form class="grid grid-4 subtle-filter" method="get" action="{{ url_for('operacao.registro') }}" style="margin-top:8px">
-        <label class="field">
-          <span>Filtrar EH</span>
-          <select name="feh">
-            <option value="">(todos)</option>
-            {% for e in eh_list %}
-              <option value="{{ e.id }}" {{ 'selected' if feh and feh|string == e.id|string else '' }}>{{ e.eh }}</option>
-            {% endfor %}
-          </select>
-        </label>
-        <label class="field">
-          <span>Filtrar Frente</span>
-          <select name="ffr">
-            <option value="">(todas)</option>
-            {% for f in fr_list %}
-              <option value="{{ f.id }}" {{ 'selected' if ffr and ffr|string == f.id|string else '' }}>{{ f.frente }}</option>
-            {% endfor %}
-          </select>
-        </label>
-        <label class="field">
-          <span>Data</span>
-          <input type="date" name="fdt" value="{{ fdt or '' }}">
-		  <button class="btn" type="submit">Aplicar</button>
-        </label>
-        <div class="field align-end">
-          <!--<button class="btn" type="submit">Aplicar</button>-->
+      <form method="get" action="{{ url_for('operacao.registro') }}" class="subtle-filter">
+        <div class="toolbar-row toolbar-4">
+          <label class="field">
+            <span>Filtrar EH</span>
+            <select name="feh">
+              <option value="">(todos)</option>
+              {% for e in eh_list %}
+                <option value="{{ e.id }}" {{ 'selected' if feh and feh|string == e.id|string else '' }}>{{ e.eh }}</option>
+              {% endfor %}
+            </select>
+          </label>
+
+          <label class="field">
+            <span>Filtrar Frente</span>
+            <select name="ffr">
+              <option value="">(todas)</option>
+              {% for f in fr_list %}
+                <option value="{{ f.id }}" {{ 'selected' if ffr and ffr|string == f.id|string else '' }}>{{ f.frente }}</option>
+              {% endfor %}
+            </select>
+          </label>
+
+          <label class="field">
+            <span>Data</span>
+            <input type="date" name="fdt" value="{{ fdt or '' }}">
+          </label>
+
+          <div class="toolbar-actions">
+            <button class="btn primary" type="submit">🔍 Aplicar</button>
+          </div>
         </div>
       </form>
 
-      <div style="margin-top:10px">
+      <div style="margin-top:12px">
         <table class="table">
           <thead>
             <tr>
@@ -98,7 +229,7 @@
               <th>EH</th>
               <th>FRENTE</th>
               <th>EXECUTADO DIA</th>
-              <th style="width:1%"></th>
+              <th class="acoes-col"></th>
             </tr>
           </thead>
           <tbody>
@@ -110,10 +241,12 @@
                 <td>{{ r.frente_nome }}</td>
                 <td class="num">{{ r.realizado }}</td>
                 <td>
-                  <form method="post" action="{{ url_for('operacao.registro_realizada_delete') }}" onsubmit="return confirm('Excluir registro executado?')">
-                    <input type="hidden" name="id" value="{{ r.id }}">
-                    <button class="btn btn-danger" type="submit">Excluir</button>
-                  </form>
+                  <div class="row-actions">
+                    <form method="post" action="{{ url_for('operacao.registro_realizada_delete') }}" onsubmit="return confirm('Excluir registro executado?')">
+                      <input type="hidden" name="id" value="{{ r.id }}">
+                      <button class="btn danger" type="submit">🗑️ Excluir</button>
+                    </form>
+                  </div>
                 </td>
               </tr>
               {% endfor %}
@@ -130,11 +263,11 @@
   <section class="zone">
     <header class="zone-head" data-target="#z-planejado">
       <div class="zone-left">
-        <span class="zone-icon">💡</span>
+        <span class="zone-icon">📋</span>
         <div class="zone-title">Registro Planejado</div>
       </div>
       <div class="zone-actions">
-        <button type="button" class="icon-btn">
+        <button type="button" class="icon-btn" aria-label="Seção de planejado">
           <svg viewBox="0 0 24 24" width="16" height="16">
             <path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/>
           </svg>
@@ -143,76 +276,79 @@
       </div>
     </header>
 
-    <!-- começa FECHADO; se keep_open == 'planejada', removemos 'collapsed' via JS -->
     <div class="zone-body collapsed" id="z-planejado">
-      <form class="grid grid-5" method="post" action="{{ url_for('operacao.registro_planejada_create') }}">
-        <label class="field">
-          <span>EH *</span>
-          <select name="eh_id" required>
-            <option value="">-- selecione --</option>
-            {% for e in eh_list %}
-              <option value="{{ e.id }}" {{ 'selected' if feh and feh|string == e.id|string else '' }}>{{ e.eh }}</option>
-            {% endfor %}
-          </select>
-        </label>
+      <form method="post" action="{{ url_for('operacao.registro_planejada_create') }}">
+        <div class="toolbar-row toolbar-5">
+          <label class="field">
+            <span>EH *</span>
+            <select name="eh_id" required>
+              <option value="">-- selecione --</option>
+              {% for e in eh_list %}
+                <option value="{{ e.id }}" {{ 'selected' if feh and feh|string == e.id|string else '' }}>{{ e.eh }}</option>
+              {% endfor %}
+            </select>
+          </label>
 
-        <label class="field">
-          <span>Frente *</span>
-          <select name="frente_id" required>
-            <option value="">-- selecione --</option>
-            {% for f in fr_list %}
-              <option value="{{ f.id }}" {{ 'selected' if ffr and ffr|string == f.id|string else '' }}>{{ f.frente }}</option>
-            {% endfor %}
-          </select>
-        </label>
+          <label class="field">
+            <span>Frente *</span>
+            <select name="frente_id" required>
+              <option value="">-- selecione --</option>
+              {% for f in fr_list %}
+                <option value="{{ f.id }}" {{ 'selected' if ffr and ffr|string == f.id|string else '' }}>{{ f.frente }}</option>
+              {% endfor %}
+            </select>
+          </label>
 
-        <label class="field">
-          <span>Data *</span>
-          <input type="date" name="data" value="{{ fdt or '' }}" required>
-        </label>
+          <label class="field">
+            <span>Data *</span>
+            <input type="date" name="data" value="{{ fdt or '' }}" required>
+          </label>
 
-        <label class="field">
-          <span>Planejado (dia) *</span>
-          <input type="number" name="planejado" min="0" step="1" placeholder="Qtd do dia" required>
-		  <button class="btn" type="submit">Salvar</button>
-        </label>
+          <label class="field">
+            <span>Planejado (dia) *</span>
+            <input type="number" name="planejado" min="0" step="1" placeholder="Qtd do dia" required>
+          </label>
 
-        <div class="field align-end">
-          <!--<button class="btn" type="submit">Salvar</button>-->
+          <div class="toolbar-actions">
+            <button class="btn success" type="submit">💾 Salvar</button>
+          </div>
         </div>
       </form>
 
-      <!-- Filtro simples da lista -->
-      <form class="grid grid-4 subtle-filter" method="get" action="{{ url_for('operacao.registro') }}" style="margin-top:8px">
-        <label class="field">
-          <span>Filtrar EH</span>
-          <select name="feh">
-            <option value="">(todos)</option>
-            {% for e in eh_list %}
-              <option value="{{ e.id }}" {{ 'selected' if feh and feh|string == e.id|string else '' }}>{{ e.eh }}</option>
-            {% endfor %}
-          </select>
-        </label>
-        <label class="field">
-          <span>Filtrar Frente</span>
-          <select name="ffr">
-            <option value="">(todas)</option>
-            {% for f in fr_list %}
-              <option value="{{ f.id }}" {{ 'selected' if ffr and ffr|string == f.id|string else '' }}>{{ f.frente }}</option>
-            {% endfor %}
-          </select>
-        </label>
-        <label class="field">
-          <span>Data</span>
-          <input type="date" name="fdt" value="{{ fdt or '' }}">
-		  <button class="btn" type="submit">Aplicar</button>
-        </label>
-        <div class="field align-end">
-          <!--<button class="btn" type="submit">Aplicar</button>-->
+      <form method="get" action="{{ url_for('operacao.registro') }}" class="subtle-filter">
+        <div class="toolbar-row toolbar-4">
+          <label class="field">
+            <span>Filtrar EH</span>
+            <select name="feh">
+              <option value="">(todos)</option>
+              {% for e in eh_list %}
+                <option value="{{ e.id }}" {{ 'selected' if feh and feh|string == e.id|string else '' }}>{{ e.eh }}</option>
+              {% endfor %}
+            </select>
+          </label>
+
+          <label class="field">
+            <span>Filtrar Frente</span>
+            <select name="ffr">
+              <option value="">(todas)</option>
+              {% for f in fr_list %}
+                <option value="{{ f.id }}" {{ 'selected' if ffr and ffr|string == f.id|string else '' }}>{{ f.frente }}</option>
+              {% endfor %}
+            </select>
+          </label>
+
+          <label class="field">
+            <span>Data</span>
+            <input type="date" name="fdt" value="{{ fdt or '' }}">
+          </label>
+
+          <div class="toolbar-actions">
+            <button class="btn primary" type="submit">🔍 Aplicar</button>
+          </div>
         </div>
       </form>
 
-      <div style="margin-top:10px">
+      <div style="margin-top:12px">
         <table class="table">
           <thead>
             <tr>
@@ -220,7 +356,7 @@
               <th>EH</th>
               <th>FRENTE</th>
               <th>PLANEJADO DIA</th>
-              <th style="width:1%"></th>
+              <th class="acoes-col"></th>
             </tr>
           </thead>
           <tbody>
@@ -232,10 +368,12 @@
                 <td>{{ r.frente_nome }}</td>
                 <td class="num">{{ r.planejado }}</td>
                 <td>
-                  <form method="post" action="{{ url_for('operacao.registro_planejada_delete') }}" onsubmit="return confirm('Excluir registro planejado?')">
-                    <input type="hidden" name="id" value="{{ r.id }}">
-                    <button class="btn btn-danger" type="submit">Excluir</button>
-                  </form>
+                  <div class="row-actions">
+                    <form method="post" action="{{ url_for('operacao.registro_planejada_delete') }}" onsubmit="return confirm('Excluir registro planejado?')">
+                      <input type="hidden" name="id" value="{{ r.id }}">
+                      <button class="btn danger" type="submit">🗑️ Excluir</button>
+                    </form>
+                  </div>
                 </td>
               </tr>
               {% endfor %}
@@ -252,32 +390,83 @@
 </div>
 
 <script>
-  // Toggle de zonas
-  document.querySelectorAll('.zone-head').forEach(h => {
-    h.addEventListener('click', (e) => {
-      if (e.target.closest('.icon-btn') && !e.target.closest('.caret')) return;
-      const sel = h.getAttribute('data-target');
+  const zoneStorageKey = "operacao_registro_zone_state";
+
+  function getZoneState() {
+    try {
+      return JSON.parse(localStorage.getItem(zoneStorageKey) || "{}");
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function setZoneState(state) {
+    localStorage.setItem(zoneStorageKey, JSON.stringify(state));
+  }
+
+  function setZoneOpen(sel, open) {
+    const body = document.querySelector(sel);
+    const head = document.querySelector(`.zone-head[data-target="${sel}"]`);
+    const caret = head ? head.querySelector(".caret") : null;
+
+    if (!body) return;
+
+    if (open) {
+      body.classList.remove("collapsed");
+      if (caret) caret.textContent = "▴";
+    } else {
+      body.classList.add("collapsed");
+      if (caret) caret.textContent = "▾";
+    }
+  }
+
+  document.querySelectorAll(".zone-head").forEach(h => {
+    const sel = h.getAttribute("data-target");
+    const state = getZoneState();
+    const saved = state[sel];
+
+    if (saved === true) {
+      setZoneOpen(sel, true);
+    } else if (saved === false) {
+      setZoneOpen(sel, false);
+    } else {
       const body = document.querySelector(sel);
-      const caret = h.querySelector('.caret');
-      if (body) body.classList.toggle('collapsed');
-      if (caret) caret.textContent = (caret.textContent.trim() === '▴') ? '▾' : '▴';
+      const caret = h.querySelector(".caret");
+      if (body && !body.classList.contains("collapsed")) {
+        if (caret) caret.textContent = "▴";
+      } else {
+        if (caret) caret.textContent = "▾";
+      }
+    }
+
+    h.addEventListener("click", (e) => {
+      if (e.target.closest(".icon-btn") && !e.target.closest(".caret")) return;
+
+      const body = document.querySelector(sel);
+      if (!body) return;
+
+      const willOpen = body.classList.contains("collapsed");
+      setZoneOpen(sel, willOpen);
+
+      const state = getZoneState();
+      state[sel] = willOpen;
+      setZoneState(state);
     });
   });
 
-  // Manter aberto após salvar
   (function(){
     const keep = "{{ keep_open or '' }}";
     if (keep === "realizada") {
-      const body = document.querySelector("#z-executado");
-      const caret = document.querySelector('header[data-target="#z-executado"] .caret');
-      if (body && body.classList.contains('collapsed')) body.classList.remove('collapsed');
-      if (caret) caret.textContent = '▴';
+      const state = getZoneState();
+      state["#z-executado"] = true;
+      setZoneState(state);
+      setZoneOpen("#z-executado", true);
     }
     if (keep === "planejada") {
-      const body = document.querySelector("#z-planejado");
-      const caret = document.querySelector('header[data-target="#z-planejado"] .caret');
-      if (body && body.classList.contains('collapsed')) body.classList.remove('collapsed');
-      if (caret) caret.textContent = '▴';
+      const state = getZoneState();
+      state["#z-planejado"] = true;
+      setZoneState(state);
+      setZoneOpen("#z-planejado", true);
     }
   })();
 </script>
