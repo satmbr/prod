@@ -5,12 +5,12 @@
 <div class="page-wrap">
 
   <style>
-    .prod-toolbar{
-      display:grid;
-      grid-template-columns: 1fr 1fr auto;
-      gap:10px;
-      align-items:end;
-    }
+	.prod-toolbar{
+	  display:grid;
+	  grid-template-columns: 1fr 1fr auto;
+	  gap:6px;
+	  align-items:end;
+	}
 
     .prod-toolbar .field > span{
       display:block;
@@ -24,12 +24,12 @@
       width:100%;
     }
 
-    .prod-actions{
-      display:flex;
-      gap:6px;
-      align-items:end;
-      flex-wrap:wrap;
-    }
+	.prod-actions{
+	  display:flex;
+	  gap:4px;
+	  align-items:end;
+	  flex-wrap:wrap;
+	}
 
 	.prod-hero{
 	  display:grid;
@@ -101,12 +101,12 @@
 	  height:250px;
 	}
 
-    .chart-title{
-      font-size:11px;
-      font-weight:700;
-      color:var(--pru-blue);
-      margin-bottom:8px;
-    }
+	.chart-title{
+	  font-size:9px;
+	  font-weight:700;
+	  color:var(--pru-blue);
+	  margin-bottom:5px;
+	}
 
 	.chart-wrap{
 	  position:relative;
@@ -143,22 +143,34 @@
 	  font-size:9px !important;
 	}	
 
-    .table-card-title{
-      font-size:11px;
-      font-weight:700;
-      color:var(--pru-blue);
-      margin-bottom:8px;
-    }
+	.table-card-title{
+	  font-size:9px;
+	  font-weight:700;
+	  color:var(--pru-blue);
+	  margin-bottom:5px;
+	}
 
     .linha-destaque{
       background-color:#E2EFDA !important;
     }
 
-    .prod-table th,
-    .prod-table td{
-      text-align:center;
-      white-space:nowrap;
-    }
+	.prod-table th,
+	.prod-table td{
+	  text-align:center;
+	  white-space:nowrap;
+	  line-height:1.05;
+	}
+	
+	#op-frentes .prod-table th,
+	#op-frentes .prod-table td{
+	  padding:3px 4px !important;
+	  font-size:8px !important;
+	}
+
+	#op-frentes .table-wrap{
+	  max-height:340px;
+	  overflow:auto;
+	}
 
     .prod-table td.text-left,
     .prod-table th.text-left{
@@ -333,6 +345,60 @@
         justify-items:start;
       }
     }
+	
+	#op-prod-filtros.zone-body,
+	#op-renovacao.zone-body,
+	#op-partdiaria.zone-body,
+	#op-frentes.zone-body,
+	#op-gauges.zone-body{
+	  padding:6px;
+	}
+
+	.zone-head[data-target="#op-prod-filtros"],
+	.zone-head[data-target="#op-renovacao"],
+	.zone-head[data-target="#op-partdiaria"],
+	.zone-head[data-target="#op-frentes"],
+	.zone-head[data-target="#op-gauges"]{
+	  padding:5px 7px;
+	}
+
+	.zone-head[data-target="#op-prod-filtros"] .zone-title,
+	.zone-head[data-target="#op-renovacao"] .zone-title,
+	.zone-head[data-target="#op-partdiaria"] .zone-title,
+	.zone-head[data-target="#op-frentes"] .zone-title,
+	.zone-head[data-target="#op-gauges"] .zone-title{
+	  font-size:10px;
+	}
+
+	.zone-head[data-target="#op-prod-filtros"] .zone-icon,
+	.zone-head[data-target="#op-renovacao"] .zone-icon,
+	.zone-head[data-target="#op-partdiaria"] .zone-icon,
+	.zone-head[data-target="#op-frentes"] .zone-icon,
+	.zone-head[data-target="#op-gauges"] .zone-icon{
+	  width:18px;
+	  height:18px;
+	  min-width:18px;
+	  font-size:9px;
+	}
+
+	.zone-head[data-target="#op-prod-filtros"] .icon-btn,
+	.zone-head[data-target="#op-renovacao"] .icon-btn,
+	.zone-head[data-target="#op-partdiaria"] .icon-btn,
+	.zone-head[data-target="#op-frentes"] .icon-btn,
+	.zone-head[data-target="#op-gauges"] .icon-btn{
+	  width:18px;
+	  height:18px;
+	}
+
+	.zone-head[data-target="#op-prod-filtros"] .icon-btn svg,
+	.zone-head[data-target="#op-renovacao"] .icon-btn svg,
+	.zone-head[data-target="#op-partdiaria"] .icon-btn svg,
+	.zone-head[data-target="#op-frentes"] .icon-btn svg,
+	.zone-head[data-target="#op-gauges"] .icon-btn svg{
+	  width:9px;
+	  height:9px;
+	}	
+	
   </style>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
