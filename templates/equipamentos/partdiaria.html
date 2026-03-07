@@ -143,6 +143,67 @@
       min-width:210px;
     }
 
+    /* ===== PADRÃO COMPACTO IGUAL AO OPERACAO/PRODUCAO ===== */
+    #pd-lancar.zone-body,
+    #pd-listar.zone-body,
+    #act-cadastrar.zone-body,
+    #act-editar.zone-body,
+    #act-excluir.zone-body{
+      padding:6px;
+    }
+
+    .zone-head[data-target="#pd-lancar"],
+    .zone-head[data-target="#pd-listar"],
+    .zone-head[data-target="#act-cadastrar"],
+    .zone-head[data-target="#act-editar"],
+    .zone-head[data-target="#act-excluir"]{
+      padding:5px 7px;
+    }
+
+    .zone-head[data-target="#pd-lancar"] .zone-title,
+    .zone-head[data-target="#pd-listar"] .zone-title,
+    .zone-head[data-target="#act-cadastrar"] .zone-title,
+    .zone-head[data-target="#act-editar"] .zone-title,
+    .zone-head[data-target="#act-excluir"] .zone-title{
+      font-size:10px;
+    }
+
+    .zone-head[data-target="#pd-lancar"] .zone-icon,
+    .zone-head[data-target="#pd-listar"] .zone-icon,
+    .zone-head[data-target="#act-cadastrar"] .zone-icon,
+    .zone-head[data-target="#act-editar"] .zone-icon,
+    .zone-head[data-target="#act-excluir"] .zone-icon{
+      width:18px;
+      height:18px;
+      min-width:18px;
+      font-size:9px;
+      border-radius:6px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+    }
+
+    .zone-head[data-target="#pd-lancar"] .icon-btn,
+    .zone-head[data-target="#pd-listar"] .icon-btn,
+    .zone-head[data-target="#act-cadastrar"] .icon-btn,
+    .zone-head[data-target="#act-editar"] .icon-btn,
+    .zone-head[data-target="#act-excluir"] .icon-btn{
+      width:18px;
+      height:18px;
+      min-width:18px;
+      border-radius:6px;
+      padding:0;
+    }
+
+    .zone-head[data-target="#pd-lancar"] .icon-btn svg,
+    .zone-head[data-target="#pd-listar"] .icon-btn svg,
+    .zone-head[data-target="#act-cadastrar"] .icon-btn svg,
+    .zone-head[data-target="#act-editar"] .icon-btn svg,
+    .zone-head[data-target="#act-excluir"] .icon-btn svg{
+      width:9px;
+      height:9px;
+    }
+
     @media (max-width: 1200px){
       .toolbar-row{
         grid-template-columns: repeat(2, minmax(220px, 1fr));
