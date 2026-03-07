@@ -68,10 +68,13 @@
 		<hr style="margin:16px 0;">
 
 		<div id="pd-lote-area">
-		  <h4 style="margin-bottom:10px;">
-			Lançamentos pendentes
-			<span id="pd-contador" style="font-size:14px; color:#666;">(0 itens)</span>
-		  </h4>
+			<h4 style="margin-bottom:10px; display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+			  <span>
+				Lançamentos pendentes
+				<span id="pd-contador" style="font-size:14px; color:#666;">(0 itens)</span>
+			  </span>
+			  <span id="pd-total-duracao" style="font-size:14px; color:#666;">Total: 0min</span>
+			</h4>
 
 		  <div style="overflow:auto;">
 			<table class="table" id="pd-lote-tabela">
@@ -290,6 +293,15 @@
 <script>
   const pdLancamentos = [];
 
+	function pdDuracaoEmMinutos(inicio, fim) {
+	  const [hi, mi] = inicio.split(":").map(Number);
+	  const [hf, mf] = fim.split(":").map(Number);
+
+	  const minutosInicio = hi * 60 + mi;
+	  const minutosFim = hf * 60 + mf;
+	  return Math.max(0, minutosFim - minutosInicio);
+	}
+
 	function pdCalcularDuracao(inicio, fim) {
 	  const [hi, mi] = inicio.split(":").map(Number);
 	  const [hf, mf] = fim.split(":").map(Number);
@@ -312,10 +324,11 @@
 	  return `${minutos}min`;
 	}
 
-  function pdRenderTabela() {
-	const body = document.getElementById("pd-lote-body");
-	const hidden = document.getElementById("pd_lancamentos_json");
-	const contador = document.getElementById("pd-contador");
+	function pdRenderTabela() {
+	  const body = document.getElementById("pd-lote-body");
+	  const hidden = document.getElementById("pd_lancamentos_json");
+	  const contador = document.getElementById("pd-contador");
+	  const totalDuracao = document.getElementById("pd-total-duracao");
 
     body.innerHTML = "";
 
@@ -346,6 +359,22 @@
     }
 	
 	contador.textContent = `(${pdLancamentos.length} ${pdLancamentos.length === 1 ? "item" : "itens"})`;
+	
+	const totalMinutos = pdLancamentos.reduce(function (acc, item) {
+	  return acc + pdDuracaoEmMinutos(item.hora_inicio, item.hora_fim);
+	}, 0);
+
+	const horas = Math.floor(totalMinutos / 60);
+	const minutos = totalMinutos % 60;
+
+	if (horas > 0 && minutos > 0) {
+	  totalDuracao.textContent = `Total: ${horas}h ${minutos}min`;
+	} else if (horas > 0) {
+	  totalDuracao.textContent = `Total: ${horas}h`;
+	} else {
+	  totalDuracao.textContent = `Total: ${minutos}min`;
+	}	
+	
     hidden.value = JSON.stringify(pdLancamentos);
   }
   
