@@ -82,13 +82,14 @@
 				  <th>Atividade</th>
 				  <th>Início</th>
 				  <th>Fim</th>
+				  <th>Duração</th>
 				  <th>Obs</th>
 				  <th>Ações</th>
 				</tr>
 			  </thead>
 			  <tbody id="pd-lote-body">
 				<tr id="pd-lote-vazio">
-				  <td colspan="7">Nenhum lançamento adicionado ainda.</td>
+				  <td colspan="8">Nenhum lançamento adicionado ainda.</td>
 				</tr>
 			  </tbody>
 			</table>
@@ -289,6 +290,28 @@
 <script>
   const pdLancamentos = [];
 
+	function pdCalcularDuracao(inicio, fim) {
+	  const [hi, mi] = inicio.split(":").map(Number);
+	  const [hf, mf] = fim.split(":").map(Number);
+
+	  const minutosInicio = hi * 60 + mi;
+	  const minutosFim = hf * 60 + mf;
+	  const diff = minutosFim - minutosInicio;
+
+	  if (diff <= 0) return "-";
+
+	  const horas = Math.floor(diff / 60);
+	  const minutos = diff % 60;
+
+	  if (horas > 0 && minutos > 0) {
+		return `${horas}h ${minutos}min`;
+	  }
+	  if (horas > 0) {
+		return `${horas}h`;
+	  }
+	  return `${minutos}min`;
+	}
+
   function pdRenderTabela() {
 	const body = document.getElementById("pd-lote-body");
 	const hidden = document.getElementById("pd_lancamentos_json");
@@ -299,7 +322,7 @@
     if (pdLancamentos.length === 0) {
       body.innerHTML = `
         <tr id="pd-lote-vazio">
-          <td colspan="7">Nenhum lançamento adicionado ainda.</td>
+          <td colspan="8">Nenhum lançamento adicionado ainda.</td>
         </tr>
       `;
     } else {
@@ -307,11 +330,12 @@
         const tr = document.createElement("tr");
         tr.innerHTML = `
           <td>${item.data}</td>
-          <td>${item.maquina_label}</td>
-          <td>${item.atividade_label}</td>
-          <td>${item.hora_inicio}</td>
-          <td>${item.hora_fim}</td>
-          <td>${item.obs || ""}</td>
+		  <td>${item.maquina_label}</td>
+		  <td>${item.atividade_label}</td>
+		  <td>${item.hora_inicio}</td>
+		  <td>${item.hora_fim}</td>
+		  <td>${pdCalcularDuracao(item.hora_inicio, item.hora_fim)}</td>
+		  <td>${item.obs || ""}</td>
           <td style="display:flex; gap:6px;">
 			 <button type="button" class="btn" onclick="pdEditarLancamento(${index})">Editar</button>
 			 <button type="button" class="btn" onclick="pdRemoverLancamento(${index})">Remover</button>
