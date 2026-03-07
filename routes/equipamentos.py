@@ -372,9 +372,21 @@ def part_update():
                  WHERE id=:id
             """), dict(id=id_, data=data, atividade_id=atividade_id,
                        hora_inicio=hora_inicio, hora_fim=hora_fim, obs=obs))
-        return redirect(url_for("equipamentos.partdiaria", msg="Lançamento atualizado."))
+        return redirect(url_for(
+            "equipamentos.partdiaria",
+            msg="Lançamento atualizado.",
+            ini=request.form.get("ini", ""),
+            fim=request.form.get("fim", ""),
+            maq=request.form.get("maq", ""),
+            act=request.form.get("act", ""),
+        ))
     except Exception as e:
-        return redirect(url_for("equipamentos.partdiaria", msg=f"Erro ao atualizar: {e}"))
+        return redirect(url_for("equipamentos.partdiaria", msg=f"Erro ao atualizar: {e}",
+            ini=request.form.get("ini", ""),
+            fim=request.form.get("fim", ""),
+            maq=request.form.get("maq", ""),
+            act=request.form.get("act", ""),
+        ))
 
 @bp.post("/partdiaria/item/delete")
 def part_delete():
@@ -384,9 +396,21 @@ def part_delete():
     try:
         with get_engine().begin() as conn:
             conn.execute(text("DELETE FROM parte_diaria WHERE id=:id"), {"id": id_})
-        return redirect(url_for("equipamentos.partdiaria", msg="Lançamento excluído."))
+        return redirect(url_for(
+            "equipamentos.partdiaria",
+            msg="Lançamento excluído.",
+            ini=request.form.get("ini", ""),
+            fim=request.form.get("fim", ""),
+            maq=request.form.get("maq", ""),
+            act=request.form.get("act", ""),
+        ))
     except Exception as e:
-        return redirect(url_for("equipamentos.partdiaria", msg=f"Erro ao excluir: {e}"))
+        return redirect(url_for("equipamentos.partdiaria", msg=f"Erro ao excluir: {e}",
+            ini=request.form.get("ini", ""),
+            fim=request.form.get("fim", ""),
+            maq=request.form.get("maq", ""),
+            act=request.form.get("act", ""),
+        ))
 
 # ---------- CRUD Atividade ----------
 @bp.post("/atividade/create")
