@@ -291,15 +291,67 @@
 </div>
 
 <script>
-  // Toggle das zonas
-  document.querySelectorAll('.zone-head').forEach(h => {
-    h.addEventListener('click', (e) => {
-      if (e.target.closest('.icon-btn') && !e.target.closest('.caret')) return;
-      const sel = h.getAttribute('data-target');
+  const zoneStorageKey = "equipamentos_partdiaria_zone_state";
+
+  function getZoneState() {
+    try {
+      return JSON.parse(localStorage.getItem(zoneStorageKey) || "{}");
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function setZoneState(state) {
+    localStorage.setItem(zoneStorageKey, JSON.stringify(state));
+  }
+
+  function setZoneOpen(sel, open) {
+    const body = document.querySelector(sel);
+    const head = document.querySelector(`.zone-head[data-target="${sel}"]`);
+    const caret = head ? head.querySelector(".caret") : null;
+
+    if (!body) return;
+
+    if (open) {
+      body.classList.remove("collapsed");
+      if (caret) caret.textContent = "▴";
+    } else {
+      body.classList.add("collapsed");
+      if (caret) caret.textContent = "▾";
+    }
+  }
+
+  document.querySelectorAll(".zone-head").forEach(h => {
+    const sel = h.getAttribute("data-target");
+    const state = getZoneState();
+    const saved = state[sel];
+
+    if (saved === true) {
+      setZoneOpen(sel, true);
+    } else if (saved === false) {
+      setZoneOpen(sel, false);
+    } else {
       const body = document.querySelector(sel);
-      const caret = h.querySelector('.caret');
-      if (body) body.classList.toggle('collapsed');
-      if (caret) caret.textContent = (caret.textContent.trim() === '▴') ? '▾' : '▴';
+      const caret = h.querySelector(".caret");
+      if (body && !body.classList.contains("collapsed")) {
+        if (caret) caret.textContent = "▴";
+      } else {
+        if (caret) caret.textContent = "▾";
+      }
+    }
+
+    h.addEventListener("click", (e) => {
+      if (e.target.closest(".icon-btn") && !e.target.closest(".caret")) return;
+
+      const body = document.querySelector(sel);
+      if (!body) return;
+
+      const willOpen = body.classList.contains("collapsed");
+      setZoneOpen(sel, willOpen);
+
+      const state = getZoneState();
+      state[sel] = willOpen;
+      setZoneState(state);
     });
   });
 </script>
