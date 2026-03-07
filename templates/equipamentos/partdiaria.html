@@ -152,10 +152,11 @@
           {% endfor %}
         </select>
       </label>
-      <div class="field align-end" style="display:flex; gap:8px;">
-        <button class="btn" type="submit">Aplicar Filtros</button>
-        <a class="btn" href="{{ url_for('equipamentos.partdiaria') }}">Limpar</a>
-      </div>
+	  <div class="field align-end" style="display:flex; gap:8px; flex-wrap:wrap;">
+		<button class="btn" type="submit">Aplicar Filtros</button>
+		<button class="btn" type="submit" formaction="{{ url_for('equipamentos.part_export') }}">Exportar</button>
+		<a class="btn" href="{{ url_for('equipamentos.partdiaria') }}">Limpar</a>
+	  </div>
     </form>
 
     <div style="margin-top:12px">
