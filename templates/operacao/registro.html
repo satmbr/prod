@@ -110,6 +110,49 @@
       min-width:140px;
     }
 
+    /* ===== PADRÃO COMPACTO IGUAL AO OPERACAO/PRODUCAO ===== */
+    #z-executado.zone-body,
+    #z-planejado.zone-body{
+      padding:6px;
+    }
+
+    .zone-head[data-target="#z-executado"],
+    .zone-head[data-target="#z-planejado"]{
+      padding:5px 7px;
+    }
+
+    .zone-head[data-target="#z-executado"] .zone-title,
+    .zone-head[data-target="#z-planejado"] .zone-title{
+      font-size:10px;
+    }
+
+    .zone-head[data-target="#z-executado"] .zone-icon,
+    .zone-head[data-target="#z-planejado"] .zone-icon{
+      width:18px;
+      height:18px;
+      min-width:18px;
+      font-size:9px;
+      border-radius:6px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+    }
+
+    .zone-head[data-target="#z-executado"] .icon-btn,
+    .zone-head[data-target="#z-planejado"] .icon-btn{
+      width:18px;
+      height:18px;
+      min-width:18px;
+      border-radius:6px;
+      padding:0;
+    }
+
+    .zone-head[data-target="#z-executado"] .icon-btn svg,
+    .zone-head[data-target="#z-planejado"] .icon-btn svg{
+      width:9px;
+      height:9px;
+    }
+
     @media (max-width: 1200px){
       .toolbar-row.toolbar-5,
       .toolbar-row.toolbar-4{
