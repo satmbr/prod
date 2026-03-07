@@ -840,7 +840,7 @@
         labels: labelsRen,
         datasets: [
           {
-            label: 'Previsto dia',
+            label: 'Planejado no dia',
             data: previstoDia,
             backgroundColor: 'rgba(0, 123, 255, 0.5)',
             borderColor: 'rgba(0, 123, 255, 1)',
@@ -848,7 +848,7 @@
             yAxisID: 'y'
           },
           {
-            label: 'Realizado dia',
+            label: 'Executado no dia',
             data: realizadoDia,
             backgroundColor: 'rgba(40, 167, 69, 0.5)',
             borderColor: 'rgba(40, 167, 69, 1)',
@@ -856,7 +856,7 @@
             yAxisID: 'y'
           },
           {
-            label: 'Previsto total',
+            label: 'Planejado acumulado',
             data: previstoTotal,
             type: 'line',
             borderColor: 'orange',
@@ -866,7 +866,7 @@
             yAxisID: 'y1'
           },
           {
-            label: 'Realizado total',
+            label: 'Executado acumulado',
             data: realizadoTotal,
             type: 'line',
             borderColor: 'orangered',
@@ -881,7 +881,15 @@
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-          legend: { position: 'bottom' }
+			legend: {
+			  position: 'bottom',
+			  labels: {
+				boxWidth: 10,
+				boxHeight: 10,
+				font: { size: 10 },
+				padding: 10
+			  }
+			}
         },
         scales: {
           y: {
@@ -918,7 +926,7 @@
       data: {
         labels: partLabels,
         datasets: [{
-          label: 'Duração por atividade',
+          label: 'Tempo por atividade',
           data: partTempos,
           backgroundColor: 'orange',
           borderColor: 'black',
@@ -976,7 +984,7 @@
         labels: labels02,
         datasets: [
           {
-            label: 'Previsto dia',
+            label: 'Planejado no dia',
             data: planejadoDia02,
             backgroundColor: 'rgba(255, 193, 7, 0.6)',
             borderColor: 'rgba(255, 193, 7, 1)',
@@ -984,7 +992,7 @@
             yAxisID: 'y'
           },
           {
-            label: 'Realizado dia',
+            label: 'Executado no dia',
             data: executadoDia02,
             backgroundColor: 'rgba(76, 175, 80, 0.6)',
             borderColor: 'rgba(76, 175, 80, 1)',
@@ -1017,7 +1025,15 @@
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-          legend: { position: 'bottom' }
+			legend: {
+			  position: 'bottom',
+			  labels: {
+				boxWidth: 10,
+				boxHeight: 10,
+				font: { size: 10 },
+				padding: 10
+			  }
+			}
         },
         scales: {
           y: {
@@ -1058,7 +1074,7 @@
             barThickness: 24
           },
           {
-            label: `Executado (${acumExec} / ${total})`,
+            label: `Executado acumulado (${acumExec} / ${total})`,
             data: [percExec],
             backgroundColor: 'rgba(76, 175, 80, 0.9)',
             barThickness: 24
@@ -1070,7 +1086,15 @@
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-          legend: { position: 'bottom' },
+			legend: {
+			  position: 'bottom',
+			  labels: {
+				boxWidth: 10,
+				boxHeight: 10,
+				font: { size: 10 },
+				padding: 10
+			  }
+			},
           tooltip: {
             callbacks: {
               label: ctx => `${ctx.dataset.label}: ${ctx.raw.toFixed(1)}%`
