@@ -1,412 +1,528 @@
 {% extends "base.html" %}
+{% block title %}Colaboradores · Registro{% endblock %}
 
 {% block content %}
-<style>
-    .colab-page {
-        max-width: 1400px;
-        margin: 0 auto;
+<div class="page-wrap">
+
+  <style>
+    .toolbar-row{
+      display:grid;
+      gap:12px;
+      align-items:end;
     }
 
-    .colab-title {
-        font-size: 1.4rem;
-        font-weight: 600;
-        margin-bottom: 0.5rem;
-        color: #5a4630;
+    .toolbar-row.toolbar-2{
+      grid-template-columns: 1.4fr auto;
     }
 
-    .colab-subtitle {
-        font-size: 0.9rem;
-        color: #777;
-        margin-bottom: 1.5rem;
+    .toolbar-row.toolbar-3{
+      grid-template-columns: 1fr 1fr 1fr;
     }
 
-    .colab-grid {
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 16px;
-        margin-bottom: 1.5rem;
+    .toolbar-row.toolbar-4{
+      grid-template-columns: 1fr 1fr 1fr auto;
     }
 
-    .colab-card {
-        background: #fff;
-        border-radius: 6px;
-        border: 1px solid #e4e4e4;
-        padding: 14px 18px 16px 18px;
-        box-shadow: 0 1px 2px rgba(0,0,0,.03);
+    .toolbar-actions{
+      display:flex;
+      gap:8px;
+      align-items:end;
+      flex-wrap:wrap;
+      justify-content:flex-start;
     }
 
-    .colab-card-title {
-        font-size: 0.9rem;
-        font-weight: 600;
-        margin-bottom: 10px;
-        padding-bottom: 4px;
-        border-bottom: 3px solid #f2c10a;
-        color: #5a4630;
-        text-transform: uppercase;
+    .toolbar-actions .btn,
+    .toolbar-actions a.btn{
+      white-space:nowrap;
     }
 
-    .field-row {
-        display: flex;
-        align-items: center;
-        margin-bottom: 6px;
-        gap: 8px;
-        font-size: 0.85rem;
+    .field > span{
+      display:block;
+      margin-bottom:6px;
+      font-weight:600;
+      color:#394150;
     }
 
-    .field-row label {
-        width: 40%;
-        max-width: 150px;
-        color: #444;
+    .field input,
+    .field select{
+      width:100%;
+      min-height:38px;
+      padding:7px 10px;
+      border:1px solid #cfd6df;
+      border-radius:8px;
+      background:#fff;
+      box-sizing:border-box;
     }
 
-    .field-row input[type="text"],
-    .field-row input[type="date"],
-    .field-row input[type="time"],
-    .field-row input[type="number"],
-    .field-row select {
-        flex: 1;
-        padding: 3px 6px;
-        border-radius: 3px;
-        border: 1px solid #ccc;
-        font-size: 0.85rem;
+    .zone-icon{
+      font-size:16px;
+      line-height:1;
     }
 
-    .colab-actions {
-        display: flex;
-        justify-content: flex-end;
-        gap: 8px;
-        margin-bottom: 24px;
+    .btn{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap:6px;
+      min-height:38px;
+      padding:8px 12px;
+      border:1px solid #bfc8d4;
+      border-radius:8px;
+      background:#f7f9fc;
+      color:#28323f;
+      text-decoration:none;
+      cursor:pointer;
+      box-sizing:border-box;
     }
 
-    .btn-colab {
-        padding: 6px 14px;
-        border-radius: 4px;
-        border: none;
-        font-size: 0.85rem;
-        cursor: pointer;
+    .btn:hover{
+      filter:brightness(.98);
     }
 
-    .btn-primary-colab {
-        background-color: #f2c10a;
-        color: #5a4630;
-        font-weight: 600;
+    .btn.primary{
+      background:#16324F;
+      border-color:#16324F;
+      color:#fff;
     }
 
-    .btn-secondary-colab {
-        background-color: #e0e0e0;
-        color: #444;
+    .btn.success{
+      background:#234d20;
+      border-color:#234d20;
+      color:#fff;
     }
 
-    .colab-table-wrapper {
-        margin-top: 8px;
+    .btn.info{
+      background:#235d8a;
+      border-color:#235d8a;
+      color:#fff;
     }
 
-    .colab-table {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 0.8rem;
+    .btn.warning{
+      background:#8a5a00;
+      border-color:#8a5a00;
+      color:#fff;
     }
 
-    .colab-table thead {
-        background-color: #faf5dd;
+    .btn.danger{
+      background:#8b1e1e;
+      border-color:#8b1e1e;
+      color:#fff;
     }
 
-    .colab-table th,
-    .colab-table td {
-        padding: 4px 6px;
-        border: 1px solid #e1e1e1;
-        text-align: left;
-        white-space: nowrap;
+    .section-note{
+      margin-top:12px;
+      padding:10px 12px;
+      border:1px dashed #cfd8e3;
+      border-radius:10px;
+      background:#f8fbff;
+      color:#35516b;
+      font-size:14px;
     }
 
-    .colab-table th {
-        font-weight: 600;
-        color: #5a4630;
+    .table-wrap{
+      overflow:auto;
+      margin-top:14px;
     }
 
-    @media (max-width: 1200px) {
-        .colab-grid {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
+    .table td,
+    .table th{
+      vertical-align:middle;
     }
 
-    @media (max-width: 900px) {
-        .colab-grid {
-            grid-template-columns: 1fr;
-        }
-
-        .field-row label {
-            width: 35%;
-            max-width: 140px;
-        }
+    .subtitle-soft{
+      color:#6b7280;
+      margin-bottom:14px;
     }
-</style>
 
-<div class="colab-page">
+    @media (max-width: 1200px){
+      .toolbar-row.toolbar-2,
+      .toolbar-row.toolbar-3,
+      .toolbar-row.toolbar-4{
+        grid-template-columns: repeat(2, minmax(220px, 1fr));
+      }
 
-    <div class="colab-title">Cadastro de Colaborador</div>
-    <div class="colab-subtitle">
-        Preencha os dados nas seções abaixo e clique em <strong>Salvar</strong> para registrar o colaborador.
+      .toolbar-actions{
+        grid-column:1 / -1;
+      }
+    }
+
+    @media (max-width: 700px){
+      .toolbar-row.toolbar-2,
+      .toolbar-row.toolbar-3,
+      .toolbar-row.toolbar-4{
+        grid-template-columns: 1fr;
+      }
+
+      .toolbar-actions .btn,
+      .toolbar-actions a.btn{
+        flex:1 1 auto;
+      }
+    }
+  </style>
+
+  <!-- DADOS PESSOAIS -->
+  <section class="zone">
+    <header class="zone-head" data-target="#colab-dados-pessoais">
+      <div class="zone-left">
+        <span class="zone-icon">👤</span>
+        <div class="zone-title">Dados Pessoais</div>
+      </div>
+      <div class="zone-actions">
+        <button type="button" class="icon-btn" aria-label="Seção de dados pessoais">
+          <svg viewBox="0 0 24 24" width="16" height="16">
+            <path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/>
+          </svg>
+        </button>
+        <button type="button" class="icon-btn caret">▾</button>
+      </div>
+    </header>
+    <div class="zone-body collapsed" id="colab-dados-pessoais">
+      <p class="subtitle-soft">Preencha as informações básicas do colaborador.</p>
+
+      <form method="post" action="{{ url_for('colaboradores.registro_create') }}" id="form-colaborador">
+
+        <div class="toolbar-row toolbar-3">
+          <label class="field">
+            <span>Nome *</span>
+            <input type="text" id="nome" name="nome" required>
+          </label>
+
+          <label class="field">
+            <span>Matrícula *</span>
+            <input type="text" id="matricula" name="matricula" required>
+          </label>
+
+          <label class="field">
+            <span>Data de Nascimento</span>
+            <input type="date" id="data_nascimento" name="data_nascimento">
+          </label>
+        </div>
+
+        <div class="toolbar-row toolbar-3" style="margin-top:12px;">
+          <label class="field">
+            <span>Estado Civil</span>
+            <select id="estado_civil_id" name="estado_civil_id">
+              <option value="">Selecione...</option>
+              {% for ec in estados_civis %}
+                <option value="{{ ec.id }}">{{ ec.nome }}</option>
+              {% endfor %}
+            </select>
+          </label>
+
+          <label class="field">
+            <span>Escolaridade</span>
+            <select id="escolaridade_id" name="escolaridade_id">
+              <option value="">Selecione...</option>
+              {% for esc in escolaridades %}
+                <option value="{{ esc.id }}">{{ esc.nome }}</option>
+              {% endfor %}
+            </select>
+          </label>
+
+          <label class="field">
+            <span>Telefone</span>
+            <input type="text" id="telefone" name="telefone" placeholder="(00) 00000-0000">
+          </label>
+        </div>
+
+        <div class="toolbar-row toolbar-4" style="margin-top:12px;">
+          <label class="field">
+            <span>CPF</span>
+            <input type="text" id="cpf" name="cpf">
+          </label>
+
+          <label class="field">
+            <span>RG</span>
+            <input type="text" id="rg" name="rg">
+          </label>
+
+          <label class="field">
+            <span>Número / Chave PIX</span>
+            <input type="text" id="numero_pix" name="numero_pix" placeholder="CPF, e-mail ou chave aleatória...">
+          </label>
+
+          <div></div>
+        </div>
+
+        <!-- FAMÍLIA E ORIGEM -->
+        <div class="section-note">Família e origem</div>
+
+        <div class="toolbar-row toolbar-3" style="margin-top:12px;">
+          <label class="field">
+            <span>Nome da Mãe</span>
+            <input type="text" id="mae" name="mae">
+          </label>
+
+          <label class="field">
+            <span>Nome do Pai</span>
+            <input type="text" id="pai" name="pai">
+          </label>
+
+          <label class="field">
+            <span>Cidade de Nascimento</span>
+            <input type="text" id="cidade_nascimento" name="cidade_nascimento">
+          </label>
+        </div>
+
+        <!-- DOCUMENTOS -->
+        <div class="section-note">Documentos</div>
+
+        <div class="toolbar-row toolbar-4" style="margin-top:12px;">
+          <label class="field">
+            <span>CNH</span>
+            <input type="text" id="cnh" name="cnh">
+          </label>
+
+          <label class="field">
+            <span>Vencimento CNH</span>
+            <input type="date" id="vencimento_cnh" name="vencimento_cnh">
+          </label>
+
+          <label class="field">
+            <span>CTPS</span>
+            <input type="text" id="ctps" name="ctps">
+          </label>
+
+          <label class="field">
+            <span>PIS</span>
+            <input type="text" id="pis" name="pis">
+          </label>
+        </div>
+
+        <!-- ENDEREÇO -->
+        <div class="section-note">Endereço</div>
+
+        <div class="toolbar-row toolbar-2" style="margin-top:12px;">
+          <label class="field">
+            <span>Endereço</span>
+            <input type="text" id="endereco" name="endereco">
+          </label>
+
+          <label class="field">
+            <span>CEP</span>
+            <input type="text" id="cep" name="cep">
+          </label>
+        </div>
+
+        <!-- CONTRATO E FUNÇÃO -->
+        <div class="section-note">Contrato e função</div>
+
+        <div class="toolbar-row toolbar-4" style="margin-top:12px;">
+          <label class="field">
+            <span>Função</span>
+            <select id="funcao_id" name="funcao_id">
+              <option value="">Selecione...</option>
+              {% for f in funcoes %}
+                <option value="{{ f.id }}">{{ f.nome }}</option>
+              {% endfor %}
+            </select>
+          </label>
+
+          <label class="field">
+            <span>Data Admissão</span>
+            <input type="date" id="data_admissao" name="data_admissao">
+          </label>
+
+          <label class="field">
+            <span>Data na Função</span>
+            <input type="date" id="data_funcao" name="data_funcao">
+          </label>
+
+          <label class="field">
+            <span>Situação na Folha</span>
+            <select id="situacao_folha_id" name="situacao_folha_id">
+              <option value="">Selecione...</option>
+              {% for s in situacoes_folha %}
+                <option value="{{ s.id }}">{{ s.nome }}</option>
+              {% endfor %}
+            </select>
+          </label>
+        </div>
+
+        <div class="toolbar-row toolbar-4" style="margin-top:12px;">
+          <label class="field">
+            <span>Mão de Obra</span>
+            <select id="mao_obra_id" name="mao_obra_id">
+              <option value="">Selecione...</option>
+              {% for m in maos_obra %}
+                <option value="{{ m.id }}">{{ m.nome }}</option>
+              {% endfor %}
+            </select>
+          </label>
+
+          <label class="field">
+            <span>Escala</span>
+            <select id="escala_id" name="escala_id">
+              <option value="">Selecione...</option>
+              {% for e in escalas %}
+                <option value="{{ e.id }}">{{ e.nome }}</option>
+              {% endfor %}
+            </select>
+          </label>
+
+          <label class="field">
+            <span>Contrato</span>
+            <input type="text" id="contrato" name="contrato" placeholder="CLT, PJ, aprendiz...">
+          </label>
+
+          <label class="field">
+            <span>Salário</span>
+            <input type="text" id="salario" name="salario">
+          </label>
+        </div>
+
+        <!-- JORNADA E FÉRIAS -->
+        <div class="section-note">Jornada e férias</div>
+
+        <div class="toolbar-row toolbar-4" style="margin-top:12px;">
+          <label class="field">
+            <span>Horário Início</span>
+            <input type="time" id="horario_inicio" name="horario_inicio">
+          </label>
+
+          <label class="field">
+            <span>Horário Fim</span>
+            <input type="time" id="horario_fim" name="horario_fim">
+          </label>
+
+          <label class="field">
+            <span>Início Férias</span>
+            <input type="date" id="inicio_ferias" name="inicio_ferias">
+          </label>
+
+          <label class="field">
+            <span>Fim Férias</span>
+            <input type="date" id="fim_ferias" name="fim_ferias">
+          </label>
+        </div>
+
+        <div class="toolbar-actions" style="margin-top:16px; justify-content:flex-end;">
+          <a href="{{ url_for('colaboradores.registro') }}" class="btn warning">↩️ Cancelar</a>
+          <button type="submit" class="btn success">💾 Salvar</button>
+        </div>
+      </form>
     </div>
+  </section>
 
-    <form method="post" action="{{ url_for('colaboradores.registro_create') }}">
-        <div class="colab-grid">
-            <!-- DADOS PESSOAIS -->
-            <div class="colab-card">
-                <div class="colab-card-title">Dados Pessoais</div>
-
-                <div class="field-row">
-                    <label for="nome">Nome *</label>
-                    <input type="text" id="nome" name="nome" required>
-                </div>
-
-                <div class="field-row">
-                    <label for="matricula">Matrícula *</label>
-                    <input type="text" id="matricula" name="matricula" required>
-                </div>
-
-                <div class="field-row">
-                    <label for="data_nascimento">Data de Nascimento</label>
-                    <input type="date" id="data_nascimento" name="data_nascimento">
-                </div>
-
-                <div class="field-row">
-                    <label for="estado_civil_id">Estado Civil</label>
-                    <select id="estado_civil_id" name="estado_civil_id">
-                        <option value="">Selecione...</option>
-                        {% for ec in estados_civis %}
-                            <option value="{{ ec.id }}">{{ ec.nome }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-
-                <div class="field-row">
-                    <label for="escolaridade_id">Escolaridade</label>
-                    <select id="escolaridade_id" name="escolaridade_id">
-                        <option value="">Selecione...</option>
-                        {% for esc in escolaridades %}
-                            <option value="{{ esc.id }}">{{ esc.nome }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-
-                <div class="field-row">
-                    <label for="cpf">CPF</label>
-                    <input type="text" id="cpf" name="cpf">
-                </div>
-
-                <div class="field-row">
-                    <label for="rg">RG</label>
-                    <input type="text" id="rg" name="rg">
-                </div>
-
-                <div class="field-row">
-                    <label for="telefone">Telefone</label>
-                    <input type="text" id="telefone" name="telefone" placeholder="(00) 00000-0000">
-                </div>
-
-                <div class="field-row">
-                    <label for="numero_pix">Número / Chave PIX</label>
-                    <input type="text" id="numero_pix" name="numero_pix" placeholder="CPF, e-mail ou chave aleatória...">
-                </div>
-            </div>
-
-            <!-- FAMÍLIA E ESCOLARIDADE -->
-            <div class="colab-card">
-                <div class="colab-card-title">Família e Escolaridade</div>
-
-                <div class="field-row">
-                    <label for="mae">Nome da Mãe</label>
-                    <input type="text" id="mae" name="mae">
-                </div>
-
-                <div class="field-row">
-                    <label for="pai">Nome do Pai</label>
-                    <input type="text" id="pai" name="pai">
-                </div>
-
-                <div class="field-row">
-                    <label for="cidade_nascimento">Cidade de Nascimento</label>
-                    <input type="text" id="cidade_nascimento" name="cidade_nascimento">
-                </div>
-            </div>
-
-            <!-- DOCUMENTOS -->
-            <div class="colab-card">
-                <div class="colab-card-title">Documentos</div>
-
-                <div class="field-row">
-                    <label for="cnh">CNH</label>
-                    <input type="text" id="cnh" name="cnh">
-                </div>
-
-                <div class="field-row">
-                    <label for="vencimento_cnh">Vencimento CNH</label>
-                    <input type="date" id="vencimento_cnh" name="vencimento_cnh">
-                </div>
-
-                <div class="field-row">
-                    <label for="ctps">CTPS</label>
-                    <input type="text" id="ctps" name="ctps">
-                </div>
-
-                <div class="field-row">
-                    <label for="pis">PIS</label>
-                    <input type="text" id="pis" name="pis">
-                </div>
-            </div>
-
-            <!-- ENDEREÇO -->
-            <div class="colab-card">
-                <div class="colab-card-title">Endereço</div>
-
-                <div class="field-row">
-                    <label for="endereco">Endereço</label>
-                    <input type="text" id="endereco" name="endereco">
-                </div>
-
-                <div class="field-row">
-                    <label for="cep">CEP</label>
-                    <input type="text" id="cep" name="cep">
-                </div>
-            </div>
-
-            <!-- CONTRATO E FUNÇÃO -->
-            <div class="colab-card">
-                <div class="colab-card-title">Contrato e Função</div>
-
-                <div class="field-row">
-                    <label for="funcao_id">Função</label>
-                    <select id="funcao_id" name="funcao_id">
-                        <option value="">Selecione...</option>
-                        {% for f in funcoes %}
-                            <option value="{{ f.id }}">{{ f.nome }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-
-                <div class="field-row">
-                    <label for="data_admissao">Data Admissão</label>
-                    <input type="date" id="data_admissao" name="data_admissao">
-                </div>
-
-                <div class="field-row">
-                    <label for="data_funcao">Data na Função</label>
-                    <input type="date" id="data_funcao" name="data_funcao">
-                </div>
-
-                <div class="field-row">
-                    <label for="situacao_folha_id">Situação na Folha</label>
-                    <select id="situacao_folha_id" name="situacao_folha_id">
-                        <option value="">Selecione...</option>
-                        {% for s in situacoes_folha %}
-                            <option value="{{ s.id }}">{{ s.nome }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-
-                <div class="field-row">
-                    <label for="mao_obra_id">Mão de Obra</label>
-                    <select id="mao_obra_id" name="mao_obra_id">
-                        <option value="">Selecione...</option>
-                        {% for m in maos_obra %}
-                            <option value="{{ m.id }}">{{ m.nome }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-
-                <div class="field-row">
-                    <label for="escala_id">Escala</label>
-                    <select id="escala_id" name="escala_id">
-                        <option value="">Selecione...</option>
-                        {% for e in escalas %}
-                            <option value="{{ e.id }}">{{ e.nome }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-
-                <div class="field-row">
-                    <label for="contrato">Contrato</label>
-                    <input type="text" id="contrato" name="contrato" placeholder="CLT, PJ, aprendiz...">
-                </div>
-
-                <div class="field-row">
-                    <label for="salario">Salário</label>
-                    <input type="text" id="salario" name="salario">
-                </div>
-            </div>
-
-            <!-- JORNADA E FÉRIAS -->
-            <div class="colab-card">
-                <div class="colab-card-title">Jornada e Férias</div>
-
-                <div class="field-row">
-                    <label for="horario_inicio">Horário Início</label>
-                    <input type="time" id="horario_inicio" name="horario_inicio">
-                </div>
-
-                <div class="field-row">
-                    <label for="horario_fim">Horário Fim</label>
-                    <input type="time" id="horario_fim" name="horario_fim">
-                </div>
-
-                <div class="field-row">
-                    <label for="inicio_ferias">Início Férias</label>
-                    <input type="date" id="inicio_ferias" name="inicio_ferias">
-                </div>
-
-                <div class="field-row">
-                    <label for="fim_ferias">Fim Férias</label>
-                    <input type="date" id="fim_ferias" name="fim_ferias">
-                </div>
-            </div>
-        </div>
-
-        <div class="colab-actions">
-            <a href="{{ url_for('colaboradores.registro') }}" class="btn-colab btn-secondary-colab">Cancelar</a>
-            <button type="submit" class="btn-colab btn-primary-colab">Salvar</button>
-        </div>
-    </form>
-
-    <!-- Lista de colaboradores cadastrados -->
-    <div class="colab-table-wrapper">
-        <div class="colab-card-title" style="border-bottom-width: 2px; margin-bottom: 6px;">
-            Colaboradores Cadastrados
-        </div>
-        <div style="overflow-x:auto;">
-            <table class="colab-table">
-                <thead>
-                    <tr>
-                        <th>Matrícula</th>
-                        <th>Nome</th>
-                        <th>Função</th>
-                        <th>Escala</th>
-                        <th>Mão de Obra</th>
-                        <th>Situação Folha</th>
-                        <th>Telefone</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% if colaboradores %}
-                        {% for c in colaboradores %}
-                            <tr>
-                                <td>{{ c.matricula }}</td>
-                                <td>{{ c.nome }}</td>
-                                <td>{{ c.funcao_nome or '' }}</td>
-                                <td>{{ c.escala_nome or '' }}</td>
-                                <td>{{ c.mao_obra_nome or '' }}</td>
-                                <td>{{ c.situacao_folha_nome or '' }}</td>
-                                <td>{{ c.telefone or '' }}</td>
-                            </tr>
-                        {% endfor %}
-                    {% else %}
-                        <tr>
-                            <td colspan="7">Nenhum colaborador cadastrado até o momento.</td>
-                        </tr>
-                    {% endif %}
-                </tbody>
-            </table>
-        </div>
+  <!-- COLABORADORES CADASTRADOS -->
+  <section class="zone">
+    <header class="zone-head" data-target="#colab-lista">
+      <div class="zone-left">
+        <span class="zone-icon">📋</span>
+        <div class="zone-title">Colaboradores Cadastrados</div>
+      </div>
+      <div class="zone-actions">
+        <button type="button" class="icon-btn" aria-label="Seção de colaboradores cadastrados">
+          <svg viewBox="0 0 24 24" width="16" height="16">
+            <path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/>
+          </svg>
+        </button>
+        <button type="button" class="icon-btn caret">▾</button>
+      </div>
+    </header>
+    <div class="zone-body collapsed" id="colab-lista">
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Matrícula</th>
+              <th>Nome</th>
+              <th>Função</th>
+              <th>Escala</th>
+              <th>Mão de Obra</th>
+              <th>Situação Folha</th>
+              <th>Telefone</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% if colaboradores %}
+              {% for c in colaboradores %}
+                <tr>
+                  <td>{{ c.matricula }}</td>
+                  <td>{{ c.nome }}</td>
+                  <td>{{ c.funcao_nome or '' }}</td>
+                  <td>{{ c.escala_nome or '' }}</td>
+                  <td>{{ c.mao_obra_nome or '' }}</td>
+                  <td>{{ c.situacao_folha_nome or '' }}</td>
+                  <td>{{ c.telefone or '' }}</td>
+                </tr>
+              {% endfor %}
+            {% else %}
+              <tr>
+                <td colspan="7">Nenhum colaborador cadastrado até o momento.</td>
+              </tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
     </div>
+  </section>
+
 </div>
+
+<script>
+  const zoneStorageKey = "colaboradores_registro_zone_state";
+
+  function getZoneState() {
+    try {
+      return JSON.parse(localStorage.getItem(zoneStorageKey) || "{}");
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function setZoneState(state) {
+    localStorage.setItem(zoneStorageKey, JSON.stringify(state));
+  }
+
+  function setZoneOpen(sel, open) {
+    const body = document.querySelector(sel);
+    const head = document.querySelector(`.zone-head[data-target="${sel}"]`);
+    const caret = head ? head.querySelector(".caret") : null;
+
+    if (!body) return;
+
+    if (open) {
+      body.classList.remove("collapsed");
+      if (caret) caret.textContent = "▴";
+    } else {
+      body.classList.add("collapsed");
+      if (caret) caret.textContent = "▾";
+    }
+  }
+
+  document.querySelectorAll(".zone-head").forEach(h => {
+    const sel = h.getAttribute("data-target");
+    const state = getZoneState();
+    const saved = state[sel];
+
+    if (saved === true) {
+      setZoneOpen(sel, true);
+    } else if (saved === false) {
+      setZoneOpen(sel, false);
+    } else {
+      const body = document.querySelector(sel);
+      const caret = h.querySelector(".caret");
+      if (body && !body.classList.contains("collapsed")) {
+        if (caret) caret.textContent = "▴";
+      } else {
+        if (caret) caret.textContent = "▾";
+      }
+    }
+
+    h.addEventListener("click", (e) => {
+      if (e.target.closest(".icon-btn") && !e.target.closest(".caret")) return;
+
+      const body = document.querySelector(sel);
+      if (!body) return;
+
+      const willOpen = body.classList.contains("collapsed");
+      setZoneOpen(sel, willOpen);
+
+      const state = getZoneState();
+      state[sel] = willOpen;
+      setZoneState(state);
+    });
+  });
+</script>
 {% endblock %}
