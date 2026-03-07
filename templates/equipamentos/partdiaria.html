@@ -183,6 +183,10 @@
                 <tr>
                   <form method="post" action="{{ url_for('equipamentos.part_update') }}">
                     <input type="hidden" name="id" value="{{ r.id }}">
+					<input type="hidden" name="ini" value="{{ filtros.ini or '' }}">
+					<input type="hidden" name="fim" value="{{ filtros.fim or '' }}">
+					<input type="hidden" name="maq" value="{{ filtros.maq or '' }}">
+					<input type="hidden" name="act" value="{{ filtros.act or '' }}">
                     <td><input type="date" name="data" value="{{ r.data }}"></td>
                     <td>{{ r.maquina_tag }} — {{ r.maquina_desc }}</td>
                     <td>
@@ -201,6 +205,10 @@
 
                   <form method="post" action="{{ url_for('equipamentos.part_delete') }}" style="display:inline;" onsubmit="return confirm('Excluir lançamento?');">
                     <input type="hidden" name="id" value="{{ r.id }}">
+					<input type="hidden" name="ini" value="{{ filtros.ini or '' }}">
+					<input type="hidden" name="fim" value="{{ filtros.fim or '' }}">
+					<input type="hidden" name="maq" value="{{ filtros.maq or '' }}">
+					<input type="hidden" name="act" value="{{ filtros.act or '' }}">
                     <button class="btn danger" type="submit">Excluir</button>
                   </form>
                     </td>
