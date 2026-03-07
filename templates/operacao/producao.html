@@ -156,9 +156,18 @@
 
 	.prod-table th,
 	.prod-table td{
-	  text-align:center;
+	  text-align:center !important;
+	  vertical-align:middle !important;
 	  white-space:nowrap;
 	  line-height:1.05;
+	}
+
+	.prod-table thead th{
+	  text-align:center !important;
+	}
+
+	.prod-table tbody td{
+	  text-align:center !important;
 	}
 	
 	#op-frentes .prod-table th,
@@ -172,10 +181,10 @@
 	  overflow:auto;
 	}
 
-    .prod-table td.text-left,
-    .prod-table th.text-left{
-      text-align:left;
-    }
+	.prod-table td.text-left,
+	.prod-table th.text-left{
+	  text-align:center !important;
+	}
 
 	.summary-grid{
 	  display:grid;
@@ -512,11 +521,11 @@
                 <thead>
                   <tr>
                     <th>Data</th>
-                    <th>Prev. dia</th>
-                    <th>Prev. total</th>
-                    <th>Real. dia</th>
-                    <th>Real. total</th>
-                    <th>Dif.</th>
+                    <th>Planejado no dia</th>
+                    <th>Planejado total</th>
+                    <th>Executado no dia</th>
+                    <th>Executado total</th>
+                    <th>Diferença</th>
                     <th>Atraso</th>
                   </tr>
                 </thead>
