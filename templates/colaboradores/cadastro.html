@@ -1,277 +1,572 @@
 {% extends "base.html" %}
+{% block title %}Colaboradores · Cadastro{% endblock %}
 
 {% block content %}
-<div class="container-fluid mt-3">
+<div class="page-wrap">
 
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h4 class="mb-0">
-            <i class="fas fa-users-cog me-2"></i>
-            Cadastro de Tabelas Auxiliares de Colaboradores
-        </h4>
-    </div>
+  <style>
+    .toolbar-row{
+      display:grid;
+      gap:12px;
+      align-items:end;
+    }
 
-    <div class="card">
-        <div class="card-body">
+    .toolbar-row.toolbar-2{
+      grid-template-columns: 1.4fr auto;
+    }
 
-            <!-- LINHA 1 – ESCALA / ESCOLARIDADE / ESTADO CIVIL -->
-            <div class="row">
+    .toolbar-row.toolbar-3{
+      grid-template-columns: 1.1fr 1.2fr auto;
+    }
 
-                <!-- ESCALA -->
-                <div class="col-md-4 mb-4">
-                    <h6 class="text-muted mb-2">Escala</h6>
-                    <form method="post" action="{{ url_for('colaboradores.escala_create') }}" class="mb-2">
-                        <div class="mb-2">
-                            <label class="form-label">Nome</label>
-                            <input type="text" name="nome" class="form-control form-control-sm" required>
-                        </div>
-                        <div class="mb-2">
-                            <label class="form-label">Descrição</label>
-                            <input type="text" name="descricao" class="form-control form-control-sm">
-                        </div>
-                        <button type="submit" class="btn btn-sm btn-prumat">
-                            Salvar
-                        </button>
-                    </form>
+    .toolbar-actions{
+      display:flex;
+      gap:8px;
+      align-items:end;
+      flex-wrap:wrap;
+      justify-content:flex-start;
+    }
 
-                    <div class="table-responsive">
-                        <table class="table table-sm table-striped mb-0">
-                            <thead>
-                                <tr>
-                                    <th style="width: 60px;">ID</th>
-                                    <th>Nome</th>
-                                    <th>Descrição</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for escala in escalas %}
-                                <tr>
-                                    <td>{{ escala.id }}</td>
-                                    <td>{{ escala.nome }}</td>
-                                    <td>{{ escala.descricao }}</td>
-                                </tr>
-                                {% else %}
-                                <tr>
-                                    <td colspan="3" class="text-center text-muted">
-                                        Nenhuma escala cadastrada.
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+    .toolbar-actions .btn,
+    .toolbar-actions a.btn{
+      white-space:nowrap;
+    }
 
-                <!-- ESCOLARIDADE -->
-                <div class="col-md-4 mb-4">
-                    <h6 class="text-muted mb-2">Escolaridade</h6>
-                    <form method="post" action="{{ url_for('colaboradores.escolaridade_create') }}" class="mb-2">
-                        <div class="mb-2">
-                            <label class="form-label">Nome</label>
-                            <input type="text" name="nome" class="form-control form-control-sm" required>
-                        </div>
-                        <button type="submit" class="btn btn-sm btn-prumat">
-                            Salvar
-                        </button>
-                    </form>
+    .field > span{
+      display:block;
+      margin-bottom:6px;
+      font-weight:600;
+      color:#394150;
+    }
 
-                    <div class="table-responsive">
-                        <table class="table table-sm table-striped mb-0">
-                            <thead>
-                                <tr>
-                                    <th style="width: 60px;">ID</th>
-                                    <th>Nome</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for esc in escolaridades %}
-                                <tr>
-                                    <td>{{ esc.id }}</td>
-                                    <td>{{ esc.nome }}</td>
-                                </tr>
-                                {% else %}
-                                <tr>
-                                    <td colspan="2" class="text-center text-muted">
-                                        Nenhuma escolaridade cadastrada.
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+    .field input,
+    .field select{
+      width:100%;
+      min-height:38px;
+      padding:7px 10px;
+      border:1px solid #cfd6df;
+      border-radius:8px;
+      background:#fff;
+      box-sizing:border-box;
+    }
 
-                <!-- ESTADO CIVIL -->
-                <div class="col-md-4 mb-4">
-                    <h6 class="text-muted mb-2">Estado Civil</h6>
-                    <form method="post" action="{{ url_for('colaboradores.estado_civil_create') }}" class="mb-2">
-                        <div class="mb-2">
-                            <label class="form-label">Nome</label>
-                            <input type="text" name="nome" class="form-control form-control-sm" required>
-                        </div>
-                        <button type="submit" class="btn btn-sm btn-prumat">
-                            Salvar
-                        </button>
-                    </form>
+    .zone-icon{
+      font-size:16px;
+      line-height:1;
+    }
 
-                    <div class="table-responsive">
-                        <table class="table table-sm table-striped mb-0">
-                            <thead>
-                                <tr>
-                                    <th style="width: 60px;">ID</th>
-                                    <th>Nome</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for ec in estados_civis %}
-                                <tr>
-                                    <td>{{ ec.id }}</td>
-                                    <td>{{ ec.nome }}</td>
-                                </tr>
-                                {% else %}
-                                <tr>
-                                    <td colspan="2" class="text-center text-muted">
-                                        Nenhum estado civil cadastrado.
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+    .btn{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap:6px;
+      min-height:38px;
+      padding:8px 12px;
+      border:1px solid #bfc8d4;
+      border-radius:8px;
+      background:#f7f9fc;
+      color:#28323f;
+      text-decoration:none;
+      cursor:pointer;
+      box-sizing:border-box;
+    }
 
-            </div>
+    .btn:hover{
+      filter:brightness(.98);
+    }
 
-            <hr class="my-3">
+    .btn.primary{
+      background:#16324F;
+      border-color:#16324F;
+      color:#fff;
+    }
 
-            <!-- LINHA 2 – FUNÇÃO / MÃO DE OBRA / SITUAÇÃO FOLHA -->
-            <div class="row">
+    .btn.success{
+      background:#234d20;
+      border-color:#234d20;
+      color:#fff;
+    }
 
-                <!-- FUNÇÃO -->
-                <div class="col-md-4 mb-4">
-                    <h6 class="text-muted mb-2">Função</h6>
-                    <form method="post" action="{{ url_for('colaboradores.funcao_create') }}" class="mb-2">
-                        <div class="mb-2">
-                            <label class="form-label">Nome</label>
-                            <input type="text" name="nome" class="form-control form-control-sm" required>
-                        </div>
-                        <div class="mb-2">
-                            <label class="form-label">Código</label>
-                            <input type="text" name="codigo" class="form-control form-control-sm">
-                        </div>
-                        <button type="submit" class="btn btn-sm btn-prumat">
-                            Salvar
-                        </button>
-                    </form>
+    .btn.info{
+      background:#235d8a;
+      border-color:#235d8a;
+      color:#fff;
+    }
 
-                    <div class="table-responsive">
-                        <table class="table table-sm table-striped mb-0">
-                            <thead>
-                                <tr>
-                                    <th style="width: 60px;">ID</th>
-                                    <th>Nome</th>
-                                    <th>Código</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for func in funcoes %}
-                                <tr>
-                                    <td>{{ func.id }}</td>
-                                    <td>{{ func.nome }}</td>
-                                    <td>{{ func.codigo }}</td>
-                                </tr>
-                                {% else %}
-                                <tr>
-                                    <td colspan="3" class="text-center text-muted">
-                                        Nenhuma função cadastrada.
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+    .btn.warning{
+      background:#8a5a00;
+      border-color:#8a5a00;
+      color:#fff;
+    }
 
-                <!-- MÃO DE OBRA -->
-                <div class="col-md-4 mb-4">
-                    <h6 class="text-muted mb-2">Mão de Obra</h6>
-                    <form method="post" action="{{ url_for('colaboradores.mao_obra_create') }}" class="mb-2">
-                        <div class="mb-2">
-                            <label class="form-label">Nome</label>
-                            <input type="text" name="nome" class="form-control form-control-sm" required>
-                        </div>
-                        <button type="submit" class="btn btn-sm btn-prumat">
-                            Salvar
-                        </button>
-                    </form>
+    .btn.danger{
+      background:#8b1e1e;
+      border-color:#8b1e1e;
+      color:#fff;
+    }
 
-                    <div class="table-responsive">
-                        <table class="table table-sm table-striped mb-0">
-                            <thead>
-                                <tr>
-                                    <th style="width: 60px;">ID</th>
-                                    <th>Nome</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for mo in maos_obra %}
-                                <tr>
-                                    <td>{{ mo.id }}</td>
-                                    <td>{{ mo.nome }}</td>
-                                </tr>
-                                {% else %}
-                                <tr>
-                                    <td colspan="2" class="text-center text-muted">
-                                        Nenhum tipo de mão de obra cadastrado.
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+    .table-wrap{
+      margin-top:14px;
+      overflow:auto;
+    }
 
-                <!-- SITUAÇÃO FOLHA -->
-                <div class="col-md-4 mb-4">
-                    <h6 class="text-muted mb-2">Situação na Folha</h6>
-                    <form method="post" action="{{ url_for('colaboradores.situacao_folha_create') }}" class="mb-2">
-                        <div class="mb-2">
-                            <label class="form-label">Nome</label>
-                            <input type="text" name="nome" class="form-control form-control-sm" required>
-                        </div>
-                        <button type="submit" class="btn btn-sm btn-prumat">
-                            Salvar
-                        </button>
-                    </form>
+    .table td,
+    .table th{
+      vertical-align:middle;
+    }
 
-                    <div class="table-responsive">
-                        <table class="table table-sm table-striped mb-0">
-                            <thead>
-                                <tr>
-                                    <th style="width: 60px;">ID</th>
-                                    <th>Nome</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for sit in situacoes_folha %}
-                                <tr>
-                                    <td>{{ sit.id }}</td>
-                                    <td>{{ sit.nome }}</td>
-                                </tr>
-                                {% else %}
-                                <tr>
-                                    <td colspan="2" class="text-center text-muted">
-                                        Nenhuma situação cadastrada.
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+    .section-note{
+      margin-top:12px;
+      padding:10px 12px;
+      border:1px dashed #cfd8e3;
+      border-radius:10px;
+      background:#f8fbff;
+      color:#35516b;
+      font-size:14px;
+    }
 
-            </div>
+    .mini-title{
+      font-size:14px;
+      font-weight:700;
+      color:#5b6470;
+      margin-bottom:10px;
+      text-transform:uppercase;
+      letter-spacing:.03em;
+    }
 
+    @media (max-width: 1100px){
+      .toolbar-row.toolbar-2,
+      .toolbar-row.toolbar-3{
+        grid-template-columns: repeat(2, minmax(220px, 1fr));
+      }
+
+      .toolbar-actions{
+        grid-column:1 / -1;
+      }
+    }
+
+    @media (max-width: 700px){
+      .toolbar-row.toolbar-2,
+      .toolbar-row.toolbar-3{
+        grid-template-columns: 1fr;
+      }
+
+      .toolbar-actions .btn,
+      .toolbar-actions a.btn{
+        flex:1 1 auto;
+      }
+    }
+  </style>
+
+  <!-- ESCALA -->
+  <section class="zone">
+    <header class="zone-head" data-target="#cad-escala">
+      <div class="zone-left">
+        <span class="zone-icon">📅</span>
+        <div class="zone-title">Escala</div>
+      </div>
+      <div class="zone-actions">
+        <button type="button" class="icon-btn" aria-label="Seção de escala">
+          <svg viewBox="0 0 24 24" width="16" height="16">
+            <path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/>
+          </svg>
+        </button>
+        <button type="button" class="icon-btn caret">▾</button>
+      </div>
+    </header>
+    <div class="zone-body collapsed" id="cad-escala">
+      <form method="post" action="{{ url_for('colaboradores.escala_create') }}">
+        <div class="toolbar-row toolbar-3">
+          <label class="field">
+            <span>Nome *</span>
+            <input type="text" name="nome" required>
+          </label>
+
+          <label class="field">
+            <span>Descrição</span>
+            <input type="text" name="descricao">
+          </label>
+
+          <div class="toolbar-actions">
+            <button type="submit" class="btn success">💾 Salvar</button>
+          </div>
         </div>
+      </form>
+
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th style="width:80px;">ID</th>
+              <th>Nome</th>
+              <th>Descrição</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for escala in escalas %}
+            <tr>
+              <td>{{ escala.id }}</td>
+              <td>{{ escala.nome }}</td>
+              <td>{{ escala.descricao }}</td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="3">Nenhuma escala cadastrada.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
     </div>
+  </section>
+
+  <!-- ESCOLARIDADE -->
+  <section class="zone">
+    <header class="zone-head" data-target="#cad-escolaridade">
+      <div class="zone-left">
+        <span class="zone-icon">🎓</span>
+        <div class="zone-title">Escolaridade</div>
+      </div>
+      <div class="zone-actions">
+        <button type="button" class="icon-btn" aria-label="Seção de escolaridade">
+          <svg viewBox="0 0 24 24" width="16" height="16">
+            <path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/>
+          </svg>
+        </button>
+        <button type="button" class="icon-btn caret">▾</button>
+      </div>
+    </header>
+    <div class="zone-body collapsed" id="cad-escolaridade">
+      <form method="post" action="{{ url_for('colaboradores.escolaridade_create') }}">
+        <div class="toolbar-row toolbar-2">
+          <label class="field">
+            <span>Nome *</span>
+            <input type="text" name="nome" required>
+          </label>
+
+          <div class="toolbar-actions">
+            <button type="submit" class="btn success">💾 Salvar</button>
+          </div>
+        </div>
+      </form>
+
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th style="width:80px;">ID</th>
+              <th>Nome</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for esc in escolaridades %}
+            <tr>
+              <td>{{ esc.id }}</td>
+              <td>{{ esc.nome }}</td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="2">Nenhuma escolaridade cadastrada.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ESTADO CIVIL -->
+  <section class="zone">
+    <header class="zone-head" data-target="#cad-estado-civil">
+      <div class="zone-left">
+        <span class="zone-icon">💍</span>
+        <div class="zone-title">Estado Civil</div>
+      </div>
+      <div class="zone-actions">
+        <button type="button" class="icon-btn" aria-label="Seção de estado civil">
+          <svg viewBox="0 0 24 24" width="16" height="16">
+            <path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/>
+          </svg>
+        </button>
+        <button type="button" class="icon-btn caret">▾</button>
+      </div>
+    </header>
+    <div class="zone-body collapsed" id="cad-estado-civil">
+      <form method="post" action="{{ url_for('colaboradores.estado_civil_create') }}">
+        <div class="toolbar-row toolbar-2">
+          <label class="field">
+            <span>Nome *</span>
+            <input type="text" name="nome" required>
+          </label>
+
+          <div class="toolbar-actions">
+            <button type="submit" class="btn success">💾 Salvar</button>
+          </div>
+        </div>
+      </form>
+
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th style="width:80px;">ID</th>
+              <th>Nome</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for ec in estados_civis %}
+            <tr>
+              <td>{{ ec.id }}</td>
+              <td>{{ ec.nome }}</td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="2">Nenhum estado civil cadastrado.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- FUNÇÃO -->
+  <section class="zone">
+    <header class="zone-head" data-target="#cad-funcao">
+      <div class="zone-left">
+        <span class="zone-icon">🧰</span>
+        <div class="zone-title">Função</div>
+      </div>
+      <div class="zone-actions">
+        <button type="button" class="icon-btn" aria-label="Seção de função">
+          <svg viewBox="0 0 24 24" width="16" height="16">
+            <path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/>
+          </svg>
+        </button>
+        <button type="button" class="icon-btn caret">▾</button>
+      </div>
+    </header>
+    <div class="zone-body collapsed" id="cad-funcao">
+      <form method="post" action="{{ url_for('colaboradores.funcao_create') }}">
+        <div class="toolbar-row toolbar-3">
+          <label class="field">
+            <span>Nome *</span>
+            <input type="text" name="nome" required>
+          </label>
+
+          <label class="field">
+            <span>Código</span>
+            <input type="text" name="codigo">
+          </label>
+
+          <div class="toolbar-actions">
+            <button type="submit" class="btn success">💾 Salvar</button>
+          </div>
+        </div>
+      </form>
+
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th style="width:80px;">ID</th>
+              <th>Nome</th>
+              <th>Código</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for func in funcoes %}
+            <tr>
+              <td>{{ func.id }}</td>
+              <td>{{ func.nome }}</td>
+              <td>{{ func.codigo }}</td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="3">Nenhuma função cadastrada.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- MÃO DE OBRA -->
+  <section class="zone">
+    <header class="zone-head" data-target="#cad-mao-obra">
+      <div class="zone-left">
+        <span class="zone-icon">👷</span>
+        <div class="zone-title">Mão de Obra</div>
+      </div>
+      <div class="zone-actions">
+        <button type="button" class="icon-btn" aria-label="Seção de mão de obra">
+          <svg viewBox="0 0 24 24" width="16" height="16">
+            <path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/>
+          </svg>
+        </button>
+        <button type="button" class="icon-btn caret">▾</button>
+      </div>
+    </header>
+    <div class="zone-body collapsed" id="cad-mao-obra">
+      <form method="post" action="{{ url_for('colaboradores.mao_obra_create') }}">
+        <div class="toolbar-row toolbar-2">
+          <label class="field">
+            <span>Nome *</span>
+            <input type="text" name="nome" required>
+          </label>
+
+          <div class="toolbar-actions">
+            <button type="submit" class="btn success">💾 Salvar</button>
+          </div>
+        </div>
+      </form>
+
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th style="width:80px;">ID</th>
+              <th>Nome</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for mo in maos_obra %}
+            <tr>
+              <td>{{ mo.id }}</td>
+              <td>{{ mo.nome }}</td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="2">Nenhum tipo de mão de obra cadastrado.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- SITUAÇÃO FOLHA -->
+  <section class="zone">
+    <header class="zone-head" data-target="#cad-situacao-folha">
+      <div class="zone-left">
+        <span class="zone-icon">📄</span>
+        <div class="zone-title">Situação na Folha</div>
+      </div>
+      <div class="zone-actions">
+        <button type="button" class="icon-btn" aria-label="Seção de situação na folha">
+          <svg viewBox="0 0 24 24" width="16" height="16">
+            <path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/>
+          </svg>
+        </button>
+        <button type="button" class="icon-btn caret">▾</button>
+      </div>
+    </header>
+    <div class="zone-body collapsed" id="cad-situacao-folha">
+      <form method="post" action="{{ url_for('colaboradores.situacao_folha_create') }}">
+        <div class="toolbar-row toolbar-2">
+          <label class="field">
+            <span>Nome *</span>
+            <input type="text" name="nome" required>
+          </label>
+
+          <div class="toolbar-actions">
+            <button type="submit" class="btn success">💾 Salvar</button>
+          </div>
+        </div>
+      </form>
+
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th style="width:80px;">ID</th>
+              <th>Nome</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for sit in situacoes_folha %}
+            <tr>
+              <td>{{ sit.id }}</td>
+              <td>{{ sit.nome }}</td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="2">Nenhuma situação cadastrada.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
 </div>
+
+<script>
+  const zoneStorageKey = "colaboradores_cadastro_zone_state";
+
+  function getZoneState() {
+    try {
+      return JSON.parse(localStorage.getItem(zoneStorageKey) || "{}");
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function setZoneState(state) {
+    localStorage.setItem(zoneStorageKey, JSON.stringify(state));
+  }
+
+  function setZoneOpen(sel, open) {
+    const body = document.querySelector(sel);
+    const head = document.querySelector(`.zone-head[data-target="${sel}"]`);
+    const caret = head ? head.querySelector(".caret") : null;
+
+    if (!body) return;
+
+    if (open) {
+      body.classList.remove("collapsed");
+      if (caret) caret.textContent = "▴";
+    } else {
+      body.classList.add("collapsed");
+      if (caret) caret.textContent = "▾";
+    }
+  }
+
+  document.querySelectorAll(".zone-head").forEach(h => {
+    const sel = h.getAttribute("data-target");
+    const state = getZoneState();
+    const saved = state[sel];
+
+    if (saved === true) {
+      setZoneOpen(sel, true);
+    } else if (saved === false) {
+      setZoneOpen(sel, false);
+    } else {
+      const body = document.querySelector(sel);
+      const caret = h.querySelector(".caret");
+      if (body && !body.classList.contains("collapsed")) {
+        if (caret) caret.textContent = "▴";
+      } else {
+        if (caret) caret.textContent = "▾";
+      }
+    }
+
+    h.addEventListener("click", (e) => {
+      if (e.target.closest(".icon-btn") && !e.target.closest(".caret")) return;
+
+      const body = document.querySelector(sel);
+      if (!body) return;
+
+      const willOpen = body.classList.contains("collapsed");
+      setZoneOpen(sel, willOpen);
+
+      const state = getZoneState();
+      state[sel] = willOpen;
+      setZoneState(state);
+    });
+  });
+</script>
 {% endblock %}
