@@ -514,7 +514,6 @@
 
           <div class="user-menu-dropdown" id="userMenuDropdown">
             <a class="user-menu-link" href="{{ url_for('auth.minha_conta') }}">Minha Conta</a>
-            <a class="user-menu-link" href="{{ url_for('auth.trocar_senha') }}">Trocar senha</a>
 
             {% if 'auth:administrar' in current_user_permissions %}
               <div class="user-menu-divider"></div>
