@@ -2,14 +2,24 @@
 {% block title %}Acesso negado | PRUMAT{% endblock %}
 
 {% block content %}
-<div class="page-wrap" style="max-width: 700px; margin: 40px auto;">
-  <section class="zone">
-    <div style="padding:32px; text-align:center;">
-      <h2 style="margin-bottom:10px;">Acesso negado</h2>
-      <p style="color:#667487;">
-        Você não possui permissão para acessar esta área.
-      </p>
-      <a href="{{ url_for('index') }}" class="btn-primary">Voltar ao início</a>
+<div class="page-wrap" style="max-width: 760px; margin: 40px auto;">
+  <section class="zone" style="overflow:hidden;">
+    <div style="background:linear-gradient(180deg, #16324F 0%, #1d3e61 100%); padding:28px;">
+      <h2 style="margin:0; color:#fff;">Acesso negado</h2>
+      <div style="color:#d9e6f2; font-size:14px; margin-top:6px;">
+        Você não possui permissão para acessar esta área do sistema.
+      </div>
+    </div>
+
+    <div style="padding:28px;">
+      <div class="alert" style="margin-bottom:18px;">
+        Seu perfil atual não possui a permissão necessária para abrir esta página ou executar esta ação.
+      </div>
+
+      <div style="display:flex; gap:12px; flex-wrap:wrap;">
+        <a href="{{ url_for('index') }}" class="btn-primary">Voltar ao início</a>
+        <a href="{{ url_for('auth.minha_conta') }}" class="btn-outline">Minha conta</a>
+      </div>
     </div>
   </section>
 </div>
