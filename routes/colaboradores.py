@@ -1,5 +1,6 @@
 from datetime import datetime
 from typing import List, Dict, Any, Tuple
+from routes.auth import login_required
 
 from flask import (
     Blueprint,
@@ -140,6 +141,7 @@ def parse_date(value: str):
 # Página inicial / índice
 # ---------------------------------------------------------------------
 @bp.route("/")
+@login_required
 def index():
     return render_template(
         "colaboradores/index.html",
@@ -151,6 +153,7 @@ def index():
 # REGISTRO DE COLABORADORES
 # ---------------------------------------------------------------------
 @bp.route("/registro", methods=["GET"])
+@login_required
 def registro():
     engine = get_engine()
     with engine.connect() as conn:
@@ -222,6 +225,7 @@ def registro():
 
 
 @bp.route("/registro/create", methods=["POST"])
+@login_required
 def registro_create():
     engine = get_engine()
     form = request.form
@@ -350,6 +354,7 @@ def registro_create():
 # CADASTRO DE TABELAS AUXILIARES
 # ---------------------------------------------------------------------
 @bp.route("/cadastro", methods=["GET"])
+@login_required
 def cadastro():
     engine = get_engine()
     with engine.connect() as conn:
@@ -376,6 +381,7 @@ def cadastro():
 
 # ----------------- ESCALA -----------------
 @bp.route("/cadastro/escala/create", methods=["POST"])
+@login_required
 def escala_create():
     engine = get_engine()
     nome = request.form.get("nome", "").strip()
@@ -404,6 +410,7 @@ def escala_create():
 
 # ----------------- ESCOLARIDADE -----------------
 @bp.route("/cadastro/escolaridade/create", methods=["POST"])
+@login_required
 def escolaridade_create():
     engine = get_engine()
     nome = request.form.get("nome", "").strip()
@@ -431,6 +438,7 @@ def escolaridade_create():
 
 # ----------------- ESTADO CIVIL -----------------
 @bp.route("/cadastro/estado_civil/create", methods=["POST"])
+@login_required
 def estado_civil_create():
     engine = get_engine()
     nome = request.form.get("nome", "").strip()
@@ -458,6 +466,7 @@ def estado_civil_create():
 
 # ----------------- FUNÇÃO -----------------
 @bp.route("/cadastro/funcao/create", methods=["POST"])
+@login_required
 def funcao_create():
     engine = get_engine()
     nome = request.form.get("nome", "").strip()
@@ -489,6 +498,7 @@ def funcao_create():
 
 # ----------------- MÃO DE OBRA -----------------
 @bp.route("/cadastro/mao_obra/create", methods=["POST"])
+@login_required
 def mao_obra_create():
     engine = get_engine()
     nome = request.form.get("nome", "").strip()
@@ -516,6 +526,7 @@ def mao_obra_create():
 
 # ----------------- SITUAÇÃO NA FOLHA -----------------
 @bp.route("/cadastro/situacao_folha/create", methods=["POST"])
+@login_required
 def situacao_folha_create():
     engine = get_engine()
     nome = request.form.get("nome", "").strip()

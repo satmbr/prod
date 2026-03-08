@@ -1,31 +1,34 @@
-from flask import Flask, request
+from flask import Flask, session, redirect, url_for, request
 import os
 
 def create_app():
     app = Flask(__name__)
-    app.config["SECRET_KEY"] = "uma-string-bem-secreta-aqui"
+    app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "troque-esta-chave-em-producao")
 
-    # injeta o nome do usuário em todos os templates
     @app.context_processor
     def inject_user():
-        name = (request.args.get("user")
-                or os.getenv("APP_USER")
-                or "Usuário")
-        return {"current_user_name": name}
+        return {
+            "current_user_name": session.get("usuario_nome"),
+            "usuario_logado": "usuario_id" in session
+        }
 
-    # registra o blueprint de Operação
+    from routes.auth import bp as auth_bp
+    app.register_blueprint(auth_bp)
+
     from routes.operacao import bp as operacao_bp
     app.register_blueprint(operacao_bp, url_prefix="/operacao")
-    
+
     from routes.equipamentos import bp as equipamentos_bp
     app.register_blueprint(equipamentos_bp, url_prefix="/equipamentos")
-    
-    from routes.colaboradores import bp as colaboradores_bp  # ajuste o caminho se preciso
+
+    from routes.colaboradores import bp as colaboradores_bp
     app.register_blueprint(colaboradores_bp)
 
     @app.get("/")
     def index():
         from flask import render_template
+        if "usuario_id" not in session:
+            return redirect(url_for("auth.login"))
         return render_template("index.html")
 
     @app.get("/health")

@@ -370,7 +370,10 @@
     </div>
 
     <div class="nav-right">
-      <a class="nav-link" href="#user">{{ current_user_name }}</a>
+	  {% if usuario_logado %}
+		<span style="color:#fff; font-weight:600;">{{ current_user_name }}</span>
+		<a class="nav-link" href="{{ url_for('auth.logout') }}">Sair</a>
+	  {% endif %}
       <a class="nav-link" href="#help">Help</a>
     </div>
   </div>

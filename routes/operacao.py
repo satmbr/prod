@@ -2,6 +2,7 @@ from datetime import date
 from flask import Blueprint, render_template, request, redirect, url_for
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
+from routes.auth import login_required
 
 from db import get_engine
 
@@ -73,6 +74,7 @@ def load_eh_frentes(conn):
 # /operacao/  -> tela “limpa” (só com o sub-menu)
 # -------------------------------------------------------------------
 @bp.route("/")
+@login_required
 def index():
     # sub-menu, mas sem nada no corpo da página
     subnav = build_operacao_subnav(None)
@@ -86,6 +88,7 @@ def index():
 # /operacao/producao
 # -------------------------------------------------------------------
 @bp.route("/producao")
+@login_required
 def producao():
     engine = get_engine()
     with engine.connect() as conn:
@@ -380,6 +383,7 @@ def producao():
 # /operacao/cadastro  (EH e Frentes)
 # -------------------------------------------------------------------
 @bp.route("/cadastro", methods=["GET"])
+@login_required
 def cadastro():
     engine = get_engine()
     with engine.connect() as conn:
@@ -396,6 +400,7 @@ def cadastro():
 
 
 @bp.route("/cadastro/eh/create", methods=["POST"])
+@login_required
 def eh_create():
     eh = request.form.get("eh", "").strip()
     if not eh:
@@ -411,6 +416,7 @@ def eh_create():
 
 
 @bp.route("/cadastro/eh/update", methods=["POST"])
+@login_required
 def eh_update():
     eid = request.form.get("id")
     novo = request.form.get("novo_eh", "").strip()
@@ -428,6 +434,7 @@ def eh_update():
 
 
 @bp.route("/cadastro/eh/delete", methods=["POST"])
+@login_required
 def eh_delete():
     eid = request.form.get("id")
     if not eid:
@@ -443,6 +450,7 @@ def eh_delete():
 
 
 @bp.route("/cadastro/frente/create", methods=["POST"])
+@login_required
 def frente_create():
     frente = request.form.get("frente", "").strip()
     if not frente:
@@ -459,6 +467,7 @@ def frente_create():
 
 
 @bp.route("/cadastro/frente/update", methods=["POST"])
+@login_required
 def frente_update():
     fid = request.form.get("id")
     novo = request.form.get("nova_frente", "").strip()
@@ -476,6 +485,7 @@ def frente_update():
 
 
 @bp.route("/cadastro/frente/delete", methods=["POST"])
+@login_required
 def frente_delete():
     fid = request.form.get("id")
     if not fid:
@@ -494,6 +504,7 @@ def frente_delete():
 # /operacao/registro  (Planejado x Realizado)
 # -------------------------------------------------------------------
 @bp.route("/registro", methods=["GET"])
+@login_required
 def registro():
     engine = get_engine()
     with engine.connect() as conn:
@@ -564,6 +575,7 @@ def registro():
 
 
 @bp.route("/registro/realizada/create", methods=["POST"])
+@login_required
 def registro_realizada_create():
     eh_id = request.form.get("eh_id")
     fr_id = request.form.get("frente_id")
@@ -590,6 +602,7 @@ def registro_realizada_create():
 
 
 @bp.route("/registro/realizada/delete", methods=["POST"])
+@login_required
 def registro_realizada_delete():
     rid = request.form.get("id")
     if not rid:
@@ -606,6 +619,7 @@ def registro_realizada_delete():
 
 
 @bp.route("/registro/planejada/create", methods=["POST"])
+@login_required
 def registro_planejada_create():
     eh_id = request.form.get("eh_id")
     fr_id = request.form.get("frente_id")
@@ -632,6 +646,7 @@ def registro_planejada_create():
 
 
 @bp.route("/registro/planejada/delete", methods=["POST"])
+@login_required
 def registro_planejada_delete():
     pid = request.form.get("id")
     if not pid:

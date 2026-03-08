@@ -5,6 +5,7 @@ from datetime import date
 import json
 import csv
 import io
+from routes.auth import login_required
 
 
 bp = Blueprint("equipamentos", __name__)
@@ -44,10 +45,12 @@ def _fetch_listas():
 # Páginas
 # ----------------------------
 @bp.get("/")
+@login_required
 def index():
     return render_template("equipamentos/index.html", subnav_links=_subnav(""))
 
 @bp.get("/cadastro")
+@login_required
 def cadastro():
     maquinas, pontos = _fetch_listas()
     return render_template(
@@ -62,6 +65,7 @@ def cadastro():
 # CRUD · MÁQUINA
 # ----------------------------
 @bp.post("/cadastro/maquina/create")
+@login_required
 def maq_create():
     tag = (request.form.get("tag") or "").strip()
     descricao = (request.form.get("descricao") or "").strip()
@@ -79,6 +83,7 @@ def maq_create():
         return redirect(url_for("equipamentos.cadastro", msg=f"Erro ao cadastrar máquina: {e}"))
 
 @bp.post("/cadastro/maquina/update")
+@login_required
 def maq_update():
     id_ = request.form.get("id")
     nova_tag = (request.form.get("nova_tag") or "").strip()
@@ -104,6 +109,7 @@ def maq_update():
         return redirect(url_for("equipamentos.cadastro", msg=f"Erro ao atualizar máquina: {e}"))
 
 @bp.post("/cadastro/maquina/delete")
+@login_required
 def maq_delete():
     id_ = request.form.get("id")
     if not id_:
@@ -119,6 +125,7 @@ def maq_delete():
 # CRUD · PONTO DE MEDIÇÃO
 # ----------------------------
 @bp.post("/cadastro/ponto/create")
+@login_required
 def ponto_create():
     maquina_id = request.form.get("maquina_id")
     codigo = (request.form.get("codigo") or "").strip()
@@ -137,6 +144,7 @@ def ponto_create():
         return redirect(url_for("equipamentos.cadastro", msg=f"Erro ao cadastrar ponto: {e}"))
 
 @bp.post("/cadastro/ponto/update")
+@login_required
 def ponto_update():
     id_ = request.form.get("id")
     maquina_id = request.form.get("maquina_id")  # agora OBRIGATÓRIA para validar vínculo
@@ -173,6 +181,7 @@ def ponto_update():
         return redirect(url_for("equipamentos.cadastro", msg=f"Erro ao atualizar ponto: {e}"))
 
 @bp.post("/cadastro/ponto/delete")
+@login_required
 def ponto_delete():
     id_ = request.form.get("id")
     maquina_id = request.form.get("maquina_id")  # OBRIGATÓRIA
@@ -216,6 +225,7 @@ def _listas_basicas():
 
 # ---------- página PartDiaria ----------
 @bp.get("/partdiaria")
+@login_required
 def partdiaria():
     filtros = {
         "ini": request.args.get("ini"),
@@ -276,6 +286,7 @@ def partdiaria():
                            msg=request.args.get("msg"))
 
 @bp.get("/partdiaria/export")
+@login_required
 def part_export():
     filtros = {
         "ini": request.args.get("ini", "").strip(),
@@ -357,6 +368,7 @@ def part_export():
 
 # ---------- CRUD Parte Diária ----------
 @bp.post("/partdiaria/create")
+@login_required
 def part_create():
     data = request.form.get("data")
     maquina_id = request.form.get("maquina_id")
@@ -383,6 +395,7 @@ def part_create():
         return redirect(url_for("equipamentos.partdiaria", msg=f"Erro ao salvar: {e}"))
         
 @bp.post("/partdiaria/create_lote")
+@login_required
 def part_create_lote():
     raw = request.form.get("lancamentos_json", "").strip()
 
@@ -429,6 +442,7 @@ def part_create_lote():
         return redirect(url_for("equipamentos.partdiaria", msg=f"Erro ao salvar lote: {e}"))
 
 @bp.post("/partdiaria/item/update")
+@login_required
 def part_update():
     id_ = request.form.get("id")
     data = request.form.get("data")
@@ -472,6 +486,7 @@ def part_update():
         ))
 
 @bp.post("/partdiaria/item/delete")
+@login_required
 def part_delete():
     id_ = request.form.get("id")
     if not id_:
@@ -497,6 +512,7 @@ def part_delete():
 
 # ---------- CRUD Atividade ----------
 @bp.post("/atividade/create")
+@login_required
 def act_create():
     nome = (request.form.get("nome") or "").strip()
     if not nome:
@@ -509,6 +525,7 @@ def act_create():
         return redirect(url_for("equipamentos.partdiaria", msg=f"Erro ao cadastrar atividade: {e}"))
 
 @bp.post("/atividade/update")
+@login_required
 def act_update():
     id_ = request.form.get("id")
     nome = (request.form.get("nome") or "").strip()
@@ -524,6 +541,7 @@ def act_update():
         return redirect(url_for("equipamentos.partdiaria", msg=f"Erro ao atualizar atividade: {e}"))
 
 @bp.post("/atividade/delete")
+@login_required
 def act_delete():
     id_ = request.form.get("id")
     if not id_:
