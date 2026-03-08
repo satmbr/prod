@@ -52,50 +52,56 @@ def create_app():
     from routes.colaboradores import bp as colaboradores_bp
     app.register_blueprint(colaboradores_bp)
 
-    @app.get("/")
-    def index():
-        from flask import render_template
+@app.get("/")
+def home():
+    from flask import render_template
+    return render_template("home_publica.html")
 
-        if "usuario_id" not in session:
-            return redirect(url_for("auth.login"))
 
-        permissoes = session.get("permissoes", [])
+@app.get("/dashboard")
+def dashboard():
+    from flask import render_template
 
-        cards = []
+    if "usuario_id" not in session:
+        return redirect(url_for("auth.login"))
 
-        if "operacao:visualizar" in permissoes or "auth:administrar" in permissoes:
-            cards.append({
-                "titulo": "Operação",
-                "descricao": "Acompanhe produção, cadastros e registros do módulo de operação.",
-                "href": url_for("operacao.index"),
-                "botao": "Acessar módulo"
-            })
+    permissoes = session.get("permissoes", [])
 
-        if "equipamentos:visualizar" in permissoes or "auth:administrar" in permissoes:
-            cards.append({
-                "titulo": "Equipamentos",
-                "descricao": "Consulte e gerencie cadastros, controles e informações dos equipamentos.",
-                "href": url_for("equipamentos.index"),
-                "botao": "Acessar módulo"
-            })
+    cards = []
 
-        if "colaboradores:visualizar" in permissoes or "auth:administrar" in permissoes:
-            cards.append({
-                "titulo": "Colaboradores",
-                "descricao": "Visualize e mantenha os registros e dados dos colaboradores.",
-                "href": url_for("colaboradores.registro"),
-                "botao": "Acessar módulo"
-            })
+    if "operacao:visualizar" in permissoes or "auth:administrar" in permissoes:
+        cards.append({
+            "titulo": "Operação",
+            "descricao": "Acompanhe produção, cadastros e registros do módulo de operação.",
+            "href": url_for("operacao.index"),
+            "botao": "Acessar módulo"
+        })
 
-        if "auth:administrar" in permissoes:
-            cards.append({
-                "titulo": "Administração",
-                "descricao": "Gerencie usuários, perfis, permissões e auditoria do sistema.",
-                "href": url_for("auth.usuarios"),
-                "botao": "Abrir administração"
-            })
+    if "equipamentos:visualizar" in permissoes or "auth:administrar" in permissoes:
+        cards.append({
+            "titulo": "Equipamentos",
+            "descricao": "Consulte e gerencie cadastros, controles e informações dos equipamentos.",
+            "href": url_for("equipamentos.index"),
+            "botao": "Acessar módulo"
+        })
 
-        return render_template("index.html", cards=cards)
+    if "colaboradores:visualizar" in permissoes or "auth:administrar" in permissoes:
+        cards.append({
+            "titulo": "Colaboradores",
+            "descricao": "Visualize e mantenha os registros e dados dos colaboradores.",
+            "href": url_for("colaboradores.registro"),
+            "botao": "Acessar módulo"
+        })
+
+    if "auth:administrar" in permissoes:
+        cards.append({
+            "titulo": "Administração",
+            "descricao": "Gerencie usuários, perfis, permissões e auditoria do sistema.",
+            "href": url_for("auth.usuarios"),
+            "botao": "Abrir administração"
+        })
+
+    return render_template("index.html", cards=cards)
 
     @app.get("/health")
     def health():

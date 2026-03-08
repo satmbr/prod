@@ -236,7 +236,7 @@ def login():
             flash("Troque sua senha antes de continuar.", "aviso")
             return redirect(url_for("auth.trocar_senha"))
 
-        return redirect(url_for("index"))
+        return redirect(url_for("dashboard"))
 
     return render_template("auth/login.html")
 
@@ -547,7 +547,7 @@ def trocar_senha():
             username=session.get("username")
         )
         flash("Senha alterada com sucesso.", "sucesso")
-        return redirect(url_for("index"))
+        return redirect(url_for("dashboard"))
 
     return render_template("auth/trocar_senha.html")
 

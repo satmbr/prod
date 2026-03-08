@@ -531,29 +531,33 @@
     </div>
   </div>
 
-  <nav class="header-nav">
-    <div class="nav-left">
-      <a class="home-icon" title="Home" href="{{ url_for('index') }}">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2 12h3v9h6v-6h2v6h6v-9h3z"/></svg>
-      </a>
+	<nav class="header-nav">
+	  <div class="nav-left">
+		<a class="home-icon" title="Home" href="{% if usuario_logado %}{{ url_for('dashboard') }}{% else %}{{ url_for('home') }}{% endif %}">
+		  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2 12h3v9h6v-6h2v6h6v-9h3z"/></svg>
+		</a>
 
-      {% if 'operacao:visualizar' in current_user_permissions or 'auth:administrar' in current_user_permissions %}
-        <a class="nav-link" href="{{ url_for('operacao.index') }}">Operação</a>
-      {% endif %}
+		{% if usuario_logado %}
+		  {% if 'operacao:visualizar' in current_user_permissions or 'auth:administrar' in current_user_permissions %}
+			<a class="nav-link" href="{{ url_for('operacao.index') }}">Operação</a>
+		  {% endif %}
 
-      {% if 'equipamentos:visualizar' in current_user_permissions or 'auth:administrar' in current_user_permissions %}
-        <a class="nav-link" href="{{ url_for('equipamentos.index') }}">Equipamentos</a>
-      {% endif %}
+		  {% if 'equipamentos:visualizar' in current_user_permissions or 'auth:administrar' in current_user_permissions %}
+			<a class="nav-link" href="{{ url_for('equipamentos.index') }}">Equipamentos</a>
+		  {% endif %}
 
-      {% if 'colaboradores:visualizar' in current_user_permissions or 'auth:administrar' in current_user_permissions %}
-        <a class="nav-link" href="{{ url_for('colaboradores.registro') }}">Colaboradores</a>
-      {% endif %}
+		  {% if 'colaboradores:visualizar' in current_user_permissions or 'auth:administrar' in current_user_permissions %}
+			<a class="nav-link" href="{{ url_for('colaboradores.registro') }}">Colaboradores</a>
+		  {% endif %}
 
-      {% if 'manutencao:visualizar' in current_user_permissions or 'auth:administrar' in current_user_permissions %}
-        <a class="nav-link" href="#manutencao">Manutenção</a>
-      {% endif %}
-    </div>
-  </nav>
+		  {% if 'manutencao:visualizar' in current_user_permissions or 'auth:administrar' in current_user_permissions %}
+			<a class="nav-link" href="#manutencao">Manutenção</a>
+		  {% endif %}
+		{% else %}
+		  <a class="nav-link" href="{{ url_for('auth.login') }}">Entrar</a>
+		{% endif %}
+	  </div>
+	</nav>
 
   <div class="divider"></div>
 
