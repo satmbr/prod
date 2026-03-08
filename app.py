@@ -10,7 +10,8 @@ def create_app():
         return {
             "current_user_name": session.get("usuario_nome"),
             "usuario_logado": "usuario_id" in session,
-            "current_user_profile": session.get("perfil_nome")
+            "current_user_profile": session.get("perfil_nome"),
+            "current_user_permissions": session.get("permissoes", [])
         }
 
     from routes.auth import bp as auth_bp

@@ -11,6 +11,24 @@
 
 	  <a class="nav-link" href="{{ url_for('auth.logout') }}">Sair</a>
 	{% endif %}
+	
+	{% if 'operacao:visualizar' in current_user_permissions or 'auth:administrar' in current_user_permissions %}
+	  <a class="nav-link" href="{{ url_for('operacao.index') }}">Operação</a>
+	{% endif %}
+
+	{% if 'equipamentos:visualizar' in current_user_permissions or 'auth:administrar' in current_user_permissions %}
+	  <a class="nav-link" href="{{ url_for('equipamentos.index') }}">Equipamentos</a>
+	{% endif %}
+
+	{% if 'colaboradores:visualizar' in current_user_permissions or 'auth:administrar' in current_user_permissions %}
+	  <a class="nav-link" href="{{ url_for('colaboradores.index') }}">Colaboradores</a>
+	{% endif %}
+
+	{% if 'auth:administrar' in current_user_permissions %}
+	  <a class="nav-link" href="{{ url_for('auth.usuarios') }}">Usuários</a>
+	  <a class="nav-link" href="{{ url_for('auth.perfis') }}">Perfis</a>
+	{% endif %}
+	
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>{% block title %}PRUMAT{% endblock %}</title>

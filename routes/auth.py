@@ -6,6 +6,20 @@ from functools import wraps
 
 bp = Blueprint("auth", __name__, url_prefix="/auth")
 
+def carregar_permissoes_usuario(usuario_id):
+    with get_engine().connect() as conn:
+        rows = conn.execute(
+            text("""
+                SELECT pm.modulo, pm.acao
+                FROM usuarios u
+                INNER JOIN perfil_permissoes pp ON pp.perfil_id = u.perfil_id
+                INNER JOIN permissoes pm ON pm.id = pp.permissao_id
+                WHERE u.id = :usuario_id
+            """),
+            {"usuario_id": usuario_id}
+        ).mappings().all()
+
+    return [f"{r['modulo']}:{r['acao']}" for r in rows]
 
 def login_required(view):
     @wraps(view)
@@ -32,8 +46,26 @@ def perfil_required(*nomes_permitidos):
     return decorator
 
 
+def permission_required(modulo, acao):
+    def decorator(view):
+        @wraps(view)
+        def wrapped_view(*args, **kwargs):
+            if "usuario_id" not in session:
+                return redirect(url_for("auth.login"))
+
+            permissoes = session.get("permissoes", [])
+            chave = f"{modulo}:{acao}"
+
+            if chave not in permissoes and "auth:administrar" not in permissoes:
+                abort(403)
+
+            return view(*args, **kwargs)
+        return wrapped_view
+    return decorator
+
+
 def admin_required(view):
-    return perfil_required("Administrador")(view)
+    return permission_required("auth", "administrar")(view)
 
 
 @bp.route("/login", methods=["GET", "POST"])
@@ -80,6 +112,7 @@ def login():
         session["username"] = usuario["username"]
         session["perfil_id"] = usuario["perfil_id"]
         session["perfil_nome"] = usuario["perfil_nome"]
+        session["permissoes"] = carregar_permissoes_usuario(usuario["id"])
 
         with get_engine().begin() as conn:
             conn.execute(
@@ -325,7 +358,6 @@ def toggle_usuario(usuario_id):
     flash("Status do usuário atualizado.", "sucesso")
     return redirect(url_for("auth.usuarios"))
 
-
 @bp.route("/trocar-senha", methods=["GET", "POST"])
 @login_required
 def trocar_senha():
@@ -547,6 +579,80 @@ def editar_perfil(perfil_id):
 
     return render_template("auth/perfil_form.html", perfil=perfil)
 
+@bp.get("/perfis/<int:perfil_id>/permissoes")
+@login_required
+@admin_required
+def permissoes_perfil(perfil_id):
+    with get_engine().connect() as conn:
+        perfil = conn.execute(
+            text("""
+                SELECT id, nome, descricao, ativo
+                FROM perfis
+                WHERE id = :id
+            """),
+            {"id": perfil_id}
+        ).mappings().first()
+
+        if not perfil:
+            abort(404)
+
+        permissoes = conn.execute(
+            text("""
+                SELECT
+                    pm.id,
+                    pm.modulo,
+                    pm.acao,
+                    pm.descricao,
+                    CASE
+                        WHEN pp.id IS NOT NULL THEN TRUE
+                        ELSE FALSE
+                    END AS marcado
+                FROM permissoes pm
+                LEFT JOIN perfil_permissoes pp
+                    ON pp.permissao_id = pm.id
+                   AND pp.perfil_id = :perfil_id
+                ORDER BY pm.modulo ASC, pm.acao ASC
+            """),
+            {"perfil_id": perfil_id}
+        ).mappings().all()
+
+    return render_template("auth/perfil_permissoes.html", perfil=perfil, permissoes=permissoes)
+
+@bp.post("/perfis/<int:perfil_id>/permissoes")
+@login_required
+@admin_required
+def salvar_permissoes_perfil(perfil_id):
+    permissoes_ids = request.form.getlist("permissoes")
+
+    with get_engine().begin() as conn:
+        perfil = conn.execute(
+            text("SELECT id, nome FROM perfis WHERE id = :id"),
+            {"id": perfil_id}
+        ).mappings().first()
+
+        if not perfil:
+            abort(404)
+
+        conn.execute(
+            text("DELETE FROM perfil_permissoes WHERE perfil_id = :perfil_id"),
+            {"perfil_id": perfil_id}
+        )
+
+        for permissao_id in permissoes_ids:
+            conn.execute(
+                text("""
+                    INSERT INTO perfil_permissoes (perfil_id, permissao_id)
+                    VALUES (:perfil_id, :permissao_id)
+                    ON CONFLICT (perfil_id, permissao_id) DO NOTHING
+                """),
+                {
+                    "perfil_id": perfil_id,
+                    "permissao_id": int(permissao_id)
+                }
+            )
+
+    flash("Permissões do perfil atualizadas com sucesso.", "sucesso")
+    return redirect(url_for("auth.permissoes_perfil", perfil_id=perfil_id))
 
 @bp.app_errorhandler(403)
 def acesso_negado(e):

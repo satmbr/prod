@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Permissões do Perfil | PRUMAT{% endblock %}
+
+{% block content %}
+<div class="page-wrap" style="max-width: 1000px; margin: 24px auto;">
+  <section class="zone">
+    <div class="zone-head">
+      <div class="zone-left">
+        <div>
+          <h2 style="margin:0;">Permissões do perfil</h2>
+          <div style="color:#667487; font-size:14px; margin-top:4px;">
+            Perfil: {{ perfil.nome }}
+          </div>
+        </div>
+      </div>
+      <div class="zone-actions">
+        <a href="{{ url_for('auth.perfis') }}" class="btn-outline">Voltar</a>
+      </div>
+    </div>
+
+    <div style="padding:24px;">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+            <div style="margin-bottom:12px; padding:12px 14px; border-radius:10px; background:#f5f8fc; border:1px solid #d7e2ef;">
+              {{ message }}
+            </div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+
+      <form method="post">
+        <div style="overflow-x:auto;">
+          <table class="data-table" style="width:100%;">
+            <thead>
+              <tr>
+                <th style="width:80px; text-align:center;">Marcar</th>
+                <th>Módulo</th>
+                <th>Ação</th>
+                <th>Descrição</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for p in permissoes %}
+              <tr>
+                <td style="text-align:center;">
+                  <input type="checkbox" name="permissoes" value="{{ p.id }}" {% if p.marcado %}checked{% endif %}>
+                </td>
+                <td>{{ p.modulo }}</td>
+                <td>{{ p.acao }}</td>
+                <td>{{ p.descricao or '' }}</td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="4" style="text-align:center;">Nenhuma permissão encontrada.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <div style="margin-top:24px; display:flex; gap:12px;">
+          <button type="submit" class="btn-primary">Salvar permissões</button>
+          <a href="{{ url_for('auth.perfis') }}" class="btn-outline">Cancelar</a>
+        </div>
+      </form>
+    </div>
+  </section>
+</div>
+{% endblock %}

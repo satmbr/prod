@@ -48,9 +48,10 @@
               <td>{{ p.descricao or '' }}</td>
               <td>{{ 'Ativo' if p.ativo else 'Inativo' }}</td>
               <td>{{ p.criado_em or '' }}</td>
-              <td style="text-align:center;">
-                <a href="{{ url_for('auth.editar_perfil', perfil_id=p.id) }}" class="btn-outline">Editar</a>
-              </td>
+			  <td style="text-align:center; white-space:nowrap;">
+				<a href="{{ url_for('auth.editar_perfil', perfil_id=p.id) }}" class="btn-outline">Editar</a>
+				<a href="{{ url_for('auth.permissoes_perfil', perfil_id=p.id) }}" class="btn-outline">Permissões</a>
+			  </td>
             </tr>
             {% else %}
             <tr>
