@@ -16,18 +16,24 @@ def login_required(view):
     return wrapped_view
 
 
+def perfil_required(*nomes_permitidos):
+    def decorator(view):
+        @wraps(view)
+        def wrapped_view(*args, **kwargs):
+            if "usuario_id" not in session:
+                return redirect(url_for("auth.login"))
+
+            perfil_nome = (session.get("perfil_nome") or "").strip()
+            if perfil_nome not in nomes_permitidos:
+                abort(403)
+
+            return view(*args, **kwargs)
+        return wrapped_view
+    return decorator
+
+
 def admin_required(view):
-    @wraps(view)
-    def wrapped_view(*args, **kwargs):
-        if "usuario_id" not in session:
-            return redirect(url_for("auth.login"))
-
-        username = (session.get("username") or "").strip().lower()
-        if username != "admin":
-            abort(403)
-
-        return view(*args, **kwargs)
-    return wrapped_view
+    return perfil_required("Administrador")(view)
 
 
 @bp.route("/login", methods=["GET", "POST"])
@@ -39,9 +45,18 @@ def login():
         with get_engine().connect() as conn:
             usuario = conn.execute(
                 text("""
-                    SELECT id, nome, username, senha_hash, ativo, deve_trocar_senha
-                    FROM usuarios
-                    WHERE username = :username
+                    SELECT
+                        u.id,
+                        u.nome,
+                        u.username,
+                        u.senha_hash,
+                        u.ativo,
+                        u.deve_trocar_senha,
+                        u.perfil_id,
+                        p.nome AS perfil_nome
+                    FROM usuarios u
+                    LEFT JOIN perfis p ON p.id = u.perfil_id
+                    WHERE u.username = :username
                     LIMIT 1
                 """),
                 {"username": username}
@@ -63,6 +78,8 @@ def login():
         session["usuario_id"] = usuario["id"]
         session["usuario_nome"] = usuario["nome"]
         session["username"] = usuario["username"]
+        session["perfil_id"] = usuario["perfil_id"]
+        session["perfil_nome"] = usuario["perfil_nome"]
 
         with get_engine().begin() as conn:
             conn.execute(
@@ -97,16 +114,19 @@ def usuarios():
         rows = conn.execute(
             text("""
                 SELECT
-                    id,
-                    nome,
-                    username,
-                    email,
-                    ativo,
-                    deve_trocar_senha,
-                    ultimo_login,
-                    criado_em
-                FROM usuarios
-                ORDER BY nome ASC
+                    u.id,
+                    u.nome,
+                    u.username,
+                    u.email,
+                    u.ativo,
+                    u.deve_trocar_senha,
+                    u.ultimo_login,
+                    u.criado_em,
+                    u.perfil_id,
+                    p.nome AS perfil_nome
+                FROM usuarios u
+                LEFT JOIN perfis p ON p.id = u.perfil_id
+                ORDER BY u.nome ASC
             """)
         ).mappings().all()
 
@@ -117,17 +137,28 @@ def usuarios():
 @login_required
 @admin_required
 def novo_usuario():
+    with get_engine().connect() as conn:
+        perfis = conn.execute(
+            text("""
+                SELECT id, nome, descricao
+                FROM perfis
+                WHERE ativo = TRUE
+                ORDER BY nome ASC
+            """)
+        ).mappings().all()
+
     if request.method == "POST":
         nome = (request.form.get("nome") or "").strip()
         username = (request.form.get("username") or "").strip()
         email = (request.form.get("email") or "").strip()
         senha = request.form.get("senha") or ""
+        perfil_id = request.form.get("perfil_id")
         ativo = True if request.form.get("ativo") == "on" else False
         deve_trocar_senha = True if request.form.get("deve_trocar_senha") == "on" else False
 
-        if not nome or not username or not senha:
-            flash("Preencha nome, usuário e senha.", "erro")
-            return render_template("auth/usuario_form.html", usuario=None)
+        if not nome or not username or not senha or not perfil_id:
+            flash("Preencha nome, usuário, senha e perfil.", "erro")
+            return render_template("auth/usuario_form.html", usuario=None, perfis=perfis)
 
         senha_hash = generate_password_hash(senha)
 
@@ -136,11 +167,11 @@ def novo_usuario():
                 conn.execute(
                     text("""
                         INSERT INTO usuarios (
-                            nome, username, email, senha_hash, ativo,
+                            nome, username, email, senha_hash, perfil_id, ativo,
                             deve_trocar_senha, criado_por
                         )
                         VALUES (
-                            :nome, :username, :email, :senha_hash, :ativo,
+                            :nome, :username, :email, :senha_hash, :perfil_id, :ativo,
                             :deve_trocar_senha, :criado_por
                         )
                     """),
@@ -149,6 +180,7 @@ def novo_usuario():
                         "username": username,
                         "email": email if email else None,
                         "senha_hash": senha_hash,
+                        "perfil_id": int(perfil_id),
                         "ativo": ativo,
                         "deve_trocar_senha": deve_trocar_senha,
                         "criado_por": session.get("usuario_id")
@@ -158,9 +190,9 @@ def novo_usuario():
             return redirect(url_for("auth.usuarios"))
         except Exception:
             flash("Não foi possível criar o usuário. Verifique se o username já existe.", "erro")
-            return render_template("auth/usuario_form.html", usuario=None)
+            return render_template("auth/usuario_form.html", usuario=None, perfis=perfis)
 
-    return render_template("auth/usuario_form.html", usuario=None)
+    return render_template("auth/usuario_form.html", usuario=None, perfis=perfis)
 
 
 @bp.route("/usuarios/<int:usuario_id>/editar", methods=["GET", "POST"])
@@ -170,12 +202,21 @@ def editar_usuario(usuario_id):
     with get_engine().connect() as conn:
         usuario = conn.execute(
             text("""
-                SELECT id, nome, username, email, ativo, deve_trocar_senha
+                SELECT id, nome, username, email, ativo, deve_trocar_senha, perfil_id
                 FROM usuarios
                 WHERE id = :id
             """),
             {"id": usuario_id}
         ).mappings().first()
+
+        perfis = conn.execute(
+            text("""
+                SELECT id, nome, descricao
+                FROM perfis
+                WHERE ativo = TRUE
+                ORDER BY nome ASC
+            """)
+        ).mappings().all()
 
     if not usuario:
         abort(404)
@@ -184,12 +225,13 @@ def editar_usuario(usuario_id):
         nome = (request.form.get("nome") or "").strip()
         username = (request.form.get("username") or "").strip()
         email = (request.form.get("email") or "").strip()
+        perfil_id = request.form.get("perfil_id")
         ativo = True if request.form.get("ativo") == "on" else False
         deve_trocar_senha = True if request.form.get("deve_trocar_senha") == "on" else False
 
-        if not nome or not username:
-            flash("Preencha nome e usuário.", "erro")
-            return render_template("auth/usuario_form.html", usuario=usuario)
+        if not nome or not username or not perfil_id:
+            flash("Preencha nome, usuário e perfil.", "erro")
+            return render_template("auth/usuario_form.html", usuario=usuario, perfis=perfis)
 
         try:
             with get_engine().begin() as conn:
@@ -200,6 +242,7 @@ def editar_usuario(usuario_id):
                             nome = :nome,
                             username = :username,
                             email = :email,
+                            perfil_id = :perfil_id,
                             ativo = :ativo,
                             deve_trocar_senha = :deve_trocar_senha,
                             atualizado_em = CURRENT_TIMESTAMP
@@ -210,6 +253,7 @@ def editar_usuario(usuario_id):
                         "nome": nome,
                         "username": username,
                         "email": email if email else None,
+                        "perfil_id": int(perfil_id),
                         "ativo": ativo,
                         "deve_trocar_senha": deve_trocar_senha
                     }
@@ -224,12 +268,13 @@ def editar_usuario(usuario_id):
                 "nome": nome,
                 "username": username,
                 "email": email,
+                "perfil_id": int(perfil_id),
                 "ativo": ativo,
                 "deve_trocar_senha": deve_trocar_senha
             }
-            return render_template("auth/usuario_form.html", usuario=usuario)
+            return render_template("auth/usuario_form.html", usuario=usuario, perfis=perfis)
 
-    return render_template("auth/usuario_form.html", usuario=usuario)
+    return render_template("auth/usuario_form.html", usuario=usuario, perfis=perfis)
 
 
 @bp.post("/usuarios/<int:usuario_id>/toggle")
@@ -239,9 +284,10 @@ def toggle_usuario(usuario_id):
     with get_engine().begin() as conn:
         usuario = conn.execute(
             text("""
-                SELECT id, username, ativo
-                FROM usuarios
-                WHERE id = :id
+                SELECT u.id, u.username, u.ativo, p.nome AS perfil_nome
+                FROM usuarios u
+                LEFT JOIN perfis p ON p.id = u.perfil_id
+                WHERE u.id = :id
             """),
             {"id": usuario_id}
         ).mappings().first()
@@ -249,9 +295,20 @@ def toggle_usuario(usuario_id):
         if not usuario:
             abort(404)
 
-        if usuario["username"].strip().lower() == "admin" and usuario["ativo"]:
-            flash("O usuário administrador principal não pode ser inativado.", "erro")
-            return redirect(url_for("auth.usuarios"))
+        if usuario["perfil_nome"] == "Administrador" and usuario["ativo"]:
+            qtd_admins_ativos = conn.execute(
+                text("""
+                    SELECT COUNT(*) AS total
+                    FROM usuarios u
+                    INNER JOIN perfis p ON p.id = u.perfil_id
+                    WHERE p.nome = 'Administrador'
+                      AND u.ativo = TRUE
+                """)
+            ).scalar()
+
+            if qtd_admins_ativos <= 1:
+                flash("Não é permitido inativar o último administrador ativo.", "erro")
+                return redirect(url_for("auth.usuarios"))
 
         conn.execute(
             text("""
@@ -378,6 +435,117 @@ def resetar_senha(usuario_id):
         return redirect(url_for("auth.usuarios"))
 
     return render_template("auth/trocar_senha.html", reset_user=usuario)
+
+
+@bp.get("/perfis")
+@login_required
+@admin_required
+def perfis():
+    with get_engine().connect() as conn:
+        rows = conn.execute(
+            text("""
+                SELECT id, nome, descricao, ativo, criado_em
+                FROM perfis
+                ORDER BY nome ASC
+            """)
+        ).mappings().all()
+
+    return render_template("auth/perfis.html", perfis=rows)
+
+
+@bp.route("/perfis/novo", methods=["GET", "POST"])
+@login_required
+@admin_required
+def novo_perfil():
+    if request.method == "POST":
+        nome = (request.form.get("nome") or "").strip()
+        descricao = (request.form.get("descricao") or "").strip()
+        ativo = True if request.form.get("ativo") == "on" else False
+
+        if not nome:
+            flash("Informe o nome do perfil.", "erro")
+            return render_template("auth/perfil_form.html", perfil=None)
+
+        try:
+            with get_engine().begin() as conn:
+                conn.execute(
+                    text("""
+                        INSERT INTO perfis (nome, descricao, ativo)
+                        VALUES (:nome, :descricao, :ativo)
+                    """),
+                    {
+                        "nome": nome,
+                        "descricao": descricao if descricao else None,
+                        "ativo": ativo
+                    }
+                )
+            flash("Perfil criado com sucesso.", "sucesso")
+            return redirect(url_for("auth.perfis"))
+        except Exception:
+            flash("Não foi possível criar o perfil. Verifique se o nome já existe.", "erro")
+            return render_template("auth/perfil_form.html", perfil=None)
+
+    return render_template("auth/perfil_form.html", perfil=None)
+
+
+@bp.route("/perfis/<int:perfil_id>/editar", methods=["GET", "POST"])
+@login_required
+@admin_required
+def editar_perfil(perfil_id):
+    with get_engine().connect() as conn:
+        perfil = conn.execute(
+            text("""
+                SELECT id, nome, descricao, ativo
+                FROM perfis
+                WHERE id = :id
+            """),
+            {"id": perfil_id}
+        ).mappings().first()
+
+    if not perfil:
+        abort(404)
+
+    if request.method == "POST":
+        nome = (request.form.get("nome") or "").strip()
+        descricao = (request.form.get("descricao") or "").strip()
+        ativo = True if request.form.get("ativo") == "on" else False
+
+        if not nome:
+            flash("Informe o nome do perfil.", "erro")
+            return render_template("auth/perfil_form.html", perfil=perfil)
+
+        try:
+            with get_engine().begin() as conn:
+                conn.execute(
+                    text("""
+                        UPDATE perfis
+                        SET
+                            nome = :nome,
+                            descricao = :descricao,
+                            ativo = :ativo
+                        WHERE id = :id
+                    """),
+                    {
+                        "id": perfil_id,
+                        "nome": nome,
+                        "descricao": descricao if descricao else None,
+                        "ativo": ativo
+                    }
+                )
+            flash("Perfil atualizado com sucesso.", "sucesso")
+            return redirect(url_for("auth.perfis"))
+        except Exception:
+            flash("Não foi possível atualizar o perfil. Verifique se o nome já existe.", "erro")
+
+            perfil = {
+                "id": perfil_id,
+                "nome": nome,
+                "descricao": descricao,
+                "ativo": ativo
+            }
+            return render_template("auth/perfil_form.html", perfil=perfil)
+
+    return render_template("auth/perfil_form.html", perfil=perfil)
 
 
 @bp.app_errorhandler(403)

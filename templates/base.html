@@ -4,8 +4,9 @@
 	{% if usuario_logado %}
 	  <a class="nav-link" href="{{ url_for('auth.trocar_senha') }}">Trocar senha</a>
 
-	  {% if session.get('username') == 'admin' %}
+	  {% if current_user_profile == 'Administrador' %}
 		<a class="nav-link" href="{{ url_for('auth.usuarios') }}">Usuários</a>
+		<a class="nav-link" href="{{ url_for('auth.perfis') }}">Perfis</a>
 	  {% endif %}
 
 	  <a class="nav-link" href="{{ url_for('auth.logout') }}">Sair</a>

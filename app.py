@@ -9,7 +9,8 @@ def create_app():
     def inject_user():
         return {
             "current_user_name": session.get("usuario_nome"),
-            "usuario_logado": "usuario_id" in session
+            "usuario_logado": "usuario_id" in session,
+            "current_user_profile": session.get("perfil_nome")
         }
 
     from routes.auth import bp as auth_bp

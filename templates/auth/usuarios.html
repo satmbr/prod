@@ -13,7 +13,8 @@
           </div>
         </div>
       </div>
-      <div class="zone-actions">
+      <div class="zone-actions" style="display:flex; gap:10px;">
+        <a href="{{ url_for('auth.perfis') }}" class="btn-outline">Perfis</a>
         <a href="{{ url_for('auth.novo_usuario') }}" class="btn-primary">+ Novo usuário</a>
       </div>
     </div>
@@ -36,6 +37,7 @@
               <th>Nome</th>
               <th>Usuário</th>
               <th>E-mail</th>
+              <th>Perfil</th>
               <th>Status</th>
               <th>Troca senha</th>
               <th>Último login</th>
@@ -49,6 +51,7 @@
               <td>{{ u.nome }}</td>
               <td>{{ u.username }}</td>
               <td>{{ u.email or '' }}</td>
+              <td>{{ u.perfil_nome or '' }}</td>
               <td>{{ 'Ativo' if u.ativo else 'Inativo' }}</td>
               <td>{{ 'Sim' if u.deve_trocar_senha else 'Não' }}</td>
               <td>{{ u.ultimo_login or '' }}</td>
@@ -65,7 +68,7 @@
             </tr>
             {% else %}
             <tr>
-              <td colspan="8" style="text-align:center;">Nenhum usuário encontrado.</td>
+              <td colspan="9" style="text-align:center;">Nenhum usuário encontrado.</td>
             </tr>
             {% endfor %}
           </tbody>

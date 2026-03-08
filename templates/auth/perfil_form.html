@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Editar perfil' if perfil else 'Novo perfil' }} | PRUMAT{% endblock %}
+
+{% block content %}
+<div class="page-wrap" style="max-width: 760px; margin: 24px auto;">
+  <section class="zone">
+    <div class="zone-head">
+      <div class="zone-left">
+        <div>
+          <h2 style="margin:0;">{{ 'Editar perfil' if perfil else 'Novo perfil' }}</h2>
+          <div style="color:#667487; font-size:14px; margin-top:4px;">
+            Cadastro e manutenção de perfis
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="padding:24px;">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+            <div style="margin-bottom:12px; padding:12px 14px; border-radius:10px; background:#fff3f3; border:1px solid #f1c0c0; color:#9f2d2d;">
+              {{ message }}
+            </div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+
+      <form method="post">
+        <div style="margin-bottom:16px;">
+          <label>Nome do perfil</label>
+          <input type="text" name="nome" required value="{{ perfil.nome if perfil else '' }}"
+                 style="width:100%; height:42px; border:1px solid #d9e1ea; border-radius:10px; padding:0 12px;">
+        </div>
+
+        <div style="margin-bottom:16px;">
+          <label>Descrição</label>
+          <input type="text" name="descricao" value="{{ perfil.descricao if perfil else '' }}"
+                 style="width:100%; height:42px; border:1px solid #d9e1ea; border-radius:10px; padding:0 12px;">
+        </div>
+
+        <div style="display:flex; gap:24px; margin-top:18px;">
+          <label style="display:flex; align-items:center; gap:8px;">
+            <input type="checkbox" name="ativo" {% if perfil and perfil.ativo %}checked{% elif not perfil %}checked{% endif %}>
+            Ativo
+          </label>
+        </div>
+
+        <div style="margin-top:24px; display:flex; gap:12px;">
+          <button type="submit" class="btn-primary">Salvar</button>
+          <a href="{{ url_for('auth.perfis') }}" class="btn-outline">Voltar</a>
+        </div>
+      </form>
+    </div>
+  </section>
+</div>
+{% endblock %}

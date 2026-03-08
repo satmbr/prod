@@ -40,10 +40,25 @@
           </div>
         </div>
 
-        <div style="margin-top:16px;">
-          <label>E-mail</label>
-          <input type="email" name="email" value="{{ usuario.email if usuario else '' }}"
-                 style="width:100%; height:42px; border:1px solid #d9e1ea; border-radius:10px; padding:0 12px;">
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:16px;">
+          <div>
+            <label>E-mail</label>
+            <input type="email" name="email" value="{{ usuario.email if usuario else '' }}"
+                   style="width:100%; height:42px; border:1px solid #d9e1ea; border-radius:10px; padding:0 12px;">
+          </div>
+          <div>
+            <label>Perfil</label>
+            <select name="perfil_id" required
+                    style="width:100%; height:42px; border:1px solid #d9e1ea; border-radius:10px; padding:0 12px;">
+              <option value="">Selecione</option>
+              {% for p in perfis %}
+                <option value="{{ p.id }}"
+                  {% if usuario and usuario.perfil_id == p.id %}selected{% endif %}>
+                  {{ p.nome }}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
         </div>
 
         {% if not usuario %}
