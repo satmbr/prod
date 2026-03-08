@@ -3,56 +3,123 @@
 
 {% block content %}
 <div class="page-wrap">
+
   <section class="zone" style="overflow:hidden;">
-    <div style="background:linear-gradient(180deg, #16324F 0%, #1d3e61 100%); padding:36px 30px;">
-      <div style="max-width:900px;">
-        <h1 style="margin:0; color:#fff; font-size:32px;">Sistema PRUMAT</h1>
-        <div style="margin-top:10px; color:#d9e6f2; font-size:16px; line-height:1.6;">
-          Plataforma interna para gestão operacional, equipamentos, colaboradores e administração de acessos.
+    <div style="background:linear-gradient(180deg, #16324F 0%, #1d3e61 100%); padding:40px 32px;">
+      <div style="display:grid; grid-template-columns:1.3fr .7fr; gap:24px; align-items:center;">
+        <div style="max-width:900px;">
+          <div style="display:inline-flex; align-items:center; gap:8px; padding:6px 12px; border-radius:999px; background:rgba(255,255,255,.10); border:1px solid rgba(255,255,255,.14); color:#d9e6f2; font-size:12px; font-weight:700; letter-spacing:.03em; text-transform:uppercase;">
+            Plataforma interna PRUMAT
+          </div>
+
+          <h1 style="margin:16px 0 0 0; color:#fff; font-size:34px; line-height:1.15;">
+            Sistema PRUMAT
+          </h1>
+
+          <div style="margin-top:12px; color:#d9e6f2; font-size:16px; line-height:1.7; max-width:780px;">
+            Plataforma interna para gestão operacional, equipamentos, colaboradores e administração de acessos,
+            reunindo controle, rastreabilidade e organização em um único ambiente.
+          </div>
+
+          <div style="margin-top:24px; display:flex; gap:12px; flex-wrap:wrap;">
+            <a href="{{ url_for('auth.login') }}" class="btn-primary">Entrar no sistema</a>
+            {% if usuario_logado %}
+              <a href="{{ url_for('dashboard') }}"
+                 class="btn-outline"
+                 style="background:transparent; color:#fff; border-color:rgba(255,255,255,.25);">
+                Ir para o dashboard
+              </a>
+            {% endif %}
+          </div>
         </div>
 
-        <div style="margin-top:22px; display:flex; gap:12px; flex-wrap:wrap;">
-          <a href="{{ url_for('auth.login') }}" class="btn-primary">Entrar no sistema</a>
-          {% if usuario_logado %}
-            <a href="{{ url_for('dashboard') }}" class="btn-outline" style="background:transparent; color:#fff; border-color:rgba(255,255,255,.25);">
-              Ir para o dashboard
-            </a>
-          {% endif %}
+        <div style="display:grid; gap:12px;">
+          <div style="background:rgba(255,255,255,.10); border:1px solid rgba(255,255,255,.14); border-radius:14px; padding:16px;">
+            <div style="color:#d9e6f2; font-size:12px; text-transform:uppercase; font-weight:700; letter-spacing:.03em;">
+              Gestão integrada
+            </div>
+            <div style="color:#fff; font-size:18px; font-weight:700; margin-top:6px;">
+              Operação, equipamentos e colaboradores
+            </div>
+          </div>
+
+          <div style="background:rgba(255,255,255,.10); border:1px solid rgba(255,255,255,.14); border-radius:14px; padding:16px;">
+            <div style="color:#d9e6f2; font-size:12px; text-transform:uppercase; font-weight:700; letter-spacing:.03em;">
+              Segurança
+            </div>
+            <div style="color:#fff; font-size:18px; font-weight:700; margin-top:6px;">
+              Usuários, perfis, permissões e auditoria
+            </div>
+          </div>
+
+          <div style="background:rgba(255,255,255,.10); border:1px solid rgba(255,255,255,.14); border-radius:14px; padding:16px;">
+            <div style="color:#d9e6f2; font-size:12px; text-transform:uppercase; font-weight:700; letter-spacing:.03em;">
+              Painel interno
+            </div>
+            <div style="color:#fff; font-size:18px; font-weight:700; margin-top:6px;">
+              Dashboard com acesso conforme perfil
+            </div>
+          </div>
         </div>
       </div>
     </div>
 
     <div style="padding:28px;">
+      <div style="margin-bottom:18px;">
+        <h2 style="margin:0; color:#16324F; font-size:22px;">Principais áreas do sistema</h2>
+        <div style="margin-top:6px; color:#667487; font-size:14px;">
+          Estrutura central da plataforma PRUMAT para operação e gestão interna.
+        </div>
+      </div>
+
       <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:18px;">
-        <div style="background:#fff; border:1px solid #d9e1ea; border-radius:14px; padding:20px;">
+        <div style="background:#fff; border:1px solid #d9e1ea; border-radius:14px; padding:20px; box-shadow:0 8px 20px rgba(18,39,61,.06);">
           <h3 style="margin:0 0 8px 0; color:#16324F;">Operação</h3>
           <p style="margin:0; color:#667487; line-height:1.5;">
             Controle de produção, registros operacionais e acompanhamento das frentes de serviço.
           </p>
         </div>
 
-        <div style="background:#fff; border:1px solid #d9e1ea; border-radius:14px; padding:20px;">
+        <div style="background:#fff; border:1px solid #d9e1ea; border-radius:14px; padding:20px; box-shadow:0 8px 20px rgba(18,39,61,.06);">
           <h3 style="margin:0 0 8px 0; color:#16324F;">Equipamentos</h3>
           <p style="margin:0; color:#667487; line-height:1.5;">
             Consulta e gestão das informações dos equipamentos e seus registros associados.
           </p>
         </div>
 
-        <div style="background:#fff; border:1px solid #d9e1ea; border-radius:14px; padding:20px;">
+        <div style="background:#fff; border:1px solid #d9e1ea; border-radius:14px; padding:20px; box-shadow:0 8px 20px rgba(18,39,61,.06);">
           <h3 style="margin:0 0 8px 0; color:#16324F;">Colaboradores</h3>
           <p style="margin:0; color:#667487; line-height:1.5;">
             Cadastro, consulta e organização das informações dos colaboradores.
           </p>
         </div>
 
-        <div style="background:#fff; border:1px solid #d9e1ea; border-radius:14px; padding:20px;">
+        <div style="background:#fff; border:1px solid #d9e1ea; border-radius:14px; padding:20px; box-shadow:0 8px 20px rgba(18,39,61,.06);">
           <h3 style="margin:0 0 8px 0; color:#16324F;">Segurança e Auditoria</h3>
           <p style="margin:0; color:#667487; line-height:1.5;">
             Controle de acesso com usuários, perfis, permissões e rastreabilidade das ações no sistema.
           </p>
         </div>
       </div>
+
+      <div style="margin-top:24px; display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px;">
+        <div style="background:#f8fbff; border:1px solid #d9e1ea; border-radius:12px; padding:16px;">
+          <div style="font-size:12px; color:#667487; text-transform:uppercase; font-weight:700; letter-spacing:.03em;">Acesso controlado</div>
+          <div style="margin-top:8px; color:#16324F; font-weight:700;">Permissões por perfil e módulo</div>
+        </div>
+
+        <div style="background:#f8fbff; border:1px solid #d9e1ea; border-radius:12px; padding:16px;">
+          <div style="font-size:12px; color:#667487; text-transform:uppercase; font-weight:700; letter-spacing:.03em;">Rastreabilidade</div>
+          <div style="margin-top:8px; color:#16324F; font-weight:700;">Auditoria de acessos e ações administrativas</div>
+        </div>
+
+        <div style="background:#f8fbff; border:1px solid #d9e1ea; border-radius:12px; padding:16px;">
+          <div style="font-size:12px; color:#667487; text-transform:uppercase; font-weight:700; letter-spacing:.03em;">Produtividade</div>
+          <div style="margin-top:8px; color:#16324F; font-weight:700;">Dashboard com atalhos conforme perfil do usuário</div>
+        </div>
+      </div>
     </div>
   </section>
+
 </div>
 {% endblock %}

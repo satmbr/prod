@@ -5,12 +5,12 @@
 <div class="page-wrap">
 
   <style>
-	.prod-toolbar{
-	  display:grid;
-	  grid-template-columns: 1fr 1fr auto;
-	  gap:6px;
-	  align-items:end;
-	}
+    .prod-toolbar{
+      display:grid;
+      grid-template-columns: 1fr 1fr auto;
+      gap:6px;
+      align-items:end;
+    }
 
     .prod-toolbar .field > span{
       display:block;
@@ -24,248 +24,248 @@
       width:100%;
     }
 
-	.prod-actions{
-	  display:flex;
-	  gap:4px;
-	  align-items:end;
-	  flex-wrap:wrap;
-	}
+    .prod-actions{
+      display:flex;
+      gap:4px;
+      align-items:end;
+      flex-wrap:wrap;
+    }
 
-	.prod-hero{
-	  display:grid;
-	  grid-template-columns: 1.2fr .8fr;
-	  gap:8px;
-	  align-items:start;
-	}
+    .prod-hero{
+      display:grid;
+      grid-template-columns: 1.2fr .8fr;
+      gap:8px;
+      align-items:start;
+    }
 
-	.hero-card{
-	  border:1px solid var(--pru-border);
-	  border-radius:8px;
-	  background:linear-gradient(180deg, #fbfdff 0%, #f5f9fc 100%);
-	  padding:6px 8px;
-	  min-height:56px;
-	  display:flex;
-	  flex-direction:column;
-	  justify-content:center;
-	}
+    .hero-card{
+      border:1px solid var(--pru-border);
+      border-radius:8px;
+      background:linear-gradient(180deg, #fbfdff 0%, #f5f9fc 100%);
+      padding:6px 8px;
+      min-height:56px;
+      display:flex;
+      flex-direction:column;
+      justify-content:center;
+    }
 
-	.hero-title{
-	  font-size:9px;
-	  font-weight:700;
-	  letter-spacing:.04em;
-	  color:#6b7a8d;
-	  text-transform:uppercase;
-	  margin-bottom:2px;
-	}
+    .hero-title{
+      font-size:9px;
+      font-weight:700;
+      letter-spacing:.04em;
+      color:#6b7a8d;
+      text-transform:uppercase;
+      margin-bottom:2px;
+    }
 
-	.hero-value{
-	  font-size:11px;
-	  font-weight:700;
-	  color:var(--pru-blue);
-	  line-height:1.1;
-	}
+    .hero-value{
+      font-size:11px;
+      font-weight:700;
+      color:var(--pru-blue);
+      line-height:1.1;
+    }
 
-	.hero-sub{
-	  color:#5d6b7c;
-	  margin-top:2px;
-	  font-size:9px;
-	}
+    .hero-sub{
+      color:#5d6b7c;
+      margin-top:2px;
+      font-size:9px;
+    }
 
-	.layout-tabela-grafico{
-	  display:grid;
-	  grid-template-columns: minmax(360px, 1.15fr) minmax(260px, .85fr);
-	  gap:8px;
-	  align-items:start;
-	}
+    .layout-tabela-grafico{
+      display:grid;
+      grid-template-columns: minmax(360px, 1.15fr) minmax(260px, .85fr);
+      gap:8px;
+      align-items:start;
+    }
 
     .col-tabela,
     .col-grafico{
       min-width:0;
     }
 
-	.chart-card{
-	  border:1px solid var(--pru-border);
-	  border-radius:8px;
-	  background:#fff;
-	  padding:6px;
-	  height:auto;
-	  min-height:auto;
-	  box-shadow:var(--pru-shadow);
-	}
+    .chart-card{
+      border:1px solid var(--pru-border);
+      border-radius:8px;
+      background:#fff;
+      padding:6px;
+      height:auto;
+      min-height:auto;
+      box-shadow:var(--pru-shadow);
+    }
 
-	.chart-card.chart-sm{
-	  height:290px;
-	}
+    .chart-card.chart-sm{
+      height:290px;
+    }
 
-	.chart-card.chart-lg{
-	  height:340px;
-	}
+    .chart-card.chart-lg{
+      height:340px;
+    }
 
-	.chart-title{
-	  font-size:9px;
-	  font-weight:700;
-	  color:var(--pru-blue);
-	  margin-bottom:5px;
-	}
+    .chart-title{
+      font-size:9px;
+      font-weight:700;
+      color:var(--pru-blue);
+      margin-bottom:5px;
+    }
 
-	.chart-wrap{
-	  position:relative;
-	  width:100%;
-	  height:250px;
-	  min-height:250px;
-	  max-height:250px;
-	}
+    .chart-wrap{
+      position:relative;
+      width:100%;
+      height:250px;
+      min-height:250px;
+      max-height:250px;
+    }
 
-	.chart-wrap.chart-wrap-lg{
-	  height:300px;
-	  min-height:300px;
-	  max-height:300px;
-	}
-	
-	.chart-wrap canvas{
-	  width:100% !important;
-	  height:100% !important;
-	  display:block;
-	}	
+    .chart-wrap.chart-wrap-lg{
+      height:300px;
+      min-height:300px;
+      max-height:300px;
+    }
 
-	.table-card{
-	  border:1px solid var(--pru-border);
-	  border-radius:8px;
-	  background:#fff;
-	  padding:6px;
-	  box-shadow:var(--pru-shadow);
-	  height:auto;
-	}
-	
-	.prod-table th,
-	.prod-table td{
-	  padding:4px 5px !important;
-	  font-size:9px !important;
-	}	
+    .chart-wrap canvas{
+      width:100% !important;
+      height:100% !important;
+      display:block;
+    }
 
-	.table-card-title{
-	  font-size:9px;
-	  font-weight:700;
-	  color:var(--pru-blue);
-	  margin-bottom:5px;
-	}
+    .table-card{
+      border:1px solid var(--pru-border);
+      border-radius:8px;
+      background:#fff;
+      padding:6px;
+      box-shadow:var(--pru-shadow);
+      height:auto;
+    }
+
+    .prod-table th,
+    .prod-table td{
+      padding:4px 5px !important;
+      font-size:9px !important;
+    }
+
+    .table-card-title{
+      font-size:9px;
+      font-weight:700;
+      color:var(--pru-blue);
+      margin-bottom:5px;
+    }
 
     .linha-destaque{
       background-color:#E2EFDA !important;
     }
 
-	.prod-table th,
-	.prod-table td{
-	  text-align:center !important;
-	  vertical-align:middle !important;
-	  white-space:nowrap;
-	  line-height:1.05;
-	}
+    .prod-table th,
+    .prod-table td{
+      text-align:center !important;
+      vertical-align:middle !important;
+      white-space:nowrap;
+      line-height:1.05;
+    }
 
-	.prod-table thead th{
-	  text-align:center !important;
-	}
+    .prod-table thead th{
+      text-align:center !important;
+    }
 
-	.prod-table tbody td{
-	  text-align:center !important;
-	}
-	
-	#op-frentes .prod-table th,
-	#op-frentes .prod-table td{
-	  padding:3px 4px !important;
-	  font-size:8px !important;
-	}
+    .prod-table tbody td{
+      text-align:center !important;
+    }
 
-	#op-frentes .table-wrap{
-	  max-height:340px;
-	  overflow:auto;
-	}
+    #op-frentes .prod-table th,
+    #op-frentes .prod-table td{
+      padding:3px 4px !important;
+      font-size:8px !important;
+    }
 
-	.prod-table td.text-left,
-	.prod-table th.text-left{
-	  text-align:center !important;
-	}
+    #op-frentes .table-wrap{
+      max-height:340px;
+      overflow:auto;
+    }
 
-	.summary-grid{
-	  display:grid;
-	  grid-template-columns: repeat(3, minmax(0, 1fr));
-	  gap:8px;
-	}
+    .prod-table td.text-left,
+    .prod-table th.text-left{
+      text-align:center !important;
+    }
 
-	.summary-item{
-	  border:1px solid var(--pru-border);
-	  border-radius:8px;
-	  background:#fff;
-	  padding:6px;
-	  box-shadow:var(--pru-shadow);
-	}
+    .summary-grid{
+      display:grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap:8px;
+    }
 
-	.summary-item .k{
-	  font-size:8px;
-	  color:#6b7a8d;
-	  text-transform:uppercase;
-	  letter-spacing:.04em;
-	  font-weight:700;
-	  margin-bottom:2px;
-	}
+    .summary-item{
+      border:1px solid var(--pru-border);
+      border-radius:8px;
+      background:#fff;
+      padding:6px;
+      box-shadow:var(--pru-shadow);
+    }
 
-	.summary-item .v{
-	  font-size:11px;
-	  color:var(--pru-blue);
-	  font-weight:700;
-	}
+    .summary-item .k{
+      font-size:8px;
+      color:#6b7a8d;
+      text-transform:uppercase;
+      letter-spacing:.04em;
+      font-weight:700;
+      margin-bottom:2px;
+    }
 
-	.gauge-container{
-	  display:grid;
-	  grid-template-columns: repeat(auto-fit, minmax(95px, 1fr));
-	  gap:8px;
-	  margin-top:2px;
-	}
+    .summary-item .v{
+      font-size:11px;
+      color:var(--pru-blue);
+      font-weight:700;
+    }
 
-	.gauge-item{
-	  position:relative;
-	  border:1px solid var(--pru-border);
-	  border-radius:8px;
-	  background:#fff;
-	  padding:6px 5px 5px;
-	  box-shadow:var(--pru-shadow);
-	  display:flex;
-	  flex-direction:column;
-	  align-items:center;
-	  justify-content:center;
-	  min-height:125px;
-	}
+    .gauge-container{
+      display:grid;
+      grid-template-columns: repeat(auto-fit, minmax(95px, 1fr));
+      gap:8px;
+      margin-top:2px;
+    }
 
-	.gauge-item .gauge-canvas-wrap{
-	  width:68px;
-	  height:68px;
-	  position:relative;
-	  margin-bottom:5px;
-	}
+    .gauge-item{
+      position:relative;
+      border:1px solid var(--pru-border);
+      border-radius:8px;
+      background:#fff;
+      padding:6px 5px 5px;
+      box-shadow:var(--pru-shadow);
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      min-height:125px;
+    }
+
+    .gauge-item .gauge-canvas-wrap{
+      width:68px;
+      height:68px;
+      position:relative;
+      margin-bottom:5px;
+    }
 
     .gauge-item canvas{
       width:100% !important;
       height:100% !important;
     }
 
-	.gauge-item img{
-	  position:absolute;
-	  top:50%;
-	  left:50%;
-	  width:18px;
-	  height:18px;
-	  transform:translate(-50%, -50%);
-	  z-index:5;
-	  pointer-events:none;
-	}
+    .gauge-item img{
+      position:absolute;
+      top:50%;
+      left:50%;
+      width:18px;
+      height:18px;
+      transform:translate(-50%, -50%);
+      z-index:5;
+      pointer-events:none;
+    }
 
-	.gauge-label{
-	  text-align:center;
-	  font-weight:700;
-	  font-size:8px;
-	  color:var(--pru-blue);
-	  line-height:1.15;
-	}
+    .gauge-label{
+      text-align:center;
+      font-weight:700;
+      font-size:8px;
+      color:var(--pru-blue);
+      line-height:1.15;
+    }
 
     .duo-charts{
       display:grid;
@@ -274,24 +274,24 @@
       align-items:stretch;
     }
 
-	.brand-strip{
-	  display:grid;
-	  grid-template-columns: auto 1fr auto;
-	  gap:8px;
-	  align-items:center;
-	  border:1px solid var(--pru-border);
-	  border-radius:8px;
-	  background:linear-gradient(180deg, #fff 0%, #f8fbff 100%);
-	  padding:5px 8px;
-	  box-shadow:var(--pru-shadow);
-	}
+    .brand-strip{
+      display:grid;
+      grid-template-columns: auto 1fr auto;
+      gap:8px;
+      align-items:center;
+      border:1px solid var(--pru-border);
+      border-radius:8px;
+      background:linear-gradient(180deg, #fff 0%, #f8fbff 100%);
+      padding:5px 8px;
+      box-shadow:var(--pru-shadow);
+    }
 
-	.brand-strip img{
-	  height:16px;
-	  width:auto;
-	  object-fit:contain;
-	  display:block;
-	}
+    .brand-strip img{
+      height:16px;
+      width:auto;
+      object-fit:contain;
+      display:block;
+    }
 
     .brand-strip-center{
       min-width:0;
@@ -305,27 +305,64 @@
       margin-bottom:3px;
     }
 
-	.brand-badge{
-	  display:inline-flex;
-	  align-items:center;
-	  min-height:16px;
-	  padding:1px 6px;
-	  border-radius:999px;
-	  background:#edf3f8;
-	  border:1px solid var(--pru-border);
-	  color:var(--pru-blue);
-	  font-size:8px;
-	  font-weight:700;
-	  text-transform:uppercase;
-	  letter-spacing:.03em;
-	}
+    .brand-badge{
+      display:inline-flex;
+      align-items:center;
+      min-height:16px;
+      padding:1px 6px;
+      border-radius:999px;
+      background:#edf3f8;
+      border:1px solid var(--pru-border);
+      color:var(--pru-blue);
+      font-size:8px;
+      font-weight:700;
+      text-transform:uppercase;
+      letter-spacing:.03em;
+    }
 
-	.brand-scope{
-	  font-size:9px;
-	  color:#445366;
-	  line-height:1.15;
-	  font-weight:600;
-	}
+    .brand-scope{
+      font-size:9px;
+      color:#445366;
+      line-height:1.15;
+      font-weight:600;
+    }
+
+    .flash-wrap{
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+    }
+
+    .flash{
+      padding:12px 14px;
+      border-radius:12px;
+      border:1px solid #d9e1ea;
+      background:#f5f8fc;
+    }
+
+    .flash.success{
+      background:#eefaf0;
+      border-color:#bfe0c6;
+      color:#25613a;
+    }
+
+    .flash.warning{
+      background:#fff9e8;
+      border-color:#f1df9b;
+      color:#7a5a00;
+    }
+
+    .flash.danger{
+      background:#fff3f3;
+      border-color:#f1c0c0;
+      color:#9f2d2d;
+    }
+
+    .flash.info{
+      background:#eef6ff;
+      border-color:#c9d7e6;
+      color:#204564;
+    }
 
     @media (max-width: 1100px){
       .prod-hero,
@@ -354,64 +391,85 @@
         justify-items:start;
       }
     }
-	
-	#op-prod-filtros.zone-body,
-	#op-renovacao.zone-body,
-	#op-partdiaria.zone-body,
-	#op-frentes.zone-body,
-	#op-gauges.zone-body{
-	  padding:6px;
-	}
 
-	.zone-head[data-target="#op-prod-filtros"],
-	.zone-head[data-target="#op-renovacao"],
-	.zone-head[data-target="#op-partdiaria"],
-	.zone-head[data-target="#op-frentes"],
-	.zone-head[data-target="#op-gauges"]{
-	  padding:5px 7px;
-	}
+    #op-prod-filtros.zone-body,
+    #op-renovacao.zone-body,
+    #op-partdiaria.zone-body,
+    #op-frentes.zone-body,
+    #op-gauges.zone-body{
+      padding:6px;
+    }
 
-	.zone-head[data-target="#op-prod-filtros"] .zone-title,
-	.zone-head[data-target="#op-renovacao"] .zone-title,
-	.zone-head[data-target="#op-partdiaria"] .zone-title,
-	.zone-head[data-target="#op-frentes"] .zone-title,
-	.zone-head[data-target="#op-gauges"] .zone-title{
-	  font-size:10px;
-	}
+    .zone-head[data-target="#op-prod-filtros"],
+    .zone-head[data-target="#op-renovacao"],
+    .zone-head[data-target="#op-partdiaria"],
+    .zone-head[data-target="#op-frentes"],
+    .zone-head[data-target="#op-gauges"]{
+      padding:5px 7px;
+    }
 
-	.zone-head[data-target="#op-prod-filtros"] .zone-icon,
-	.zone-head[data-target="#op-renovacao"] .zone-icon,
-	.zone-head[data-target="#op-partdiaria"] .zone-icon,
-	.zone-head[data-target="#op-frentes"] .zone-icon,
-	.zone-head[data-target="#op-gauges"] .zone-icon{
-	  width:18px;
-	  height:18px;
-	  min-width:18px;
-	  font-size:9px;
-	}
+    .zone-head[data-target="#op-prod-filtros"] .zone-title,
+    .zone-head[data-target="#op-renovacao"] .zone-title,
+    .zone-head[data-target="#op-partdiaria"] .zone-title,
+    .zone-head[data-target="#op-frentes"] .zone-title,
+    .zone-head[data-target="#op-gauges"] .zone-title{
+      font-size:10px;
+    }
 
-	.zone-head[data-target="#op-prod-filtros"] .icon-btn,
-	.zone-head[data-target="#op-renovacao"] .icon-btn,
-	.zone-head[data-target="#op-partdiaria"] .icon-btn,
-	.zone-head[data-target="#op-frentes"] .icon-btn,
-	.zone-head[data-target="#op-gauges"] .icon-btn{
-	  width:18px;
-	  height:18px;
-	}
+    .zone-head[data-target="#op-prod-filtros"] .zone-icon,
+    .zone-head[data-target="#op-renovacao"] .zone-icon,
+    .zone-head[data-target="#op-partdiaria"] .zone-icon,
+    .zone-head[data-target="#op-frentes"] .zone-icon,
+    .zone-head[data-target="#op-gauges"] .zone-icon{
+      width:18px;
+      height:18px;
+      min-width:18px;
+      font-size:9px;
+    }
 
-	.zone-head[data-target="#op-prod-filtros"] .icon-btn svg,
-	.zone-head[data-target="#op-renovacao"] .icon-btn svg,
-	.zone-head[data-target="#op-partdiaria"] .icon-btn svg,
-	.zone-head[data-target="#op-frentes"] .icon-btn svg,
-	.zone-head[data-target="#op-gauges"] .icon-btn svg{
-	  width:9px;
-	  height:9px;
-	}	
-	
+    .zone-head[data-target="#op-prod-filtros"] .icon-btn,
+    .zone-head[data-target="#op-renovacao"] .icon-btn,
+    .zone-head[data-target="#op-partdiaria"] .icon-btn,
+    .zone-head[data-target="#op-frentes"] .icon-btn,
+    .zone-head[data-target="#op-gauges"] .icon-btn{
+      width:18px;
+      height:18px;
+    }
+
+    .zone-head[data-target="#op-prod-filtros"] .icon-btn svg,
+    .zone-head[data-target="#op-renovacao"] .icon-btn svg,
+    .zone-head[data-target="#op-partdiaria"] .icon-btn svg,
+    .zone-head[data-target="#op-frentes"] .icon-btn svg,
+    .zone-head[data-target="#op-gauges"] .icon-btn svg{
+      width:9px;
+      height:9px;
+    }
   </style>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <section class="zone">
+        <div class="zone-body">
+          <div class="flash-wrap">
+            {% for category, message in messages %}
+              <div class="flash {{ category }}">{{ message }}</div>
+            {% endfor %}
+          </div>
+        </div>
+      </section>
+    {% endif %}
+  {% endwith %}
+
+  {% if msg %}
+    <section class="zone">
+      <div class="zone-body">
+        <div class="flash info">{{ msg }}</div>
+      </div>
+    </section>
+  {% endif %}
 
   <section class="zone">
     <header class="zone-head" data-target="#op-prod-filtros">
@@ -474,7 +532,12 @@
         <div class="hero-card">
           <div class="hero-title">Escopo</div>
           <div class="hero-value">Renovação P190 · Produção e Parte Diária</div>
-          <div class="hero-sub">EH selecionada: {% for eh in ehs %}{% if eh_id == eh.id %}{{ eh.nome }}{% endif %}{% endfor %}</div>
+          <div class="hero-sub">
+            EH selecionada:
+            {% for eh in ehs %}
+              {% if eh_id == eh.id %}{{ eh.nome }}{% endif %}
+            {% endfor %}
+          </div>
         </div>
 
         <div class="summary-grid">
@@ -836,11 +899,11 @@
 
 <script>
   const dadosRen = {{ dados | default([], true) | tojson }};
-  const labelsRen = dadosRen.map(d => d.data);
-  const previstoDia = dadosRen.map(d => d.previsto_dia);
-  const previstoTotal = dadosRen.map(d => d.previsto_total);
-  const realizadoDia = dadosRen.map(d => d.realizado_dia);
-  const realizadoTotal = dadosRen.map(d => d.realizado_total);
+  const labelsRen = Array.isArray(dadosRen) ? dadosRen.map(d => d.data) : [];
+  const previstoDia = Array.isArray(dadosRen) ? dadosRen.map(d => d.previsto_dia) : [];
+  const previstoTotal = Array.isArray(dadosRen) ? dadosRen.map(d => d.previsto_total) : [];
+  const realizadoDia = Array.isArray(dadosRen) ? dadosRen.map(d => d.realizado_dia) : [];
+  const realizadoTotal = Array.isArray(dadosRen) ? dadosRen.map(d => d.realizado_total) : [];
 
   if (document.getElementById('graficoProducao')) {
     new Chart(document.getElementById('graficoProducao').getContext('2d'), {
@@ -890,15 +953,15 @@
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-			legend: {
-			  position: 'bottom',
-			  labels: {
-				boxWidth: 10,
-				boxHeight: 10,
-				font: { size: 10 },
-				padding: 10
-			  }
-			}
+          legend: {
+            position: 'bottom',
+            labels: {
+              boxWidth: 10,
+              boxHeight: 10,
+              font: { size: 10 },
+              padding: 10
+            }
+          }
         },
         scales: {
           y: {
@@ -968,12 +1031,12 @@
             }
           }
         },
-		scales: {
-		  y: {
-			beginAtZero: true,
-			grace: '20%'
-		  }
-		}
+        scales: {
+          y: {
+            beginAtZero: true,
+            grace: '20%'
+          }
+        }
       },
       plugins: [ChartDataLabels]
     });
@@ -1034,15 +1097,15 @@
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-			legend: {
-			  position: 'bottom',
-			  labels: {
-				boxWidth: 10,
-				boxHeight: 10,
-				font: { size: 10 },
-				padding: 10
-			  }
-			}
+          legend: {
+            position: 'bottom',
+            labels: {
+              boxWidth: 10,
+              boxHeight: 10,
+              font: { size: 10 },
+              padding: 10
+            }
+          }
         },
         scales: {
           y: {
@@ -1059,7 +1122,9 @@
   }
 
   const bateria = {{ grafico_bateria_carregamento | default({}, true) | tojson }};
-  let total = 1, acumPlan = 0, acumExec = 0;
+  let total = 1;
+  let acumPlan = 0;
+  let acumExec = 0;
 
   if (bateria && typeof bateria === 'object') {
     total = bateria.planejado_total || 1;
@@ -1095,15 +1160,15 @@
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-			legend: {
-			  position: 'bottom',
-			  labels: {
-				boxWidth: 10,
-				boxHeight: 10,
-				font: { size: 10 },
-				padding: 10
-			  }
-			},
+          legend: {
+            position: 'bottom',
+            labels: {
+              boxWidth: 10,
+              boxHeight: 10,
+              font: { size: 10 },
+              padding: 10
+            }
+          },
           tooltip: {
             callbacks: {
               label: ctx => `${ctx.dataset.label}: ${ctx.raw.toFixed(1)}%`

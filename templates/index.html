@@ -1,8 +1,9 @@
 {% extends "base.html" %}
-{% block title %}Início | PRUMAT{% endblock %}
+{% block title %}Dashboard | PRUMAT{% endblock %}
 
 {% block content %}
 <div class="page-wrap">
+
   <section class="zone" style="overflow:hidden;">
     <div style="background:linear-gradient(180deg, #16324F 0%, #1d3e61 100%); padding:28px 28px 24px;">
       <div style="display:flex; justify-content:space-between; gap:20px; flex-wrap:wrap; align-items:center;">
@@ -15,8 +16,12 @@
 
         <div style="background:rgba(255,255,255,.10); border:1px solid rgba(255,255,255,.14); border-radius:14px; padding:14px 16px; min-width:240px;">
           <div style="color:#d9e6f2; font-size:13px;">Usuário logado</div>
-          <div style="color:#fff; font-size:18px; font-weight:700; margin-top:4px;">{{ current_user_name }}</div>
-          <div style="color:#d9e6f2; font-size:13px; margin-top:4px;">Perfil: {{ current_user_profile or 'Sem perfil' }}</div>
+          <div style="color:#fff; font-size:18px; font-weight:700; margin-top:4px;">
+            {{ current_user_name }}
+          </div>
+          <div style="color:#d9e6f2; font-size:13px; margin-top:4px;">
+            Perfil: {{ current_user_profile or 'Sem perfil' }}
+          </div>
         </div>
       </div>
     </div>
@@ -24,12 +29,16 @@
     <div style="padding:24px;">
       <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:18px;">
         {% for card in cards %}
-          <div style="background:#fff; border:1px solid #d9e1ea; border-radius:14px; padding:20px; box-shadow:0 8px 20px rgba(18,39,61,.06);">
-            <h3 style="margin:0 0 8px 0; color:#16324F;">{{ card.titulo }}</h3>
-            <p style="margin:0 0 18px 0; color:#667487; line-height:1.5;">
-              {{ card.descricao }}
-            </p>
-            <a href="{{ card.href }}" class="btn-primary">{{ card.botao }}</a>
+          <div style="background:#fff; border:1px solid #d9e1ea; border-radius:14px; padding:20px; box-shadow:0 8px 20px rgba(18,39,61,.06); display:flex; flex-direction:column; justify-content:space-between;">
+            <div>
+              <h3 style="margin:0 0 8px 0; color:#16324F;">{{ card.titulo }}</h3>
+              <p style="margin:0 0 18px 0; color:#667487; line-height:1.5;">
+                {{ card.descricao }}
+              </p>
+            </div>
+            <div>
+              <a href="{{ card.href }}" class="btn-primary">{{ card.botao }}</a>
+            </div>
           </div>
         {% else %}
           <div class="alert">
@@ -37,7 +46,37 @@
           </div>
         {% endfor %}
       </div>
+
+      <div style="margin-top:24px; display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px;">
+        <div style="background:#fff; border:1px solid #d9e1ea; border-radius:12px; padding:16px; box-shadow:0 6px 16px rgba(18,39,61,.05);">
+          <div style="font-size:12px; color:#667487; text-transform:uppercase; font-weight:700; letter-spacing:.03em;">Minha conta</div>
+          <div style="margin-top:8px; color:#16324F; font-weight:700;">Gerencie seus dados e senha</div>
+          <div style="margin-top:12px;">
+            <a href="{{ url_for('auth.minha_conta') }}" class="btn-outline">Abrir minha conta</a>
+          </div>
+        </div>
+
+        <div style="background:#fff; border:1px solid #d9e1ea; border-radius:12px; padding:16px; box-shadow:0 6px 16px rgba(18,39,61,.05);">
+          <div style="font-size:12px; color:#667487; text-transform:uppercase; font-weight:700; letter-spacing:.03em;">Segurança</div>
+          <div style="margin-top:8px; color:#16324F; font-weight:700;">Atualize sua senha de acesso</div>
+          <div style="margin-top:12px;">
+            <a href="{{ url_for('auth.trocar_senha') }}" class="btn-outline">Trocar senha</a>
+          </div>
+        </div>
+
+        {% if 'auth:administrar' in current_user_permissions %}
+        <div style="background:#fff; border:1px solid #d9e1ea; border-radius:12px; padding:16px; box-shadow:0 6px 16px rgba(18,39,61,.05);">
+          <div style="font-size:12px; color:#667487; text-transform:uppercase; font-weight:700; letter-spacing:.03em;">Administração</div>
+          <div style="margin-top:8px; color:#16324F; font-weight:700;">Usuários, perfis e auditoria</div>
+          <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;">
+            <a href="{{ url_for('auth.usuarios') }}" class="btn-outline">Usuários</a>
+            <a href="{{ url_for('auth.logs') }}" class="btn-outline">Auditoria</a>
+          </div>
+        </div>
+        {% endif %}
+      </div>
     </div>
   </section>
+
 </div>
 {% endblock %}

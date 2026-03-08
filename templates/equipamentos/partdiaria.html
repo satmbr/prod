@@ -143,6 +143,43 @@
       min-width:210px;
     }
 
+    .flash-wrap{
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+    }
+
+    .flash{
+      padding:12px 14px;
+      border-radius:12px;
+      border:1px solid #d9e1ea;
+      background:#f5f8fc;
+    }
+
+    .flash.success{
+      background:#eefaf0;
+      border-color:#bfe0c6;
+      color:#25613a;
+    }
+
+    .flash.warning{
+      background:#fff9e8;
+      border-color:#f1df9b;
+      color:#7a5a00;
+    }
+
+    .flash.danger{
+      background:#fff3f3;
+      border-color:#f1c0c0;
+      color:#9f2d2d;
+    }
+
+    .flash.info{
+      background:#eef6ff;
+      border-color:#c9d7e6;
+      color:#204564;
+    }
+
     /* ===== PADRÃO COMPACTO IGUAL AO OPERACAO/PRODUCAO ===== */
     #pd-lancar.zone-body,
     #pd-listar.zone-body,
@@ -233,6 +270,34 @@
     }
   </style>
 
+  {% set can_create = 'equipamentos:criar' in current_user_permissions or 'auth:administrar' in current_user_permissions %}
+  {% set can_edit = 'equipamentos:editar' in current_user_permissions or 'auth:administrar' in current_user_permissions %}
+  {% set can_delete = 'equipamentos:excluir' in current_user_permissions or 'auth:administrar' in current_user_permissions %}
+  {% set can_export = 'equipamentos:exportar' in current_user_permissions or 'auth:administrar' in current_user_permissions %}
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <section class="zone">
+        <div class="zone-body">
+          <div class="flash-wrap">
+            {% for category, message in messages %}
+              <div class="flash {{ category }}">{{ message }}</div>
+            {% endfor %}
+          </div>
+        </div>
+      </section>
+    {% endif %}
+  {% endwith %}
+
+  {% if msg %}
+    <section class="zone">
+      <div class="zone-body">
+        <div class="flash info">{{ msg }}</div>
+      </div>
+    </section>
+  {% endif %}
+
+  {% if can_create %}
   <!-- ==================== LANÇAR PARTE DIÁRIA ==================== -->
   <section class="zone">
     <header class="zone-head" data-target="#pd-lancar">
@@ -342,6 +407,7 @@
       </div>
     </div>
   </section>
+  {% endif %}
 
   <!-- ==================== CONSULTAR / EDITAR / EXCLUIR ==================== -->
   <section class="zone">
@@ -399,7 +465,9 @@
 
           <div class="toolbar-actions">
             <button class="btn primary" type="submit">🔍 Aplicar Filtros</button>
-            <button class="btn info" type="submit" formaction="{{ url_for('equipamentos.part_export') }}">📤 Exportar</button>
+            {% if can_export %}
+              <button class="btn info" type="submit" formaction="{{ url_for('equipamentos.part_export') }}">📤 Exportar</button>
+            {% endif %}
             <a class="btn warning" href="{{ url_for('equipamentos.partdiaria') }}">🧹 Limpar</a>
           </div>
         </div>
@@ -422,46 +490,67 @@
                   <th>Início</th>
                   <th>Fim</th>
                   <th>Obs</th>
-                  <th class="acoes-col">Ações</th>
+                  {% if can_edit or can_delete %}
+                    <th class="acoes-col">Ações</th>
+                  {% endif %}
                 </tr>
               </thead>
               <tbody>
                 {% for r in resultados %}
                   <tr>
-                    <form method="post" action="{{ url_for('equipamentos.part_update') }}">
-                      <input type="hidden" name="id" value="{{ r.id }}">
-                      <input type="hidden" name="ini" value="{{ filtros.ini or '' }}">
-                      <input type="hidden" name="fim" value="{{ filtros.fim or '' }}">
-                      <input type="hidden" name="maq" value="{{ filtros.maq or '' }}">
-                      <input type="hidden" name="act" value="{{ filtros.act or '' }}">
+                    {% if can_edit %}
+                      <form method="post" action="{{ url_for('equipamentos.part_update') }}">
+                        <input type="hidden" name="id" value="{{ r.id }}">
+                        <input type="hidden" name="ini" value="{{ filtros.ini or '' }}">
+                        <input type="hidden" name="fim" value="{{ filtros.fim or '' }}">
+                        <input type="hidden" name="maq" value="{{ filtros.maq or '' }}">
+                        <input type="hidden" name="act" value="{{ filtros.act or '' }}">
 
-                      <td><input type="date" name="data" value="{{ r.data }}"></td>
-                      <td>{{ r.maquina_tag }} — {{ r.maquina_desc }}</td>
-                      <td>
-                        <select name="atividade_id" required>
-                          {% for a in atividades %}
-                            <option value="{{ a.id }}" {{ 'selected' if a.id == r.atividade_id else '' }}>{{ a.nome }}</option>
-                          {% endfor %}
-                        </select>
-                      </td>
-                      <td><input type="time" name="hora_inicio" value="{{ r.hora_inicio }}"></td>
-                      <td><input type="time" name="hora_fim" value="{{ r.hora_fim }}"></td>
-                      <td><input type="text" name="obs" value="{{ r.obs or '' }}"></td>
-                      <td>
-                        <div class="row-actions">
-                          <button class="btn success" type="submit">💾 Salvar</button>
-                    </form>
+                        <td><input type="date" name="data" value="{{ r.data }}"></td>
+                        <td>{{ r.maquina_tag }} — {{ r.maquina_desc }}</td>
+                        <td>
+                          <select name="atividade_id" required>
+                            {% for a in atividades %}
+                              <option value="{{ a.id }}" {{ 'selected' if a.id == r.atividade_id else '' }}>{{ a.nome }}</option>
+                            {% endfor %}
+                          </select>
+                        </td>
+                        <td><input type="time" name="hora_inicio" value="{{ r.hora_inicio }}"></td>
+                        <td><input type="time" name="hora_fim" value="{{ r.hora_fim }}"></td>
+                        <td><input type="text" name="obs" value="{{ r.obs or '' }}"></td>
+                        {% if can_edit or can_delete %}
+                        <td>
+                          <div class="row-actions">
+                            <button class="btn success" type="submit">💾 Salvar</button>
+                      </form>
+                      {% else %}
+                        <td>{{ r.data }}</td>
+                        <td>{{ r.maquina_tag }} — {{ r.maquina_desc }}</td>
+                        <td>{{ r.atividade_nome }}</td>
+                        <td>{{ r.hora_inicio }}</td>
+                        <td>{{ r.hora_fim }}</td>
+                        <td>{{ r.obs or '' }}</td>
+                        {% if can_edit or can_delete %}
+                        <td>
+                          <div class="row-actions">
+                      {% endif %}
+                    {% endif %}
 
-                    <form method="post" action="{{ url_for('equipamentos.part_delete') }}" style="display:inline;" onsubmit="return confirm('Excluir lançamento?');">
-                      <input type="hidden" name="id" value="{{ r.id }}">
-                      <input type="hidden" name="ini" value="{{ filtros.ini or '' }}">
-                      <input type="hidden" name="fim" value="{{ filtros.fim or '' }}">
-                      <input type="hidden" name="maq" value="{{ filtros.maq or '' }}">
-                      <input type="hidden" name="act" value="{{ filtros.act or '' }}">
-                          <button class="btn danger" type="submit">🗑️ Excluir</button>
-                    </form>
-                        </div>
-                      </td>
+                    {% if can_delete %}
+                      <form method="post" action="{{ url_for('equipamentos.part_delete') }}" style="display:inline;" onsubmit="return confirm('Excluir lançamento?');">
+                        <input type="hidden" name="id" value="{{ r.id }}">
+                        <input type="hidden" name="ini" value="{{ filtros.ini or '' }}">
+                        <input type="hidden" name="fim" value="{{ filtros.fim or '' }}">
+                        <input type="hidden" name="maq" value="{{ filtros.maq or '' }}">
+                        <input type="hidden" name="act" value="{{ filtros.act or '' }}">
+                        <button class="btn danger" type="submit">🗑️ Excluir</button>
+                      </form>
+                    {% endif %}
+
+                    {% if can_edit or can_delete %}
+                          </div>
+                        </td>
+                    {% endif %}
                   </tr>
                 {% endfor %}
               </tbody>
@@ -477,7 +566,8 @@
     </div>
   </section>
 
-  <!-- ==================== ATIVIDADES (CRUD) ==================== -->
+  {% if can_create %}
+  <!-- ==================== ATIVIDADES (CRIAR) ==================== -->
   <section class="zone">
     <header class="zone-head" data-target="#act-cadastrar">
       <div class="zone-left">
@@ -508,7 +598,9 @@
       </form>
     </div>
   </section>
+  {% endif %}
 
+  {% if can_edit %}
   <section class="zone">
     <header class="zone-head" data-target="#act-editar">
       <div class="zone-left">
@@ -549,7 +641,9 @@
       </form>
     </div>
   </section>
+  {% endif %}
 
+  {% if can_delete %}
   <section class="zone">
     <header class="zone-head" data-target="#act-excluir">
       <div class="zone-left">
@@ -587,10 +681,8 @@
       </form>
     </div>
   </section>
-
-  {% if msg %}
-    <div class="alert">{{ msg }}</div>
   {% endif %}
+
 </div>
 
 <script>
@@ -659,6 +751,7 @@
   });
 </script>
 
+{% if can_create %}
 <script>
   const pdLancamentos = [];
 
@@ -873,4 +966,5 @@
 
   pdRenderTabela();
 </script>
+{% endif %}
 {% endblock %}

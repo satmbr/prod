@@ -134,6 +134,43 @@
       margin-bottom:14px;
     }
 
+    .flash-wrap{
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+    }
+
+    .flash{
+      padding:12px 14px;
+      border-radius:12px;
+      border:1px solid #d9e1ea;
+      background:#f5f8fc;
+    }
+
+    .flash.success{
+      background:#eefaf0;
+      border-color:#bfe0c6;
+      color:#25613a;
+    }
+
+    .flash.warning{
+      background:#fff9e8;
+      border-color:#f1df9b;
+      color:#7a5a00;
+    }
+
+    .flash.danger{
+      background:#fff3f3;
+      border-color:#f1c0c0;
+      color:#9f2d2d;
+    }
+
+    .flash.info{
+      background:#eef6ff;
+      border-color:#c9d7e6;
+      color:#204564;
+    }
+
     /* ===== PADRÃO COMPACTO IGUAL AO OPERACAO/PRODUCAO ===== */
     #colab-dados-pessoais.zone-body,
     #colab-lista.zone-body{
@@ -203,6 +240,23 @@
     }
   </style>
 
+  {% set can_create = 'colaboradores:criar' in current_user_permissions or 'auth:administrar' in current_user_permissions %}
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <section class="zone">
+        <div class="zone-body">
+          <div class="flash-wrap">
+            {% for category, message in messages %}
+              <div class="flash {{ category }}">{{ message }}</div>
+            {% endfor %}
+          </div>
+        </div>
+      </section>
+    {% endif %}
+  {% endwith %}
+
+  {% if can_create %}
   <!-- DADOS PESSOAIS -->
   <section class="zone">
     <header class="zone-head" data-target="#colab-dados-pessoais">
@@ -442,6 +496,7 @@
       </form>
     </div>
   </section>
+  {% endif %}
 
   <!-- COLABORADORES CADASTRADOS -->
   <section class="zone">
