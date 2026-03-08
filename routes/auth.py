@@ -3,7 +3,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from db import get_engine
 from sqlalchemy import text
 from functools import wraps
-from datetime import datetime
+from datetime import datetime, timedelta
 
 bp = Blueprint("auth", __name__, url_prefix="/auth")
 
@@ -120,6 +120,8 @@ def login():
                         u.ativo,
                         u.deve_trocar_senha,
                         u.perfil_id,
+                        u.tentativas_login,
+                        u.bloqueado_ate,
                         p.nome AS perfil_nome
                     FROM usuarios u
                     LEFT JOIN perfis p ON p.id = u.perfil_id
@@ -130,6 +132,15 @@ def login():
             ).mappings().first()
 
         if not usuario:
+            if usuario["bloqueado_ate"] and usuario["bloqueado_ate"] > datetime.utcnow():
+                registrar_log(
+                    evento="login_bloqueado_temporario",
+                    detalhes=f"Usuário bloqueado até {usuario['bloqueado_ate']}",
+                    usuario_id=usuario["id"],
+                    username=usuario["username"]
+                )
+                flash("Usuário temporariamente bloqueado por excesso de tentativas. Tente novamente mais tarde.", "erro")
+                return render_template("auth/login.html")
             registrar_log(
                 evento="login_invalido",
                 detalhes="Usuário não encontrado",
@@ -149,13 +160,45 @@ def login():
             return render_template("auth/login.html")
 
         if not check_password_hash(usuario["senha_hash"], senha):
-            registrar_log(
-                evento="login_invalido",
-                detalhes="Senha inválida",
-                usuario_id=usuario["id"],
-                username=usuario["username"]
-            )
-            flash("Usuário ou senha inválidos.", "erro")
+            tentativas = (usuario["tentativas_login"] or 0) + 1
+            bloqueado_ate = None
+
+            if tentativas >= 5:
+                bloqueado_ate = datetime.utcnow() + timedelta(minutes=15)
+
+            with get_engine().begin() as conn:
+                conn.execute(
+                    text("""
+                        UPDATE usuarios
+                        SET
+                            tentativas_login = :tentativas,
+                            bloqueado_ate = :bloqueado_ate
+                        WHERE id = :id
+                    """),
+                    {
+                        "id": usuario["id"],
+                        "tentativas": tentativas,
+                        "bloqueado_ate": bloqueado_ate
+                    }
+                )
+
+            if bloqueado_ate:
+                registrar_log(
+                    evento="usuario_bloqueado_temporariamente",
+                    detalhes=f"Bloqueado após {tentativas} tentativas inválidas. Até {bloqueado_ate}",
+                    usuario_id=usuario["id"],
+                    username=usuario["username"]
+                )
+                flash("Usuário temporariamente bloqueado por excesso de tentativas. Tente novamente em 15 minutos.", "erro")
+            else:
+                registrar_log(
+                    evento="login_invalido",
+                    detalhes=f"Senha inválida. Tentativa {tentativas} de 5",
+                    usuario_id=usuario["id"],
+                    username=usuario["username"]
+                )
+                flash(f"Usuário ou senha inválidos. Tentativa {tentativas} de 5.", "erro")
+
             return render_template("auth/login.html")
 
         session.clear()
@@ -173,7 +216,10 @@ def login():
             conn.execute(
                 text("""
                     UPDATE usuarios
-                    SET ultimo_login = CURRENT_TIMESTAMP
+                    SET
+                        ultimo_login = CURRENT_TIMESTAMP,
+                        tentativas_login = 0,
+                        bloqueado_ate = NULL
                     WHERE id = :id
                 """),
                 {"id": usuario["id"]}
