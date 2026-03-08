@@ -55,9 +55,47 @@ def create_app():
     @app.get("/")
     def index():
         from flask import render_template
+
         if "usuario_id" not in session:
             return redirect(url_for("auth.login"))
-        return render_template("index.html")
+
+        permissoes = session.get("permissoes", [])
+
+        cards = []
+
+        if "operacao:visualizar" in permissoes or "auth:administrar" in permissoes:
+            cards.append({
+                "titulo": "Operação",
+                "descricao": "Acompanhe produção, cadastros e registros do módulo de operação.",
+                "href": url_for("operacao.index"),
+                "botao": "Acessar módulo"
+            })
+
+        if "equipamentos:visualizar" in permissoes or "auth:administrar" in permissoes:
+            cards.append({
+                "titulo": "Equipamentos",
+                "descricao": "Consulte e gerencie cadastros, controles e informações dos equipamentos.",
+                "href": url_for("equipamentos.index"),
+                "botao": "Acessar módulo"
+            })
+
+        if "colaboradores:visualizar" in permissoes or "auth:administrar" in permissoes:
+            cards.append({
+                "titulo": "Colaboradores",
+                "descricao": "Visualize e mantenha os registros e dados dos colaboradores.",
+                "href": url_for("colaboradores.registro"),
+                "botao": "Acessar módulo"
+            })
+
+        if "auth:administrar" in permissoes:
+            cards.append({
+                "titulo": "Administração",
+                "descricao": "Gerencie usuários, perfis, permissões e auditoria do sistema.",
+                "href": url_for("auth.usuarios"),
+                "botao": "Abrir administração"
+            })
+
+        return render_template("index.html", cards=cards)
 
     @app.get("/health")
     def health():
