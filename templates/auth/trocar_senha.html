@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}
+  {% if reset_user %}Resetar senha | PRUMAT{% else %}Trocar senha | PRUMAT{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="page-wrap" style="max-width: 560px; margin: 30px auto;">
+  <section class="zone">
+    <div class="zone-head">
+      <div class="zone-left">
+        <div>
+          <h2 style="margin:0;">
+            {% if reset_user %}Resetar senha{% else %}Trocar senha{% endif %}
+          </h2>
+          <div style="color:#667487; font-size:14px; margin-top:4px;">
+            {% if reset_user %}
+              Usuário: {{ reset_user.nome }} ({{ reset_user.username }})
+            {% else %}
+              Atualize sua senha de acesso
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="padding:24px;">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+            <div style="margin-bottom:12px; padding:12px 14px; border-radius:10px; background:#f5f8fc; border:1px solid #d7e2ef;">
+              {{ message }}
+            </div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+
+      <form method="post">
+        {% if not reset_user %}
+        <div style="margin-bottom:16px;">
+          <label>Senha atual</label>
+          <input type="password" name="senha_atual" required
+                 style="width:100%; height:42px; border:1px solid #d9e1ea; border-radius:10px; padding:0 12px;">
+        </div>
+        {% endif %}
+
+        <div style="margin-bottom:16px;">
+          <label>Nova senha</label>
+          <input type="password" name="nova_senha" required
+                 style="width:100%; height:42px; border:1px solid #d9e1ea; border-radius:10px; padding:0 12px;">
+        </div>
+
+        <div style="margin-bottom:20px;">
+          <label>Confirmar nova senha</label>
+          <input type="password" name="confirmar_senha" required
+                 style="width:100%; height:42px; border:1px solid #d9e1ea; border-radius:10px; padding:0 12px;">
+        </div>
+
+        <div style="display:flex; gap:12px;">
+          <button type="submit" class="btn-primary">Salvar senha</button>
+          {% if reset_user %}
+            <a href="{{ url_for('auth.usuarios') }}" class="btn-outline">Voltar</a>
+          {% else %}
+            <a href="{{ url_for('index') }}" class="btn-outline">Cancelar</a>
+          {% endif %}
+        </div>
+      </form>
+    </div>
+  </section>
+</div>
+{% endblock %}

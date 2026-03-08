@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Acesso negado | PRUMAT{% endblock %}
+
+{% block content %}
+<div class="page-wrap" style="max-width: 700px; margin: 40px auto;">
+  <section class="zone">
+    <div style="padding:32px; text-align:center;">
+      <h2 style="margin-bottom:10px;">Acesso negado</h2>
+      <p style="color:#667487;">
+        Você não possui permissão para acessar esta área.
+      </p>
+      <a href="{{ url_for('index') }}" class="btn-primary">Voltar ao início</a>
+    </div>
+  </section>
+</div>
+{% endblock %}

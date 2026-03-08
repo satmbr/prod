@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}Usuários | PRUMAT{% endblock %}
+
+{% block content %}
+<div class="page-wrap">
+  <section class="zone">
+    <div class="zone-head">
+      <div class="zone-left">
+        <div>
+          <h2 style="margin:0;">Usuários cadastrados</h2>
+          <div style="color:#667487; font-size:14px; margin-top:4px;">
+            Gestão administrativa de acessos
+          </div>
+        </div>
+      </div>
+      <div class="zone-actions">
+        <a href="{{ url_for('auth.novo_usuario') }}" class="btn-primary">+ Novo usuário</a>
+      </div>
+    </div>
+
+    <div style="padding:20px;">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+            <div style="margin-bottom:12px; padding:12px 14px; border-radius:10px; background:#f5f8fc; border:1px solid #d7e2ef;">
+              {{ message }}
+            </div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+
+      <div style="overflow-x:auto;">
+        <table class="data-table" style="width:100%;">
+          <thead>
+            <tr>
+              <th>Nome</th>
+              <th>Usuário</th>
+              <th>E-mail</th>
+              <th>Status</th>
+              <th>Troca senha</th>
+              <th>Último login</th>
+              <th>Criado em</th>
+              <th style="text-align:center;">Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for u in usuarios %}
+            <tr>
+              <td>{{ u.nome }}</td>
+              <td>{{ u.username }}</td>
+              <td>{{ u.email or '' }}</td>
+              <td>{{ 'Ativo' if u.ativo else 'Inativo' }}</td>
+              <td>{{ 'Sim' if u.deve_trocar_senha else 'Não' }}</td>
+              <td>{{ u.ultimo_login or '' }}</td>
+              <td>{{ u.criado_em or '' }}</td>
+              <td style="text-align:center; white-space:nowrap;">
+                <a href="{{ url_for('auth.editar_usuario', usuario_id=u.id) }}" class="btn-outline">Editar</a>
+                <a href="{{ url_for('auth.resetar_senha', usuario_id=u.id) }}" class="btn-outline">Resetar senha</a>
+                <form method="post" action="{{ url_for('auth.toggle_usuario', usuario_id=u.id) }}" style="display:inline;">
+                  <button type="submit" class="btn-outline">
+                    {{ 'Inativar' if u.ativo else 'Ativar' }}
+                  </button>
+                </form>
+              </td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="8" style="text-align:center;">Nenhum usuário encontrado.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</div>
+{% endblock %}

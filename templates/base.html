@@ -1,6 +1,15 @@
 <!doctype html>
 <html lang="pt-br">
 <head>
+	{% if usuario_logado %}
+	  <a class="nav-link" href="{{ url_for('auth.trocar_senha') }}">Trocar senha</a>
+
+	  {% if session.get('username') == 'admin' %}
+		<a class="nav-link" href="{{ url_for('auth.usuarios') }}">Usuários</a>
+	  {% endif %}
+
+	  <a class="nav-link" href="{{ url_for('auth.logout') }}">Sair</a>
+	{% endif %}
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>{% block title %}PRUMAT{% endblock %}</title>
