@@ -495,65 +495,90 @@
                   {% endif %}
                 </tr>
               </thead>
-              <tbody>
-                {% for r in resultados %}
-                  <tr>
-                    {% if can_edit %}
-                      <form method="post" action="{{ url_for('equipamentos.part_update') }}">
-                        <input type="hidden" name="id" value="{{ r.id }}">
-                        <input type="hidden" name="ini" value="{{ filtros.ini or '' }}">
-                        <input type="hidden" name="fim" value="{{ filtros.fim or '' }}">
-                        <input type="hidden" name="maq" value="{{ filtros.maq or '' }}">
-                        <input type="hidden" name="act" value="{{ filtros.act or '' }}">
+				<tbody>
+				  {% for r in resultados %}
+					<tr>
+					  <td>
+						{% if can_edit %}
+						  <form method="post" action="{{ url_for('equipamentos.part_update') }}">
+							<input type="hidden" name="id" value="{{ r.id }}">
+							<input type="hidden" name="ini" value="{{ filtros.ini or '' }}">
+							<input type="hidden" name="fim" value="{{ filtros.fim or '' }}">
+							<input type="hidden" name="maq" value="{{ filtros.maq or '' }}">
+							<input type="hidden" name="act" value="{{ filtros.act or '' }}">
+							<input type="date" name="data" value="{{ r.data }}">
+						{% else %}
+						  {{ r.data }}
+						{% endif %}
+					  </td>
 
-                        <td><input type="date" name="data" value="{{ r.data }}"></td>
-                        <td>{{ r.maquina_tag }} — {{ r.maquina_desc }}</td>
-                        <td>
-                          <select name="atividade_id" required>
-                            {% for a in atividades %}
-                              <option value="{{ a.id }}" {{ 'selected' if a.id == r.atividade_id else '' }}>{{ a.nome }}</option>
-                            {% endfor %}
-                          </select>
-                        </td>
-                        <td><input type="time" name="hora_inicio" value="{{ r.hora_inicio }}"></td>
-                        <td><input type="time" name="hora_fim" value="{{ r.hora_fim }}"></td>
-                        <td><input type="text" name="obs" value="{{ r.obs or '' }}"></td>
-                        {% if can_edit or can_delete %}
-                        <td>
-                          <div class="row-actions">
-                            <button class="btn success" type="submit">💾 Salvar</button>
-                      </form>
-                      {% else %}
-                        <td>{{ r.data }}</td>
-                        <td>{{ r.maquina_tag }} — {{ r.maquina_desc }}</td>
-                        <td>{{ r.atividade_nome }}</td>
-                        <td>{{ r.hora_inicio }}</td>
-                        <td>{{ r.hora_fim }}</td>
-                        <td>{{ r.obs or '' }}</td>
-                        {% if can_edit or can_delete %}
-                        <td>
-                          <div class="row-actions">
-                      {% endif %}
-                    {% endif %}
+					  <td>{{ r.maquina_tag }} — {{ r.maquina_desc }}</td>
 
-                    {% if can_delete %}
-                      <form method="post" action="{{ url_for('equipamentos.part_delete') }}" style="display:inline;" onsubmit="return confirm('Excluir lançamento?');">
-                        <input type="hidden" name="id" value="{{ r.id }}">
-                        <input type="hidden" name="ini" value="{{ filtros.ini or '' }}">
-                        <input type="hidden" name="fim" value="{{ filtros.fim or '' }}">
-                        <input type="hidden" name="maq" value="{{ filtros.maq or '' }}">
-                        <input type="hidden" name="act" value="{{ filtros.act or '' }}">
-                        <button class="btn danger" type="submit">🗑️ Excluir</button>
-                      </form>
-                    {% endif %}
+					  <td>
+						{% if can_edit %}
+						  <select name="atividade_id" required>
+							{% for a in atividades %}
+							  <option value="{{ a.id }}" {{ 'selected' if a.id == r.atividade_id else '' }}>
+								{{ a.nome }}
+							  </option>
+							{% endfor %}
+						  </select>
+						{% else %}
+						  {{ r.atividade_nome }}
+						{% endif %}
+					  </td>
 
-                    {% if can_edit or can_delete %}
-                          </div>
-                        </td>
-                    {% endif %}
-                  </tr>
-                {% endfor %}
-              </tbody>
+					  <td>
+						{% if can_edit %}
+						  <input type="time" name="hora_inicio" value="{{ r.hora_inicio }}">
+						{% else %}
+						  {{ r.hora_inicio }}
+						{% endif %}
+					  </td>
+
+					  <td>
+						{% if can_edit %}
+						  <input type="time" name="hora_fim" value="{{ r.hora_fim }}">
+						{% else %}
+						  {{ r.hora_fim }}
+						{% endif %}
+					  </td>
+
+					  <td>
+						{% if can_edit %}
+						  <input type="text" name="obs" value="{{ r.obs or '' }}">
+						{% else %}
+						  {{ r.obs or '' }}
+						{% endif %}
+					  </td>
+
+					  {% if can_edit or can_delete %}
+					  <td>
+						<div class="row-actions">
+						  {% if can_edit %}
+							<button class="btn success" type="submit">💾 Salvar</button>
+							</form>
+						  {% endif %}
+
+						  {% if can_delete %}
+							<form method="post"
+								  action="{{ url_for('equipamentos.part_delete') }}"
+								  style="display:inline;"
+								  onsubmit="return confirm('Excluir lançamento?');">
+							  <input type="hidden" name="id" value="{{ r.id }}">
+							  <input type="hidden" name="ini" value="{{ filtros.ini or '' }}">
+							  <input type="hidden" name="fim" value="{{ filtros.fim or '' }}">
+							  <input type="hidden" name="maq" value="{{ filtros.maq or '' }}">
+							  <input type="hidden" name="act" value="{{ filtros.act or '' }}">
+							  <button class="btn danger" type="submit">🗑️ Excluir</button>
+							</form>
+						  {% endif %}
+						</div>
+					  </td>
+					  {% endif %}
+					</tr>
+				  {% endfor %}
+				</tbody>
             </table>
           </div>
 
