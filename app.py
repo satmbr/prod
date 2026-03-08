@@ -23,7 +23,7 @@ def create_app():
 
             if ultimo_acesso:
                 tempo_inativo = agora - ultimo_acesso
-                if tempo_inativo > 60:  # 30 minutos
+                if tempo_inativo > 1800:  # 30 minutos
                     session.clear()
                     flash("Sua sessão expirou por inatividade. Faça login novamente.", "erro")
                     return redirect(url_for("auth.login"))
