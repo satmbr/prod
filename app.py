@@ -1,9 +1,35 @@
-from flask import Flask, session, redirect, url_for, request
+from flask import Flask, session, redirect, url_for, request, flash
 import os
+from datetime import timedelta, datetime
 
 def create_app():
     app = Flask(__name__)
     app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "troque-esta-chave-em-producao")
+    app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(minutes=30)
+
+    @app.before_request
+    def controlar_sessao():
+        rotas_livres = {
+            "auth.login",
+            "static"
+        }
+
+        if request.endpoint in rotas_livres or request.endpoint is None:
+            return
+
+        if "usuario_id" in session:
+            agora = datetime.utcnow().timestamp()
+            ultimo_acesso = session.get("ultimo_acesso")
+
+            if ultimo_acesso:
+                tempo_inativo = agora - ultimo_acesso
+                if tempo_inativo > 60:  # 30 minutos
+                    session.clear()
+                    flash("Sua sessão expirou por inatividade. Faça login novamente.", "erro")
+                    return redirect(url_for("auth.login"))
+
+            session["ultimo_acesso"] = agora
+            session.permanent = True
 
     @app.context_processor
     def inject_user():

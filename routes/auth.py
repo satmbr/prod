@@ -3,6 +3,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from db import get_engine
 from sqlalchemy import text
 from functools import wraps
+from datetime import datetime
 
 bp = Blueprint("auth", __name__, url_prefix="/auth")
 
@@ -164,6 +165,9 @@ def login():
         session["perfil_id"] = usuario["perfil_id"]
         session["perfil_nome"] = usuario["perfil_nome"]
         session["permissoes"] = carregar_permissoes_usuario(usuario["id"])
+        
+        session["ultimo_acesso"] = datetime.utcnow().timestamp()
+        session.permanent = True        
 
         with get_engine().begin() as conn:
             conn.execute(
