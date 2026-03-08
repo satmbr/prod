@@ -793,3 +793,31 @@ def logs():
         ).mappings().all()
 
     return render_template("auth/logs.html", logs=rows)
+
+@bp.get("/minha-conta")
+@login_required
+def minha_conta():
+    with get_engine().connect() as conn:
+        usuario = conn.execute(
+            text("""
+                SELECT
+                    u.id,
+                    u.nome,
+                    u.username,
+                    u.email,
+                    u.ativo,
+                    u.ultimo_login,
+                    u.criado_em,
+                    p.nome AS perfil_nome
+                FROM usuarios u
+                LEFT JOIN perfis p ON p.id = u.perfil_id
+                WHERE u.id = :id
+            """),
+            {"id": session.get("usuario_id")}
+        ).mappings().first()
+
+    if not usuario:
+        session.clear()
+        return redirect(url_for("auth.login"))
+
+    return render_template("auth/minha_conta.html", usuario=usuario)

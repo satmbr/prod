@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Minha Conta | PRUMAT{% endblock %}
+
+{% block content %}
+<div class="page-wrap" style="max-width: 900px; margin: 24px auto;">
+  <section class="zone">
+    <div class="zone-head">
+      <div class="zone-left">
+        <div>
+          <h2 style="margin:0;">Minha Conta</h2>
+          <div style="color:#667487; font-size:14px; margin-top:4px;">
+            Informações do usuário logado
+          </div>
+        </div>
+      </div>
+      <div class="zone-actions">
+        <a href="{{ url_for('auth.trocar_senha') }}" class="btn-primary">Trocar senha</a>
+      </div>
+    </div>
+
+    <div style="padding:24px;">
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+        <div>
+          <label style="display:block; font-weight:700; margin-bottom:6px;">Nome</label>
+          <div class="alert">{{ usuario.nome }}</div>
+        </div>
+
+        <div>
+          <label style="display:block; font-weight:700; margin-bottom:6px;">Usuário</label>
+          <div class="alert">{{ usuario.username }}</div>
+        </div>
+
+        <div>
+          <label style="display:block; font-weight:700; margin-bottom:6px;">E-mail</label>
+          <div class="alert">{{ usuario.email or '-' }}</div>
+        </div>
+
+        <div>
+          <label style="display:block; font-weight:700; margin-bottom:6px;">Perfil</label>
+          <div class="alert">{{ usuario.perfil_nome or '-' }}</div>
+        </div>
+
+        <div>
+          <label style="display:block; font-weight:700; margin-bottom:6px;">Status</label>
+          <div class="alert">{{ 'Ativo' if usuario.ativo else 'Inativo' }}</div>
+        </div>
+
+        <div>
+          <label style="display:block; font-weight:700; margin-bottom:6px;">Último login</label>
+          <div class="alert">{{ usuario.ultimo_login or '-' }}</div>
+        </div>
+
+        <div>
+          <label style="display:block; font-weight:700; margin-bottom:6px;">Conta criada em</label>
+          <div class="alert">{{ usuario.criado_em or '-' }}</div>
+        </div>
+      </div>
+
+      <div style="margin-top:24px; display:flex; gap:12px;">
+        <a href="{{ url_for('index') }}" class="btn-outline">Voltar</a>
+        <a href="{{ url_for('auth.trocar_senha') }}" class="btn-primary">Trocar senha</a>
+      </div>
+    </div>
+  </section>
+</div>
+{% endblock %}

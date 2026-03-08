@@ -369,20 +369,26 @@
       <!--<div class="brand-title">Consórcio PRUMAT</div>-->
     </div>
 
-    <div class="nav-right">
-      {% if usuario_logado %}
-        <span style="color:#fff; font-weight:600;">{{ current_user_name }}</span>
-        <a class="nav-link" href="{{ url_for('auth.trocar_senha') }}">Trocar senha</a>
+	<div class="nav-right">
+	  {% if usuario_logado %}
+		<div style="display:flex; flex-direction:column; align-items:flex-end; margin-right:6px;">
+		  <span style="color:#fff; font-weight:700; line-height:1.1;">{{ current_user_name }}</span>
+		  <span style="color:#d6e3f0; font-size:12px; line-height:1.1;">{{ current_user_profile or 'Sem perfil' }}</span>
+		</div>
 
-        {% if 'auth:administrar' in current_user_permissions %}
-          <a class="nav-link" href="{{ url_for('auth.usuarios') }}">Usuários</a>
-          <a class="nav-link" href="{{ url_for('auth.perfis') }}">Perfis</a>
+		<a class="nav-link" href="{{ url_for('auth.minha_conta') }}">Minha Conta</a>
+		<a class="nav-link" href="{{ url_for('auth.trocar_senha') }}">Trocar senha</a>
+
+		{% if 'auth:administrar' in current_user_permissions %}
+		  <a class="nav-link" href="{{ url_for('auth.usuarios') }}">Usuários</a>
+		  <a class="nav-link" href="{{ url_for('auth.perfis') }}">Perfis</a>
 		  <a class="nav-link" href="{{ url_for('auth.logs') }}">Auditoria</a>
-        {% endif %}
+		{% endif %}
 
-        <a class="nav-link" href="{{ url_for('auth.logout') }}">Sair</a>
-      {% endif %}
-    </div>
+		<a class="nav-link" href="{{ url_for('auth.logout') }}">Sair</a>
+	  {% endif %}
+	</div>
+
   </div>
 
   <nav class="header-nav">
