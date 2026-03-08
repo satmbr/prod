@@ -1,12 +1,20 @@
 from datetime import date
-from flask import Blueprint, render_template, request, redirect, url_for
+from flask import Blueprint, render_template, request, redirect, url_for, session
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
-from routes.auth import login_required, permission_required
 
+from routes.auth import login_required, permission_required
 from db import get_engine
 
 bp = Blueprint("operacao", __name__, url_prefix="/operacao")
+
+
+# -------------------------------------------------------------------
+# Helper: permissões do usuário logado
+# -------------------------------------------------------------------
+def user_can(chave: str) -> bool:
+    permissoes = session.get("permissoes", [])
+    return chave in permissoes or "auth:administrar" in permissoes
 
 
 # -------------------------------------------------------------------
@@ -17,23 +25,34 @@ def build_operacao_subnav(active: str | None):
     Monta os links do sub-menu (Produção / Registro / Cadastro).
     'active' deve ser: 'producao', 'registro', 'cadastro' ou None.
     """
-    return [
-        {
-            "text": "Produção",
-            "href": url_for("operacao.producao"),
-            "active": active == "producao",
-        },
-        {
-            "text": "Registro",
-            "href": url_for("operacao.registro"),
-            "active": active == "registro",
-        },
-        {
-            "text": "Cadastro",
-            "href": url_for("operacao.cadastro"),
-            "active": active == "cadastro",
-        },
-    ]
+    links = []
+
+    if user_can("operacao:visualizar"):
+        links.append(
+            {
+                "text": "Produção",
+                "href": url_for("operacao.producao"),
+                "active": active == "producao",
+            }
+        )
+        links.append(
+            {
+                "text": "Registro",
+                "href": url_for("operacao.registro"),
+                "active": active == "registro",
+            }
+        )
+
+    if user_can("operacao:criar"):
+        links.append(
+            {
+                "text": "Cadastro",
+                "href": url_for("operacao.cadastro"),
+                "active": active == "cadastro",
+            }
+        )
+
+    return links
 
 
 # -------------------------------------------------------------------
@@ -43,7 +62,6 @@ def load_eh_frentes(conn):
     eh_list = []
     fr_list = []
 
-    # Tabela de EH: entre_house (id, eh)
     try:
         eh_list = (
             conn.execute(
@@ -55,7 +73,6 @@ def load_eh_frentes(conn):
     except SQLAlchemyError:
         eh_list = []
 
-    # Tabela de Frentes: frente_equipe (id, frente)
     try:
         fr_list = (
             conn.execute(
@@ -77,7 +94,6 @@ def load_eh_frentes(conn):
 @login_required
 @permission_required("operacao", "visualizar")
 def index():
-    # sub-menu, mas sem nada no corpo da página
     subnav = build_operacao_subnav(None)
     return render_template(
         "operacao/index.html",
@@ -93,8 +109,8 @@ def index():
 @permission_required("operacao", "visualizar")
 def producao():
     engine = get_engine()
+
     with engine.connect() as conn:
-        # 1) Carregar EH a partir de entre_house
         ehs = []
         try:
             ehs = (
@@ -111,23 +127,17 @@ def producao():
         except SQLAlchemyError:
             ehs = []
 
-        # EH selecionada
         eh_id_param = request.args.get("eh_id")
         eh_id = int(eh_id_param) if eh_id_param else None
 
         if eh_id is None and ehs:
             eh_id = ehs[0]["id"]
 
-        # Data selecionada (para destacar linha, filtros etc.)
         data_param = request.args.get("data_partdiaria")
-        if data_param:
-            data_partdiaria = data_param
-        else:
-            data_partdiaria = date.today().isoformat()
+        data_partdiaria = data_param if data_param else date.today().isoformat()
 
         # ------------------------------------------------------------------
         # BLOCO 1 – ACOMPANHAMENTO RENOVAÇÃO (01 - Renovação)
-        # usando producao_planejada / producao_realizada
         # ------------------------------------------------------------------
         dados = []
         if eh_id is not None:
@@ -135,7 +145,6 @@ def producao():
                 sql_acomp = text(
                     """
                     WITH base AS (
-                        -- Planejado dia
                         SELECT
                             p.data::date AS data,
                             SUM(p.planejado)::float AS previsto_dia,
@@ -148,7 +157,6 @@ def producao():
 
                         UNION ALL
 
-                        -- Realizado dia
                         SELECT
                             r.data::date AS data,
                             0.0::float AS previsto_dia,
@@ -198,7 +206,7 @@ def producao():
                 dados = []
 
         # ------------------------------------------------------------------
-        # BLOCO 2 – Parte Diária (filtrando direto no SQL)
+        # BLOCO 2 – Parte Diária
         # ------------------------------------------------------------------
         dados_partdiaria = []
         grafico_atividades = {"labels": [], "tempos": []}
@@ -230,8 +238,6 @@ def producao():
                 }
             ).mappings().all()
 
-            # Se não houver registros da P190 na data,
-            # busca qualquer máquina apenas nessa mesma data
             if not rows_pd:
                 sql_pd_data = text(
                     """
@@ -252,9 +258,7 @@ def producao():
 
                 rows_pd = conn.execute(
                     sql_pd_data,
-                    {
-                        "data_ref": data_partdiaria,
-                    }
+                    {"data_ref": data_partdiaria}
                 ).mappings().all()
 
             dados_partdiaria = list(rows_pd)
@@ -262,13 +266,12 @@ def producao():
         except SQLAlchemyError:
             dados_partdiaria = []
 
-        # Monta dados para o gráfico
         labels = [r["atividade"] for r in dados_partdiaria]
         tempos = [float(r["duracao"] or 0.0) for r in dados_partdiaria]
         grafico_atividades = {"labels": labels, "tempos": tempos}
 
         # ------------------------------------------------------------------
-        # BLOCO 3 – Resumo frentes (demais frentes da frente_equipe)
+        # BLOCO 3 – Resumo frentes
         # ------------------------------------------------------------------
         dados_resumo_frentes = []
         try:
@@ -277,7 +280,6 @@ def producao():
                 WITH base AS (
                     SELECT
                         r.data::date AS data,
-                        -- Carregamento / Descarregamento
                         SUM(
                             CASE WHEN f.frente = '02 - Carregamento_novo'
                                  THEN r.realizado ELSE 0 END
@@ -290,26 +292,18 @@ def producao():
                             CASE WHEN f.frente = '07 - Descarregamento_novo'
                                  THEN r.realizado ELSE 0 END
                         ) AS desc_novo,
-
-                        -- Remoção de Grampos
                         SUM(
                             CASE WHEN f.frente = '03 - Remoção_grampos'
                                  THEN r.realizado ELSE 0 END
                         ) AS rem_grampos,
-
-                        -- Remoção de Galochas
                         SUM(
                             CASE WHEN f.frente = '04 - Remoção_galochas'
                                  THEN r.realizado ELSE 0 END
                         ) AS rem_galochas,
-
-                        -- Pregação (aplicação de grampos)
                         SUM(
                             CASE WHEN f.frente = '06 - Aplicação_grampos'
                                  THEN r.realizado ELSE 0 END
                         ) AS aplicado,
-
-                        -- Segregação
                         SUM(
                             CASE WHEN f.frente = '09 - Segregacao_velho'
                                  THEN r.realizado ELSE 0 END
@@ -326,22 +320,18 @@ def producao():
                 SELECT
                     data,
                     carregado,
-                    0::float AS saldo,   -- placeholder, podemos ajustar depois
+                    0::float AS saldo,
                     SUM(carregado) OVER (ORDER BY data) AS acumulado_carregado,
                     desc_velho,
                     desc_novo,
-
                     rem_grampos,
-                    rem_grampos AS fa_grampos,  -- por enquanto igual à remoção
+                    rem_grampos AS fa_grampos,
                     SUM(rem_grampos) OVER (ORDER BY data) AS acum_rem_grampos,
-
                     rem_galochas,
                     rem_galochas AS fa_galochas,
                     SUM(rem_galochas) OVER (ORDER BY data) AS acum_rem_galochas,
-
                     aplicado,
-                    0::float AS aberto, -- placeholder
-
+                    0::float AS aberto,
                     seg_ruins,
                     seg_bons
                 FROM base
@@ -357,11 +347,9 @@ def producao():
         except SQLAlchemyError:
             dados_resumo_frentes = []
 
-        # (mantém estes, por enquanto ainda vazios)
         grafico_barra_carregamento = []
         grafico_bateria_carregamento = {}
         percentuais_graficos = {}
-
 
     subnav = build_operacao_subnav("producao")
 
@@ -389,6 +377,7 @@ def producao():
 @permission_required("operacao", "criar")
 def cadastro():
     engine = get_engine()
+
     with engine.connect() as conn:
         lista_eh, lista_frente = load_eh_frentes(conn)
 
@@ -411,11 +400,12 @@ def eh_create():
         return redirect(url_for("operacao.cadastro"))
 
     engine = get_engine()
-    with engine.connect() as conn:
+    with engine.begin() as conn:
         conn.execute(
-            text("INSERT INTO entre_house (eh) VALUES (:eh)"), {"eh": eh}
+            text("INSERT INTO entre_house (eh) VALUES (:eh)"),
+            {"eh": eh}
         )
-        conn.commit()
+
     return redirect(url_for("operacao.cadastro"))
 
 
@@ -429,12 +419,12 @@ def eh_update():
         return redirect(url_for("operacao.cadastro"))
 
     engine = get_engine()
-    with engine.connect() as conn:
+    with engine.begin() as conn:
         conn.execute(
             text("UPDATE entre_house SET eh = :novo WHERE id = :id"),
             {"novo": novo, "id": eid},
         )
-        conn.commit()
+
     return redirect(url_for("operacao.cadastro"))
 
 
@@ -447,11 +437,12 @@ def eh_delete():
         return redirect(url_for("operacao.cadastro"))
 
     engine = get_engine()
-    with engine.connect() as conn:
+    with engine.begin() as conn:
         conn.execute(
-            text("DELETE FROM entre_house WHERE id = :id"), {"id": eid}
+            text("DELETE FROM entre_house WHERE id = :id"),
+            {"id": eid}
         )
-        conn.commit()
+
     return redirect(url_for("operacao.cadastro"))
 
 
@@ -464,12 +455,12 @@ def frente_create():
         return redirect(url_for("operacao.cadastro"))
 
     engine = get_engine()
-    with engine.connect() as conn:
+    with engine.begin() as conn:
         conn.execute(
             text("INSERT INTO frente_equipe (frente) VALUES (:fr)"),
             {"fr": frente},
         )
-        conn.commit()
+
     return redirect(url_for("operacao.cadastro"))
 
 
@@ -483,12 +474,12 @@ def frente_update():
         return redirect(url_for("operacao.cadastro"))
 
     engine = get_engine()
-    with engine.connect() as conn:
+    with engine.begin() as conn:
         conn.execute(
             text("UPDATE frente_equipe SET frente = :novo WHERE id = :id"),
             {"novo": novo, "id": fid},
         )
-        conn.commit()
+
     return redirect(url_for("operacao.cadastro"))
 
 
@@ -501,11 +492,12 @@ def frente_delete():
         return redirect(url_for("operacao.cadastro"))
 
     engine = get_engine()
-    with engine.connect() as conn:
+    with engine.begin() as conn:
         conn.execute(
-            text("DELETE FROM frente_equipe WHERE id = :id"), {"id": fid}
+            text("DELETE FROM frente_equipe WHERE id = :id"),
+            {"id": fid}
         )
-        conn.commit()
+
     return redirect(url_for("operacao.cadastro"))
 
 
@@ -514,9 +506,10 @@ def frente_delete():
 # -------------------------------------------------------------------
 @bp.route("/registro", methods=["GET"])
 @login_required
-@permission_required("operacao", "criar")
+@permission_required("operacao", "visualizar")
 def registro():
     engine = get_engine()
+
     with engine.connect() as conn:
         eh_list, fr_list = load_eh_frentes(conn)
 
@@ -524,7 +517,6 @@ def registro():
         ffr = request.args.get("ffr") or None
         fdt = request.args.get("fdt") or None
 
-        # Lista de realizados
         lista_rlz = (
             conn.execute(
                 text(
@@ -546,7 +538,6 @@ def registro():
             .all()
         )
 
-        # Lista de planejados
         lista_pln = (
             conn.execute(
                 text(
@@ -597,7 +588,7 @@ def registro_realizada_create():
         return redirect(url_for("operacao.registro"))
 
     engine = get_engine()
-    with engine.connect() as conn:
+    with engine.begin() as conn:
         conn.execute(
             text(
                 """
@@ -607,7 +598,6 @@ def registro_realizada_create():
             ),
             {"eh": eh_id, "fr": fr_id, "dt": data_str, "val": realizado},
         )
-        conn.commit()
 
     return redirect(url_for("operacao.registro", keep_open="realizada"))
 
@@ -621,11 +611,11 @@ def registro_realizada_delete():
         return redirect(url_for("operacao.registro"))
 
     engine = get_engine()
-    with engine.connect() as conn:
+    with engine.begin() as conn:
         conn.execute(
-            text("DELETE FROM producao_realizada WHERE id = :id"), {"id": rid}
+            text("DELETE FROM producao_realizada WHERE id = :id"),
+            {"id": rid}
         )
-        conn.commit()
 
     return redirect(url_for("operacao.registro", keep_open="realizada"))
 
@@ -643,7 +633,7 @@ def registro_planejada_create():
         return redirect(url_for("operacao.registro"))
 
     engine = get_engine()
-    with engine.connect() as conn:
+    with engine.begin() as conn:
         conn.execute(
             text(
                 """
@@ -653,7 +643,6 @@ def registro_planejada_create():
             ),
             {"eh": eh_id, "fr": fr_id, "dt": data_str, "val": planejado},
         )
-        conn.commit()
 
     return redirect(url_for("operacao.registro", keep_open="planejada"))
 
@@ -667,10 +656,10 @@ def registro_planejada_delete():
         return redirect(url_for("operacao.registro"))
 
     engine = get_engine()
-    with engine.connect() as conn:
+    with engine.begin() as conn:
         conn.execute(
-            text("DELETE FROM producao_planejada WHERE id = :id"), {"id": pid}
+            text("DELETE FROM producao_planejada WHERE id = :id"),
+            {"id": pid}
         )
-        conn.commit()
 
     return redirect(url_for("operacao.registro", keep_open="planejada"))

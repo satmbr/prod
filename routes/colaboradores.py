@@ -1,6 +1,5 @@
 from datetime import datetime
 from typing import List, Dict, Any, Tuple
-from routes.auth import login_required, permission_required
 
 from flask import (
     Blueprint,
@@ -9,27 +8,48 @@ from flask import (
     redirect,
     url_for,
     flash,
+    session,
 )
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
-from db import get_engine  # usa o mesmo helper do restante do sistema
+from routes.auth import login_required, permission_required
+from db import get_engine
 
 bp = Blueprint("colaboradores", __name__, url_prefix="/colaboradores")
 
+
+# ---------------------------------------------------------------------
+# Helpers de permissão / subnav
+# ---------------------------------------------------------------------
+def user_can(chave: str) -> bool:
+    permissoes = session.get("permissoes", [])
+    return chave in permissoes or "auth:administrar" in permissoes
+
+
 def build_colaboradores_subnav(active: str | None):
-    return [
-        {
-            "text": "Registro",
-            "href": url_for("colaboradores.registro"),
-            "active": active == "registro",
-        },
-        {
-            "text": "Cadastro",
-            "href": url_for("colaboradores.cadastro"),
-            "active": active == "cadastro",
-        },
-    ]
+    links = []
+
+    if user_can("colaboradores:visualizar"):
+        links.append(
+            {
+                "text": "Registro",
+                "href": url_for("colaboradores.registro"),
+                "active": active == "registro",
+            }
+        )
+
+    if user_can("colaboradores:criar"):
+        links.append(
+            {
+                "text": "Cadastro",
+                "href": url_for("colaboradores.cadastro"),
+                "active": active == "cadastro",
+            }
+        )
+
+    return links
+
 
 # ---------------------------------------------------------------------
 # Funções auxiliares
@@ -125,9 +145,10 @@ def load_auxiliares(conn) -> Tuple[
 
 
 def parse_date(value: str):
-    """Converte 'dd/mm/aaaa' para date ou retorna None."""
+    """Converte 'yyyy-mm-dd' ou 'dd/mm/aaaa' para date; retorna None se inválido."""
     if not value:
         return None
+
     try:
         return datetime.strptime(value, "%Y-%m-%d").date()
     except ValueError:
@@ -158,6 +179,7 @@ def index():
 @permission_required("colaboradores", "visualizar")
 def registro():
     engine = get_engine()
+
     with engine.connect() as conn:
         (
             escalas,
@@ -274,6 +296,10 @@ def registro_create():
         "numero_pix": form.get("numero_pix", "").strip() or None,
     }
 
+    if not params["nome"] or not params["matricula"]:
+        flash("Nome e matrícula são obrigatórios.", "warning")
+        return redirect(url_for("colaboradores.registro"))
+
     insert_sql = text(
         """
         INSERT INTO colaborador_prumat (
@@ -343,7 +369,6 @@ def registro_create():
             conn.execute(insert_sql, params)
         flash("Colaborador cadastrado com sucesso.", "success")
     except SQLAlchemyError as e:
-        # Trata erro de chave única da matrícula
         msg = str(e.__cause__ or e)
         if "colaborador_prumat_matricula_key" in msg:
             flash("Já existe um colaborador cadastrado com essa matrícula.", "warning")
@@ -361,6 +386,7 @@ def registro_create():
 @permission_required("colaboradores", "criar")
 def cadastro():
     engine = get_engine()
+
     with engine.connect() as conn:
         (
             escalas,
@@ -495,7 +521,8 @@ def funcao_create():
     try:
         with engine.begin() as conn:
             conn.execute(
-                insert_sql, {"nome": nome, "codigo": codigo, "ativo": ativo}
+                insert_sql,
+                {"nome": nome, "codigo": codigo, "ativo": ativo},
             )
         flash("Função cadastrada com sucesso.", "success")
     except SQLAlchemyError as e:
