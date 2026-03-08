@@ -13,9 +13,23 @@
           </div>
         </div>
       </div>
-      <div class="zone-actions">
-        <a href="{{ url_for('auth.usuarios') }}" class="btn-outline">Voltar</a>
-      </div>
+		<div class="zone-actions" style="display:flex; gap:10px; flex-wrap:wrap;">
+		  <a
+			href="{{ url_for('auth.exportar_logs_csv', username=filtros.username, evento=filtros.evento, data_ini=filtros.data_ini, data_fim=filtros.data_fim) }}"
+			class="btn-outline"
+		  >
+			Exportar CSV
+		  </a>
+
+		  <a
+			href="{{ url_for('auth.exportar_logs_excel', username=filtros.username, evento=filtros.evento, data_ini=filtros.data_ini, data_fim=filtros.data_fim) }}"
+			class="btn-outline"
+		  >
+			Exportar Excel
+		  </a>
+
+		  <a href="{{ url_for('auth.usuarios') }}" class="btn-outline">Voltar</a>
+		</div>
     </div>
 
     <div style="padding:20px; border-bottom:1px solid #d9e1ea;">

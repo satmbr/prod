@@ -1,9 +1,12 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session, abort
+from flask import Blueprint, render_template, request, redirect, url_for, flash, session, abort, send_file, Response
 from werkzeug.security import check_password_hash, generate_password_hash
 from db import get_engine
 from sqlalchemy import text
 from functools import wraps
 from datetime import datetime, timedelta
+import io
+import csv
+from openpyxl import Workbook
 
 bp = Blueprint("auth", __name__, url_prefix="/auth")
 
@@ -815,11 +818,8 @@ def salvar_permissoes_perfil(perfil_id):
 @bp.app_errorhandler(403)
 def acesso_negado(e):
     return render_template("auth/acesso_negado.html"), 403
-    
-@bp.get("/logs")
-@login_required
-@admin_required
-def logs():
+
+def montar_filtros_logs():
     username = (request.args.get("username") or "").strip()
     evento = (request.args.get("evento") or "").strip()
     data_ini = (request.args.get("data_ini") or "").strip()
@@ -848,6 +848,21 @@ def logs():
     if where:
         where_sql = "WHERE " + " AND ".join(where)
 
+    filtros = {
+        "username": username,
+        "evento": evento,
+        "data_ini": data_ini,
+        "data_fim": data_fim
+    }
+
+    return where_sql, params, filtros
+
+@bp.get("/logs")
+@login_required
+@admin_required
+def logs():
+    where_sql, params, filtros = montar_filtros_logs()
+
     sql = f"""
         SELECT
             id,
@@ -866,13 +881,6 @@ def logs():
 
     with get_engine().connect() as conn:
         rows = conn.execute(text(sql), params).mappings().all()
-
-    filtros = {
-        "username": username,
-        "evento": evento,
-        "data_ini": data_ini,
-        "data_fim": data_fim
-    }
 
     return render_template("auth/logs.html", logs=rows, filtros=filtros)
 
@@ -903,3 +911,115 @@ def minha_conta():
         return redirect(url_for("auth.login"))
 
     return render_template("auth/minha_conta.html", usuario=usuario)
+
+@bp.get("/logs/exportar-csv")
+@login_required
+@admin_required
+def exportar_logs_csv():
+    where_sql, params, _ = montar_filtros_logs()
+
+    sql = f"""
+        SELECT
+            criado_em,
+            username,
+            evento,
+            detalhes,
+            ip,
+            user_agent
+        FROM usuario_logs
+        {where_sql}
+        ORDER BY criado_em DESC
+        LIMIT 5000
+    """
+
+    with get_engine().connect() as conn:
+        rows = conn.execute(text(sql), params).mappings().all()
+
+    output = io.StringIO()
+    writer = csv.writer(output, delimiter=";")
+
+    writer.writerow(["Data/Hora", "Usuário", "Evento", "Detalhes", "IP", "User-Agent"])
+
+    for row in rows:
+        writer.writerow([
+            row["criado_em"],
+            row["username"] or "",
+            row["evento"] or "",
+            row["detalhes"] or "",
+            row["ip"] or "",
+            row["user_agent"] or ""
+        ])
+
+    csv_content = output.getvalue()
+    output.close()
+
+    return Response(
+        csv_content,
+        mimetype="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": "attachment; filename=auditoria_logs.csv"
+        }
+    )
+
+@bp.get("/logs/exportar-excel")
+@login_required
+@admin_required
+def exportar_logs_excel():
+    where_sql, params, _ = montar_filtros_logs()
+
+    sql = f"""
+        SELECT
+            criado_em,
+            username,
+            evento,
+            detalhes,
+            ip,
+            user_agent
+        FROM usuario_logs
+        {where_sql}
+        ORDER BY criado_em DESC
+        LIMIT 5000
+    """
+
+    with get_engine().connect() as conn:
+        rows = conn.execute(text(sql), params).mappings().all()
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Auditoria"
+
+    headers = ["Data/Hora", "Usuário", "Evento", "Detalhes", "IP", "User-Agent"]
+    ws.append(headers)
+
+    for row in rows:
+        ws.append([
+            str(row["criado_em"] or ""),
+            row["username"] or "",
+            row["evento"] or "",
+            row["detalhes"] or "",
+            row["ip"] or "",
+            row["user_agent"] or ""
+        ])
+
+    for col in ws.columns:
+        max_length = 0
+        col_letter = col[0].column_letter
+        for cell in col:
+            try:
+                value_len = len(str(cell.value)) if cell.value else 0
+                if value_len > max_length:
+                    max_length = value_len
+            except Exception:
+                pass
+        ws.column_dimensions[col_letter].width = min(max_length + 2, 50)
+
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+
+    return send_file(
+        output,
+        as_attachment=True,
+        download_name="auditoria_logs.xlsx",
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
