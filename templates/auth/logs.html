@@ -18,6 +18,44 @@
       </div>
     </div>
 
+    <div style="padding:20px; border-bottom:1px solid #d9e1ea;">
+      <form method="get" action="{{ url_for('auth.logs') }}">
+        <div style="display:grid; grid-template-columns: 1.2fr 1.2fr 1fr 1fr auto auto; gap:12px; align-items:end;">
+          <div>
+            <label style="display:block; margin-bottom:6px; font-weight:600;">Usuário</label>
+            <input type="text" name="username" value="{{ filtros.username or '' }}"
+                   style="width:100%; height:40px; border:1px solid #d9e1ea; border-radius:10px; padding:0 12px;">
+          </div>
+
+          <div>
+            <label style="display:block; margin-bottom:6px; font-weight:600;">Evento</label>
+            <input type="text" name="evento" value="{{ filtros.evento or '' }}"
+                   style="width:100%; height:40px; border:1px solid #d9e1ea; border-radius:10px; padding:0 12px;">
+          </div>
+
+          <div>
+            <label style="display:block; margin-bottom:6px; font-weight:600;">Data inicial</label>
+            <input type="date" name="data_ini" value="{{ filtros.data_ini or '' }}"
+                   style="width:100%; height:40px; border:1px solid #d9e1ea; border-radius:10px; padding:0 12px;">
+          </div>
+
+          <div>
+            <label style="display:block; margin-bottom:6px; font-weight:600;">Data final</label>
+            <input type="date" name="data_fim" value="{{ filtros.data_fim or '' }}"
+                   style="width:100%; height:40px; border:1px solid #d9e1ea; border-radius:10px; padding:0 12px;">
+          </div>
+
+          <div>
+            <button type="submit" class="btn-primary">Filtrar</button>
+          </div>
+
+          <div>
+            <a href="{{ url_for('auth.logs') }}" class="btn-outline">Limpar</a>
+          </div>
+        </div>
+      </form>
+    </div>
+
     <div style="padding:20px;">
       <div style="overflow-x:auto;">
         <table class="data-table" style="width:100%;">

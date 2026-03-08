@@ -774,25 +774,61 @@ def acesso_negado(e):
 @login_required
 @admin_required
 def logs():
-    with get_engine().connect() as conn:
-        rows = conn.execute(
-            text("""
-                SELECT
-                    id,
-                    usuario_id,
-                    username,
-                    evento,
-                    detalhes,
-                    ip,
-                    user_agent,
-                    criado_em
-                FROM usuario_logs
-                ORDER BY criado_em DESC
-                LIMIT 300
-            """)
-        ).mappings().all()
+    username = (request.args.get("username") or "").strip()
+    evento = (request.args.get("evento") or "").strip()
+    data_ini = (request.args.get("data_ini") or "").strip()
+    data_fim = (request.args.get("data_fim") or "").strip()
 
-    return render_template("auth/logs.html", logs=rows)
+    where = []
+    params = {}
+
+    if username:
+        where.append("username ILIKE :username")
+        params["username"] = f"%{username}%"
+
+    if evento:
+        where.append("evento ILIKE :evento")
+        params["evento"] = f"%{evento}%"
+
+    if data_ini:
+        where.append("criado_em >= :data_ini")
+        params["data_ini"] = f"{data_ini} 00:00:00"
+
+    if data_fim:
+        where.append("criado_em <= :data_fim")
+        params["data_fim"] = f"{data_fim} 23:59:59"
+
+    where_sql = ""
+    if where:
+        where_sql = "WHERE " + " AND ".join(where)
+
+    sql = f"""
+        SELECT
+            id,
+            usuario_id,
+            username,
+            evento,
+            detalhes,
+            ip,
+            user_agent,
+            criado_em
+        FROM usuario_logs
+        {where_sql}
+        ORDER BY criado_em DESC
+        LIMIT 500
+    """
+
+    with get_engine().connect() as conn:
+        rows = conn.execute(text(sql), params).mappings().all()
+
+    filtros = {
+        "username": username,
+        "evento": evento,
+        "data_ini": data_ini,
+        "data_fim": data_fim
+    }
+
+    return render_template("auth/logs.html", logs=rows, filtros=filtros)
 
 @bp.get("/minha-conta")
 @login_required
