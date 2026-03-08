@@ -1,34 +1,6 @@
 <!doctype html>
 <html lang="pt-br">
 <head>
-	{% if usuario_logado %}
-	  <a class="nav-link" href="{{ url_for('auth.trocar_senha') }}">Trocar senha</a>
-
-	  {% if current_user_profile == 'Administrador' %}
-		<a class="nav-link" href="{{ url_for('auth.usuarios') }}">Usuários</a>
-		<a class="nav-link" href="{{ url_for('auth.perfis') }}">Perfis</a>
-	  {% endif %}
-
-	  <a class="nav-link" href="{{ url_for('auth.logout') }}">Sair</a>
-	{% endif %}
-	
-	{% if 'operacao:visualizar' in current_user_permissions or 'auth:administrar' in current_user_permissions %}
-	  <a class="nav-link" href="{{ url_for('operacao.index') }}">Operação</a>
-	{% endif %}
-
-	{% if 'equipamentos:visualizar' in current_user_permissions or 'auth:administrar' in current_user_permissions %}
-	  <a class="nav-link" href="{{ url_for('equipamentos.index') }}">Equipamentos</a>
-	{% endif %}
-
-	{% if 'colaboradores:visualizar' in current_user_permissions or 'auth:administrar' in current_user_permissions %}
-	  <a class="nav-link" href="{{ url_for('colaboradores.index') }}">Colaboradores</a>
-	{% endif %}
-
-	{% if 'auth:administrar' in current_user_permissions %}
-	  <a class="nav-link" href="{{ url_for('auth.usuarios') }}">Usuários</a>
-	  <a class="nav-link" href="{{ url_for('auth.perfis') }}">Perfis</a>
-	{% endif %}
-	
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>{% block title %}PRUMAT{% endblock %}</title>
@@ -398,11 +370,17 @@
     </div>
 
     <div class="nav-right">
-	  {% if usuario_logado %}
-		<span style="color:#fff; font-weight:600;">{{ current_user_name }}</span>
-		<a class="nav-link" href="{{ url_for('auth.logout') }}">Sair</a>
-	  {% endif %}
-      <a class="nav-link" href="#help">Help</a>
+      {% if usuario_logado %}
+        <span style="color:#fff; font-weight:600;">{{ current_user_name }}</span>
+        <a class="nav-link" href="{{ url_for('auth.trocar_senha') }}">Trocar senha</a>
+
+        {% if 'auth:administrar' in current_user_permissions %}
+          <a class="nav-link" href="{{ url_for('auth.usuarios') }}">Usuários</a>
+          <a class="nav-link" href="{{ url_for('auth.perfis') }}">Perfis</a>
+        {% endif %}
+
+        <a class="nav-link" href="{{ url_for('auth.logout') }}">Sair</a>
+      {% endif %}
     </div>
   </div>
 
@@ -412,11 +390,21 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2 12h3v9h6v-6h2v6h6v-9h3z"/></svg>
       </a>
 
-      <a class="nav-link" href="{{ url_for('operacao.index') }}">Operação</a>
-      <a class="nav-link" href="#manutencao">Manutenção</a>
-      <a class="nav-link" href="{{ url_for('equipamentos.index') }}">Equipamentos</a>
-      <a class="nav-link" href="#pdr">PDR</a>
-      <a class="nav-link" href="{{ url_for('colaboradores.registro') }}">Colaboradores</a>
+      {% if 'operacao:visualizar' in current_user_permissions or 'auth:administrar' in current_user_permissions %}
+        <a class="nav-link" href="{{ url_for('operacao.index') }}">Operação</a>
+      {% endif %}
+
+      {% if 'equipamentos:visualizar' in current_user_permissions or 'auth:administrar' in current_user_permissions %}
+        <a class="nav-link" href="{{ url_for('equipamentos.index') }}">Equipamentos</a>
+      {% endif %}
+
+      {% if 'colaboradores:visualizar' in current_user_permissions or 'auth:administrar' in current_user_permissions %}
+        <a class="nav-link" href="{{ url_for('colaboradores.registro') }}">Colaboradores</a>
+      {% endif %}
+
+      {% if 'manutencao:visualizar' in current_user_permissions or 'auth:administrar' in current_user_permissions %}
+        <a class="nav-link" href="#manutencao">Manutenção</a>
+      {% endif %}
     </div>
   </nav>
 
