@@ -6,6 +6,40 @@ from functools import wraps
 
 bp = Blueprint("auth", __name__, url_prefix="/auth")
 
+def registrar_log(evento, detalhes=None, usuario_id=None, username=None):
+    try:
+        with get_engine().begin() as conn:
+            conn.execute(
+                text("""
+                    INSERT INTO usuario_logs (
+                        usuario_id,
+                        username,
+                        evento,
+                        detalhes,
+                        ip,
+                        user_agent
+                    )
+                    VALUES (
+                        :usuario_id,
+                        :username,
+                        :evento,
+                        :detalhes,
+                        :ip,
+                        :user_agent
+                    )
+                """),
+                {
+                    "usuario_id": usuario_id,
+                    "username": username,
+                    "evento": evento,
+                    "detalhes": detalhes,
+                    "ip": request.headers.get("X-Forwarded-For", request.remote_addr),
+                    "user_agent": request.headers.get("User-Agent")
+                }
+            )
+    except Exception:
+        pass
+
 def carregar_permissoes_usuario(usuario_id):
     with get_engine().connect() as conn:
         rows = conn.execute(
@@ -95,14 +129,31 @@ def login():
             ).mappings().first()
 
         if not usuario:
+            registrar_log(
+                evento="login_invalido",
+                detalhes="Usuário não encontrado",
+                username=username
+            )
             flash("Usuário ou senha inválidos.", "erro")
             return render_template("auth/login.html")
 
         if not usuario["ativo"]:
+            registrar_log(
+                evento="login_bloqueado",
+                detalhes="Usuário inativo",
+                usuario_id=usuario["id"],
+                username=usuario["username"]
+            )
             flash("Usuário inativo. Procure o administrador.", "erro")
             return render_template("auth/login.html")
 
         if not check_password_hash(usuario["senha_hash"], senha):
+            registrar_log(
+                evento="login_invalido",
+                detalhes="Senha inválida",
+                usuario_id=usuario["id"],
+                username=usuario["username"]
+            )
             flash("Usuário ou senha inválidos.", "erro")
             return render_template("auth/login.html")
 
@@ -124,6 +175,13 @@ def login():
                 {"id": usuario["id"]}
             )
 
+        registrar_log(
+            evento="login_sucesso",
+            detalhes=f"Perfil: {usuario.get('perfil_nome') or 'Sem perfil'}",
+            usuario_id=usuario["id"],
+            username=usuario["username"]
+        )
+
         if usuario["deve_trocar_senha"]:
             flash("Troque sua senha antes de continuar.", "aviso")
             return redirect(url_for("auth.trocar_senha"))
@@ -135,6 +193,12 @@ def login():
 
 @bp.get("/logout")
 def logout():
+    registrar_log(
+        evento="logout",
+        detalhes="Logout realizado com sucesso",
+        usuario_id=session.get("usuario_id"),
+        username=session.get("username")
+    )
     session.clear()
     return redirect(url_for("auth.login"))
 
@@ -219,6 +283,12 @@ def novo_usuario():
                         "criado_por": session.get("usuario_id")
                     }
                 )
+            registrar_log(
+                evento="usuario_criado",
+                detalhes=f"Novo usuário criado: {username}",
+                usuario_id=session.get("usuario_id"),
+                username=session.get("username")
+            )                
             flash("Usuário criado com sucesso.", "sucesso")
             return redirect(url_for("auth.usuarios"))
         except Exception:
@@ -291,6 +361,12 @@ def editar_usuario(usuario_id):
                         "deve_trocar_senha": deve_trocar_senha
                     }
                 )
+            registrar_log(
+                evento="usuario_editado",
+                detalhes=f"Usuário editado: {username} (ID {usuario_id})",
+                usuario_id=session.get("usuario_id"),
+                username=session.get("username")
+            )                
             flash("Usuário atualizado com sucesso.", "sucesso")
             return redirect(url_for("auth.usuarios"))
         except Exception:
@@ -354,7 +430,12 @@ def toggle_usuario(usuario_id):
                 "ativo": not usuario["ativo"]
             }
         )
-
+    registrar_log(
+        evento="usuario_status_alterado",
+        detalhes=f"Usuário ID {usuario_id} teve status alterado para {'ativo' if not usuario['ativo'] else 'inativo'}",
+        usuario_id=session.get("usuario_id"),
+        username=session.get("username")
+    )
     flash("Status do usuário atualizado.", "sucesso")
     return redirect(url_for("auth.usuarios"))
 
@@ -409,7 +490,12 @@ def trocar_senha():
                     "senha_hash": nova_hash
                 }
             )
-
+        registrar_log(
+            evento="senha_alterada",
+            detalhes="Usuário alterou a própria senha",
+            usuario_id=session.get("usuario_id"),
+            username=session.get("username")
+        )
         flash("Senha alterada com sucesso.", "sucesso")
         return redirect(url_for("index"))
 
@@ -462,7 +548,12 @@ def resetar_senha(usuario_id):
                     "senha_hash": nova_hash
                 }
             )
-
+        registrar_log(
+            evento="senha_resetada",
+            detalhes=f"Senha resetada para o usuário ID {usuario_id}",
+            usuario_id=session.get("usuario_id"),
+            username=session.get("username")
+        )
         flash("Senha redefinida com sucesso. O usuário deverá trocá-la no próximo acesso.", "sucesso")
         return redirect(url_for("auth.usuarios"))
 
@@ -511,6 +602,12 @@ def novo_perfil():
                         "ativo": ativo
                     }
                 )
+            registrar_log(
+                evento="perfil_criado",
+                detalhes=f"Perfil criado: {nome}",
+                usuario_id=session.get("usuario_id"),
+                username=session.get("username")
+            )                
             flash("Perfil criado com sucesso.", "sucesso")
             return redirect(url_for("auth.perfis"))
         except Exception:
@@ -564,6 +661,12 @@ def editar_perfil(perfil_id):
                         "ativo": ativo
                     }
                 )
+            registrar_log(
+                evento="perfil_editado",
+                detalhes=f"Perfil editado: {nome} (ID {perfil_id})",
+                usuario_id=session.get("usuario_id"),
+                username=session.get("username")
+            )                
             flash("Perfil atualizado com sucesso.", "sucesso")
             return redirect(url_for("auth.perfis"))
         except Exception:
@@ -650,10 +753,39 @@ def salvar_permissoes_perfil(perfil_id):
                     "permissao_id": int(permissao_id)
                 }
             )
-
+    registrar_log(
+        evento="permissoes_perfil_alteradas",
+        detalhes=f"Permissões alteradas para o perfil ID {perfil_id}",
+        usuario_id=session.get("usuario_id"),
+        username=session.get("username")
+    )
     flash("Permissões do perfil atualizadas com sucesso.", "sucesso")
     return redirect(url_for("auth.permissoes_perfil", perfil_id=perfil_id))
 
 @bp.app_errorhandler(403)
 def acesso_negado(e):
     return render_template("auth/acesso_negado.html"), 403
+    
+@bp.get("/logs")
+@login_required
+@admin_required
+def logs():
+    with get_engine().connect() as conn:
+        rows = conn.execute(
+            text("""
+                SELECT
+                    id,
+                    usuario_id,
+                    username,
+                    evento,
+                    detalhes,
+                    ip,
+                    user_agent,
+                    criado_em
+                FROM usuario_logs
+                ORDER BY criado_em DESC
+                LIMIT 300
+            """)
+        ).mappings().all()
+
+    return render_template("auth/logs.html", logs=rows)

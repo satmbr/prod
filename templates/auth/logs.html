@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Auditoria | PRUMAT{% endblock %}
+
+{% block content %}
+<div class="page-wrap">
+  <section class="zone">
+    <div class="zone-head">
+      <div class="zone-left">
+        <div>
+          <h2 style="margin:0;">Logs de auditoria</h2>
+          <div style="color:#667487; font-size:14px; margin-top:4px;">
+            Últimos eventos administrativos e acessos do sistema
+          </div>
+        </div>
+      </div>
+      <div class="zone-actions">
+        <a href="{{ url_for('auth.usuarios') }}" class="btn-outline">Voltar</a>
+      </div>
+    </div>
+
+    <div style="padding:20px;">
+      <div style="overflow-x:auto;">
+        <table class="data-table" style="width:100%;">
+          <thead>
+            <tr>
+              <th>Data/Hora</th>
+              <th>Usuário</th>
+              <th>Evento</th>
+              <th>Detalhes</th>
+              <th>IP</th>
+              <th>User-Agent</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for log in logs %}
+            <tr>
+              <td>{{ log.criado_em }}</td>
+              <td>{{ log.username or '' }}</td>
+              <td>{{ log.evento }}</td>
+              <td>{{ log.detalhes or '' }}</td>
+              <td>{{ log.ip or '' }}</td>
+              <td style="max-width:320px; white-space:normal;">{{ log.user_agent or '' }}</td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="6" style="text-align:center;">Nenhum log encontrado.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</div>
+{% endblock %}
