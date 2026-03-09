@@ -214,21 +214,21 @@
     }
 
     .zone-icon{
-      width:34px;
-      height:34px;
-      min-width:34px;
-      border-radius:10px;
+      width:42px;
+      height:42px;
+      min-width:42px;
+      border-radius:12px;
       display:inline-flex;
       align-items:center;
       justify-content:center;
       background:#eaf1f7;
       color:var(--pru-blue);
-      font-size:16px;
+      font-size:18px;
       box-shadow:inset 0 0 0 1px #d6e0ea;
     }
 
     .zone-title{
-      font-size:16px;
+      font-size:18px;
       font-weight:700;
       color:var(--pru-blue);
       letter-spacing:.01em;
@@ -457,6 +457,145 @@
       margin:6px 4px;
     }
 
+    /* ===== NOVO PADRÃO VISUAL DOS MÓDULOS ===== */
+    .module-panel{
+      background:var(--pru-surface);
+      border:1px solid var(--pru-border);
+      border-radius:20px;
+      overflow:hidden;
+      box-shadow:var(--pru-shadow);
+    }
+
+    .module-hero{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:24px;
+      padding:28px;
+      background:linear-gradient(180deg, #16324F 0%, #1d3e61 100%);
+    }
+
+    .module-hero-left{
+      display:flex;
+      align-items:flex-start;
+      gap:16px;
+      min-width:0;
+    }
+
+    .module-hero-icon{
+      width:58px;
+      height:58px;
+      min-width:58px;
+      border-radius:16px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      background:rgba(255,255,255,.12);
+      border:1px solid rgba(255,255,255,.14);
+      color:#fff;
+      font-size:24px;
+      box-shadow:inset 0 0 0 1px rgba(255,255,255,.04);
+    }
+
+    .module-hero-title{
+      margin:0;
+      color:#fff;
+      font-size:30px;
+      line-height:1.1;
+      font-weight:800;
+    }
+
+    .module-hero-text{
+      margin-top:8px;
+      color:#d9e6f2;
+      font-size:15px;
+      line-height:1.5;
+      max-width:860px;
+    }
+
+    .module-hero-side{
+      min-width:240px;
+      padding:14px 16px;
+      border-radius:14px;
+      background:rgba(255,255,255,.10);
+      border:1px solid rgba(255,255,255,.14);
+    }
+
+    .module-hero-side-label{
+      color:#d9e6f2;
+      font-size:13px;
+    }
+
+    .module-hero-side-value{
+      margin-top:4px;
+      color:#fff;
+      font-size:18px;
+      font-weight:700;
+    }
+
+    .module-content{
+      padding:26px 28px 30px;
+      background:#fff;
+      border-top:1px solid var(--pru-border);
+    }
+
+    .module-grid{
+      display:grid;
+      grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));
+      gap:18px;
+    }
+
+    .module-card{
+      display:block;
+      background:#fff;
+      border:1px solid var(--pru-border);
+      border-radius:18px;
+      padding:22px;
+      box-shadow:0 8px 20px rgba(18,39,61,.06);
+      transition:.18s ease;
+    }
+
+    .module-card:hover{
+      transform:translateY(-2px);
+      box-shadow:0 14px 26px rgba(18,39,61,.10);
+      border-color:#c7d5e3;
+    }
+
+    .module-card-title{
+      margin:0 0 10px 0;
+      color:#16324F;
+      font-size:18px;
+      font-weight:800;
+    }
+
+    .module-card-text{
+      margin:0;
+      color:#667487;
+      line-height:1.6;
+      font-size:15px;
+    }
+
+    .module-card-action{
+      margin-top:18px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      min-height:40px;
+      padding:8px 14px;
+      border-radius:10px;
+      font-size:14px;
+      font-weight:700;
+      background:var(--pru-blue);
+      color:#fff;
+      border:1px solid var(--pru-blue);
+      box-shadow:0 6px 16px rgba(22,50,79,.16);
+    }
+
+    .module-card-action:hover{
+      background:var(--pru-blue-2);
+      border-color:var(--pru-blue-2);
+    }
+
     @media (max-width: 900px){
       .header-top,
       .header-nav,
@@ -489,6 +628,24 @@
       .zone-body{
         padding:14px;
       }
+
+      .module-hero{
+        flex-direction:column;
+        padding:20px;
+      }
+
+      .module-content{
+        padding:20px;
+      }
+
+      .module-hero-title{
+        font-size:24px;
+      }
+
+      .module-hero-side{
+        min-width:unset;
+        width:100%;
+      }
     }
   </style>
 </head>
@@ -498,7 +655,6 @@
   <div class="header-top">
     <div class="brand">
       <img src="{{ url_for('static', filename='logo-prumat.png') }}" alt="Consórcio PRUMAT">
-      <!--<div class="brand-title">Consórcio PRUMAT</div>-->
     </div>
 
     <div class="nav-right">
@@ -530,33 +686,37 @@
     </div>
   </div>
 
-	<nav class="header-nav">
-	  <div class="nav-left">
-		<a class="home-icon" title="Home" href="{% if usuario_logado %}{{ url_for('dashboard') }}{% else %}{{ url_for('home') }}{% endif %}">
-		  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2 12h3v9h6v-6h2v6h6v-9h3z"/></svg>
-		</a>
+  <nav class="header-nav">
+    <div class="nav-left">
+      <a class="home-icon" title="Home" href="{% if usuario_logado %}{{ url_for('dashboard') }}{% else %}{{ url_for('home') }}{% endif %}">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2 12h3v9h6v-6h2v6h6v-9h3z"/></svg>
+      </a>
 
-		{% if usuario_logado %}
-		  {% if 'operacao:visualizar' in current_user_permissions or 'auth:administrar' in current_user_permissions %}
-			<a class="nav-link" href="{{ url_for('operacao.index') }}">Operação</a>
-		  {% endif %}
+      {% if usuario_logado %}
+        {% if 'operacao:visualizar' in current_user_permissions or 'auth:administrar' in current_user_permissions %}
+          <a class="nav-link" href="{{ url_for('operacao.index') }}">Operação</a>
+        {% endif %}
 
-		  {% if 'equipamentos:visualizar' in current_user_permissions or 'auth:administrar' in current_user_permissions %}
-			<a class="nav-link" href="{{ url_for('equipamentos.index') }}">Equipamentos</a>
-		  {% endif %}
+        {% if 'equipamentos:visualizar' in current_user_permissions or 'auth:administrar' in current_user_permissions %}
+          <a class="nav-link" href="{{ url_for('equipamentos.index') }}">Equipamentos</a>
+        {% endif %}
 
-		  {% if 'colaboradores:visualizar' in current_user_permissions or 'auth:administrar' in current_user_permissions %}
-			<a class="nav-link" href="{{ url_for('colaboradores.index') }}">Colaboradores</a>
-		  {% endif %}
+        {% if 'colaboradores:visualizar' in current_user_permissions or 'auth:administrar' in current_user_permissions %}
+          <a class="nav-link" href="{{ url_for('colaboradores.index') }}">Colaboradores</a>
+        {% endif %}
 
-		  {% if 'manutencao:visualizar' in current_user_permissions or 'auth:administrar' in current_user_permissions %}
-			<a class="nav-link" href="#manutencao">Manutenção</a>
-		  {% endif %}
-		{% else %}
-		  <a class="nav-link" href="{{ url_for('auth.login') }}">Entrar</a>
-		{% endif %}
-	  </div>
-	</nav>
+        {% if 'manutencao:visualizar' in current_user_permissions or 'auth:administrar' in current_user_permissions %}
+          <a class="nav-link" href="#manutencao">Manutenção</a>
+        {% endif %}
+
+        {% if 'financeiro:visualizar' in current_user_permissions or 'auth:administrar' in current_user_permissions %}
+          <a class="nav-link" href="{{ url_for('financeiro.index') }}">Financeiro</a>
+        {% endif %}
+      {% else %}
+        <a class="nav-link" href="{{ url_for('auth.login') }}">Entrar</a>
+      {% endif %}
+    </div>
+  </nav>
 
   <div class="divider"></div>
 
