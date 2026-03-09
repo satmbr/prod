@@ -1,0 +1,306 @@
+{% extends "base.html" %}
+{% block title %}Financeiro · Gerar ND MATISA{% endblock %}
+
+{% block content %}
+<div class="page-wrap">
+
+  <style>
+    .form-grid{
+      display:grid;
+      grid-template-columns: repeat(4, minmax(220px, 1fr));
+      gap:14px;
+    }
+    .field > span{
+      display:block;
+      margin-bottom:6px;
+      font-weight:600;
+      color:#394150;
+    }
+    .field input, .field select, .field textarea{
+      width:100%;
+      min-height:38px;
+      padding:7px 10px;
+      border:1px solid #cfd6df;
+      border-radius:8px;
+      background:#fff;
+      box-sizing:border-box;
+      font-family:inherit;
+    }
+    .field textarea{
+      min-height:90px;
+      resize:vertical;
+    }
+    .span-2{ grid-column: span 2; }
+    .span-4{ grid-column: span 4; }
+
+    .btn{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      min-height:38px;
+      padding:8px 12px;
+      border:1px solid #bfc8d4;
+      border-radius:8px;
+      background:#f7f9fc;
+      color:#28323f;
+      text-decoration:none;
+      cursor:pointer;
+    }
+    .btn.primary{
+      background:#16324F;
+      border-color:#16324F;
+      color:#fff;
+    }
+    .btn.success{
+      background:#234d20;
+      border-color:#234d20;
+      color:#fff;
+    }
+
+    .table-wrap{
+      overflow:auto;
+      padding:14px;
+    }
+    table{
+      width:100%;
+      border-collapse:collapse;
+      background:#fff;
+    }
+    th, td{
+      border:1px solid #d9e1ea;
+      padding:8px 10px;
+      font-size:14px;
+      vertical-align:middle;
+    }
+    th{
+      background:#f3f7fb;
+      color:#16324F;
+      text-align:center;
+    }
+    td.center{ text-align:center; }
+    td.right{ text-align:right; }
+
+    .section-title{
+      font-size:16px;
+      font-weight:700;
+      color:#16324F;
+      margin:0;
+    }
+
+    .flash{
+      margin-bottom:12px;
+      padding:12px 14px;
+      border-radius:12px;
+      border:1px solid #d9e1ea;
+      background:#f5f8fc;
+    }
+    .flash.success{ background:#eefaf0; border-color:#bfe0c6; color:#25613a; }
+    .flash.danger{ background:#fff3f3; border-color:#f1c0c0; color:#9f2d2d; }
+
+    @media (max-width: 1000px){
+      .form-grid{ grid-template-columns: repeat(2, minmax(220px, 1fr)); }
+      .span-4{ grid-column: span 2; }
+    }
+    @media (max-width: 700px){
+      .form-grid{ grid-template-columns: 1fr; }
+      .span-2, .span-4{ grid-column: span 1; }
+    }
+  </style>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <section class="zone">
+        <div class="zone-body" style="padding:14px;">
+          {% for category, message in messages %}
+            <div class="flash {{ category }}">{{ message }}</div>
+          {% endfor %}
+        </div>
+      </section>
+    {% endif %}
+  {% endwith %}
+
+  <section class="zone">
+    <div class="zone-head">
+      <div class="zone-left">
+        <div class="zone-icon">⚙️</div>
+        <div class="zone-title">Gerar ND MATISA</div>
+      </div>
+      <div class="zone-actions">
+        <a class="btn" href="{{ url_for('financeiro_nd.lista_nd') }}">Voltar</a>
+      </div>
+    </div>
+
+    <div class="zone-body" style="padding:14px;">
+      <form method="get" class="form-grid">
+        <label class="field">
+          <span>Contrato</span>
+          <select name="contrato_id">
+            <option value="">Todos</option>
+            {% for c in contratos %}
+              <option value="{{ c.id }}" {% if filtros.contrato_id == (c.id|string) %}selected{% endif %}>{{ c.nome }}</option>
+            {% endfor %}
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Competência</span>
+          <input type="text" name="competencia" value="{{ filtros.competencia }}" placeholder="AAAAMM">
+        </label>
+
+        <label class="field">
+          <span>Tipo ND</span>
+          <select name="tipo_nd">
+            <option value="despesas" {% if filtros.tipo_nd == 'despesas' %}selected{% endif %}>Despesas</option>
+            <option value="folha" {% if filtros.tipo_nd == 'folha' %}selected{% endif %}>Folha</option>
+            <option value="material" {% if filtros.tipo_nd == 'material' %}selected{% endif %}>Material</option>
+          </select>
+        </label>
+
+        <div style="display:flex; align-items:end; gap:8px; flex-wrap:wrap;">
+          <button type="submit" class="btn primary">Buscar itens</button>
+          <a href="{{ url_for('financeiro_nd.gerar_nd_matisa') }}" class="btn">Limpar</a>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <form method="post">
+    <input type="hidden" name="contrato_id" value="{{ filtros.contrato_id }}">
+    <input type="hidden" name="competencia" value="{{ filtros.competencia }}">
+    <input type="hidden" name="tipo_nd" value="{{ filtros.tipo_nd }}">
+
+    <section class="zone">
+      <div class="zone-head">
+        <div class="zone-left">
+          <div class="zone-icon">📝</div>
+          <div class="zone-title">Dados da ND</div>
+        </div>
+      </div>
+
+      <div class="zone-body" style="padding:14px;">
+        <div class="form-grid">
+          <label class="field">
+            <span>Número ND</span>
+            <input type="text" name="numero_nd" required>
+          </label>
+
+          <label class="field">
+            <span>Data emissão</span>
+            <input type="date" name="data_emissao" required>
+          </label>
+
+          <label class="field span-2">
+            <span>Observações</span>
+            <textarea name="observacoes"></textarea>
+          </label>
+        </div>
+      </div>
+    </section>
+
+    <section class="zone">
+      <div class="zone-head">
+        <div class="zone-left">
+          <div class="zone-icon">💸</div>
+          <div class="zone-title">Despesas elegíveis sem ND</div>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Selecionar</th>
+              <th>ID</th>
+              <th>Competência</th>
+              <th>Data</th>
+              <th>Colaborador</th>
+              <th>Nº origem</th>
+              <th>Descrição</th>
+              <th>Categoria</th>
+              <th>Valor BRL</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for d in despesas %}
+              <tr>
+                <td class="center">
+                  <input type="checkbox" name="despesa_ids" value="{{ d.id }}">
+                </td>
+                <td class="center">{{ d.id }}</td>
+                <td class="center">{{ d.competencia }}</td>
+                <td class="center">{{ d.data_despesa.strftime('%d/%m/%Y') if d.data_despesa else '' }}</td>
+                <td>
+                  {{ d.colaborador_nome or '' }}
+                  {% if d.colaborador_matricula %}<br><small>{{ d.colaborador_matricula }}</small>{% endif %}
+                </td>
+                <td class="center">{{ d.numero_origem or '' }}</td>
+                <td>{{ d.descricao }}</td>
+                <td>{{ d.categoria_nome or '' }}</td>
+                <td class="right">R$ {{ '%.2f'|format(d.valor_brl or 0) }}</td>
+              </tr>
+            {% else %}
+              <tr>
+                <td colspan="9" class="center">Nenhuma despesa sem ND encontrada para os filtros informados.</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="zone">
+      <div class="zone-head">
+        <div class="zone-left">
+          <div class="zone-icon">🧾</div>
+          <div class="zone-title">Faturas elegíveis sem ND</div>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Selecionar</th>
+              <th>ID</th>
+              <th>Competência</th>
+              <th>Nº origem</th>
+              <th>Descrição</th>
+              <th>Vencimento</th>
+              <th>Status</th>
+              <th>Valor BRL</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for f in faturas %}
+              <tr>
+                <td class="center">
+                  <input type="checkbox" name="fatura_ids" value="{{ f.id }}">
+                </td>
+                <td class="center">{{ f.id }}</td>
+                <td class="center">{{ f.competencia }}</td>
+                <td class="center">{{ f.numero_origem or '' }}</td>
+                <td>{{ f.descricao }}</td>
+                <td class="center">{{ f.data_vencimento.strftime('%d/%m/%Y') if f.data_vencimento else '' }}</td>
+                <td class="center">{{ f.status }}</td>
+                <td class="right">R$ {{ '%.2f'|format(f.valor_brl or 0) }}</td>
+              </tr>
+            {% else %}
+              <tr>
+                <td colspan="8" class="center">Nenhuma fatura sem ND encontrada para os filtros informados.</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="zone">
+      <div class="zone-body" style="padding:14px; display:flex; gap:10px; flex-wrap:wrap;">
+        <button type="submit" class="btn success">Gerar ND MATISA</button>
+        <a href="{{ url_for('financeiro_nd.lista_nd') }}" class="btn">Cancelar</a>
+      </div>
+    </section>
+  </form>
+
+</div>
+{% endblock %}

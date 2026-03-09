@@ -1,0 +1,270 @@
+{% extends "base.html" %}
+{% block title %}Financeiro · Visualizar ND{% endblock %}
+
+{% block content %}
+<div class="page-wrap">
+
+  <style>
+    .summary-grid{
+      display:grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap:14px;
+      margin-bottom:16px;
+    }
+    .box{
+      background:#fff;
+      border:1px solid #d9e1ea;
+      border-radius:14px;
+      padding:16px;
+    }
+    .box .label{
+      font-size:12px;
+      color:#667487;
+      margin-bottom:6px;
+      text-transform:uppercase;
+      letter-spacing:.04em;
+    }
+    .box .value{
+      font-size:18px;
+      font-weight:700;
+      color:#16324F;
+    }
+    .table-wrap{
+      overflow:auto;
+      padding:14px;
+    }
+    table{
+      width:100%;
+      border-collapse:collapse;
+      background:#fff;
+    }
+    th, td{
+      border:1px solid #d9e1ea;
+      padding:8px 10px;
+      font-size:14px;
+      vertical-align:middle;
+    }
+    th{
+      background:#f3f7fb;
+      color:#16324F;
+      text-align:center;
+    }
+    td.center{ text-align:center; }
+    td.right{ text-align:right; }
+    .btn{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      min-height:38px;
+      padding:8px 12px;
+      border:1px solid #bfc8d4;
+      border-radius:8px;
+      background:#f7f9fc;
+      color:#28323f;
+      text-decoration:none;
+      cursor:pointer;
+    }
+    .btn.primary{
+      background:#16324F;
+      border-color:#16324F;
+      color:#fff;
+    }
+  </style>
+
+  <section class="zone">
+    <div class="zone-head">
+      <div class="zone-left">
+        <div class="zone-icon">📘</div>
+        <div class="zone-title">ND {{ nd.numero_nd }}</div>
+      </div>
+      <div class="zone-actions">
+        <a class="btn" href="{{ url_for('financeiro_nd.editar_nd', nd_id=nd.id) }}">Editar</a>
+        <a class="btn" href="{{ url_for('financeiro_nd.lista_nd') }}">Voltar</a>
+      </div>
+    </div>
+
+    <div class="zone-body" style="padding:14px;">
+      <div class="summary-grid">
+        <div class="box">
+          <div class="label">Emitente</div>
+          <div class="value">{{ nd.empresa_emitente }}</div>
+        </div>
+
+        <div class="box">
+          <div class="label">Tipo</div>
+          <div class="value">{{ nd.tipo_nd }}</div>
+        </div>
+
+        <div class="box">
+          <div class="label">Competência</div>
+          <div class="value">{{ nd.competencia }}</div>
+        </div>
+
+        <div class="box">
+          <div class="label">Data emissão</div>
+          <div class="value">{{ nd.data_emissao.strftime('%d/%m/%Y') if nd.data_emissao else '' }}</div>
+        </div>
+
+        <div class="box">
+          <div class="label">Contrato</div>
+          <div class="value">{{ nd.contrato_nome or '' }}</div>
+        </div>
+
+        <div class="box">
+          <div class="label">Valor total</div>
+          <div class="value">R$ {{ '%.2f'|format(nd.valor_total or 0) }}</div>
+        </div>
+      </div>
+
+      {% if nd.observacoes %}
+        <div class="box" style="margin-top:14px;">
+          <div class="label">Observações</div>
+          <div class="value" style="font-size:15px; font-weight:500; color:#394150;">{{ nd.observacoes }}</div>
+        </div>
+      {% endif %}
+    </div>
+  </section>
+  
+	{% if nd.arquivo_pdf or nd.arquivo_excel %}
+	  <section class="zone">
+		<div class="zone-head">
+		  <div class="zone-left">
+			<div class="zone-icon">📂</div>
+			<div class="zone-title">Arquivos da ND</div>
+		  </div>
+		</div>
+
+		<div class="zone-body" style="padding:14px; display:flex; gap:10px; flex-wrap:wrap;">
+		  {% if nd.arquivo_pdf %}
+			<a class="btn" target="_blank" href="{{ url_for('static', filename=nd.arquivo_pdf) }}">Abrir PDF</a>
+		  {% endif %}
+		  {% if nd.arquivo_excel %}
+			<a class="btn" target="_blank" href="{{ url_for('static', filename=nd.arquivo_excel) }}">Abrir Excel</a>
+		  {% endif %}
+		</div>
+	  </section>
+	{% endif %}
+
+  <section class="zone">
+    <div class="zone-head">
+      <div class="zone-left">
+        <div class="zone-icon">💸</div>
+        <div class="zone-title">Despesas vinculadas</div>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Data</th>
+            <th>Colaborador</th>
+            <th>Nº origem</th>
+            <th>Descrição</th>
+            <th>Valor BRL</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in despesas %}
+            <tr>
+              <td class="center">{{ item.id }}</td>
+              <td class="center">{{ item.data_despesa.strftime('%d/%m/%Y') if item.data_despesa else '' }}</td>
+              <td>
+                {{ item.colaborador_nome or '' }}
+                {% if item.colaborador_matricula %}<br><small>{{ item.colaborador_matricula }}</small>{% endif %}
+              </td>
+              <td class="center">{{ item.numero_origem or '' }}</td>
+              <td>{{ item.descricao }}</td>
+              <td class="right">R$ {{ '%.2f'|format(item.valor_brl or 0) }}</td>
+            </tr>
+          {% else %}
+            <tr>
+              <td colspan="6" class="center">Nenhuma despesa vinculada.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="zone">
+    <div class="zone-head">
+      <div class="zone-left">
+        <div class="zone-icon">🧾</div>
+        <div class="zone-title">Faturas vinculadas</div>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Nº origem</th>
+            <th>Descrição</th>
+            <th>Vencimento</th>
+            <th>Pagamento</th>
+            <th>Status</th>
+            <th>Valor BRL</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in faturas %}
+            <tr>
+              <td class="center">{{ item.id }}</td>
+              <td class="center">{{ item.numero_origem or '' }}</td>
+              <td>{{ item.descricao }}</td>
+              <td class="center">{{ item.data_vencimento.strftime('%d/%m/%Y') if item.data_vencimento else '' }}</td>
+              <td class="center">{{ item.data_pagamento.strftime('%d/%m/%Y') if item.data_pagamento else '' }}</td>
+              <td class="center">{{ item.status }}</td>
+              <td class="right">R$ {{ '%.2f'|format(item.valor_brl or 0) }}</td>
+            </tr>
+          {% else %}
+            <tr>
+              <td colspan="7" class="center">Nenhuma fatura vinculada.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="zone">
+    <div class="zone-head">
+      <div class="zone-left">
+        <div class="zone-icon">🗒️</div>
+        <div class="zone-title">Itens manuais / rastreados da ND</div>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Descrição</th>
+            <th>Origem</th>
+            <th>Valor</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in itens %}
+            <tr>
+              <td class="center">{{ item.id }}</td>
+              <td>{{ item.descricao_item }}</td>
+              <td class="center">{{ item.origem_item or '' }}</td>
+              <td class="right">R$ {{ '%.2f'|format(item.valor_item or 0) }}</td>
+            </tr>
+          {% else %}
+            <tr>
+              <td colspan="4" class="center">Nenhum item manual registrado.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+</div>
+{% endblock %}

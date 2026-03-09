@@ -1,0 +1,207 @@
+{% extends "base.html" %}
+{% block title %}Financeiro · Anexos da Despesa{% endblock %}
+
+{% block content %}
+<div class="page-wrap">
+
+  <style>
+    .btn{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      min-height:38px;
+      padding:8px 12px;
+      border:1px solid #bfc8d4;
+      border-radius:8px;
+      background:#f7f9fc;
+      color:#28323f;
+      text-decoration:none;
+      cursor:pointer;
+    }
+    .btn.primary{
+      background:#16324F;
+      border-color:#16324F;
+      color:#fff;
+    }
+    .btn.danger{
+      background:#9f2d2d;
+      border-color:#9f2d2d;
+      color:#fff;
+    }
+    .zone-info{
+      padding:14px 16px;
+      color:#394150;
+      line-height:1.5;
+    }
+    .form-grid{
+      display:grid;
+      grid-template-columns: repeat(3, minmax(220px, 1fr));
+      gap:14px;
+      padding:14px;
+    }
+    .field > span{
+      display:block;
+      margin-bottom:6px;
+      font-weight:600;
+      color:#394150;
+    }
+    .field input, .field select{
+      width:100%;
+      min-height:38px;
+      padding:7px 10px;
+      border:1px solid #cfd6df;
+      border-radius:8px;
+      background:#fff;
+      box-sizing:border-box;
+      font-family:inherit;
+    }
+    .span-3{ grid-column: span 3; }
+    .table-wrap{
+      overflow:auto;
+      padding:14px;
+    }
+    table{
+      width:100%;
+      border-collapse:collapse;
+      background:#fff;
+    }
+    th, td{
+      border:1px solid #d9e1ea;
+      padding:8px 10px;
+      font-size:14px;
+      vertical-align:middle;
+    }
+    th{
+      background:#f3f7fb;
+      color:#16324F;
+      text-align:center;
+    }
+    td.center{ text-align:center; }
+    .flash{
+      margin-bottom:12px;
+      padding:12px 14px;
+      border-radius:12px;
+      border:1px solid #d9e1ea;
+      background:#f5f8fc;
+    }
+    .flash.success{ background:#eefaf0; border-color:#bfe0c6; color:#25613a; }
+    .flash.danger{ background:#fff3f3; border-color:#f1c0c0; color:#9f2d2d; }
+    .flash.warning{ background:#fff9e8; border-color:#f1df9b; color:#7a5a00; }
+
+    @media (max-width: 900px){
+      .form-grid{ grid-template-columns: 1fr; }
+      .span-3{ grid-column: span 1; }
+    }
+  </style>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <section class="zone">
+        <div class="zone-body" style="padding:14px;">
+          {% for category, message in messages %}
+            <div class="flash {{ category }}">{{ message }}</div>
+          {% endfor %}
+        </div>
+      </section>
+    {% endif %}
+  {% endwith %}
+
+  <section class="zone">
+    <div class="zone-head">
+      <div class="zone-left">
+        <div class="zone-icon">📎</div>
+        <div class="zone-title">Anexos da despesa #{{ despesa.id }}</div>
+      </div>
+      <div class="zone-actions">
+        <a class="btn" href="{{ url_for('financeiro_despesas.lista_despesas') }}">Voltar</a>
+      </div>
+    </div>
+
+    <div class="zone-info">
+      <div><strong>Descrição:</strong> {{ despesa.descricao }}</div>
+      <div><strong>Número origem:</strong> {{ despesa.numero_origem or '' }}</div>
+      <div><strong>Data da despesa:</strong> {{ despesa.data_despesa.strftime('%d/%m/%Y') if despesa.data_despesa else '' }}</div>
+    </div>
+  </section>
+
+  <section class="zone">
+    <div class="zone-head">
+      <div class="zone-left">
+        <div class="zone-icon">⬆️</div>
+        <div class="zone-title">Adicionar novo anexo</div>
+      </div>
+    </div>
+
+    <form method="post" enctype="multipart/form-data" class="form-grid">
+      <label class="field">
+        <span>Arquivo</span>
+        <input type="file" name="anexo_principal" accept=".pdf,.png,.jpg,.jpeg,.webp,.xls,.xlsx" required>
+      </label>
+
+      <label class="field">
+        <span>Tipo do documento</span>
+        <select name="tipo_documento">
+          <option value="">Selecione</option>
+          <option value="recibo">Recibo</option>
+          <option value="nf">Nota Fiscal</option>
+          <option value="comprovante">Comprovante</option>
+          <option value="outro">Outro</option>
+        </select>
+      </label>
+
+      <div class="field" style="display:flex; align-items:end;">
+        <button type="submit" class="btn primary">Adicionar anexo</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="zone">
+    <div class="zone-head">
+      <div class="zone-left">
+        <div class="zone-icon">📂</div>
+        <div class="zone-title">Arquivos vinculados</div>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Arquivo</th>
+            <th>Tipo</th>
+            <th>Data</th>
+            <th>Abrir</th>
+            <th>Excluir</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for a in anexos %}
+            <tr>
+              <td class="center">{{ a.id }}</td>
+              <td>{{ a.nome_arquivo }}</td>
+              <td class="center">{{ a.tipo_documento or '' }}</td>
+              <td class="center">{{ a.created_at.strftime('%d/%m/%Y %H:%M') if a.created_at else '' }}</td>
+              <td class="center">
+                <a class="btn" target="_blank" href="{{ url_for('static', filename=a.caminho_arquivo) }}">Abrir</a>
+              </td>
+              <td class="center">
+                <form method="post"
+                      action="{{ url_for('financeiro_despesas.excluir_anexo_despesa', anexo_id=a.id) }}"
+                      onsubmit="return confirm('Deseja realmente excluir este anexo?');">
+                  <button type="submit" class="btn danger">Excluir</button>
+                </form>
+              </td>
+            </tr>
+          {% else %}
+            <tr>
+              <td colspan="6" class="center">Nenhum anexo encontrado.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+</div>
+{% endblock %}

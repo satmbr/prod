@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% block title %}Financeiro · Importar Despesas{% endblock %}
+
+{% block content %}
+<div class="page-wrap">
+
+  <style>
+    .form-grid{
+      display:grid;
+      grid-template-columns: repeat(4, minmax(220px, 1fr));
+      gap:14px;
+    }
+    .field > span{
+      display:block;
+      margin-bottom:6px;
+      font-weight:600;
+      color:#394150;
+    }
+    .field input, .field select, .field textarea{
+      width:100%;
+      min-height:38px;
+      padding:7px 10px;
+      border:1px solid #cfd6df;
+      border-radius:8px;
+      background:#fff;
+      box-sizing:border-box;
+      font-family:inherit;
+    }
+    .span-2{ grid-column: span 2; }
+    .span-4{ grid-column: span 4; }
+    .btn{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      min-height:38px;
+      padding:8px 12px;
+      border:1px solid #bfc8d4;
+      border-radius:8px;
+      background:#f7f9fc;
+      color:#28323f;
+      text-decoration:none;
+      cursor:pointer;
+    }
+    .btn.primary{
+      background:#16324F;
+      border-color:#16324F;
+      color:#fff;
+    }
+    .btn-row{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      padding-top:10px;
+    }
+  </style>
+
+  <section class="zone">
+    <div class="zone-head">
+      <div class="zone-left">
+        <div class="zone-icon">📥</div>
+        <div class="zone-title">Importar despesas</div>
+      </div>
+      <div class="zone-actions">
+        <a class="btn" href="{{ url_for('financeiro_despesas.lista_despesas') }}">Voltar</a>
+      </div>
+    </div>
+
+    <div class="zone-body" style="padding:18px;">
+      <form method="post" enctype="multipart/form-data" class="form-grid">
+
+        <label class="field span-2">
+          <span>Arquivo Excel</span>
+          <input type="file" name="arquivo_importacao" accept=".xls,.xlsx" required>
+        </label>
+
+        <label class="field">
+          <span>Contrato</span>
+          <select name="contrato_id">
+            <option value="">Selecione</option>
+            {% for item in contratos %}
+              <option value="{{ item.id }}">{{ item.nome }}</option>
+            {% endfor %}
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Colaborador</span>
+          <select name="colaborador_id">
+            <option value="">Selecione</option>
+            {% for col in colaboradores %}
+              <option value="{{ col.id }}">{{ col.nome }} {% if col.matricula %}- {{ col.matricula }}{% endif %}</option>
+            {% endfor %}
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Empresa responsável</span>
+          <select name="empresa_responsavel">
+            <option value="MATISA">MATISA</option>
+            <option value="PRUMO">PRUMO</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Tipo de origem</span>
+          <select name="tipo_origem" required>
+            <option value="">Selecione</option>
+            <option value="om_campo">OM Campo</option>
+            <option value="relatorio_administrativo">Relatório Administrativo</option>
+            <option value="fatura">Fatura</option>
+            <option value="despesa_avulsa">Despesa Avulsa</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Competência padrão</span>
+          <input type="text" name="competencia_padrao" placeholder="AAAAMM">
+        </label>
+
+        <label class="field span-2">
+          <span>Vincular a ND</span>
+          <select name="nd_id">
+            <option value="">Sem ND</option>
+            {% for nd in nds %}
+              <option value="{{ nd.id }}">
+                {{ nd.numero_nd }} - {{ nd.empresa_emitente }} - {{ nd.tipo_nd }} - {{ nd.competencia }}
+              </option>
+            {% endfor %}
+          </select>
+        </label>
+
+        <div class="span-4" style="background:#f8fbff; border:1px solid #d9e1ea; border-radius:12px; padding:14px;">
+          <strong>Colunas esperadas na planilha:</strong><br>
+          Data, Recibo, Descrição, Detalhes, Categoria, Aplicação/Máquina, Valor, Moeda, Cambio, Valor BRL
+        </div>
+
+        <div class="span-4 btn-row">
+          <button type="submit" class="btn primary">Importar planilha</button>
+        </div>
+      </form>
+    </div>
+  </section>
+</div>
+{% endblock %}

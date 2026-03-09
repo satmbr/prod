@@ -1,0 +1,329 @@
+{% extends "base.html" %}
+{% block title %}Financeiro · {% if modo == 'editar' %}Editar{% else %}Nova{% endif %} Fatura{% endblock %}
+
+{% block content %}
+<div class="page-wrap">
+
+  <style>
+    .form-grid{
+      display:grid;
+      grid-template-columns: repeat(4, minmax(220px, 1fr));
+      gap:14px;
+    }
+    .field > span{
+      display:block;
+      margin-bottom:6px;
+      font-weight:600;
+      color:#394150;
+    }
+    .field input, .field select, .field textarea{
+      width:100%;
+      min-height:38px;
+      padding:7px 10px;
+      border:1px solid #cfd6df;
+      border-radius:8px;
+      background:#fff;
+      box-sizing:border-box;
+      font-family:inherit;
+    }
+    .field textarea{
+      min-height:90px;
+      resize:vertical;
+    }
+    .span-2{ grid-column: span 2; }
+    .span-4{ grid-column: span 4; }
+    .btn{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      min-height:38px;
+      padding:8px 12px;
+      border:1px solid #bfc8d4;
+      border-radius:8px;
+      background:#f7f9fc;
+      color:#28323f;
+      text-decoration:none;
+      cursor:pointer;
+    }
+    .btn.primary{
+      background:#16324F;
+      border-color:#16324F;
+      color:#fff;
+    }
+    .btn-row{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      padding-top:10px;
+    }
+    .flash{
+      margin-bottom:12px;
+      padding:12px 14px;
+      border-radius:12px;
+      border:1px solid #d9e1ea;
+      background:#f5f8fc;
+    }
+    .flash.success{ background:#eefaf0; border-color:#bfe0c6; color:#25613a; }
+    .flash.danger{ background:#fff3f3; border-color:#f1c0c0; color:#9f2d2d; }
+
+    @media (max-width: 1000px){
+      .form-grid{ grid-template-columns: repeat(2, minmax(220px, 1fr)); }
+      .span-4{ grid-column: span 2; }
+    }
+    @media (max-width: 700px){
+      .form-grid{ grid-template-columns: 1fr; }
+      .span-2, .span-4{ grid-column: span 1; }
+    }
+  </style>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <section class="zone">
+        <div class="zone-body" style="padding:14px;">
+          {% for category, message in messages %}
+            <div class="flash {{ category }}">{{ message }}</div>
+          {% endfor %}
+        </div>
+      </section>
+    {% endif %}
+  {% endwith %}
+
+  <section class="zone">
+    <div class="zone-head">
+      <div class="zone-left">
+        <div class="zone-icon">🧾</div>
+        <div class="zone-title">
+          {% if modo == "editar" %}Editar fatura{% else %}Nova fatura{% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="zone-body" style="padding:18px;">
+      <form method="post" enctype="multipart/form-data" class="form-grid">
+
+        <label class="field">
+          <span>Contrato</span>
+          <select name="contrato_id">
+            <option value="">Selecione</option>
+            {% for item in contratos %}
+              <option value="{{ item.id }}" {% if fatura and fatura.contrato_id == item.id %}selected{% endif %}>{{ item.nome }}</option>
+            {% endfor %}
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Colaborador</span>
+          <select name="colaborador_id">
+            <option value="">Selecione</option>
+            {% for col in colaboradores %}
+              <option value="{{ col.id }}" {% if fatura and fatura.colaborador_id == col.id %}selected{% endif %}>
+                {{ col.nome }} {% if col.matricula %}- {{ col.matricula }}{% endif %}
+              </option>
+            {% endfor %}
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Empresa responsável</span>
+          {% set er = fatura.empresa_responsavel if fatura else 'MATISA' %}
+          <select name="empresa_responsavel">
+            <option value="MATISA" {% if er == 'MATISA' %}selected{% endif %}>MATISA</option>
+            <option value="PRUMO" {% if er == 'PRUMO' %}selected{% endif %}>PRUMO</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Status</span>
+          {% set st = fatura.status if fatura else 'aberta' %}
+          <select name="status">
+            <option value="aberta" {% if st == 'aberta' %}selected{% endif %}>Aberta</option>
+            <option value="vencida" {% if st == 'vencida' %}selected{% endif %}>Vencida</option>
+            <option value="paga" {% if st == 'paga' %}selected{% endif %}>Paga</option>
+            <option value="cancelada" {% if st == 'cancelada' %}selected{% endif %}>Cancelada</option>
+          </select>
+        </label>
+
+        <label class="field span-2">
+          <span>Fornecedor</span>
+          <input type="text" name="fornecedor" value="{{ fatura.fornecedor if fatura else '' }}">
+        </label>
+
+        <label class="field">
+          <span>Número origem</span>
+          <input type="text" name="numero_origem" value="{{ fatura.numero_origem if fatura else '' }}">
+        </label>
+
+        <label class="field">
+          <span>Competência</span>
+          <input type="text" name="competencia" placeholder="AAAAMM" value="{{ fatura.competencia if fatura else '' }}" required>
+        </label>
+
+        <label class="field span-2">
+          <span>Descrição</span>
+          <input type="text" name="descricao" value="{{ fatura.descricao if fatura else '' }}" required>
+        </label>
+
+        <label class="field">
+          <span>Data emissão</span>
+          <input type="date" name="data_emissao" value="{{ fatura.data_emissao.strftime('%Y-%m-%d') if fatura and fatura.data_emissao else '' }}">
+        </label>
+
+        <label class="field">
+          <span>Data vencimento</span>
+          <input type="date" name="data_vencimento" value="{{ fatura.data_vencimento.strftime('%Y-%m-%d') if fatura and fatura.data_vencimento else '' }}" required>
+        </label>
+
+        <label class="field">
+          <span>Data pagamento</span>
+          <input type="date" name="data_pagamento" value="{{ fatura.data_pagamento.strftime('%Y-%m-%d') if fatura and fatura.data_pagamento else '' }}">
+        </label>
+
+        <label class="field">
+          <span>Valor original</span>
+          <input type="text" name="valor_original" value="{{ ('%.2f'|format(fatura.valor_original)).replace('.', ',') if fatura and fatura.valor_original is not none else '' }}" required>
+        </label>
+
+        <label class="field">
+          <span>Moeda</span>
+          {% set moeda = fatura.moeda if fatura else 'BRL' %}
+          <select name="moeda" id="moeda">
+            <option value="BRL" {% if moeda == 'BRL' %}selected{% endif %}>BRL</option>
+            <option value="USD" {% if moeda == 'USD' %}selected{% endif %}>USD</option>
+            <option value="EUR" {% if moeda == 'EUR' %}selected{% endif %}>EUR</option>
+            <option value="CHF" {% if moeda == 'CHF' %}selected{% endif %}>CHF</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Câmbio</span>
+          <input type="text" name="cambio" id="cambio" value="{{ ('%.6f'|format(fatura.cambio)).replace('.', ',') if fatura and fatura.cambio is not none else '1,000000' }}">
+        </label>
+
+        <label class="field">
+          <span>Valor BRL</span>
+          <input type="text" name="valor_brl" id="valor_brl" value="{{ ('%.2f'|format(fatura.valor_brl)).replace('.', ',') if fatura and fatura.valor_brl is not none else '' }}">
+        </label>
+
+        <label class="field span-2">
+          <span>Vincular a ND</span>
+          <select name="nd_id">
+            <option value="">Sem ND</option>
+            {% for nd in nds %}
+              <option value="{{ nd.id }}" {% if fatura and fatura.nd_id == nd.id %}selected{% endif %}>
+                {{ nd.numero_nd }} - {{ nd.empresa_emitente }} - {{ nd.tipo_nd }} - {{ nd.competencia }}
+              </option>
+            {% endfor %}
+          </select>
+        </label>
+
+        <label class="field span-4">
+          <span>Observações</span>
+          <textarea name="observacoes">{{ fatura.observacoes if fatura else '' }}</textarea>
+        </label>
+
+        <label class="field span-2">
+          <span>Anexo principal</span>
+          <input type="file" name="anexo_principal" accept=".pdf,.png,.jpg,.jpeg,.webp,.xls,.xlsx">
+        </label>
+
+        <label class="field span-2">
+          <span>Tipo do documento</span>
+          <select name="tipo_documento">
+            <option value="">Selecione</option>
+            <option value="recibo">Recibo</option>
+            <option value="nf">Nota Fiscal</option>
+            <option value="comprovante">Comprovante</option>
+            <option value="boleto">Boleto</option>
+            <option value="fatura">Fatura</option>
+            <option value="outro">Outro</option>
+          </select>
+        </label>
+
+        {% if modo == "editar" %}
+          <div class="span-4" style="margin-top:4px;">
+            <div style="border:1px solid #d9e1ea; border-radius:12px; background:#f8fbff; padding:14px;">
+              <div style="font-weight:700; color:#16324F; margin-bottom:10px;">
+                Anexos já cadastrados
+              </div>
+
+              {% if anexos and anexos|length > 0 %}
+                <div style="overflow:auto;">
+                  <table style="width:100%; border-collapse:collapse; background:#fff;">
+                    <thead>
+                      <tr>
+                        <th style="border:1px solid #d9e1ea; padding:8px; text-align:center;">ID</th>
+                        <th style="border:1px solid #d9e1ea; padding:8px;">Arquivo</th>
+                        <th style="border:1px solid #d9e1ea; padding:8px; text-align:center;">Tipo</th>
+                        <th style="border:1px solid #d9e1ea; padding:8px; text-align:center;">Data</th>
+                        <th style="border:1px solid #d9e1ea; padding:8px; text-align:center;">Abrir</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for anexo in anexos %}
+                        <tr>
+                          <td style="border:1px solid #d9e1ea; padding:8px; text-align:center;">
+                            {{ anexo.id }}
+                          </td>
+                          <td style="border:1px solid #d9e1ea; padding:8px;">
+                            {{ anexo.nome_arquivo }}
+                          </td>
+                          <td style="border:1px solid #d9e1ea; padding:8px; text-align:center;">
+                            {{ anexo.tipo_documento or '' }}
+                          </td>
+                          <td style="border:1px solid #d9e1ea; padding:8px; text-align:center;">
+                            {{ anexo.created_at.strftime('%d/%m/%Y %H:%M') if anexo.created_at else '' }}
+                          </td>
+                          <td style="border:1px solid #d9e1ea; padding:8px; text-align:center;">
+                            <a class="btn" target="_blank" href="{{ url_for('static', filename=anexo.caminho_arquivo) }}">
+                              Abrir
+                            </a>
+                          </td>
+                        </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+              {% else %}
+                <div style="color:#667487;">
+                  Nenhum anexo cadastrado para esta fatura.
+                </div>
+              {% endif %}
+            </div>
+          </div>
+        {% endif %}
+
+        <div class="span-4 btn-row">
+          <button type="submit" class="btn primary">
+            {% if modo == "editar" %}Salvar alterações{% else %}Cadastrar fatura{% endif %}
+          </button>
+          <a href="{{ url_for('financeiro_faturas.lista_faturas') }}" class="btn">Voltar</a>
+        </div>
+      </form>
+    </div>
+  </section>
+</div>
+
+<script>
+  function atualizarCamposMoeda() {
+    const moeda = document.getElementById('moeda').value;
+    const cambio = document.getElementById('cambio');
+    const valorOriginal = document.querySelector('input[name="valor_original"]');
+    const valorBrl = document.getElementById('valor_brl');
+
+    if (moeda === 'BRL') {
+      cambio.value = '1,000000';
+      cambio.readOnly = true;
+      valorBrl.value = valorOriginal.value;
+      valorBrl.readOnly = true;
+    } else {
+      cambio.readOnly = false;
+      valorBrl.readOnly = false;
+    }
+  }
+
+  document.getElementById('moeda').addEventListener('change', atualizarCamposMoeda);
+  document.querySelector('input[name="valor_original"]').addEventListener('input', atualizarCamposMoeda);
+
+  atualizarCamposMoeda();
+</script>
+{% endblock %}

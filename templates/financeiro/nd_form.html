@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+{% block title %}Financeiro · {% if modo == 'editar' %}Editar{% else %}Nova{% endif %} ND{% endblock %}
+
+{% block content %}
+<div class="page-wrap">
+
+  <style>
+    .form-grid{
+      display:grid;
+      grid-template-columns: repeat(4, minmax(220px, 1fr));
+      gap:14px;
+    }
+    .field > span{
+      display:block;
+      margin-bottom:6px;
+      font-weight:600;
+      color:#394150;
+    }
+    .field input, .field select, .field textarea{
+      width:100%;
+      min-height:38px;
+      padding:7px 10px;
+      border:1px solid #cfd6df;
+      border-radius:8px;
+      background:#fff;
+      box-sizing:border-box;
+      font-family:inherit;
+    }
+    .field textarea{
+      min-height:100px;
+      resize:vertical;
+    }
+    .span-2{ grid-column: span 2; }
+    .span-4{ grid-column: span 4; }
+    .btn{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      min-height:38px;
+      padding:8px 12px;
+      border:1px solid #bfc8d4;
+      border-radius:8px;
+      background:#f7f9fc;
+      color:#28323f;
+      text-decoration:none;
+      cursor:pointer;
+    }
+    .btn.primary{
+      background:#16324F;
+      border-color:#16324F;
+      color:#fff;
+    }
+    .btn-row{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      padding-top:10px;
+    }
+    .flash{
+      margin-bottom:12px;
+      padding:12px 14px;
+      border-radius:12px;
+      border:1px solid #d9e1ea;
+      background:#f5f8fc;
+    }
+    .flash.success{ background:#eefaf0; border-color:#bfe0c6; color:#25613a; }
+    .flash.danger{ background:#fff3f3; border-color:#f1c0c0; color:#9f2d2d; }
+
+    @media (max-width: 1000px){
+      .form-grid{ grid-template-columns: repeat(2, minmax(220px, 1fr)); }
+      .span-4{ grid-column: span 2; }
+    }
+    @media (max-width: 700px){
+      .form-grid{ grid-template-columns: 1fr; }
+      .span-2, .span-4{ grid-column: span 1; }
+    }
+  </style>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <section class="zone">
+        <div class="zone-body" style="padding:14px;">
+          {% for category, message in messages %}
+            <div class="flash {{ category }}">{{ message }}</div>
+          {% endfor %}
+        </div>
+      </section>
+    {% endif %}
+  {% endwith %}
+
+  <section class="zone">
+    <div class="zone-head">
+      <div class="zone-left">
+        <div class="zone-icon">🗂️</div>
+        <div class="zone-title">
+          {% if modo == "editar" %}Editar ND{% else %}Nova ND{% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="zone-body" style="padding:18px;">
+      <form method="post" enctype="multipart/form-data" class="form-grid">
+
+        <label class="field">
+          <span>Empresa emitente</span>
+          {% set ee = nd.empresa_emitente if nd else 'MATISA' %}
+          <select name="empresa_emitente" required>
+            <option value="MATISA" {% if ee == 'MATISA' %}selected{% endif %}>MATISA</option>
+            <option value="PRUMO" {% if ee == 'PRUMO' %}selected{% endif %}>PRUMO</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Contrato</span>
+          <select name="contrato_id">
+            <option value="">Selecione</option>
+            {% for item in contratos %}
+              <option value="{{ item.id }}" {% if nd and nd.contrato_id == item.id %}selected{% endif %}>{{ item.nome }}</option>
+            {% endfor %}
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Tipo ND</span>
+          {% set tipo = nd.tipo_nd if nd else 'despesas' %}
+          <select name="tipo_nd" required>
+            <option value="despesas" {% if tipo == 'despesas' %}selected{% endif %}>Despesas</option>
+            <option value="folha" {% if tipo == 'folha' %}selected{% endif %}>Folha</option>
+            <option value="material" {% if tipo == 'material' %}selected{% endif %}>Material</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Modo de registro</span>
+          {% set mr = nd.modo_registro if nd else 'cadastro_manual' %}
+          <select name="modo_registro" required>
+            <option value="cadastro_manual" {% if mr == 'cadastro_manual' %}selected{% endif %}>Cadastro Manual</option>
+            <option value="gerada_sistema" {% if mr == 'gerada_sistema' %}selected{% endif %}>Gerada pelo Sistema</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Número ND</span>
+          <input type="text" name="numero_nd" value="{{ nd.numero_nd if nd else '' }}" required>
+        </label>
+
+        <label class="field">
+          <span>Competência</span>
+          <input type="text" name="competencia" placeholder="AAAAMM" value="{{ nd.competencia if nd else '' }}" required>
+        </label>
+
+        <label class="field">
+          <span>Data emissão</span>
+          <input type="date" name="data_emissao" value="{{ nd.data_emissao.strftime('%Y-%m-%d') if nd and nd.data_emissao else '' }}" required>
+        </label>
+
+        <label class="field">
+          <span>Valor total</span>
+          <input type="text" name="valor_total" value="{{ ('%.2f'|format(nd.valor_total)).replace('.', ',') if nd and nd.valor_total is not none else '' }}" required>
+        </label>
+
+        <label class="field span-4">
+          <span>Observações</span>
+          <textarea name="observacoes">{{ nd.observacoes if nd else '' }}</textarea>
+        </label>
+
+		<label class="field span-2">
+		  <span>Arquivo PDF</span>
+		  <input type="file" name="arquivo_pdf" accept=".pdf">
+		</label>
+
+		<label class="field span-2">
+		  <span>Arquivo Excel</span>
+		  <input type="file" name="arquivo_excel" accept=".xls,.xlsx">
+		</label>
+
+        <div class="span-4 btn-row">
+          <button type="submit" class="btn primary">
+            {% if modo == "editar" %}Salvar alterações{% else %}Cadastrar ND{% endif %}
+          </button>
+          <a href="{{ url_for('financeiro_nd.lista_nd') }}" class="btn">Voltar</a>
+        </div>
+      </form>
+    </div>
+  </section>
+</div>
+{% endblock %}

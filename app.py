@@ -53,6 +53,18 @@ def create_app():
 
     from routes.colaboradores import bp as colaboradores_bp
     app.register_blueprint(colaboradores_bp)
+    
+    from routes.financeiro import bp as financeiro_bp
+    app.register_blueprint(financeiro_bp)
+
+    from routes.financeiro_despesas import bp as financeiro_despesas_bp
+    app.register_blueprint(financeiro_despesas_bp)
+
+    from routes.financeiro_faturas import bp as financeiro_faturas_bp
+    app.register_blueprint(financeiro_faturas_bp)
+
+    from routes.financeiro_nd import bp as financeiro_nd_bp
+    app.register_blueprint(financeiro_nd_bp)
 
     @app.get("/")
     def home():
@@ -96,6 +108,14 @@ def create_app():
                 "descricao": "Gerencie usuários, perfis, permissões e auditoria do sistema.",
                 "href": url_for("auth.usuarios"),
                 "botao": "Abrir administração"
+            })
+            
+        if "financeiro:visualizar" in permissoes or "auth:administrar" in permissoes:
+            cards.append({
+                "titulo": "Financeiro",
+                "descricao": "Controle despesas, faturas, notas de débito e documentos financeiros.",
+                "href": url_for("financeiro.index"),
+                "botao": "Acessar módulo"
             })
 
         return render_template("index.html", cards=cards)

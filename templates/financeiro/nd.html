@@ -1,0 +1,210 @@
+{% extends "base.html" %}
+{% block title %}Financeiro · Notas de Débito{% endblock %}
+
+{% block content %}
+<div class="page-wrap">
+
+  <style>
+    .cards-grid{
+      display:grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap:14px;
+      margin-bottom:16px;
+    }
+    .mini-card{
+      background:#fff;
+      border:1px solid #d9e1ea;
+      border-radius:14px;
+      padding:16px;
+    }
+    .mini-card .t1{
+      font-size:13px;
+      color:#667487;
+      margin-bottom:6px;
+    }
+    .mini-card .t2{
+      font-size:28px;
+      font-weight:800;
+      color:#16324F;
+      line-height:1;
+      margin-bottom:8px;
+    }
+    .mini-card .t3{
+      font-size:13px;
+      color:#667487;
+    }
+    .btn{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      min-height:38px;
+      padding:8px 12px;
+      border:1px solid #bfc8d4;
+      border-radius:8px;
+      background:#f7f9fc;
+      color:#28323f;
+      text-decoration:none;
+      cursor:pointer;
+    }
+    .btn.primary{
+      background:#16324F;
+      border-color:#16324F;
+      color:#fff;
+    }
+    .btn.success{
+      background:#234d20;
+      border-color:#234d20;
+      color:#fff;
+    }
+    .table-wrap{
+      overflow:auto;
+      padding:14px;
+    }
+    table{
+      width:100%;
+      border-collapse:collapse;
+      background:#fff;
+    }
+    th, td{
+      border:1px solid #d9e1ea;
+      padding:8px 10px;
+      font-size:14px;
+      vertical-align:middle;
+    }
+    th{
+      background:#f3f7fb;
+      color:#16324F;
+      text-align:center;
+    }
+    td.center{ text-align:center; }
+    td.right{ text-align:right; }
+    .tag{
+      display:inline-block;
+      padding:4px 9px;
+      border-radius:999px;
+      font-size:12px;
+      font-weight:700;
+      border:1px solid #d9e1ea;
+      background:#fff;
+    }
+    .tag.matisa{
+      background:#eef5ff;
+      border-color:#c8daff;
+      color:#1e4a8d;
+    }
+    .tag.prumo{
+      background:#fff6ea;
+      border-color:#f1d4a1;
+      color:#8a5a00;
+    }
+    .flash{
+      margin-bottom:12px;
+      padding:12px 14px;
+      border-radius:12px;
+      border:1px solid #d9e1ea;
+      background:#f5f8fc;
+    }
+    .flash.success{ background:#eefaf0; border-color:#bfe0c6; color:#25613a; }
+    .flash.danger{ background:#fff3f3; border-color:#f1c0c0; color:#9f2d2d; }
+  </style>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <section class="zone">
+        <div class="zone-body" style="padding:14px;">
+          {% for category, message in messages %}
+            <div class="flash {{ category }}">{{ message }}</div>
+          {% endfor %}
+        </div>
+      </section>
+    {% endif %}
+  {% endwith %}
+
+  <section class="zone">
+    <div class="zone-head">
+      <div class="zone-left">
+        <div class="zone-icon">📑</div>
+        <div class="zone-title">Notas de Débito</div>
+      </div>
+		<div class="zone-actions">
+		  <a class="btn primary" href="{{ url_for('financeiro_nd.gerar_nd_matisa') }}">Gerar ND MATISA</a>
+		  <a class="btn success" href="{{ url_for('financeiro_nd.nova_nd') }}">+ Nova ND</a>
+		</div>
+    </div>
+
+    <div class="zone-body" style="padding:14px;">
+      <div class="cards-grid">
+        <div class="mini-card">
+          <div class="t1">Despesas sem ND</div>
+          <div class="t2">{{ resumo.despesas_sem_nd or 0 }}</div>
+          <div class="t3">Total: R$ {{ '%.2f'|format(resumo.total_despesas_sem_nd or 0) }}</div>
+        </div>
+
+        <div class="mini-card">
+          <div class="t1">Faturas sem ND</div>
+          <div class="t2">{{ resumo.faturas_sem_nd or 0 }}</div>
+          <div class="t3">Total: R$ {{ '%.2f'|format(resumo.total_faturas_sem_nd or 0) }}</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="zone">
+    <div class="zone-head">
+      <div class="zone-left">
+        <div class="zone-icon">📋</div>
+        <div class="zone-title">Lista de NDs</div>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Emitente</th>
+            <th>Tipo</th>
+            <th>Número ND</th>
+            <th>Competência</th>
+            <th>Data</th>
+            <th>Contrato</th>
+            <th>Modo</th>
+            <th>Valor Total</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for nd in notas %}
+            <tr>
+              <td class="center">{{ nd.id }}</td>
+              <td class="center">
+                <span class="tag {% if nd.empresa_emitente == 'MATISA' %}matisa{% else %}prumo{% endif %}">
+                  {{ nd.empresa_emitente }}
+                </span>
+              </td>
+              <td class="center">{{ nd.tipo_nd }}</td>
+              <td class="center">{{ nd.numero_nd }}</td>
+              <td class="center">{{ nd.competencia }}</td>
+              <td class="center">{{ nd.data_emissao.strftime('%d/%m/%Y') if nd.data_emissao else '' }}</td>
+              <td>{{ nd.contrato_nome or '' }}</td>
+              <td class="center">{{ nd.modo_registro }}</td>
+              <td class="right">R$ {{ '%.2f'|format(nd.valor_total or 0) }}</td>
+              <td class="center">
+                <div style="display:flex; gap:8px; justify-content:center; flex-wrap:wrap;">
+                  <a class="btn" href="{{ url_for('financeiro_nd.visualizar_nd', nd_id=nd.id) }}">Visualizar</a>
+                  <a class="btn" href="{{ url_for('financeiro_nd.editar_nd', nd_id=nd.id) }}">Editar</a>
+                </div>
+              </td>
+            </tr>
+          {% else %}
+            <tr>
+              <td colspan="10" class="center">Nenhuma ND cadastrada.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+</div>
+{% endblock %}

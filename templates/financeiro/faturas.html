@@ -1,0 +1,283 @@
+{% extends "base.html" %}
+{% block title %}Financeiro · Faturas{% endblock %}
+
+{% block content %}
+<div class="page-wrap">
+
+  <style>
+    .field > span{
+      display:block;
+      margin-bottom:6px;
+      font-weight:600;
+      color:#394150;
+    }
+    .field input, .field select{
+      width:100%;
+      min-height:38px;
+      padding:7px 10px;
+      border:1px solid #cfd6df;
+      border-radius:8px;
+      background:#fff;
+      box-sizing:border-box;
+    }
+    .toolbar-grid{
+      display:grid;
+      grid-template-columns: 1fr 1fr 1fr 1fr auto;
+      gap:12px;
+      align-items:end;
+    }
+    .btn{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      min-height:38px;
+      padding:8px 12px;
+      border:1px solid #bfc8d4;
+      border-radius:8px;
+      background:#f7f9fc;
+      color:#28323f;
+      text-decoration:none;
+      cursor:pointer;
+    }
+    .btn.primary{
+      background:#16324F;
+      border-color:#16324F;
+      color:#fff;
+    }
+    .btn.success{
+      background:#234d20;
+      border-color:#234d20;
+      color:#fff;
+    }
+    .table-wrap{
+      overflow:auto;
+      padding:14px;
+    }
+    table{
+      width:100%;
+      border-collapse:collapse;
+      background:#fff;
+    }
+    th, td{
+      border:1px solid #d9e1ea;
+      padding:8px 10px;
+      font-size:14px;
+      vertical-align:middle;
+    }
+    th{
+      background:#f3f7fb;
+      color:#16324F;
+      text-align:center;
+    }
+    td.center{ text-align:center; }
+    td.right{ text-align:right; }
+    .actions{
+      display:flex;
+      gap:8px;
+      justify-content:center;
+      flex-wrap:wrap;
+    }
+    .tag{
+      display:inline-block;
+      padding:4px 9px;
+      border-radius:999px;
+      font-size:12px;
+      font-weight:700;
+      border:1px solid #d9e1ea;
+      background:#fff;
+    }
+    .tag.ok{
+      background:#eefaf0;
+      border-color:#bfe0c6;
+      color:#25613a;
+    }
+    .tag.warn{
+      background:#fff9e8;
+      border-color:#f1df9b;
+      color:#7a5a00;
+    }
+    .semaforo{
+      display:inline-block;
+      width:12px;
+      height:12px;
+      border-radius:999px;
+      border:1px solid rgba(0,0,0,.15);
+      vertical-align:middle;
+      margin-right:6px;
+    }
+    .verde{ background:#34a853; }
+    .amarelo{ background:#fbbc05; }
+    .vermelho{ background:#ea4335; }
+    .cinza{ background:#a0a7b4; }
+    .flash{
+      margin-bottom:12px;
+      padding:12px 14px;
+      border-radius:12px;
+      border:1px solid #d9e1ea;
+      background:#f5f8fc;
+    }
+    .flash.success{ background:#eefaf0; border-color:#bfe0c6; color:#25613a; }
+    .flash.danger{ background:#fff3f3; border-color:#f1c0c0; color:#9f2d2d; }
+
+    @media (max-width: 1200px){
+      .toolbar-grid{ grid-template-columns: 1fr 1fr 1fr; }
+    }
+    @media (max-width: 700px){
+      .toolbar-grid{ grid-template-columns: 1fr; }
+    }
+  </style>
+
+  {% macro semaforo_fatura(item) %}
+    {% if item.status == 'paga' %}
+      <span class="semaforo verde"></span> Paga
+    {% elif item.data_vencimento %}
+      {% set dias = (item.data_vencimento - item.data_vencimento.today()).days %}
+      {% if dias < 0 %}
+        <span class="semaforo vermelho"></span> Vencida
+      {% elif dias <= 7 %}
+        <span class="semaforo amarelo"></span> Próxima
+      {% else %}
+        <span class="semaforo verde"></span> Em dia
+      {% endif %}
+    {% else %}
+      <span class="semaforo cinza"></span> Sem vencimento
+    {% endif %}
+  {% endmacro %}
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <section class="zone">
+        <div class="zone-body" style="padding:14px;">
+          {% for category, message in messages %}
+            <div class="flash {{ category }}">{{ message }}</div>
+          {% endfor %}
+        </div>
+      </section>
+    {% endif %}
+  {% endwith %}
+
+  <section class="zone">
+    <div class="zone-head">
+      <div class="zone-left">
+        <div class="zone-icon">🧾</div>
+        <div class="zone-title">Faturas</div>
+      </div>
+      <div class="zone-actions">
+        <a class="btn success" href="{{ url_for('financeiro_faturas.nova_fatura') }}">+ Nova fatura</a>
+      </div>
+    </div>
+
+    <div class="zone-body" style="padding:14px;">
+      <form method="get" class="toolbar-grid">
+        <label class="field">
+          <span>Competência</span>
+          <input type="text" name="competencia" value="{{ filtros.competencia }}" placeholder="AAAAMM">
+        </label>
+
+        <label class="field">
+          <span>Status</span>
+          <select name="status">
+            <option value="">Todos</option>
+            <option value="aberta" {% if filtros.status == 'aberta' %}selected{% endif %}>Aberta</option>
+            <option value="vencida" {% if filtros.status == 'vencida' %}selected{% endif %}>Vencida</option>
+            <option value="paga" {% if filtros.status == 'paga' %}selected{% endif %}>Paga</option>
+            <option value="cancelada" {% if filtros.status == 'cancelada' %}selected{% endif %}>Cancelada</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Colaborador</span>
+          <select name="colaborador_id">
+            <option value="">Todos</option>
+            {% for col in colaboradores %}
+              <option value="{{ col.id }}" {% if filtros.colaborador_id == (col.id|string) %}selected{% endif %}>
+                {{ col.nome }} {% if col.matricula %}- {{ col.matricula }}{% endif %}
+              </option>
+            {% endfor %}
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Status ND</span>
+          <select name="status_nd">
+            <option value="">Todos</option>
+            <option value="sem_nd" {% if filtros.status_nd == 'sem_nd' %}selected{% endif %}>Sem ND</option>
+            <option value="com_nd" {% if filtros.status_nd == 'com_nd' %}selected{% endif %}>Com ND</option>
+          </select>
+        </label>
+
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button type="submit" class="btn primary">Filtrar</button>
+          <a href="{{ url_for('financeiro_faturas.lista_faturas') }}" class="btn">Limpar</a>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <section class="zone">
+    <div class="zone-head">
+      <div class="zone-left">
+        <div class="zone-icon">📋</div>
+        <div class="zone-title">Lista de faturas</div>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Competência</th>
+            <th>Fornecedor</th>
+            <th>Nº origem</th>
+            <th>Descrição</th>
+            <th>Vencimento</th>
+            <th>Pagamento</th>
+            <th>Situação</th>
+            <th>Status</th>
+            <th>Valor BRL</th>
+            <th>Anexos</th>
+            <th>ND</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for f in faturas %}
+            <tr>
+              <td class="center">{{ f.id }}</td>
+              <td class="center">{{ f.competencia }}</td>
+              <td>{{ f.fornecedor or '' }}</td>
+              <td class="center">{{ f.numero_origem or '' }}</td>
+              <td>{{ f.descricao }}</td>
+              <td class="center">{{ f.data_vencimento.strftime('%d/%m/%Y') if f.data_vencimento else '' }}</td>
+              <td class="center">{{ f.data_pagamento.strftime('%d/%m/%Y') if f.data_pagamento else '' }}</td>
+              <td class="center">{{ semaforo_fatura(f) }}</td>
+              <td class="center">{{ f.status }}</td>
+              <td class="right">R$ {{ '%.2f'|format(f.valor_brl or 0) }}</td>
+              <td class="center">{{ f.qtd_anexos or 0 }}</td>
+              <td class="center">
+                {% if f.numero_nd %}
+                  <span class="tag ok">{{ f.numero_nd }}</span>
+                {% else %}
+                  <span class="tag warn">Sem ND</span>
+                {% endif %}
+              </td>
+              <td class="center">
+                <div class="actions">
+                  <a class="btn" href="{{ url_for('financeiro_faturas.editar_fatura', fatura_id=f.id) }}">Editar</a>
+                  <a class="btn" href="{{ url_for('financeiro_faturas.anexos_fatura', fatura_id=f.id) }}">Anexos</a>
+                </div>
+              </td>
+            </tr>
+          {% else %}
+            <tr>
+              <td colspan="13" class="center">Nenhuma fatura encontrada.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+</div>
+{% endblock %}

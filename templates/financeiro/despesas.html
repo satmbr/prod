@@ -1,0 +1,267 @@
+{% extends "base.html" %}
+{% block title %}Financeiro · Despesas{% endblock %}
+
+{% block content %}
+<div class="page-wrap">
+
+  <style>
+    .field > span{
+      display:block;
+      margin-bottom:6px;
+      font-weight:600;
+      color:#394150;
+    }
+    .field input, .field select{
+      width:100%;
+      min-height:38px;
+      padding:7px 10px;
+      border:1px solid #cfd6df;
+      border-radius:8px;
+      background:#fff;
+      box-sizing:border-box;
+    }
+    .toolbar-grid{
+      display:grid;
+      grid-template-columns: 1fr 1fr 1fr 1fr 1fr auto;
+      gap:12px;
+      align-items:end;
+    }
+    .btn{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      min-height:38px;
+      padding:8px 12px;
+      border:1px solid #bfc8d4;
+      border-radius:8px;
+      background:#f7f9fc;
+      color:#28323f;
+      text-decoration:none;
+      cursor:pointer;
+    }
+    .btn.primary{
+      background:#16324F;
+      border-color:#16324F;
+      color:#fff;
+    }
+    .btn.success{
+      background:#234d20;
+      border-color:#234d20;
+      color:#fff;
+    }
+    .table-wrap{
+      overflow:auto;
+      padding:14px;
+    }
+    table{
+      width:100%;
+      border-collapse:collapse;
+      background:#fff;
+    }
+    th, td{
+      border:1px solid #d9e1ea;
+      padding:8px 10px;
+      font-size:14px;
+      vertical-align:middle;
+    }
+    th{
+      background:#f3f7fb;
+      color:#16324F;
+      text-align:center;
+    }
+    td.center{ text-align:center; }
+    td.right{ text-align:right; }
+    .tag{
+      display:inline-block;
+      padding:4px 9px;
+      border-radius:999px;
+      font-size:12px;
+      font-weight:700;
+      border:1px solid #d9e1ea;
+      background:#fff;
+    }
+    .tag.ok{
+      background:#eefaf0;
+      border-color:#bfe0c6;
+      color:#25613a;
+    }
+    .tag.warn{
+      background:#fff9e8;
+      border-color:#f1df9b;
+      color:#7a5a00;
+    }
+    .actions{
+      display:flex;
+      gap:8px;
+      justify-content:center;
+      flex-wrap:wrap;
+    }
+    .flash{
+      margin-bottom:12px;
+      padding:12px 14px;
+      border-radius:12px;
+      border:1px solid #d9e1ea;
+      background:#f5f8fc;
+    }
+    .flash.success{ background:#eefaf0; border-color:#bfe0c6; color:#25613a; }
+    .flash.danger{ background:#fff3f3; border-color:#f1c0c0; color:#9f2d2d; }
+
+    @media (max-width: 1200px){
+      .toolbar-grid{ grid-template-columns: 1fr 1fr 1fr; }
+    }
+    @media (max-width: 700px){
+      .toolbar-grid{ grid-template-columns: 1fr; }
+    }
+  </style>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <section class="zone">
+        <div class="zone-body" style="padding:14px;">
+          {% for category, message in messages %}
+            <div class="flash {{ category }}">{{ message }}</div>
+          {% endfor %}
+        </div>
+      </section>
+    {% endif %}
+  {% endwith %}
+
+  <section class="zone">
+    <div class="zone-head">
+      <div class="zone-left">
+        <div class="zone-icon">💸</div>
+        <div class="zone-title">Despesas</div>
+      </div>
+      <div class="zone-actions">
+        <a class="btn" href="{{ url_for('financeiro_despesas.importar_despesas') }}">Importar</a>
+		<a class="btn success" href="{{ url_for('financeiro_despesas.nova_despesa') }}">+ Nova despesa</a>
+      </div>
+    </div>
+
+    <div class="zone-body" style="padding:14px;">
+      <form method="get" class="toolbar-grid">
+        <label class="field">
+          <span>Competência</span>
+          <input type="text" name="competencia" value="{{ filtros.competencia }}" placeholder="AAAAMM">
+        </label>
+
+        <label class="field">
+          <span>Tipo de origem</span>
+          <select name="tipo_origem">
+            <option value="">Todos</option>
+            <option value="om_campo" {% if filtros.tipo_origem == 'om_campo' %}selected{% endif %}>OM Campo</option>
+            <option value="relatorio_administrativo" {% if filtros.tipo_origem == 'relatorio_administrativo' %}selected{% endif %}>Relatório Administrativo</option>
+            <option value="fatura" {% if filtros.tipo_origem == 'fatura' %}selected{% endif %}>Fatura</option>
+            <option value="despesa_avulsa" {% if filtros.tipo_origem == 'despesa_avulsa' %}selected{% endif %}>Despesa Avulsa</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Colaborador</span>
+          <select name="colaborador_id">
+            <option value="">Todos</option>
+            {% for col in colaboradores %}
+              <option value="{{ col.id }}" {% if filtros.colaborador_id == (col.id|string) %}selected{% endif %}>
+                {{ col.nome }} {% if col.matricula %}- {{ col.matricula }}{% endif %}
+              </option>
+            {% endfor %}
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Categoria</span>
+          <select name="categoria_id">
+            <option value="">Todas</option>
+            {% for cat in categorias %}
+              <option value="{{ cat.id }}" {% if filtros.categoria_id == (cat.id|string) %}selected{% endif %}>{{ cat.nome }}</option>
+            {% endfor %}
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Status ND</span>
+          <select name="status_nd">
+            <option value="">Todos</option>
+            <option value="sem_nd" {% if filtros.status_nd == 'sem_nd' %}selected{% endif %}>Sem ND</option>
+            <option value="com_nd" {% if filtros.status_nd == 'com_nd' %}selected{% endif %}>Com ND</option>
+          </select>
+        </label>
+
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button type="submit" class="btn primary">Filtrar</button>
+          <a href="{{ url_for('financeiro_despesas.lista_despesas') }}" class="btn">Limpar</a>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <section class="zone">
+    <div class="zone-head">
+      <div class="zone-left">
+        <div class="zone-icon">📋</div>
+        <div class="zone-title">Lista de despesas</div>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Competência</th>
+            <th>Data</th>
+            <th>Colaborador</th>
+            <th>Origem</th>
+            <th>Nº origem</th>
+            <th>Descrição</th>
+            <th>Categoria</th>
+            <th>Aplicação</th>
+            <th>Valor BRL</th>
+            <th>ND</th>
+            <th>Ações</th>
+			<th>Anexos</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for d in despesas %}
+            <tr>
+              <td class="center">{{ d.id }}</td>
+              <td class="center">{{ d.competencia }}</td>
+              <td class="center">{{ d.data_despesa.strftime('%d/%m/%Y') if d.data_despesa else '' }}</td>
+              <td>
+                {{ d.colaborador_nome or '' }}
+                {% if d.colaborador_matricula %}<br><small>{{ d.colaborador_matricula }}</small>{% endif %}
+              </td>
+              <td class="center">{{ d.tipo_origem }}</td>
+              <td class="center">{{ d.numero_origem or '' }}</td>
+              <td>{{ d.descricao }}</td>
+              <td>{{ d.categoria_nome or '' }}</td>
+              <td>{{ d.aplicacao_nome or '' }}</td>
+              <td class="right">R$ {{ '%.2f'|format(d.valor_brl or 0) }}</td>
+              <td class="center">
+                {% if d.numero_nd %}
+                  <span class="tag ok">{{ d.numero_nd }}</span>
+                {% else %}
+                  <span class="tag warn">Sem ND</span>
+                {% endif %}
+              </td>
+              <td class="center">
+                <div class="actions">
+                  <a class="btn" href="{{ url_for('financeiro_despesas.editar_despesa', despesa_id=d.id) }}">Editar</a>
+				  <a class="btn" href="{{ url_for('financeiro_despesas.anexos_despesa', despesa_id=d.id) }}">Anexos</a>
+                </div>
+              </td>
+			  <td class="center">{{ d.qtd_anexos or 0 }}</td>
+            </tr>
+          {% else %}
+            <tr>
+              <td colspan="12" class="center">Nenhuma despesa encontrada.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+</div>
+{% endblock %}
