@@ -5,44 +5,45 @@
 {% block content %}
 <div class="page-wrap">
 
-  <section class="module-panel">
-    <div class="module-hero">
-      <div class="module-hero-left">
-        <div class="module-hero-icon">🚜</div>
+  <section class="zone" style="overflow:hidden;">
+    <div style="background:linear-gradient(180deg, #16324F 0%, #1d3e61 100%); padding:28px 28px 24px;">
+      <div style="display:flex; justify-content:space-between; gap:20px; flex-wrap:wrap; align-items:center;">
         <div>
-          <h1 class="module-hero-title">Módulo de Equipamentos</h1>
-          <div class="module-hero-text">
-            Gerencie máquinas, pontos de medição e os lançamentos de parte diária com o mesmo padrão visual do sistema.
+          <h1 style="margin:0; color:#fff; font-size:28px;">Módulo de Equipamentos</h1>
+          <div style="margin-top:8px; color:#d9e6f2; font-size:15px;">
+            Gerencie máquinas, pontos de medição e os lançamentos de parte diária.
+          </div>
+        </div>
+
+        <div style="background:rgba(255,255,255,.10); border:1px solid rgba(255,255,255,.14); border-radius:14px; padding:14px 16px; min-width:240px;">
+          <div style="color:#d9e6f2; font-size:13px;">Perfil atual</div>
+          <div style="color:#fff; font-size:18px; font-weight:700; margin-top:4px;">
+            {{ current_user_profile or 'Sem perfil' }}
           </div>
         </div>
       </div>
-
-      <div class="module-hero-side">
-        <div class="module-hero-side-label">Perfil atual</div>
-        <div class="module-hero-side-value">{{ current_user_profile or 'Sem perfil' }}</div>
-      </div>
     </div>
 
-    <div class="module-content">
-      <div class="module-grid">
+    <div style="padding:24px;">
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:18px;">
 
         {% if 'equipamentos:criar' in current_user_permissions or 'auth:administrar' in current_user_permissions %}
-        <div class="module-card">
-          <h3 class="module-card-title">Cadastro</h3>
-          <p class="module-card-text">
+        <div style="background:#fff; border:1px solid #d9e1ea; border-radius:14px; padding:20px; box-shadow:0 8px 20px rgba(18,39,61,.06);">
+          <h3 style="margin:0 0 8px 0; color:#16324F;">Cadastro</h3>
+          <p style="margin:0 0 18px 0; color:#667487; line-height:1.5;">
             Cadastre e mantenha máquinas e pontos de medição do módulo de equipamentos.
           </p>
-          <a href="{{ url_for('equipamentos.cadastro') }}" class="module-card-action">Abrir cadastro</a>
+          <a href="{{ url_for('equipamentos.cadastro') }}" class="btn-primary">Abrir cadastro</a>
         </div>
         {% endif %}
 
         {% if 'equipamentos:visualizar' in current_user_permissions or 'auth:administrar' in current_user_permissions %}
-        <div class="module-card">
-          <h3 class="module-card-title">Parte Diária</h3>
-          <p class="module-card-text">
+        <div style="background:#fff; border:1px solid #d9e1ea; border-radius:14px; padding:20px; box-shadow:0 8px 20px rgba(18,39,61,.06);">
+          <h3 style="margin:0 0 8px 0; color:#16324F;">Parte Diária</h3>
+          <p style="margin:0 0 18px 0; color:#667487; line-height:1.5;">
             Consulte os lançamentos, filtre por período, máquina e atividade, e acompanhe a parte diária.
           </p>
-          <a href="{{ url_for('equipamentos.partdiaria') }}" class="module-card-action">Abrir parte diária</a>
+          <a href="{{ url_for('equipamentos.partdiaria') }}" class="btn-primary">Abrir parte diária</a>
         </div>
         {% endif %}
 

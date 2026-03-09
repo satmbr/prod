@@ -4,50 +4,36 @@
 {% block content %}
 <div class="page-wrap">
 
-  <section class="module-panel">
-    <div class="module-hero">
-      <div class="module-hero-left">
-        <div class="module-hero-icon">💰</div>
+  <section class="zone">
+    <div class="zone-head">
+      <div class="zone-left">
+        <div class="zone-icon">💰</div>
         <div>
-          <h1 class="module-hero-title">Módulo Financeiro</h1>
-          <div class="module-hero-text">
-            Controle de despesas, faturas e notas de débito em um ambiente organizado, com navegação rápida e visual padronizado.
+          <div class="zone-title">Módulo Financeiro</div>
+          <div style="font-size:13px; color:#667487; margin-top:4px;">
+            Controle de despesas, faturas e notas de débito.
           </div>
         </div>
       </div>
-
-      <div class="module-hero-side">
-        <div class="module-hero-side-label">Perfil atual</div>
-        <div class="module-hero-side-value">{{ current_user_profile or 'Sem perfil' }}</div>
-      </div>
     </div>
 
-    <div class="module-content">
-      <div class="module-grid">
-        <a class="module-card" href="{{ url_for('financeiro_despesas.lista_despesas') }}">
-          <h3 class="module-card-title">Despesas</h3>
-          <p class="module-card-text">
-            Cadastre e acompanhe despesas com ou sem vínculo em ND.
-          </p>
-          <span class="module-card-action">Abrir despesas</span>
-        </a>
+    <div style="padding:24px;">
+		<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:18px;">
+		  <a href="{{ url_for('financeiro_despesas.lista_despesas') }}" style="background:#fff; border:1px solid #d9e1ea; border-radius:14px; padding:18px; display:block;">
+			<h3 style="margin:0 0 8px 0; color:#16324F;">Despesas</h3>
+			<p style="margin:0; color:#667487;">Cadastre e acompanhe despesas com ou sem vínculo em ND.</p>
+		  </a>
 
-        <a class="module-card" href="{{ url_for('financeiro_faturas.lista_faturas') }}">
-          <h3 class="module-card-title">Faturas</h3>
-          <p class="module-card-text">
-            Controle vencimentos, pagamentos e anexos.
-          </p>
-          <span class="module-card-action">Abrir faturas</span>
-        </a>
+		  <a href="{{ url_for('financeiro_faturas.lista_faturas') }}" style="background:#fff; border:1px solid #d9e1ea; border-radius:14px; padding:18px; display:block;">
+			<h3 style="margin:0 0 8px 0; color:#16324F;">Faturas</h3>
+			<p style="margin:0; color:#667487;">Controle vencimentos, pagamentos e anexos.</p>
+		  </a>
 
-        <a class="module-card" href="{{ url_for('financeiro_nd.lista_nd') }}">
-          <h3 class="module-card-title">Notas de Débito</h3>
-          <p class="module-card-text">
-            Cadastre NDs da PRUMO e prepare a futura geração de NDs da MATISA.
-          </p>
-          <span class="module-card-action">Abrir notas de débito</span>
-        </a>
-      </div>
+		  <a href="{{ url_for('financeiro_nd.lista_nd') }}" style="background:#fff; border:1px solid #d9e1ea; border-radius:14px; padding:18px; display:block;">
+			<h3 style="margin:0 0 8px 0; color:#16324F;">Notas de Débito</h3>
+			<p style="margin:0; color:#667487;">Cadastre NDs da PRUMO e gere NDs da MATISA futuramente.</p>
+		  </a>
+		</div>
     </div>
   </section>
 
