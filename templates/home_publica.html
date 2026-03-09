@@ -3,23 +3,40 @@
 
 {% block content %}
 <div class="page-wrap">
-  <section class="zone" style="overflow:hidden;">
-    <div style="background:linear-gradient(180deg, #16324F 0%, #1d3e61 100%); padding:48px 32px;">
-      <div style="max-width:900px;">
-        <div style="display:inline-flex; align-items:center; padding:6px 12px; border-radius:999px; background:rgba(255,255,255,.10); border:1px solid rgba(255,255,255,.14); color:#d9e6f2; font-size:12px; font-weight:700; letter-spacing:.03em; text-transform:uppercase;">
-          Plataforma interna PRUMAT
+  <section class="zone">
+    <div class="zone-head">
+      <div class="zone-left">
+        <div class="zone-icon">🏢</div>
+        <div>
+          <div class="zone-title" style="font-size:18px;">Sistema PRUMAT</div>
+          <div style="margin-top:4px; color:#667487; font-size:15px;">
+            Plataforma interna para gestão operacional, equipamentos, colaboradores e administração de acessos.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="zone-body" style="padding:30px;">
+      <div style="display:grid; grid-template-columns:1.4fr .8fr; gap:22px; align-items:stretch;">
+        <div style="background:#fff; border:1px solid #d9e1ea; border-radius:18px; padding:26px;">
+          <h3 style="margin:0 0 14px 0; color:#0f3157; font-size:18px;">Bem-vindo ao ambiente PRUMAT</h3>
+          <p style="margin:0; color:#667487; line-height:1.7;">
+            Plataforma interna para gestão operacional, rastreabilidade de informações, controle de equipamentos,
+            gestão de colaboradores e administração de acessos, reunindo organização e padronização em um único ambiente.
+          </p>
         </div>
 
-        <h1 style="margin:16px 0 0 0; color:#fff; font-size:34px; line-height:1.15;">
-          Sistema PRUMAT
-        </h1>
+        <div style="background:#fff; border:1px solid #d9e1ea; border-radius:18px; padding:26px; display:flex; flex-direction:column; justify-content:space-between;">
+          <div>
+            <h3 style="margin:0 0 14px 0; color:#0f3157; font-size:18px;">Acesso ao sistema</h3>
+            <p style="margin:0; color:#667487; line-height:1.7;">
+              Entre com seu usuário e senha para acessar os módulos disponíveis conforme seu perfil.
+            </p>
+          </div>
 
-        <div style="margin-top:12px; color:#d9e6f2; font-size:16px; line-height:1.7; max-width:780px;">
-          Plataforma interna para gestão operacional, equipamentos, colaboradores e administração de acessos, reunindo controle, rastreabilidade e organização em um único ambiente.
-        </div>
-
-        <div style="margin-top:24px;">
-          <a href="{{ url_for('auth.login') }}" class="btn-primary">Entrar no sistema</a>
+          <div style="margin-top:22px;">
+            <a href="{{ url_for('auth.login') }}" class="btn-primary">Entrar no sistema</a>
+          </div>
         </div>
       </div>
     </div>

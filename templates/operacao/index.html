@@ -5,55 +5,55 @@
 {% block content %}
 <div class="page-wrap">
 
-  <section class="zone" style="overflow:hidden;">
-    <div style="background:linear-gradient(180deg, #16324F 0%, #1d3e61 100%); padding:28px 28px 24px;">
-      <div style="display:flex; justify-content:space-between; gap:20px; flex-wrap:wrap; align-items:center;">
+  <section class="zone">
+    <div class="zone-head">
+      <div class="zone-left">
+        <div class="zone-icon">🏗️</div>
         <div>
-          <h1 style="margin:0; color:#fff; font-size:28px;">Módulo de Operação</h1>
-          <div style="margin-top:8px; color:#d9e6f2; font-size:15px;">
+          <div class="zone-title" style="font-size:18px;">Módulo de Operação</div>
+          <div style="margin-top:4px; color:#667487; font-size:15px;">
             Acompanhe produção, registros planejados e executados, e cadastros auxiliares do módulo operacional.
-          </div>
-        </div>
-
-        <div style="background:rgba(255,255,255,.10); border:1px solid rgba(255,255,255,.14); border-radius:14px; padding:14px 16px; min-width:240px;">
-          <div style="color:#d9e6f2; font-size:13px;">Perfil atual</div>
-          <div style="color:#fff; font-size:18px; font-weight:700; margin-top:4px;">
-            {{ current_user_profile or 'Sem perfil' }}
           </div>
         </div>
       </div>
     </div>
 
-    <div style="padding:24px;">
-      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:18px;">
+    <div class="zone-body" style="padding:30px;">
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:22px;">
 
         {% if 'operacao:visualizar' in current_user_permissions or 'auth:administrar' in current_user_permissions %}
-        <div style="background:#fff; border:1px solid #d9e1ea; border-radius:14px; padding:20px; box-shadow:0 8px 20px rgba(18,39,61,.06);">
-          <h3 style="margin:0 0 8px 0; color:#16324F;">Produção</h3>
-          <p style="margin:0 0 18px 0; color:#667487; line-height:1.5;">
+        <div style="background:#fff; border:1px solid #d9e1ea; border-radius:18px; padding:26px; min-height:150px;">
+          <h3 style="margin:0 0 14px 0; color:#0f3157; font-size:17px;">Produção</h3>
+          <p style="margin:0; color:#667487; line-height:1.6;">
             Visualize o acompanhamento da renovação, parte diária, gráficos e o resumo consolidado das frentes.
           </p>
-          <a href="{{ url_for('operacao.producao') }}" class="btn-primary">Abrir produção</a>
+          <div style="margin-top:20px;">
+            <a href="{{ url_for('operacao.producao') }}" class="btn-outline">Abrir produção</a>
+          </div>
         </div>
         {% endif %}
 
         {% if 'operacao:visualizar' in current_user_permissions or 'auth:administrar' in current_user_permissions %}
-        <div style="background:#fff; border:1px solid #d9e1ea; border-radius:14px; padding:20px; box-shadow:0 8px 20px rgba(18,39,61,.06);">
-          <h3 style="margin:0 0 8px 0; color:#16324F;">Registro</h3>
-          <p style="margin:0 0 18px 0; color:#667487; line-height:1.5;">
+        <div style="background:#fff; border:1px solid #d9e1ea; border-radius:18px; padding:26px; min-height:150px;">
+          <h3 style="margin:0 0 14px 0; color:#0f3157; font-size:17px;">Registro</h3>
+          <p style="margin:0; color:#667487; line-height:1.6;">
             Consulte os registros planejados e executados e acompanhe os lançamentos por EH, frente e data.
           </p>
-          <a href="{{ url_for('operacao.registro') }}" class="btn-primary">Abrir registro</a>
+          <div style="margin-top:20px;">
+            <a href="{{ url_for('operacao.registro') }}" class="btn-outline">Abrir registro</a>
+          </div>
         </div>
         {% endif %}
 
         {% if 'operacao:criar' in current_user_permissions or 'auth:administrar' in current_user_permissions %}
-        <div style="background:#fff; border:1px solid #d9e1ea; border-radius:14px; padding:20px; box-shadow:0 8px 20px rgba(18,39,61,.06);">
-          <h3 style="margin:0 0 8px 0; color:#16324F;">Cadastro</h3>
-          <p style="margin:0 0 18px 0; color:#667487; line-height:1.5;">
+        <div style="background:#fff; border:1px solid #d9e1ea; border-radius:18px; padding:26px; min-height:150px;">
+          <h3 style="margin:0 0 14px 0; color:#0f3157; font-size:17px;">Cadastro</h3>
+          <p style="margin:0; color:#667487; line-height:1.6;">
             Cadastre e mantenha EHs e frentes utilizadas no módulo de operação.
           </p>
-          <a href="{{ url_for('operacao.cadastro') }}" class="btn-primary">Abrir cadastro</a>
+          <div style="margin-top:20px;">
+            <a href="{{ url_for('operacao.cadastro') }}" class="btn-outline">Abrir cadastro</a>
+          </div>
         </div>
         {% endif %}
 
