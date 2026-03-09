@@ -8,9 +8,9 @@
   <section class="zone">
     <div class="zone-head">
       <div class="zone-left">
-        <div class="zone-icon">🚜</div>
+        <div class="zone-icon">💰</div>
         <div>
-          <div class="zone-title" style="font-size:18px;">Módulo de Equipamentos</div>
+          <div class="zone-title">Módulo Equipamentos</div>
           <div style="margin-top:4px; color:#667487; font-size:15px;">
             Gerencie máquinas, pontos de medição e os lançamentos de parte diária.
           </div>
@@ -18,30 +18,24 @@
       </div>
     </div>
 
-    <div class="zone-body" style="padding:30px;">
-      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:22px;">
+    <div class="zone-body" style="padding:24px;">
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:20px;">
 
         {% if 'equipamentos:criar' in current_user_permissions or 'auth:administrar' in current_user_permissions %}
-        <div style="background:#fff; border:1px solid #d9e1ea; border-radius:18px; padding:26px; min-height:150px;">
-          <h3 style="margin:0 0 14px 0; color:#0f3157; font-size:17px;">Cadastro</h3>
+        <div style="background:#fff; border:1px solid #d9e1ea; border-radius:18px; padding:24px;">
+          <h3 style="margin:0 0 12px 0; color:#0f3157;">Cadastro</h3>
           <p style="margin:0; color:#667487; line-height:1.6;">
             Cadastre e mantenha máquinas e pontos de medição do módulo de equipamentos.
           </p>
-          <div style="margin-top:20px;">
-            <a href="{{ url_for('equipamentos.cadastro') }}" class="btn-outline">Abrir cadastro</a>
-          </div>
         </div>
         {% endif %}
 
         {% if 'equipamentos:visualizar' in current_user_permissions or 'auth:administrar' in current_user_permissions %}
-        <div style="background:#fff; border:1px solid #d9e1ea; border-radius:18px; padding:26px; min-height:150px;">
-          <h3 style="margin:0 0 14px 0; color:#0f3157; font-size:17px;">Parte Diária</h3>
+        <div style="background:#fff; border:1px solid #d9e1ea; border-radius:18px; padding:24px;">
+          <h3 style="margin:0 0 12px 0; color:#0f3157;">Parte Diária</h3>
           <p style="margin:0; color:#667487; line-height:1.6;">
             Consulte os lançamentos, filtre por período, máquina e atividade, e acompanhe a parte diária.
           </p>
-          <div style="margin-top:20px;">
-            <a href="{{ url_for('equipamentos.partdiaria') }}" class="btn-outline">Abrir parte diária</a>
-          </div>
         </div>
         {% endif %}
 

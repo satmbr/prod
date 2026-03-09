@@ -8,9 +8,9 @@
   <section class="zone">
     <div class="zone-head">
       <div class="zone-left">
-        <div class="zone-icon">🏗️</div>
+        <div class="zone-icon">💰</div>
         <div>
-          <div class="zone-title" style="font-size:18px;">Módulo de Operação</div>
+          <div class="zone-title">Módulo Operação</div>
           <div style="margin-top:4px; color:#667487; font-size:15px;">
             Acompanhe produção, registros planejados e executados, e cadastros auxiliares do módulo operacional.
           </div>
@@ -18,42 +18,33 @@
       </div>
     </div>
 
-    <div class="zone-body" style="padding:30px;">
-      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:22px;">
+    <div class="zone-body" style="padding:24px;">
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:20px;">
 
         {% if 'operacao:visualizar' in current_user_permissions or 'auth:administrar' in current_user_permissions %}
-        <div style="background:#fff; border:1px solid #d9e1ea; border-radius:18px; padding:26px; min-height:150px;">
-          <h3 style="margin:0 0 14px 0; color:#0f3157; font-size:17px;">Produção</h3>
+        <div style="background:#fff; border:1px solid #d9e1ea; border-radius:18px; padding:24px;">
+          <h3 style="margin:0 0 12px 0; color:#0f3157;">Produção</h3>
           <p style="margin:0; color:#667487; line-height:1.6;">
             Visualize o acompanhamento da renovação, parte diária, gráficos e o resumo consolidado das frentes.
           </p>
-          <div style="margin-top:20px;">
-            <a href="{{ url_for('operacao.producao') }}" class="btn-outline">Abrir produção</a>
-          </div>
         </div>
         {% endif %}
 
         {% if 'operacao:visualizar' in current_user_permissions or 'auth:administrar' in current_user_permissions %}
-        <div style="background:#fff; border:1px solid #d9e1ea; border-radius:18px; padding:26px; min-height:150px;">
-          <h3 style="margin:0 0 14px 0; color:#0f3157; font-size:17px;">Registro</h3>
+        <div style="background:#fff; border:1px solid #d9e1ea; border-radius:18px; padding:24px;">
+          <h3 style="margin:0 0 12px 0; color:#0f3157;">Registro</h3>
           <p style="margin:0; color:#667487; line-height:1.6;">
             Consulte os registros planejados e executados e acompanhe os lançamentos por EH, frente e data.
           </p>
-          <div style="margin-top:20px;">
-            <a href="{{ url_for('operacao.registro') }}" class="btn-outline">Abrir registro</a>
-          </div>
         </div>
         {% endif %}
 
         {% if 'operacao:criar' in current_user_permissions or 'auth:administrar' in current_user_permissions %}
-        <div style="background:#fff; border:1px solid #d9e1ea; border-radius:18px; padding:26px; min-height:150px;">
-          <h3 style="margin:0 0 14px 0; color:#0f3157; font-size:17px;">Cadastro</h3>
+        <div style="background:#fff; border:1px solid #d9e1ea; border-radius:18px; padding:24px;">
+          <h3 style="margin:0 0 12px 0; color:#0f3157;">Cadastro</h3>
           <p style="margin:0; color:#667487; line-height:1.6;">
             Cadastre e mantenha EHs e frentes utilizadas no módulo de operação.
           </p>
-          <div style="margin-top:20px;">
-            <a href="{{ url_for('operacao.cadastro') }}" class="btn-outline">Abrir cadastro</a>
-          </div>
         </div>
         {% endif %}
 
