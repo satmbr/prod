@@ -48,6 +48,31 @@ def carregar_contratos(conn):
     ).mappings().all()
 
 
+def recalcular_total_nd(conn, nd_id):
+    total = conn.execute(
+        text("""
+            SELECT COALESCE(SUM(valor_item), 0) AS total
+            FROM financeiro_nd_itens
+            WHERE nd_id = :nd_id
+        """),
+        {"nd_id": nd_id}
+    ).mappings().first()
+
+    valor_total = total["total"] if total else 0
+
+    conn.execute(
+        text("""
+            UPDATE financeiro_nd
+            SET valor_total = :valor_total,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = :id
+        """),
+        {"id": nd_id, "valor_total": valor_total}
+    )
+
+    return valor_total
+
+
 @bp.route("/")
 @login_required
 @permission_required("financeiro", "visualizar")
@@ -107,23 +132,23 @@ def lista_nd():
 @permission_required("financeiro", "criar")
 def nova_nd():
     engine = get_engine()
-    
-    arquivo_pdf = request.files.get("arquivo_pdf")
-    arquivo_excel = request.files.get("arquivo_excel")
-
-    caminho_pdf = None
-    caminho_excel = None
-
-    if arquivo_pdf and arquivo_pdf.filename:
-        _, caminho_pdf = salvar_arquivo_nd(arquivo_pdf)
-
-    if arquivo_excel and arquivo_excel.filename:
-        _, caminho_excel = salvar_arquivo_nd(arquivo_excel)
 
     if request.method == "POST":
         form = request.form
 
         try:
+            arquivo_pdf = request.files.get("arquivo_pdf")
+            arquivo_excel = request.files.get("arquivo_excel")
+
+            caminho_pdf = None
+            caminho_excel = None
+
+            if arquivo_pdf and arquivo_pdf.filename:
+                _, caminho_pdf = salvar_arquivo_nd(arquivo_pdf)
+
+            if arquivo_excel and arquivo_excel.filename:
+                _, caminho_excel = salvar_arquivo_nd(arquivo_excel)
+
             with engine.begin() as conn:
                 conn.execute(
                     text("""
@@ -165,7 +190,7 @@ def nova_nd():
                         "modo_registro": (form.get("modo_registro") or "").strip(),
                         "observacoes": (form.get("observacoes") or "").strip() or None,
                         "arquivo_pdf": caminho_pdf,
-                        "arquivo_excel": caminho_excel
+                        "arquivo_excel": caminho_excel,
                     }
                 )
 
@@ -346,6 +371,8 @@ def visualizar_nd(nd_id):
             text("""
                 SELECT
                     id,
+                    despesa_id,
+                    fatura_id,
                     descricao_item,
                     valor_item,
                     origem_item
@@ -364,7 +391,164 @@ def visualizar_nd(nd_id):
         itens=itens,
         subnav_links=build_financeiro_subnav("nd"),
     )
-    
+
+
+@bp.route("/<int:nd_id>/remover-despesa/<int:despesa_id>", methods=["POST"])
+@login_required
+@permission_required("financeiro", "editar")
+def remover_despesa_nd(nd_id, despesa_id):
+    engine = get_engine()
+
+    try:
+        with engine.begin() as conn:
+            despesa = conn.execute(
+                text("""
+                    SELECT id, nd_id
+                    FROM financeiro_despesas
+                    WHERE id = :id AND nd_id = :nd_id
+                """),
+                {"id": despesa_id, "nd_id": nd_id}
+            ).mappings().first()
+
+            if not despesa:
+                flash("Despesa não encontrada nesta ND.", "danger")
+                return redirect(url_for("financeiro_nd.visualizar_nd", nd_id=nd_id))
+
+            conn.execute(
+                text("""
+                    UPDATE financeiro_despesas
+                    SET nd_id = NULL,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = :id
+                """),
+                {"id": despesa_id}
+            )
+
+            conn.execute(
+                text("""
+                    DELETE FROM financeiro_nd_itens
+                    WHERE nd_id = :nd_id AND despesa_id = :despesa_id
+                """),
+                {"nd_id": nd_id, "despesa_id": despesa_id}
+            )
+
+            recalcular_total_nd(conn, nd_id)
+
+        flash("Despesa removida da ND com sucesso.", "success")
+    except Exception as e:
+        flash(f"Erro ao remover despesa da ND: {e}", "danger")
+
+    return redirect(url_for("financeiro_nd.visualizar_nd", nd_id=nd_id))
+
+
+@bp.route("/<int:nd_id>/remover-fatura/<int:fatura_id>", methods=["POST"])
+@login_required
+@permission_required("financeiro", "editar")
+def remover_fatura_nd(nd_id, fatura_id):
+    engine = get_engine()
+
+    try:
+        with engine.begin() as conn:
+            fatura = conn.execute(
+                text("""
+                    SELECT id, nd_id
+                    FROM financeiro_faturas
+                    WHERE id = :id AND nd_id = :nd_id
+                """),
+                {"id": fatura_id, "nd_id": nd_id}
+            ).mappings().first()
+
+            if not fatura:
+                flash("Fatura não encontrada nesta ND.", "danger")
+                return redirect(url_for("financeiro_nd.visualizar_nd", nd_id=nd_id))
+
+            conn.execute(
+                text("""
+                    UPDATE financeiro_faturas
+                    SET nd_id = NULL,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = :id
+                """),
+                {"id": fatura_id}
+            )
+
+            conn.execute(
+                text("""
+                    DELETE FROM financeiro_nd_itens
+                    WHERE nd_id = :nd_id AND fatura_id = :fatura_id
+                """),
+                {"nd_id": nd_id, "fatura_id": fatura_id}
+            )
+
+            recalcular_total_nd(conn, nd_id)
+
+        flash("Fatura removida da ND com sucesso.", "success")
+    except Exception as e:
+        flash(f"Erro ao remover fatura da ND: {e}", "danger")
+
+    return redirect(url_for("financeiro_nd.visualizar_nd", nd_id=nd_id))
+
+
+@bp.route("/<int:nd_id>/remover-item/<int:item_id>", methods=["POST"])
+@login_required
+@permission_required("financeiro", "editar")
+def remover_item_nd(nd_id, item_id):
+    engine = get_engine()
+
+    try:
+        with engine.begin() as conn:
+            item = conn.execute(
+                text("""
+                    SELECT id, nd_id, despesa_id, fatura_id
+                    FROM financeiro_nd_itens
+                    WHERE id = :id AND nd_id = :nd_id
+                """),
+                {"id": item_id, "nd_id": nd_id}
+            ).mappings().first()
+
+            if not item:
+                flash("Item não encontrado nesta ND.", "danger")
+                return redirect(url_for("financeiro_nd.visualizar_nd", nd_id=nd_id))
+
+            if item["despesa_id"]:
+                conn.execute(
+                    text("""
+                        UPDATE financeiro_despesas
+                        SET nd_id = NULL,
+                            updated_at = CURRENT_TIMESTAMP
+                        WHERE id = :id
+                    """),
+                    {"id": item["despesa_id"]}
+                )
+
+            if item["fatura_id"]:
+                conn.execute(
+                    text("""
+                        UPDATE financeiro_faturas
+                        SET nd_id = NULL,
+                            updated_at = CURRENT_TIMESTAMP
+                        WHERE id = :id
+                    """),
+                    {"id": item["fatura_id"]}
+                )
+
+            conn.execute(
+                text("""
+                    DELETE FROM financeiro_nd_itens
+                    WHERE id = :id
+                """),
+                {"id": item_id}
+            )
+
+            recalcular_total_nd(conn, nd_id)
+
+        flash("Item removido da ND com sucesso.", "success")
+    except Exception as e:
+        flash(f"Erro ao remover item da ND: {e}", "danger")
+
+    return redirect(url_for("financeiro_nd.visualizar_nd", nd_id=nd_id))
+
+
 @bp.route("/gerar-matisa", methods=["GET", "POST"])
 @login_required
 @permission_required("financeiro", "gerar_nd")
@@ -386,6 +570,9 @@ def gerar_nd_matisa():
 
         despesas_ids = request.form.getlist("despesa_ids")
         faturas_ids = request.form.getlist("fatura_ids")
+
+        if tipo_nd != "despesas":
+            flash("Nesta fase, a geração automática da ND MATISA está preparada para despesas. Folha e material serão tratados em etapa futura.", "warning")
 
         if not numero_nd:
             flash("Informe o número da ND.", "danger")
@@ -444,13 +631,14 @@ def gerar_nd_matisa():
                 ).scalar()
 
                 if despesas_ids:
+                    ids_despesas = [int(x) for x in despesas_ids]
                     despesas = conn.execute(
-                        text("""
+                        text(f"""
                             SELECT id, descricao, valor_brl
                             FROM financeiro_despesas
-                            WHERE id = ANY(:ids) AND nd_id IS NULL
-                        """),
-                        {"ids": [int(x) for x in despesas_ids]}
+                            WHERE id IN ({",".join(str(i) for i in ids_despesas)})
+                              AND nd_id IS NULL
+                        """)
                     ).mappings().all()
 
                     for d in despesas:
@@ -492,13 +680,14 @@ def gerar_nd_matisa():
                         )
 
                 if faturas_ids:
+                    ids_faturas = [int(x) for x in faturas_ids]
                     faturas = conn.execute(
-                        text("""
+                        text(f"""
                             SELECT id, descricao, valor_brl
                             FROM financeiro_faturas
-                            WHERE id = ANY(:ids) AND nd_id IS NULL
-                        """),
-                        {"ids": [int(x) for x in faturas_ids]}
+                            WHERE id IN ({",".join(str(i) for i in ids_faturas)})
+                              AND nd_id IS NULL
+                        """)
                     ).mappings().all()
 
                     for f in faturas:
@@ -561,6 +750,9 @@ def gerar_nd_matisa():
         "competencia": (request.args.get("competencia") or "").strip(),
         "tipo_nd": (request.args.get("tipo_nd") or "despesas").strip(),
     }
+
+    if filtros["tipo_nd"] != "despesas":
+        flash("A seleção automática atual está preparada para despesas. Folha e material serão integrados em etapa futura.", "warning")
 
     where_despesas = ["d.nd_id IS NULL", "d.empresa_responsavel = 'MATISA'"]
     where_faturas = ["f.nd_id IS NULL", "f.empresa_responsavel = 'MATISA'"]

@@ -106,6 +106,16 @@
     }
     .flash.success{ background:#eefaf0; border-color:#bfe0c6; color:#25613a; }
     .flash.danger{ background:#fff3f3; border-color:#f1c0c0; color:#9f2d2d; }
+    .flash.warning{ background:#fff9e8; border-color:#f1df9b; color:#7a5a00; }
+
+    .note-box{
+      margin:14px;
+      padding:12px 14px;
+      border-radius:12px;
+      border:1px solid #f1df9b;
+      background:#fff9e8;
+      color:#7a5a00;
+    }
   </style>
 
   {% with messages = get_flashed_messages(with_categories=true) %}
@@ -126,10 +136,15 @@
         <div class="zone-icon">📑</div>
         <div class="zone-title">Notas de Débito</div>
       </div>
-		<div class="zone-actions">
-		  <a class="btn primary" href="{{ url_for('financeiro_nd.gerar_nd_matisa') }}">Gerar ND MATISA</a>
-		  <a class="btn success" href="{{ url_for('financeiro_nd.nova_nd') }}">+ Nova ND</a>
-		</div>
+      <div class="zone-actions">
+        <a class="btn primary" href="{{ url_for('financeiro_nd.gerar_nd_matisa') }}">Gerar ND MATISA</a>
+        <a class="btn success" href="{{ url_for('financeiro_nd.nova_nd') }}">+ Nova ND</a>
+      </div>
+    </div>
+
+    <div class="note-box">
+      A geração automática atual está preparada para <strong>ND de despesas</strong> da MATISA, consolidando despesas e faturas ainda sem vínculo.
+      As NDs de <strong>folha</strong> e <strong>material</strong> podem continuar sendo cadastradas manualmente nesta fase.
     </div>
 
     <div class="zone-body" style="padding:14px;">

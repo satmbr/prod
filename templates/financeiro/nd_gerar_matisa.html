@@ -80,13 +80,6 @@
     td.center{ text-align:center; }
     td.right{ text-align:right; }
 
-    .section-title{
-      font-size:16px;
-      font-weight:700;
-      color:#16324F;
-      margin:0;
-    }
-
     .flash{
       margin-bottom:12px;
       padding:12px 14px;
@@ -96,14 +89,51 @@
     }
     .flash.success{ background:#eefaf0; border-color:#bfe0c6; color:#25613a; }
     .flash.danger{ background:#fff3f3; border-color:#f1c0c0; color:#9f2d2d; }
+    .flash.warning{ background:#fff9e8; border-color:#f1df9b; color:#7a5a00; }
+
+    .summary-bar{
+      display:grid;
+      grid-template-columns: repeat(4, minmax(180px, 1fr));
+      gap:12px;
+      padding:14px;
+    }
+    .summary-card{
+      background:#fff;
+      border:1px solid #d9e1ea;
+      border-radius:12px;
+      padding:14px;
+    }
+    .summary-label{
+      font-size:12px;
+      color:#667487;
+      margin-bottom:6px;
+      text-transform:uppercase;
+      letter-spacing:.04em;
+    }
+    .summary-value{
+      font-size:22px;
+      font-weight:800;
+      color:#16324F;
+      line-height:1.1;
+    }
+    .note-box{
+      margin:14px;
+      padding:12px 14px;
+      border-radius:12px;
+      border:1px solid #f1df9b;
+      background:#fff9e8;
+      color:#7a5a00;
+    }
 
     @media (max-width: 1000px){
       .form-grid{ grid-template-columns: repeat(2, minmax(220px, 1fr)); }
       .span-4{ grid-column: span 2; }
+      .summary-bar{ grid-template-columns: repeat(2, minmax(180px, 1fr)); }
     }
     @media (max-width: 700px){
       .form-grid{ grid-template-columns: 1fr; }
       .span-2, .span-4{ grid-column: span 1; }
+      .summary-bar{ grid-template-columns: 1fr; }
     }
   </style>
 
@@ -162,9 +192,20 @@
         </div>
       </form>
     </div>
+
+    {% if filtros.tipo_nd != 'despesas' %}
+      <div class="note-box">
+        Nesta fase, a geração automática está preparada para <strong>ND de despesas</strong>.
+        Os tipos <strong>folha</strong> e <strong>material</strong> ainda serão integrados em etapa futura.
+      </div>
+    {% else %}
+      <div class="note-box">
+        A geração automática atual consolida despesas e faturas da MATISA ainda sem ND, com vínculo automático após a criação.
+      </div>
+    {% endif %}
   </section>
 
-  <form method="post">
+  <form method="post" id="form-gerar-nd">
     <input type="hidden" name="contrato_id" value="{{ filtros.contrato_id }}">
     <input type="hidden" name="competencia" value="{{ filtros.competencia }}">
     <input type="hidden" name="tipo_nd" value="{{ filtros.tipo_nd }}">
@@ -200,6 +241,34 @@
     <section class="zone">
       <div class="zone-head">
         <div class="zone-left">
+          <div class="zone-icon">📊</div>
+          <div class="zone-title">Resumo da seleção</div>
+        </div>
+      </div>
+
+      <div class="summary-bar">
+        <div class="summary-card">
+          <div class="summary-label">Despesas marcadas</div>
+          <div class="summary-value" id="qtd-despesas">0</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">Faturas marcadas</div>
+          <div class="summary-value" id="qtd-faturas">0</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">Itens marcados</div>
+          <div class="summary-value" id="qtd-total">0</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">Total selecionado</div>
+          <div class="summary-value" id="valor-total">R$ 0,00</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="zone">
+      <div class="zone-head">
+        <div class="zone-left">
           <div class="zone-icon">💸</div>
           <div class="zone-title">Despesas elegíveis sem ND</div>
         </div>
@@ -209,7 +278,9 @@
         <table>
           <thead>
             <tr>
-              <th>Selecionar</th>
+              <th>
+                <input type="checkbox" id="select-all-despesas">
+              </th>
               <th>ID</th>
               <th>Competência</th>
               <th>Data</th>
@@ -224,7 +295,13 @@
             {% for d in despesas %}
               <tr>
                 <td class="center">
-                  <input type="checkbox" name="despesa_ids" value="{{ d.id }}">
+                  <input
+                    type="checkbox"
+                    name="despesa_ids"
+                    value="{{ d.id }}"
+                    class="check-despesa item-check"
+                    data-valor="{{ '%.2f'|format(d.valor_brl or 0) }}"
+                  >
                 </td>
                 <td class="center">{{ d.id }}</td>
                 <td class="center">{{ d.competencia }}</td>
@@ -260,7 +337,9 @@
         <table>
           <thead>
             <tr>
-              <th>Selecionar</th>
+              <th>
+                <input type="checkbox" id="select-all-faturas">
+              </th>
               <th>ID</th>
               <th>Competência</th>
               <th>Nº origem</th>
@@ -274,7 +353,13 @@
             {% for f in faturas %}
               <tr>
                 <td class="center">
-                  <input type="checkbox" name="fatura_ids" value="{{ f.id }}">
+                  <input
+                    type="checkbox"
+                    name="fatura_ids"
+                    value="{{ f.id }}"
+                    class="check-fatura item-check"
+                    data-valor="{{ '%.2f'|format(f.valor_brl or 0) }}"
+                  >
                 </td>
                 <td class="center">{{ f.id }}</td>
                 <td class="center">{{ f.competencia }}</td>
@@ -303,4 +388,58 @@
   </form>
 
 </div>
+
+<script>
+  function formatarBRL(valor) {
+    return Number(valor || 0).toLocaleString('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    });
+  }
+
+  function atualizarResumoSelecao() {
+    const despesas = Array.from(document.querySelectorAll('.check-despesa:checked'));
+    const faturas = Array.from(document.querySelectorAll('.check-fatura:checked'));
+
+    const qtdDespesas = despesas.length;
+    const qtdFaturas = faturas.length;
+    const qtdTotal = qtdDespesas + qtdFaturas;
+
+    let valorTotal = 0;
+
+    despesas.forEach(item => {
+      valorTotal += parseFloat(item.dataset.valor || '0');
+    });
+
+    faturas.forEach(item => {
+      valorTotal += parseFloat(item.dataset.valor || '0');
+    });
+
+    document.getElementById('qtd-despesas').textContent = qtdDespesas;
+    document.getElementById('qtd-faturas').textContent = qtdFaturas;
+    document.getElementById('qtd-total').textContent = qtdTotal;
+    document.getElementById('valor-total').textContent = formatarBRL(valorTotal);
+  }
+
+  function configurarSelecionarTodos(masterId, itemSelector) {
+    const master = document.getElementById(masterId);
+    if (!master) return;
+
+    master.addEventListener('change', function() {
+      document.querySelectorAll(itemSelector).forEach(item => {
+        item.checked = master.checked;
+      });
+      atualizarResumoSelecao();
+    });
+  }
+
+  document.querySelectorAll('.item-check').forEach(item => {
+    item.addEventListener('change', atualizarResumoSelecao);
+  });
+
+  configurarSelecionarTodos('select-all-despesas', '.check-despesa');
+  configurarSelecionarTodos('select-all-faturas', '.check-fatura');
+
+  atualizarResumoSelecao();
+</script>
 {% endblock %}
