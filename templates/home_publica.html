@@ -3,43 +3,47 @@
 
 {% block content %}
 <div class="page-wrap">
+
   <section class="zone">
     <div class="zone-head">
       <div class="zone-left">
         <div class="zone-icon">🏢</div>
         <div>
-          <div class="zone-title" style="font-size:18px;">Sistema PRUMAT</div>
-          <div style="margin-top:4px; color:#667487; font-size:15px;">
-            Plataforma interna para gestão operacional, equipamentos, colaboradores e administração de acessos.
+          <div class="zone-title">Sistema PRUMAT</div>
+          <div style="font-size:13px; color:#667487; margin-top:4px;">
+            Plataforma interna para gestão operacional, equipamentos, colaboradores e acessos.
           </div>
         </div>
       </div>
     </div>
 
-    <div class="zone-body" style="padding:30px;">
-      <div style="display:grid; grid-template-columns:1.4fr .8fr; gap:22px; align-items:stretch;">
-        <div style="background:#fff; border:1px solid #d9e1ea; border-radius:18px; padding:26px;">
-          <h3 style="margin:0 0 14px 0; color:#0f3157; font-size:18px;">Bem-vindo ao ambiente PRUMAT</h3>
-          <p style="margin:0; color:#667487; line-height:1.7;">
-            Plataforma interna para gestão operacional, rastreabilidade de informações, controle de equipamentos,
-            gestão de colaboradores e administração de acessos, reunindo organização e padronização em um único ambiente.
+    <div style="padding:24px;">
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:18px;">
+
+        <a href="{{ url_for('auth.login') }}" style="background:#fff; border:1px solid #d9e1ea; border-radius:14px; padding:18px; display:block;">
+          <h3 style="margin:0 0 8px 0; color:#16324F;">Entrar no sistema</h3>
+          <p style="margin:0; color:#667487;">
+            Acesse o ambiente interno com seu usuário e senha.
+          </p>
+        </a>
+
+        <div style="background:#fff; border:1px solid #d9e1ea; border-radius:14px; padding:18px; display:block;">
+          <h3 style="margin:0 0 8px 0; color:#16324F;">Ambiente integrado</h3>
+          <p style="margin:0; color:#667487;">
+            Reúna em um só lugar operação, equipamentos, colaboradores, manutenção e financeiro.
           </p>
         </div>
 
-        <div style="background:#fff; border:1px solid #d9e1ea; border-radius:18px; padding:26px; display:flex; flex-direction:column; justify-content:space-between;">
-          <div>
-            <h3 style="margin:0 0 14px 0; color:#0f3157; font-size:18px;">Acesso ao sistema</h3>
-            <p style="margin:0; color:#667487; line-height:1.7;">
-              Entre com seu usuário e senha para acessar os módulos disponíveis conforme seu perfil.
-            </p>
-          </div>
-
-          <div style="margin-top:22px;">
-            <a href="{{ url_for('auth.login') }}" class="btn-primary">Entrar no sistema</a>
-          </div>
+        <div style="background:#fff; border:1px solid #d9e1ea; border-radius:14px; padding:18px; display:block;">
+          <h3 style="margin:0 0 8px 0; color:#16324F;">Gestão padronizada</h3>
+          <p style="margin:0; color:#667487;">
+            Navegue por módulos com interface única, simples e organizada.
+          </p>
         </div>
+
       </div>
     </div>
   </section>
+
 </div>
 {% endblock %}

@@ -1,5 +1,4 @@
 {% extends "base.html" %}
-
 {% block title %}Operação · PRUMAT{% endblock %}
 
 {% block content %}
@@ -8,44 +7,38 @@
   <section class="zone">
     <div class="zone-head">
       <div class="zone-left">
-        <div class="zone-icon">💰</div>
+        <div class="zone-icon">🏗️</div>
         <div>
           <div class="zone-title">Módulo Operação</div>
-          <div style="margin-top:4px; color:#667487; font-size:15px;">
+          <div style="font-size:13px; color:#667487; margin-top:4px;">
             Acompanhe produção, registros planejados e executados, e cadastros auxiliares do módulo operacional.
           </div>
         </div>
       </div>
     </div>
 
-    <div class="zone-body" style="padding:24px;">
-      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:20px;">
+    <div style="padding:24px;">
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:18px;">
 
         {% if 'operacao:visualizar' in current_user_permissions or 'auth:administrar' in current_user_permissions %}
-        <div style="background:#fff; border:1px solid #d9e1ea; border-radius:18px; padding:24px;">
-          <h3 style="margin:0 0 12px 0; color:#0f3157;">Produção</h3>
-          <p style="margin:0; color:#667487; line-height:1.6;">
-            Visualize o acompanhamento da renovação, parte diária, gráficos e o resumo consolidado das frentes.
-          </p>
-        </div>
+        <a href="{{ url_for('operacao.producao') }}" style="background:#fff; border:1px solid #d9e1ea; border-radius:14px; padding:18px; display:block;">
+          <h3 style="margin:0 0 8px 0; color:#16324F;">Produção</h3>
+          <p style="margin:0; color:#667487;">Visualize o acompanhamento da renovação, parte diária, gráficos e o resumo consolidado das frentes.</p>
+        </a>
         {% endif %}
 
         {% if 'operacao:visualizar' in current_user_permissions or 'auth:administrar' in current_user_permissions %}
-        <div style="background:#fff; border:1px solid #d9e1ea; border-radius:18px; padding:24px;">
-          <h3 style="margin:0 0 12px 0; color:#0f3157;">Registro</h3>
-          <p style="margin:0; color:#667487; line-height:1.6;">
-            Consulte os registros planejados e executados e acompanhe os lançamentos por EH, frente e data.
-          </p>
-        </div>
+        <a href="{{ url_for('operacao.registro') }}" style="background:#fff; border:1px solid #d9e1ea; border-radius:14px; padding:18px; display:block;">
+          <h3 style="margin:0 0 8px 0; color:#16324F;">Registro</h3>
+          <p style="margin:0; color:#667487;">Consulte os registros planejados e executados e acompanhe os lançamentos por EH, frente e data.</p>
+        </a>
         {% endif %}
 
         {% if 'operacao:criar' in current_user_permissions or 'auth:administrar' in current_user_permissions %}
-        <div style="background:#fff; border:1px solid #d9e1ea; border-radius:18px; padding:24px;">
-          <h3 style="margin:0 0 12px 0; color:#0f3157;">Cadastro</h3>
-          <p style="margin:0; color:#667487; line-height:1.6;">
-            Cadastre e mantenha EHs e frentes utilizadas no módulo de operação.
-          </p>
-        </div>
+        <a href="{{ url_for('operacao.cadastro') }}" style="background:#fff; border:1px solid #d9e1ea; border-radius:14px; padding:18px; display:block;">
+          <h3 style="margin:0 0 8px 0; color:#16324F;">Cadastro</h3>
+          <p style="margin:0; color:#667487;">Cadastre e mantenha EHs e frentes utilizadas no módulo de operação.</p>
+        </a>
         {% endif %}
 
         {% if not (

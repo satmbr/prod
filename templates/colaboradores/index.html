@@ -1,5 +1,4 @@
 {% extends "base.html" %}
-
 {% block title %}Colaboradores · PRUMAT{% endblock %}
 
 {% block content %}
@@ -8,35 +7,31 @@
   <section class="zone">
     <div class="zone-head">
       <div class="zone-left">
-        <div class="zone-icon">💰</div>
+        <div class="zone-icon">👥</div>
         <div>
           <div class="zone-title">Módulo Colaboradores</div>
-          <div style="margin-top:4px; color:#667487; font-size:15px;">
+          <div style="font-size:13px; color:#667487; margin-top:4px;">
             Gerencie registros, cadastros auxiliares e informações dos colaboradores.
           </div>
         </div>
       </div>
     </div>
 
-    <div class="zone-body" style="padding:24px;">
-      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:20px;">
+    <div style="padding:24px;">
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:18px;">
 
         {% if 'colaboradores:visualizar' in current_user_permissions or 'auth:administrar' in current_user_permissions %}
-        <div style="background:#fff; border:1px solid #d9e1ea; border-radius:18px; padding:24px;">
-          <h3 style="margin:0 0 12px 0; color:#0f3157;">Registro</h3>
-          <p style="margin:0; color:#667487; line-height:1.6;">
-            Consulte os colaboradores cadastrados e visualize seus dados principais.
-          </p>
-        </div>
+        <a href="{{ url_for('colaboradores.registro') }}" style="background:#fff; border:1px solid #d9e1ea; border-radius:14px; padding:18px; display:block;">
+          <h3 style="margin:0 0 8px 0; color:#16324F;">Registro</h3>
+          <p style="margin:0; color:#667487;">Consulte os colaboradores cadastrados e visualize seus dados principais.</p>
+        </a>
         {% endif %}
 
         {% if 'colaboradores:criar' in current_user_permissions or 'auth:administrar' in current_user_permissions %}
-        <div style="background:#fff; border:1px solid #d9e1ea; border-radius:18px; padding:24px;">
-          <h3 style="margin:0 0 12px 0; color:#0f3157;">Cadastro</h3>
-          <p style="margin:0; color:#667487; line-height:1.6;">
-            Cadastre escalas, funções, escolaridades, estado civil e demais tabelas auxiliares.
-          </p>
-        </div>
+        <a href="{{ url_for('colaboradores.cadastro') }}" style="background:#fff; border:1px solid #d9e1ea; border-radius:14px; padding:18px; display:block;">
+          <h3 style="margin:0 0 8px 0; color:#16324F;">Cadastro</h3>
+          <p style="margin:0; color:#667487;">Cadastre escalas, funções, escolaridades, estado civil e demais tabelas auxiliares.</p>
+        </a>
         {% endif %}
 
         {% if not (
