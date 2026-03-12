@@ -526,27 +526,46 @@
               <th>Mão de Obra</th>
               <th>Situação Folha</th>
               <th>Telefone</th>
+			  <th>Ações</th>
             </tr>
           </thead>
-          <tbody>
-            {% if colaboradores %}
-              {% for c in colaboradores %}
-                <tr>
-                  <td>{{ c.matricula }}</td>
-                  <td>{{ c.nome }}</td>
-                  <td>{{ c.funcao_nome or '' }}</td>
-                  <td>{{ c.escala_nome or '' }}</td>
-                  <td>{{ c.mao_obra_nome or '' }}</td>
-                  <td>{{ c.situacao_folha_nome or '' }}</td>
-                  <td>{{ c.telefone or '' }}</td>
-                </tr>
-              {% endfor %}
-            {% else %}
-              <tr>
-                <td colspan="7">Nenhum colaborador cadastrado até o momento.</td>
-              </tr>
-            {% endif %}
-          </tbody>
+			<tbody>
+			  {% if colaboradores %}
+				{% for c in colaboradores %}
+				  <tr>
+					<td>
+					  <a href="{{ url_for('colaboradores.colaborador_detalhe', colaborador_id=c.id) }}">
+						{{ c.matricula }}
+					  </a>
+					</td>
+					<td>{{ c.nome }}</td>
+					<td>{{ c.funcao_nome or '' }}</td>
+					<td>{{ c.escala_nome or '' }}</td>
+					<td>{{ c.mao_obra_nome or '' }}</td>
+					<td>{{ c.situacao_folha_nome or '' }}</td>
+					<td>{{ c.telefone or '' }}</td>
+					<td>
+					  <div style="display:flex; gap:8px; flex-wrap:wrap;">
+						<a class="btn" href="{{ url_for('colaboradores.colaborador_detalhe', colaborador_id=c.id) }}">
+						  Ver / Editar
+						</a>
+
+						<form method="post"
+							  action="{{ url_for('colaboradores.colaborador_delete', colaborador_id=c.id) }}"
+							  onsubmit="return confirm('Tem certeza que deseja excluir este colaborador?');"
+							  style="margin:0;">
+						  <button type="submit" class="btn danger">Excluir</button>
+						</form>
+					  </div>
+					</td>
+				  </tr>
+				{% endfor %}
+			  {% else %}
+				<tr>
+				  <td colspan="8">Nenhum colaborador cadastrado até o momento.</td>
+				</tr>
+			  {% endif %}
+			</tbody>
         </table>
       </div>
     </div>

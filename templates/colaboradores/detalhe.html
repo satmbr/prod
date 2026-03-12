@@ -1,0 +1,349 @@
+{% extends "base.html" %}
+{% block title %}Colaboradores · Detalhe{% endblock %}
+
+{% block content %}
+<div class="page-wrap">
+
+  <style>
+    .toolbar-row{
+      display:grid;
+      gap:12px;
+      align-items:end;
+    }
+
+    .toolbar-row.toolbar-2{ grid-template-columns:1fr 1fr; }
+    .toolbar-row.toolbar-3{ grid-template-columns:1fr 1fr 1fr; }
+    .toolbar-row.toolbar-4{ grid-template-columns:1fr 1fr 1fr 1fr; }
+
+    .field > span{
+      display:block;
+      margin-bottom:6px;
+      font-weight:600;
+      color:#394150;
+    }
+
+    .field input,
+    .field select{
+      width:100%;
+      min-height:38px;
+      padding:7px 10px;
+      border:1px solid #cfd6df;
+      border-radius:8px;
+      background:#fff;
+      box-sizing:border-box;
+    }
+
+    .btn{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap:6px;
+      min-height:38px;
+      padding:8px 12px;
+      border:1px solid #bfc8d4;
+      border-radius:8px;
+      background:#f7f9fc;
+      color:#28323f;
+      text-decoration:none;
+      cursor:pointer;
+      box-sizing:border-box;
+    }
+
+    .btn.primary{
+      background:#16324F;
+      border-color:#16324F;
+      color:#fff;
+    }
+
+    .btn.danger{
+      background:#8b1e1e;
+      border-color:#8b1e1e;
+      color:#fff;
+    }
+
+    .actions-bar{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      margin-top:18px;
+    }
+
+    .section-note{
+      margin-top:12px;
+      padding:10px 12px;
+      border:1px dashed #cfd8e3;
+      border-radius:10px;
+      background:#f8fbff;
+      color:#35516b;
+      font-size:14px;
+    }
+
+    .flash-wrap{
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+      margin-bottom:14px;
+    }
+
+    .flash{
+      padding:12px 14px;
+      border-radius:12px;
+      border:1px solid #d9e1ea;
+      background:#f5f8fc;
+    }
+
+    .flash.success{ background:#eefaf0; border-color:#bfe0c6; color:#25613a; }
+    .flash.warning{ background:#fff9e8; border-color:#f1df9b; color:#7a5a00; }
+    .flash.danger{ background:#fff3f3; border-color:#f1c0c0; color:#9f2d2d; }
+
+    @media (max-width: 1100px){
+      .toolbar-row.toolbar-2,
+      .toolbar-row.toolbar-3,
+      .toolbar-row.toolbar-4{
+        grid-template-columns:repeat(2, minmax(220px, 1fr));
+      }
+    }
+
+    @media (max-width: 700px){
+      .toolbar-row.toolbar-2,
+      .toolbar-row.toolbar-3,
+      .toolbar-row.toolbar-4{
+        grid-template-columns:1fr;
+      }
+    }
+  </style>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="flash-wrap">
+        {% for category, message in messages %}
+          <div class="flash {{ category }}">{{ message }}</div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+
+  <section class="zone">
+    <header class="zone-head">
+      <div class="zone-left">
+        <span class="zone-icon">👤</span>
+        <div class="zone-title">Detalhes do Colaborador</div>
+      </div>
+    </header>
+
+    <div class="zone-body">
+      <form method="post" action="{{ url_for('colaboradores.colaborador_update', colaborador_id=colaborador.id) }}">
+
+        <div class="toolbar-row toolbar-3">
+          <label class="field">
+            <span>Nome *</span>
+            <input type="text" name="nome" value="{{ colaborador.nome or '' }}" required>
+          </label>
+
+          <label class="field">
+            <span>Matrícula *</span>
+            <input type="text" name="matricula" value="{{ colaborador.matricula or '' }}" required>
+          </label>
+
+          <label class="field">
+            <span>Data de Nascimento</span>
+            <input type="date" name="data_nascimento" value="{{ colaborador.data_nascimento.strftime('%Y-%m-%d') if colaborador.data_nascimento else '' }}">
+          </label>
+        </div>
+
+        <div class="toolbar-row toolbar-3" style="margin-top:12px;">
+          <label class="field">
+            <span>Estado Civil</span>
+            <select name="estado_civil_id">
+              <option value="">Selecione...</option>
+              {% for ec in estados_civis %}
+                <option value="{{ ec.id }}" {% if colaborador.estado_civil_id == ec.id %}selected{% endif %}>{{ ec.nome }}</option>
+              {% endfor %}
+            </select>
+          </label>
+
+          <label class="field">
+            <span>Escolaridade</span>
+            <select name="escolaridade_id">
+              <option value="">Selecione...</option>
+              {% for esc in escolaridades %}
+                <option value="{{ esc.id }}" {% if colaborador.escolaridade_id == esc.id %}selected{% endif %}>{{ esc.nome }}</option>
+              {% endfor %}
+            </select>
+          </label>
+
+          <label class="field">
+            <span>Telefone</span>
+            <input type="text" name="telefone" value="{{ colaborador.telefone or '' }}">
+          </label>
+        </div>
+
+        <div class="toolbar-row toolbar-4" style="margin-top:12px;">
+          <label class="field">
+            <span>CPF</span>
+            <input type="text" name="cpf" value="{{ colaborador.cpf or '' }}">
+          </label>
+
+          <label class="field">
+            <span>RG</span>
+            <input type="text" name="rg" value="{{ colaborador.rg or '' }}">
+          </label>
+
+          <label class="field">
+            <span>Número / Chave PIX</span>
+            <input type="text" name="numero_pix" value="{{ colaborador.numero_pix or '' }}">
+          </label>
+
+          <div></div>
+        </div>
+
+        <div class="section-note">Documentos</div>
+
+        <div class="toolbar-row toolbar-4" style="margin-top:12px;">
+          <label class="field">
+            <span>CNH</span>
+            <input type="text" name="cnh" value="{{ colaborador.cnh or '' }}">
+          </label>
+
+          <label class="field">
+            <span>Vencimento CNH</span>
+            <input type="date" name="vencimento_cnh" value="{{ colaborador.vencimento_cnh.strftime('%Y-%m-%d') if colaborador.vencimento_cnh else '' }}">
+          </label>
+
+          <label class="field">
+            <span>CTPS</span>
+            <input type="text" name="ctps" value="{{ colaborador.ctps or '' }}">
+          </label>
+
+          <label class="field">
+            <span>PIS</span>
+            <input type="text" name="pis" value="{{ colaborador.pis or '' }}">
+          </label>
+        </div>
+
+        <div class="section-note">Endereço</div>
+
+        <div class="toolbar-row toolbar-2" style="margin-top:12px;">
+          <label class="field">
+            <span>Endereço</span>
+            <input type="text" name="endereco" value="{{ colaborador.endereco or '' }}">
+          </label>
+
+          <label class="field">
+            <span>CEP</span>
+            <input type="text" name="cep" value="{{ colaborador.cep or '' }}">
+          </label>
+        </div>
+
+        <div class="section-note">Contrato e função</div>
+
+        <div class="toolbar-row toolbar-4" style="margin-top:12px;">
+          <label class="field">
+            <span>Função</span>
+            <select name="funcao_id">
+              <option value="">Selecione...</option>
+              {% for f in funcoes %}
+                <option value="{{ f.id }}" {% if colaborador.funcao_id == f.id %}selected{% endif %}>{{ f.nome }}</option>
+              {% endfor %}
+            </select>
+          </label>
+
+          <label class="field">
+            <span>Data Admissão</span>
+            <input type="date" name="data_admissao" value="{{ colaborador.data_admissao.strftime('%Y-%m-%d') if colaborador.data_admissao else '' }}">
+          </label>
+
+          <label class="field">
+            <span>Data Função</span>
+            <input type="date" name="data_funcao" value="{{ colaborador.data_funcao.strftime('%Y-%m-%d') if colaborador.data_funcao else '' }}">
+          </label>
+
+          <label class="field">
+            <span>Contrato</span>
+            <input type="text" name="contrato" value="{{ colaborador.contrato or '' }}">
+          </label>
+        </div>
+
+        <div class="toolbar-row toolbar-4" style="margin-top:12px;">
+          <label class="field">
+            <span>Escala</span>
+            <select name="escala_id">
+              <option value="">Selecione...</option>
+              {% for e in escalas %}
+                <option value="{{ e.id }}" {% if colaborador.escala_id == e.id %}selected{% endif %}>{{ e.nome }}</option>
+              {% endfor %}
+            </select>
+          </label>
+
+          <label class="field">
+            <span>Mão de Obra</span>
+            <select name="mao_obra_id">
+              <option value="">Selecione...</option>
+              {% for mo in maos_obra %}
+                <option value="{{ mo.id }}" {% if colaborador.mao_obra_id == mo.id %}selected{% endif %}>{{ mo.nome }}</option>
+              {% endfor %}
+            </select>
+          </label>
+
+          <label class="field">
+            <span>Situação Folha</span>
+            <select name="situacao_folha_id">
+              <option value="">Selecione...</option>
+              {% for sf in situacoes_folha %}
+                <option value="{{ sf.id }}" {% if colaborador.situacao_folha_id == sf.id %}selected{% endif %}>{{ sf.nome }}</option>
+              {% endfor %}
+            </select>
+          </label>
+
+          <label class="field">
+            <span>Salário</span>
+            <input type="text" name="salario" value="{{ colaborador.salario or '' }}">
+          </label>
+        </div>
+
+        <div class="toolbar-row toolbar-4" style="margin-top:12px;">
+          <label class="field">
+            <span>Horário Início</span>
+            <input type="time" name="horario_inicio" value="{{ colaborador.horario_inicio.strftime('%H:%M') if colaborador.horario_inicio else '' }}">
+          </label>
+
+          <label class="field">
+            <span>Horário Fim</span>
+            <input type="time" name="horario_fim" value="{{ colaborador.horario_fim.strftime('%H:%M') if colaborador.horario_fim else '' }}">
+          </label>
+
+          <label class="field">
+            <span>Início Férias</span>
+            <input type="date" name="inicio_ferias" value="{{ colaborador.inicio_ferias.strftime('%Y-%m-%d') if colaborador.inicio_ferias else '' }}">
+          </label>
+
+          <label class="field">
+            <span>Fim Férias</span>
+            <input type="date" name="fim_ferias" value="{{ colaborador.fim_ferias.strftime('%Y-%m-%d') if colaborador.fim_ferias else '' }}">
+          </label>
+        </div>
+
+        <div class="toolbar-row toolbar-2" style="margin-top:12px;">
+          <label class="field">
+            <span>Cidade de Nascimento</span>
+            <input type="text" name="cidade_nascimento" value="{{ colaborador.cidade_nascimento or '' }}">
+          </label>
+          <div></div>
+        </div>
+
+        <div class="actions-bar">
+          <a href="{{ url_for('colaboradores.registro') }}" class="btn">Voltar</a>
+          <button type="submit" class="btn primary">Salvar alterações</button>
+        </div>
+      </form>
+
+      <form method="post"
+            action="{{ url_for('colaboradores.colaborador_delete', colaborador_id=colaborador.id) }}"
+            style="margin-top:12px;"
+            onsubmit="return confirm('Tem certeza que deseja excluir este colaborador?');">
+        <button type="submit" class="btn danger">Excluir colaborador</button>
+      </form>
+    </div>
+  </section>
+</div>
+{% endblock %}

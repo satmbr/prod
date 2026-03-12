@@ -377,6 +377,194 @@ def registro_create():
 
     return redirect(url_for("colaboradores.registro"))
 
+@bp.route("/registro/<int:colaborador_id>", methods=["GET"])
+@login_required
+@permission_required("colaboradores", "visualizar")
+def colaborador_detalhe(colaborador_id):
+    engine = get_engine()
+
+    with engine.connect() as conn:
+        (
+            escalas,
+            escolaridades,
+            estados_civis,
+            funcoes,
+            maos_obra,
+            situacoes_folha,
+        ) = load_auxiliares(conn)
+
+        colaborador = conn.execute(
+            text(
+                """
+                SELECT
+                    c.id,
+                    c.nome,
+                    c.matricula,
+                    c.cpf,
+                    c.rg,
+                    c.cnh,
+                    c.ctps,
+                    c.pis,
+                    c.data_nascimento,
+                    c.data_admissao,
+                    c.data_funcao,
+                    c.horario_inicio,
+                    c.horario_fim,
+                    c.inicio_ferias,
+                    c.fim_ferias,
+                    c.cidade_nascimento,
+                    c.endereco,
+                    c.cep,
+                    c.salario,
+                    c.contrato,
+                    c.vencimento_cnh,
+                    c.telefone,
+                    c.numero_pix,
+                    c.funcao_id,
+                    c.escala_id,
+                    c.estado_civil_id,
+                    c.escolaridade_id,
+                    c.mao_obra_id,
+                    c.situacao_folha_id
+                FROM colaborador_prumat c
+                WHERE c.id = :id
+                LIMIT 1
+                """
+            ),
+            {"id": colaborador_id},
+        ).mappings().first()
+
+    if not colaborador:
+        flash("Colaborador não encontrado.", "warning")
+        return redirect(url_for("colaboradores.registro"))
+
+    return render_template(
+        "colaboradores/detalhe.html",
+        colaborador=colaborador,
+        escalas=escalas,
+        escolaridades=escolaridades,
+        estados_civis=estados_civis,
+        funcoes=funcoes,
+        maos_obra=maos_obra,
+        situacoes_folha=situacoes_folha,
+        subnav_links=build_colaboradores_subnav("registro"),
+    )
+
+
+@bp.route("/registro/<int:colaborador_id>/update", methods=["POST"])
+@login_required
+@permission_required("colaboradores", "criar")
+def colaborador_update(colaborador_id):
+    engine = get_engine()
+    form = request.form
+
+    params = {
+        "id": colaborador_id,
+        "nome": form.get("nome", "").strip(),
+        "matricula": form.get("matricula", "").strip(),
+        "cpf": form.get("cpf", "").strip() or None,
+        "rg": form.get("rg", "").strip() or None,
+        "cnh": form.get("cnh", "").strip() or None,
+        "ctps": form.get("ctps", "").strip() or None,
+        "pis": form.get("pis", "").strip() or None,
+        "data_nascimento": parse_date(form.get("data_nascimento")),
+        "funcao_id": int(form["funcao_id"]) if form.get("funcao_id") else None,
+        "data_admissao": parse_date(form.get("data_admissao")),
+        "data_funcao": parse_date(form.get("data_funcao")),
+        "situacao_folha_id": int(form["situacao_folha_id"]) if form.get("situacao_folha_id") else None,
+        "mao_obra_id": int(form["mao_obra_id"]) if form.get("mao_obra_id") else None,
+        "escala_id": int(form["escala_id"]) if form.get("escala_id") else None,
+        "horario_inicio": form.get("horario_inicio") or None,
+        "horario_fim": form.get("horario_fim") or None,
+        "inicio_ferias": parse_date(form.get("inicio_ferias")),
+        "fim_ferias": parse_date(form.get("fim_ferias")),
+        "cidade_nascimento": form.get("cidade_nascimento", "").strip() or None,
+        "endereco": form.get("endereco", "").strip() or None,
+        "cep": form.get("cep", "").strip() or None,
+        "estado_civil_id": int(form["estado_civil_id"]) if form.get("estado_civil_id") else None,
+        "salario": float(form["salario"].replace(",", ".")) if form.get("salario") else None,
+        "contrato": form.get("contrato", "").strip() or None,
+        "vencimento_cnh": parse_date(form.get("vencimento_cnh")),
+        "escolaridade_id": int(form["escolaridade_id"]) if form.get("escolaridade_id") else None,
+        "telefone": form.get("telefone", "").strip() or None,
+        "numero_pix": form.get("numero_pix", "").strip() or None,
+    }
+
+    if not params["nome"] or not params["matricula"]:
+        flash("Nome e matrícula são obrigatórios.", "warning")
+        return redirect(url_for("colaboradores.colaborador_detalhe", colaborador_id=colaborador_id))
+
+    update_sql = text(
+        """
+        UPDATE colaborador_prumat
+        SET
+            nome = :nome,
+            matricula = :matricula,
+            cpf = :cpf,
+            rg = :rg,
+            cnh = :cnh,
+            ctps = :ctps,
+            pis = :pis,
+            data_nascimento = :data_nascimento,
+            funcao_id = :funcao_id,
+            data_admissao = :data_admissao,
+            data_funcao = :data_funcao,
+            situacao_folha_id = :situacao_folha_id,
+            mao_obra_id = :mao_obra_id,
+            escala_id = :escala_id,
+            horario_inicio = :horario_inicio,
+            horario_fim = :horario_fim,
+            inicio_ferias = :inicio_ferias,
+            fim_ferias = :fim_ferias,
+            cidade_nascimento = :cidade_nascimento,
+            endereco = :endereco,
+            cep = :cep,
+            estado_civil_id = :estado_civil_id,
+            salario = :salario,
+            contrato = :contrato,
+            vencimento_cnh = :vencimento_cnh,
+            escolaridade_id = :escolaridade_id,
+            telefone = :telefone,
+            numero_pix = :numero_pix
+        WHERE id = :id
+        """
+    )
+
+    try:
+        with engine.begin() as conn:
+            conn.execute(update_sql, params)
+        flash("Colaborador atualizado com sucesso.", "success")
+    except SQLAlchemyError as e:
+        msg = str(e.__cause__ or e)
+        if "colaborador_prumat_matricula_key" in msg:
+            flash("Já existe outro colaborador com essa matrícula.", "warning")
+        else:
+            flash(f"Erro ao atualizar colaborador: {msg}", "danger")
+
+    return redirect(url_for("colaboradores.colaborador_detalhe", colaborador_id=colaborador_id))
+
+
+@bp.route("/registro/<int:colaborador_id>/delete", methods=["POST"])
+@login_required
+@permission_required("colaboradores", "criar")
+def colaborador_delete(colaborador_id):
+    engine = get_engine()
+
+    try:
+        with engine.begin() as conn:
+            conn.execute(
+                text("DELETE FROM colaborador_prumat WHERE id = :id"),
+                {"id": colaborador_id},
+            )
+        flash("Colaborador excluído com sucesso.", "success")
+    except SQLAlchemyError as e:
+        flash(
+            "Não foi possível excluir o colaborador. Verifique se ele possui vínculos em outras tabelas.",
+            "danger",
+        )
+
+    return redirect(url_for("colaboradores.registro"))
+
 
 # ---------------------------------------------------------------------
 # CADASTRO DE TABELAS AUXILIARES
