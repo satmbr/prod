@@ -238,6 +238,52 @@
         flex:1 1 auto;
       }
     }
+	
+		.colab-table{
+		width:100%;
+		border-collapse:collapse;
+		font-size:12px;
+	  }
+
+	  .colab-table th,
+	  .colab-table td{
+		padding:8px 10px;
+		vertical-align:middle;
+		white-space:nowrap;
+	  }
+
+	  .colab-table th{
+		font-size:12px;
+	  }
+
+	  .colab-table td{
+		font-size:11px;
+	  }
+
+	  .colab-table .acoes-colab{
+		display:flex;
+		align-items:center;
+		gap:8px;
+		flex-wrap:nowrap;
+	  }
+
+	  .colab-table .acoes-colab form{
+		margin:0;
+	  }
+
+	  .colab-table .btn-sm{
+		min-height:32px;
+		padding:6px 12px;
+		font-size:12px;
+		line-height:1;
+		white-space:nowrap;
+	  }
+
+	  .colab-table .matricula-link{
+		font-size:11px;
+		text-decoration:none;
+	  }
+	
   </style>
 
   {% set can_create = 'colaboradores:criar' in current_user_permissions or 'auth:administrar' in current_user_permissions %}
@@ -514,62 +560,63 @@
         <button type="button" class="icon-btn caret">▾</button>
       </div>
     </header>
-    <div class="zone-body collapsed" id="colab-lista">
-      <div class="table-wrap">
-        <table class="table">
-          <thead>
-            <tr>
-              <th>Matrícula</th>
-              <th>Nome</th>
-              <th>Função</th>
-              <th>Escala</th>
-              <th>Mão de Obra</th>
-              <th>Situação Folha</th>
-              <th>Telefone</th>
-			  <th>Ações</th>
-            </tr>
-          </thead>
-			<tbody>
-			  {% if colaboradores %}
-				{% for c in colaboradores %}
-				  <tr>
-					<td>
-					  <a href="{{ url_for('colaboradores.colaborador_detalhe', colaborador_id=c.id) }}">
-						{{ c.matricula }}
-					  </a>
-					</td>
-					<td>{{ c.nome }}</td>
-					<td>{{ c.funcao_nome or '' }}</td>
-					<td>{{ c.escala_nome or '' }}</td>
-					<td>{{ c.mao_obra_nome or '' }}</td>
-					<td>{{ c.situacao_folha_nome or '' }}</td>
-					<td>{{ c.telefone or '' }}</td>
-					<td>
-					  <div style="display:flex; gap:8px; flex-wrap:wrap;">
-						<a class="btn" href="{{ url_for('colaboradores.colaborador_detalhe', colaborador_id=c.id) }}">
-						  Ver / Editar
-						</a>
+<div class="zone-body collapsed" id="colab-lista">
+  <div class="table-wrap">
+    <div class="table-responsive">
+      <table class="colab-table">
+        <thead>
+          <tr>
+            <th>Matrícula</th>
+            <th>Nome</th>
+            <th>Função</th>
+            <th>Escala</th>
+            <th>Mão de Obra</th>
+            <th>Situação Folha</th>
+            <th>Telefone</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if colaboradores %}
+            {% for c in colaboradores %}
+              <tr>
+                <td>
+                  <a class="matricula-link" href="{{ url_for('colaboradores.colaborador_detalhe', colaborador_id=c.id) }}">
+                    {{ c.matricula }}
+                  </a>
+                </td>
+                <td>{{ c.nome }}</td>
+                <td>{{ c.funcao_nome or '' }}</td>
+                <td>{{ c.escala_nome or '' }}</td>
+                <td>{{ c.mao_obra_nome or '' }}</td>
+                <td>{{ c.situacao_folha_nome or '' }}</td>
+                <td>{{ c.telefone or '' }}</td>
+                <td>
+                  <div class="acoes-colab">
+                    <a class="btn btn-sm" href="{{ url_for('colaboradores.colaborador_detalhe', colaborador_id=c.id) }}">
+                      Ver / Editar
+                    </a>
 
-						<form method="post"
-							  action="{{ url_for('colaboradores.colaborador_delete', colaborador_id=c.id) }}"
-							  onsubmit="return confirm('Tem certeza que deseja excluir este colaborador?');"
-							  style="margin:0;">
-						  <button type="submit" class="btn danger">Excluir</button>
-						</form>
-					  </div>
-					</td>
-				  </tr>
-				{% endfor %}
-			  {% else %}
-				<tr>
-				  <td colspan="8">Nenhum colaborador cadastrado até o momento.</td>
-				</tr>
-			  {% endif %}
-			</tbody>
-        </table>
-      </div>
+                    <form method="post"
+                          action="{{ url_for('colaboradores.colaborador_delete', colaborador_id=c.id) }}"
+                          onsubmit="return confirm('Tem certeza que deseja excluir este colaborador?');">
+                      <button type="submit" class="btn danger btn-sm">Excluir</button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          {% else %}
+            <tr>
+              <td colspan="8">Nenhum colaborador cadastrado até o momento.</td>
+            </tr>
+          {% endif %}
+        </tbody>
+      </table>
     </div>
-  </section>
+  </div>
+</div>
+</section>
 
 </div>
 
