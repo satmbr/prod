@@ -331,18 +331,18 @@
           <div></div>
         </div>
 
-        <div class="actions-bar">
-          <a href="{{ url_for('colaboradores.registro') }}" class="btn">Voltar</a>
-          <button type="submit" class="btn primary">Salvar alterações</button>
-        </div>
-      </form>
+		<div class="actions-bar">
+		  <a href="{{ url_for('colaboradores.registro') }}" class="btn">Voltar</a>
+		  <button type="submit" class="btn primary">Salvar alterações</button>
+		</form>
 
-      <form method="post"
-            action="{{ url_for('colaboradores.colaborador_delete', colaborador_id=colaborador.id) }}"
-            style="margin-top:12px;"
-            onsubmit="return confirm('Tem certeza que deseja excluir este colaborador?');">
-        <button type="submit" class="btn danger">Excluir colaborador</button>
-      </form>
+		<form method="post"
+			  action="{{ url_for('colaboradores.colaborador_delete', colaborador_id=colaborador.id) }}"
+			  onsubmit="return confirm('Tem certeza que deseja excluir este colaborador?');"
+			  style="margin:0;">
+		  <button type="submit" class="btn danger">Excluir colaborador</button>
+		</form>
+		</div>
     </div>
   </section>
 </div>
