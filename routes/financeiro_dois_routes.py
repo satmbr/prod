@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, session, url_for, abort
-
 from routes.auth import login_required, permission_required
-from db import get_db_connection
+from db import get_engine
+from sqlalchemy import text
 
 bp = Blueprint("financeiro_dois", __name__, url_prefix="/financeiro-dois")
 
