@@ -53,7 +53,14 @@
 
             <div class="cad-table-wrap">
               <table class="table">
-                <thead><tr><th>ID</th><th>Nome</th><th>Status</th><th>Ações</th></tr></thead>
+                <thead>
+                  <tr>
+                    <th style="width:80px;">ID</th>
+                    <th>Nome</th>
+                    <th style="width:140px;">Status</th>
+                    <th style="width:220px;">Ações</th>
+                  </tr>
+                </thead>
                 <tbody>
                   {% for item in categorias %}
                   <tr>
@@ -80,7 +87,7 @@
           </div>
         </div>
 
-        <!-- DESCRICOES -->
+        <!-- DESCRIÇÕES -->
         <div class="f2-tab-panel" id="tab-descricoes">
           <div class="cad-card">
             <div class="cad-card-head">
@@ -117,7 +124,15 @@
 
             <div class="cad-table-wrap">
               <table class="table">
-                <thead><tr><th>ID</th><th>Nome</th><th>Categoria</th><th>Status</th><th>Ações</th></tr></thead>
+                <thead>
+                  <tr>
+                    <th style="width:80px;">ID</th>
+                    <th>Nome</th>
+                    <th>Categoria</th>
+                    <th style="width:140px;">Status</th>
+                    <th style="width:220px;">Ações</th>
+                  </tr>
+                </thead>
                 <tbody>
                   {% for item in descricoes %}
                   <tr>
@@ -125,19 +140,20 @@
                     <td>
                       <form method="post" action="{{ url_for('financeiro_dois.descricao_editar', item_id=item.id) }}" class="inline-edit-form stacked">
                         <input type="text" name="nome" value="{{ item.nome }}" class="input-like input-like-sm" required>
+                    </td>
+                    <td>
                         <select name="categoria_id" class="input-like input-like-sm">
                           <option value="">Sem categoria</option>
                           {% for cat in categorias %}
-                          <option value="{{ cat.id }}" {% if item.categoria_nome == cat.nome %}selected{% endif %}>{{ cat.nome }}</option>
+                          <option value="{{ cat.id }}" {% if item.categoria_id == cat.id %}selected{% endif %}>{{ cat.nome }}</option>
                           {% endfor %}
                         </select>
-                        <button type="submit" class="btn btn-sm">Salvar</button>
-                      </form>
                     </td>
-                    <td>{{ item.categoria_nome }}</td>
                     <td>{{ item.status }}</td>
                     <td>
-                      <form method="post" action="{{ url_for('financeiro_dois.descricao_toggle_status', item_id=item.id) }}">
+                        <button type="submit" class="btn btn-sm">Salvar</button>
+                      </form>
+                      <form method="post" action="{{ url_for('financeiro_dois.descricao_toggle_status', item_id=item.id) }}" style="margin-top:6px;">
                         <button type="submit" class="btn btn-sm">{% if item.status == 'Ativo' %}Inativar{% else %}Reativar{% endif %}</button>
                       </form>
                     </td>
@@ -151,18 +167,24 @@
           </div>
         </div>
 
-        <!-- APLICACOES -->
+        <!-- APLICAÇÕES -->
         <div class="f2-tab-panel" id="tab-aplicacoes">
           <div class="cad-card">
             <div class="cad-card-head">
-              <div><div class="cad-card-title">Aplicações</div><div class="muted">Cadastro simples.</div></div>
+              <div>
+                <div class="cad-card-title">Aplicações</div>
+                <div class="muted">Cadastro simples.</div>
+              </div>
               <button type="button" class="btn btn-primary" onclick="toggleBox('box-aplicacoes')">Novo</button>
             </div>
 
             <div id="box-aplicacoes" class="cad-form-box" style="display:none;">
               <form method="post" action="{{ url_for('financeiro_dois.aplicacao_nova') }}">
                 <div class="cad-form-grid">
-                  <div class="field"><label>Nome</label><input type="text" name="nome" class="input-like" required></div>
+                  <div class="field">
+                    <label>Nome</label>
+                    <input type="text" name="nome" class="input-like" required>
+                  </div>
                 </div>
                 <div class="cad-form-actions">
                   <button type="submit" class="btn btn-primary">Salvar</button>
@@ -173,7 +195,14 @@
 
             <div class="cad-table-wrap">
               <table class="table">
-                <thead><tr><th>ID</th><th>Nome</th><th>Status</th><th>Ações</th></tr></thead>
+                <thead>
+                  <tr>
+                    <th style="width:80px;">ID</th>
+                    <th>Nome</th>
+                    <th style="width:140px;">Status</th>
+                    <th style="width:220px;">Ações</th>
+                  </tr>
+                </thead>
                 <tbody>
                   {% for item in aplicacoes %}
                   <tr>
@@ -204,16 +233,28 @@
         <div class="f2-tab-panel" id="tab-moedas">
           <div class="cad-card">
             <div class="cad-card-head">
-              <div><div class="cad-card-title">Moedas</div><div class="muted">Código, nome e câmbio padrão.</div></div>
+              <div>
+                <div class="cad-card-title">Moedas</div>
+                <div class="muted">Código, nome e câmbio padrão.</div>
+              </div>
               <button type="button" class="btn btn-primary" onclick="toggleBox('box-moedas')">Novo</button>
             </div>
 
             <div id="box-moedas" class="cad-form-box" style="display:none;">
               <form method="post" action="{{ url_for('financeiro_dois.moeda_nova') }}">
                 <div class="cad-form-grid">
-                  <div class="field"><label>Código</label><input type="text" name="codigo" class="input-like" required></div>
-                  <div class="field"><label>Nome</label><input type="text" name="nome" class="input-like" required></div>
-                  <div class="field"><label>Câmbio padrão</label><input type="text" name="cambio_padrao" class="input-like" value="1" required></div>
+                  <div class="field">
+                    <label>Código</label>
+                    <input type="text" name="codigo" class="input-like" required>
+                  </div>
+                  <div class="field">
+                    <label>Nome</label>
+                    <input type="text" name="nome" class="input-like" required>
+                  </div>
+                  <div class="field">
+                    <label>Câmbio padrão</label>
+                    <input type="text" name="cambio_padrao" class="input-like" value="1" required>
+                  </div>
                 </div>
                 <div class="cad-form-actions">
                   <button type="submit" class="btn btn-primary">Salvar</button>
@@ -224,7 +265,16 @@
 
             <div class="cad-table-wrap">
               <table class="table">
-                <thead><tr><th>ID</th><th>Código</th><th>Nome</th><th>Câmbio</th><th>Status</th><th>Ações</th></tr></thead>
+                <thead>
+                  <tr>
+                    <th style="width:80px;">ID</th>
+                    <th>Código</th>
+                    <th>Nome</th>
+                    <th>Câmbio</th>
+                    <th style="width:140px;">Status</th>
+                    <th style="width:220px;">Ações</th>
+                  </tr>
+                </thead>
                 <tbody>
                   {% for item in moedas %}
                   <tr>
@@ -253,18 +303,24 @@
           </div>
         </div>
 
-        <!-- CENTROS CUSTO -->
+        <!-- CENTROS DE CUSTO -->
         <div class="f2-tab-panel" id="tab-centros_custo">
           <div class="cad-card">
             <div class="cad-card-head">
-              <div><div class="cad-card-title">Centros de custo</div><div class="muted">Cadastro simples.</div></div>
+              <div>
+                <div class="cad-card-title">Centros de custo</div>
+                <div class="muted">Cadastro simples.</div>
+              </div>
               <button type="button" class="btn btn-primary" onclick="toggleBox('box-cc')">Novo</button>
             </div>
 
             <div id="box-cc" class="cad-form-box" style="display:none;">
               <form method="post" action="{{ url_for('financeiro_dois.centro_custo_novo') }}">
                 <div class="cad-form-grid">
-                  <div class="field"><label>Nome</label><input type="text" name="nome" class="input-like" required></div>
+                  <div class="field">
+                    <label>Nome</label>
+                    <input type="text" name="nome" class="input-like" required>
+                  </div>
                 </div>
                 <div class="cad-form-actions">
                   <button type="submit" class="btn btn-primary">Salvar</button>
@@ -275,7 +331,14 @@
 
             <div class="cad-table-wrap">
               <table class="table">
-                <thead><tr><th>ID</th><th>Nome</th><th>Status</th><th>Ações</th></tr></thead>
+                <thead>
+                  <tr>
+                    <th style="width:80px;">ID</th>
+                    <th>Nome</th>
+                    <th style="width:140px;">Status</th>
+                    <th style="width:220px;">Ações</th>
+                  </tr>
+                </thead>
                 <tbody>
                   {% for item in centros_custo %}
                   <tr>
@@ -306,14 +369,20 @@
         <div class="f2-tab-panel" id="tab-status_despesa">
           <div class="cad-card">
             <div class="cad-card-head">
-              <div><div class="cad-card-title">Status despesa</div><div class="muted">Cadastro simples.</div></div>
+              <div>
+                <div class="cad-card-title">Status despesa</div>
+                <div class="muted">Cadastro simples.</div>
+              </div>
               <button type="button" class="btn btn-primary" onclick="toggleBox('box-status-despesa')">Novo</button>
             </div>
 
             <div id="box-status-despesa" class="cad-form-box" style="display:none;">
               <form method="post" action="{{ url_for('financeiro_dois.status_despesa_novo') }}">
                 <div class="cad-form-grid">
-                  <div class="field"><label>Nome</label><input type="text" name="nome" class="input-like" required></div>
+                  <div class="field">
+                    <label>Nome</label>
+                    <input type="text" name="nome" class="input-like" required>
+                  </div>
                 </div>
                 <div class="cad-form-actions">
                   <button type="submit" class="btn btn-primary">Salvar</button>
@@ -324,7 +393,14 @@
 
             <div class="cad-table-wrap">
               <table class="table">
-                <thead><tr><th>ID</th><th>Nome</th><th>Status</th><th>Ações</th></tr></thead>
+                <thead>
+                  <tr>
+                    <th style="width:80px;">ID</th>
+                    <th>Nome</th>
+                    <th style="width:140px;">Status</th>
+                    <th style="width:220px;">Ações</th>
+                  </tr>
+                </thead>
                 <tbody>
                   {% for item in status_despesa %}
                   <tr>
@@ -355,14 +431,20 @@
         <div class="f2-tab-panel" id="tab-status_nd">
           <div class="cad-card">
             <div class="cad-card-head">
-              <div><div class="cad-card-title">Status ND</div><div class="muted">Cadastro simples.</div></div>
+              <div>
+                <div class="cad-card-title">Status ND</div>
+                <div class="muted">Cadastro simples.</div>
+              </div>
               <button type="button" class="btn btn-primary" onclick="toggleBox('box-status-nd')">Novo</button>
             </div>
 
             <div id="box-status-nd" class="cad-form-box" style="display:none;">
               <form method="post" action="{{ url_for('financeiro_dois.status_nd_novo') }}">
                 <div class="cad-form-grid">
-                  <div class="field"><label>Nome</label><input type="text" name="nome" class="input-like" required></div>
+                  <div class="field">
+                    <label>Nome</label>
+                    <input type="text" name="nome" class="input-like" required>
+                  </div>
                 </div>
                 <div class="cad-form-actions">
                   <button type="submit" class="btn btn-primary">Salvar</button>
@@ -373,7 +455,14 @@
 
             <div class="cad-table-wrap">
               <table class="table">
-                <thead><tr><th>ID</th><th>Nome</th><th>Status</th><th>Ações</th></tr></thead>
+                <thead>
+                  <tr>
+                    <th style="width:80px;">ID</th>
+                    <th>Nome</th>
+                    <th style="width:140px;">Status</th>
+                    <th style="width:220px;">Ações</th>
+                  </tr>
+                </thead>
                 <tbody>
                   {% for item in status_nd %}
                   <tr>
@@ -404,14 +493,20 @@
         <div class="f2-tab-panel" id="tab-tipos_documento">
           <div class="cad-card">
             <div class="cad-card-head">
-              <div><div class="cad-card-title">Tipos de documento</div><div class="muted">Cadastro simples.</div></div>
+              <div>
+                <div class="cad-card-title">Tipos de documento</div>
+                <div class="muted">Cadastro simples.</div>
+              </div>
               <button type="button" class="btn btn-primary" onclick="toggleBox('box-tipos-documento')">Novo</button>
             </div>
 
             <div id="box-tipos-documento" class="cad-form-box" style="display:none;">
               <form method="post" action="{{ url_for('financeiro_dois.tipo_documento_novo') }}">
                 <div class="cad-form-grid">
-                  <div class="field"><label>Nome</label><input type="text" name="nome" class="input-like" required></div>
+                  <div class="field">
+                    <label>Nome</label>
+                    <input type="text" name="nome" class="input-like" required>
+                  </div>
                 </div>
                 <div class="cad-form-actions">
                   <button type="submit" class="btn btn-primary">Salvar</button>
@@ -422,7 +517,14 @@
 
             <div class="cad-table-wrap">
               <table class="table">
-                <thead><tr><th>ID</th><th>Nome</th><th>Status</th><th>Ações</th></tr></thead>
+                <thead>
+                  <tr>
+                    <th style="width:80px;">ID</th>
+                    <th>Nome</th>
+                    <th style="width:140px;">Status</th>
+                    <th style="width:220px;">Ações</th>
+                  </tr>
+                </thead>
                 <tbody>
                   {% for item in tipos_documento %}
                   <tr>
@@ -449,20 +551,32 @@
           </div>
         </div>
 
-        <!-- PARAMETROS -->
+        <!-- PARÂMETROS -->
         <div class="f2-tab-panel" id="tab-parametros">
           <div class="cad-card">
             <div class="cad-card-head">
-              <div><div class="cad-card-title">Parâmetros</div><div class="muted">Chave, valor e descrição.</div></div>
+              <div>
+                <div class="cad-card-title">Parâmetros</div>
+                <div class="muted">Chave, valor e descrição.</div>
+              </div>
               <button type="button" class="btn btn-primary" onclick="toggleBox('box-parametros')">Novo</button>
             </div>
 
             <div id="box-parametros" class="cad-form-box" style="display:none;">
               <form method="post" action="{{ url_for('financeiro_dois.parametro_novo') }}">
                 <div class="cad-form-grid">
-                  <div class="field"><label>Chave</label><input type="text" name="chave" class="input-like" required></div>
-                  <div class="field"><label>Valor</label><input type="text" name="valor" class="input-like" required></div>
-                  <div class="field field-full"><label>Descrição</label><input type="text" name="descricao" class="input-like"></div>
+                  <div class="field">
+                    <label>Chave</label>
+                    <input type="text" name="chave" class="input-like" required>
+                  </div>
+                  <div class="field">
+                    <label>Valor</label>
+                    <input type="text" name="valor" class="input-like" required>
+                  </div>
+                  <div class="field field-full">
+                    <label>Descrição</label>
+                    <input type="text" name="descricao" class="input-like">
+                  </div>
                 </div>
                 <div class="cad-form-actions">
                   <button type="submit" class="btn btn-primary">Salvar</button>
@@ -473,7 +587,16 @@
 
             <div class="cad-table-wrap">
               <table class="table">
-                <thead><tr><th>ID</th><th>Chave</th><th>Valor</th><th>Descrição</th><th>Status</th><th>Ações</th></tr></thead>
+                <thead>
+                  <tr>
+                    <th style="width:80px;">ID</th>
+                    <th>Chave</th>
+                    <th>Valor</th>
+                    <th>Descrição</th>
+                    <th style="width:140px;">Status</th>
+                    <th style="width:220px;">Ações</th>
+                  </tr>
+                </thead>
                 <tbody>
                   {% for item in parametros %}
                   <tr>
@@ -506,14 +629,20 @@
         <div class="f2-tab-panel" id="tab-empresas_nd">
           <div class="cad-card">
             <div class="cad-card-head">
-              <div><div class="cad-card-title">Empresas ND</div><div class="muted">Cadastro simples.</div></div>
+              <div>
+                <div class="cad-card-title">Empresas ND</div>
+                <div class="muted">Cadastro simples.</div>
+              </div>
               <button type="button" class="btn btn-primary" onclick="toggleBox('box-empresas-nd')">Novo</button>
             </div>
 
             <div id="box-empresas-nd" class="cad-form-box" style="display:none;">
               <form method="post" action="{{ url_for('financeiro_dois.empresa_nd_nova') }}">
                 <div class="cad-form-grid">
-                  <div class="field"><label>Nome</label><input type="text" name="nome" class="input-like" required></div>
+                  <div class="field">
+                    <label>Nome</label>
+                    <input type="text" name="nome" class="input-like" required>
+                  </div>
                 </div>
                 <div class="cad-form-actions">
                   <button type="submit" class="btn btn-primary">Salvar</button>
@@ -524,7 +653,14 @@
 
             <div class="cad-table-wrap">
               <table class="table">
-                <thead><tr><th>ID</th><th>Nome</th><th>Status</th><th>Ações</th></tr></thead>
+                <thead>
+                  <tr>
+                    <th style="width:80px;">ID</th>
+                    <th>Nome</th>
+                    <th style="width:140px;">Status</th>
+                    <th style="width:220px;">Ações</th>
+                  </tr>
+                </thead>
                 <tbody>
                   {% for item in empresas_nd %}
                   <tr>
