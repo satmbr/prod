@@ -65,6 +65,9 @@ def create_app():
 
     from routes.financeiro_nd import bp as financeiro_nd_bp
     app.register_blueprint(financeiro_nd_bp)
+    
+    from routes.financeiro_dois_routes import bp as financeiro_dois_bp
+    app.register_blueprint(financeiro_dois_bp)
 
     @app.get("/")
     def home():

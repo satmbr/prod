@@ -555,6 +555,7 @@
 
 		  {% if 'financeiro:visualizar' in current_user_permissions or 'auth:administrar' in current_user_permissions %}
 			<a class="nav-link" href="{{ url_for('financeiro.index') }}">Financeiro</a>
+			<a class="nav-link" href="{{ url_for('financeiro_dois.index') }}">Financeiro Dois</a>
 		  {% endif %}
 		{% else %}
 		  <a class="nav-link" href="{{ url_for('auth.login') }}">Entrar</a>

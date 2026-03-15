@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Financeiro Dois | PRUMAT{% endblock %}
+
+{% block content %}
+<div class="page-wrap">
+
+  <section class="zone">
+    <div class="zone-head">
+      <div class="zone-left">
+        <div class="zone-icon">💼</div>
+        <div>
+          <div class="zone-title">Financeiro Dois</div>
+          <div class="muted">
+            Novo módulo financeiro com fluxo mais simples, limpo e rastreável.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cards-grid finance2-grid">
+      {% for card in cards %}
+      <a class="finance2-card" href="{{ card.href }}">
+        <div class="finance2-card-top">
+          <div class="finance2-card-icon">{{ card.icone }}</div>
+          <div class="finance2-card-title">{{ card.titulo }}</div>
+        </div>
+        <div class="finance2-card-text">{{ card.descricao }}</div>
+      </a>
+      {% endfor %}
+    </div>
+  </section>
+
+</div>
+
+<style>
+  .finance2-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));
+    gap:16px;
+  }
+
+  .finance2-card{
+    display:block;
+    text-decoration:none;
+    color:inherit;
+    background:#fff;
+    border:1px solid #d8e1ec;
+    border-radius:18px;
+    padding:18px;
+    min-height:150px;
+    box-shadow:0 6px 18px rgba(15, 23, 42, 0.05);
+    transition:transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+  }
+
+  .finance2-card:hover{
+    transform:translateY(-2px);
+    box-shadow:0 10px 24px rgba(15, 23, 42, 0.08);
+    border-color:#b8c9dd;
+  }
+
+  .finance2-card-top{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    margin-bottom:12px;
+  }
+
+  .finance2-card-icon{
+    width:42px;
+    height:42px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    border-radius:12px;
+    background:#f3f7fb;
+    font-size:22px;
+  }
+
+  .finance2-card-title{
+    font-size:20px;
+    font-weight:700;
+    color:#16324F;
+  }
+
+  .finance2-card-text{
+    font-size:14px;
+    line-height:1.45;
+    color:#4b5563;
+  }
+
+  @media (max-width: 768px){
+    .finance2-card{
+      min-height:auto;
+    }
+  }
+</style>
+{% endblock %}
