@@ -26,7 +26,7 @@ def build_financeiro_dois_subnav(active: str | None):
         })
         links.append({
             "text": "RD",
-            "href": "#",
+            "href": url_for("financeiro_dois.rd"),
             "active": active == "rd",
         })
         links.append({
@@ -77,7 +77,7 @@ def index():
         {
             "titulo": "RD",
             "descricao": "Relatórios de despesas por período, colaborador e centro de custo.",
-            "href": "#",
+            "href": url_for("financeiro_dois.rd"),
             "icone": "🧾",
         },
         {
@@ -205,33 +205,9 @@ def om_editar(om_id: int):
             "criada_em": "15/03/2026",
             "observacao": "OM inicial para estrutura do financeiro_dois.",
             "linhas": [
-                {
-                    "data": "15/03/2026",
-                    "tipo": "Despesa",
-                    "descricao": "Hospedagem",
-                    "categoria": "Hospedagem",
-                    "aplicacao": "MATISA",
-                    "valor": 950.00,
-                    "sinal": "+",
-                },
-                {
-                    "data": "15/03/2026",
-                    "tipo": "Adiantamento",
-                    "descricao": "PIX adiantado",
-                    "categoria": "Adiantamento",
-                    "aplicacao": "MATISA",
-                    "valor": 300.00,
-                    "sinal": "-",
-                },
-                {
-                    "data": "15/03/2026",
-                    "tipo": "Despesa",
-                    "descricao": "Alimentação",
-                    "categoria": "Alimentação",
-                    "aplicacao": "MATISA",
-                    "valor": 1200.40,
-                    "sinal": "+",
-                },
+                {"data": "15/03/2026", "tipo": "Despesa", "descricao": "Hospedagem", "categoria": "Hospedagem", "aplicacao": "MATISA", "valor": 950.00, "sinal": "+"},
+                {"data": "15/03/2026", "tipo": "Adiantamento", "descricao": "PIX adiantado", "categoria": "Adiantamento", "aplicacao": "MATISA", "valor": 300.00, "sinal": "-"},
+                {"data": "15/03/2026", "tipo": "Despesa", "descricao": "Alimentação", "categoria": "Alimentação", "aplicacao": "MATISA", "valor": 1200.40, "sinal": "+"},
             ],
         },
         2: {
@@ -244,24 +220,8 @@ def om_editar(om_id: int):
             "criada_em": "14/03/2026",
             "observacao": "OM com saldo parcial.",
             "linhas": [
-                {
-                    "data": "14/03/2026",
-                    "tipo": "Despesa",
-                    "descricao": "Táxi",
-                    "categoria": "Transporte",
-                    "aplicacao": "PRUMAT",
-                    "valor": 220.75,
-                    "sinal": "+",
-                },
-                {
-                    "data": "14/03/2026",
-                    "tipo": "Pagamento",
-                    "descricao": "Reembolso parcial",
-                    "categoria": "Pagamento",
-                    "aplicacao": "PRUMAT",
-                    "valor": 200.00,
-                    "sinal": "-",
-                },
+                {"data": "14/03/2026", "tipo": "Despesa", "descricao": "Táxi", "categoria": "Transporte", "aplicacao": "PRUMAT", "valor": 220.75, "sinal": "+"},
+                {"data": "14/03/2026", "tipo": "Pagamento", "descricao": "Reembolso parcial", "categoria": "Pagamento", "aplicacao": "PRUMAT", "valor": 200.00, "sinal": "-"},
             ],
         },
         3: {
@@ -274,24 +234,8 @@ def om_editar(om_id: int):
             "criada_em": "10/03/2026",
             "observacao": "OM quitada e fechada.",
             "linhas": [
-                {
-                    "data": "10/03/2026",
-                    "tipo": "Despesa",
-                    "descricao": "Combustível",
-                    "categoria": "Transporte",
-                    "aplicacao": "GERAL",
-                    "valor": 300.00,
-                    "sinal": "+",
-                },
-                {
-                    "data": "10/03/2026",
-                    "tipo": "Pagamento",
-                    "descricao": "Quitação",
-                    "categoria": "Pagamento",
-                    "aplicacao": "GERAL",
-                    "valor": 300.00,
-                    "sinal": "-",
-                },
+                {"data": "10/03/2026", "tipo": "Despesa", "descricao": "Combustível", "categoria": "Transporte", "aplicacao": "GERAL", "valor": 300.00, "sinal": "+"},
+                {"data": "10/03/2026", "tipo": "Pagamento", "descricao": "Quitação", "categoria": "Pagamento", "aplicacao": "GERAL", "valor": 300.00, "sinal": "-"},
             ],
         },
     }
@@ -307,6 +251,125 @@ def om_editar(om_id: int):
         "financeiro_dois/om_editar.html",
         subnav_links=build_financeiro_dois_subnav("om"),
         om=om,
+        total_positivo=total_positivo,
+        total_negativo=total_negativo,
+    )
+
+
+@bp.route("/rd")
+@login_required
+@permission_required("financeiro", "visualizar")
+def rd():
+    rds = [
+        {
+            "id": 1,
+            "numero": "RD-2026-03-LME",
+            "periodo": "03/2026",
+            "matricula": "LME",
+            "colaborador": "Laercio Melo",
+            "centro_custo": "ADM",
+            "status": "Aberta",
+            "saldo": 920.50,
+            "criada_em": "15/03/2026",
+        },
+        {
+            "id": 2,
+            "numero": "RD-2026-03-ABC",
+            "periodo": "03/2026",
+            "matricula": "ABC",
+            "colaborador": "Colaborador Exemplo",
+            "centro_custo": "OPERACAO",
+            "status": "Parcial",
+            "saldo": 180.20,
+            "criada_em": "14/03/2026",
+        },
+        {
+            "id": 3,
+            "numero": "RD-2026-02-XYZ",
+            "periodo": "02/2026",
+            "matricula": "XYZ",
+            "colaborador": "Outro Colaborador",
+            "centro_custo": "MANUTENCAO",
+            "status": "Quitada",
+            "saldo": 0.00,
+            "criada_em": "28/02/2026",
+        },
+    ]
+
+    return render_template(
+        "financeiro_dois/rd.html",
+        subnav_links=build_financeiro_dois_subnav("rd"),
+        rds=rds,
+    )
+
+
+@bp.route("/rd/<int:rd_id>")
+@login_required
+@permission_required("financeiro", "visualizar")
+def rd_editar(rd_id: int):
+    rds = {
+        1: {
+            "id": 1,
+            "numero": "RD-2026-03-LME",
+            "periodo": "03/2026",
+            "matricula": "LME",
+            "colaborador": "Laercio Melo",
+            "centro_custo": "ADM",
+            "status": "Aberta",
+            "saldo": 920.50,
+            "criada_em": "15/03/2026",
+            "observacao": "RD inicial para estrutura do financeiro_dois.",
+            "linhas": [
+                {"data": "15/03/2026", "tipo": "Despesa", "descricao": "Almoço", "categoria": "Alimentação", "aplicacao": "MATISA", "valor": 120.50, "sinal": "+"},
+                {"data": "15/03/2026", "tipo": "Despesa", "descricao": "Hotel", "categoria": "Hospedagem", "aplicacao": "MATISA", "valor": 900.00, "sinal": "+"},
+                {"data": "15/03/2026", "tipo": "Pagamento", "descricao": "Acerto parcial", "categoria": "Pagamento", "aplicacao": "MATISA", "valor": 100.00, "sinal": "-"},
+            ],
+        },
+        2: {
+            "id": 2,
+            "numero": "RD-2026-03-ABC",
+            "periodo": "03/2026",
+            "matricula": "ABC",
+            "colaborador": "Colaborador Exemplo",
+            "centro_custo": "OPERACAO",
+            "status": "Parcial",
+            "saldo": 180.20,
+            "criada_em": "14/03/2026",
+            "observacao": "RD com pagamento parcial.",
+            "linhas": [
+                {"data": "14/03/2026", "tipo": "Despesa", "descricao": "Táxi", "categoria": "Transporte", "aplicacao": "PRUMAT", "valor": 220.20, "sinal": "+"},
+                {"data": "14/03/2026", "tipo": "Pagamento", "descricao": "Reembolso parcial", "categoria": "Pagamento", "aplicacao": "PRUMAT", "valor": 40.00, "sinal": "-"},
+            ],
+        },
+        3: {
+            "id": 3,
+            "numero": "RD-2026-02-XYZ",
+            "periodo": "02/2026",
+            "matricula": "XYZ",
+            "colaborador": "Outro Colaborador",
+            "centro_custo": "MANUTENCAO",
+            "status": "Quitada",
+            "saldo": 0.00,
+            "criada_em": "28/02/2026",
+            "observacao": "RD encerrada.",
+            "linhas": [
+                {"data": "28/02/2026", "tipo": "Despesa", "descricao": "Combustível", "categoria": "Transporte", "aplicacao": "GERAL", "valor": 300.00, "sinal": "+"},
+                {"data": "28/02/2026", "tipo": "Pagamento", "descricao": "Quitação", "categoria": "Pagamento", "aplicacao": "GERAL", "valor": 300.00, "sinal": "-"},
+            ],
+        },
+    }
+
+    rd = rds.get(rd_id)
+    if not rd:
+        abort(404)
+
+    total_positivo = sum(item["valor"] for item in rd["linhas"] if item["sinal"] == "+")
+    total_negativo = sum(item["valor"] for item in rd["linhas"] if item["sinal"] == "-")
+
+    return render_template(
+        "financeiro_dois/rd_editar.html",
+        subnav_links=build_financeiro_dois_subnav("rd"),
+        rd=rd,
         total_positivo=total_positivo,
         total_negativo=total_negativo,
     )

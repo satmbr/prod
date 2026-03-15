@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+{% block title %}RD | Financeiro Dois{% endblock %}
+
+{% block content %}
+<div class="page-wrap">
+
+  <section class="zone">
+    <div class="zone-head">
+      <div class="zone-left">
+        <div class="zone-icon">🧾</div>
+        <div>
+          <div class="zone-title">RD</div>
+          <div class="muted">
+            Relatórios de despesas por período, colaborador e centro de custo.
+          </div>
+        </div>
+      </div>
+
+      <div class="zone-actions">
+        <a class="btn btn-primary" href="#">Nova RD</a>
+      </div>
+    </div>
+
+    <div class="filters-card">
+      <div class="filters-grid">
+        <div class="field">
+          <label>Busca</label>
+          <input type="text" class="input-like" placeholder="Número, matrícula ou colaborador" />
+        </div>
+
+        <div class="field">
+          <label>Status</label>
+          <select class="input-like">
+            <option>Todos</option>
+            <option>Aberta</option>
+            <option>Parcial</option>
+            <option>Quitada</option>
+            <option>Cancelada</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label>Período</label>
+          <input type="text" class="input-like" placeholder="Ex.: 03/2026" />
+        </div>
+
+        <div class="field">
+          <label>Centro de custo</label>
+          <input type="text" class="input-like" placeholder="Ex.: ADM" />
+        </div>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Número</th>
+            <th>Período</th>
+            <th>Matrícula</th>
+            <th>Colaborador</th>
+            <th>Centro de custo</th>
+            <th>Status</th>
+            <th>Criada em</th>
+            <th style="text-align:right;">Saldo</th>
+            <th style="width:160px;">Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in rds %}
+          <tr>
+            <td><strong>{{ item.numero }}</strong></td>
+            <td>{{ item.periodo }}</td>
+            <td>{{ item.matricula }}</td>
+            <td>{{ item.colaborador }}</td>
+            <td>{{ item.centro_custo }}</td>
+            <td>
+              <span class="status-pill
+                {% if item.status == 'Aberta' %}status-open{% endif %}
+                {% if item.status == 'Parcial' %}status-warn{% endif %}
+                {% if item.status == 'Quitada' %}status-done{% endif %}
+              ">
+                {{ item.status }}
+              </span>
+            </td>
+            <td>{{ item.criada_em }}</td>
+            <td style="text-align:right;">R$ {{ '%.2f'|format(item.saldo) }}</td>
+            <td>
+              <div class="table-actions">
+                <a class="btn btn-sm" href="{{ url_for('financeiro_dois.rd_editar', rd_id=item.id) }}">Editar</a>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+</div>
+
+<style>
+  .filters-card{
+    background:#fff;
+    border:1px solid #d8e1ec;
+    border-radius:18px;
+    padding:18px;
+    margin-bottom:16px;
+    box-shadow:0 6px 18px rgba(15, 23, 42, 0.05);
+  }
+
+  .filters-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));
+    gap:14px;
+  }
+
+  .field label{
+    display:block;
+    margin-bottom:6px;
+    font-size:13px;
+    font-weight:600;
+    color:#334155;
+  }
+
+  .input-like{
+    width:100%;
+    height:42px;
+    border:1px solid #d8e1ec;
+    border-radius:12px;
+    padding:0 12px;
+    font-size:14px;
+    background:#fff;
+  }
+
+  .input-like:focus{
+    outline:none;
+    border-color:#9db6cf;
+    box-shadow:0 0 0 3px rgba(22, 50, 79, 0.08);
+  }
+
+  .table-wrap{
+    overflow:auto;
+  }
+
+  .table-actions{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+  }
+
+  .btn-sm{
+    padding:7px 10px;
+    font-size:12px;
+    line-height:1;
+  }
+
+  .status-pill{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    min-width:84px;
+    padding:6px 10px;
+    border-radius:999px;
+    font-size:12px;
+    font-weight:700;
+  }
+
+  .status-open{
+    background:#eff6ff;
+    color:#1d4ed8;
+  }
+
+  .status-warn{
+    background:#fffbeb;
+    color:#b45309;
+  }
+
+  .status-done{
+    background:#ecfdf5;
+    color:#047857;
+  }
+</style>
+{% endblock %}

@@ -1,0 +1,253 @@
+{% extends "base.html" %}
+{% block title %}{{ rd.numero }} | Financeiro Dois{% endblock %}
+
+{% block content %}
+<div class="page-wrap">
+
+  <section class="zone">
+    <div class="zone-head">
+      <div class="zone-left">
+        <div class="zone-icon">🧾</div>
+        <div>
+          <div class="zone-title">{{ rd.numero }}</div>
+          <div class="muted">
+            Edição da RD com cabeçalho, linhas e resumo de saldo.
+          </div>
+        </div>
+      </div>
+
+      <div class="zone-actions">
+        <a class="btn" href="{{ url_for('financeiro_dois.rd') }}">Voltar</a>
+        <a class="btn btn-primary" href="#">Salvar alterações</a>
+      </div>
+    </div>
+
+    <div class="om-grid">
+      <div class="om-card">
+        <div class="card-title">Dados principais</div>
+
+        <div class="form-grid">
+          <div class="field">
+            <label>Número RD</label>
+            <input class="input-like" type="text" value="{{ rd.numero }}" />
+          </div>
+
+          <div class="field">
+            <label>Período</label>
+            <input class="input-like" type="text" value="{{ rd.periodo }}" />
+          </div>
+
+          <div class="field">
+            <label>Matrícula</label>
+            <input class="input-like" type="text" value="{{ rd.matricula }}" />
+          </div>
+
+          <div class="field">
+            <label>Colaborador</label>
+            <input class="input-like" type="text" value="{{ rd.colaborador }}" />
+          </div>
+
+          <div class="field">
+            <label>Centro de custo</label>
+            <input class="input-like" type="text" value="{{ rd.centro_custo }}" />
+          </div>
+
+          <div class="field">
+            <label>Status</label>
+            <select class="input-like">
+              <option {% if rd.status == 'Aberta' %}selected{% endif %}>Aberta</option>
+              <option {% if rd.status == 'Parcial' %}selected{% endif %}>Parcial</option>
+              <option {% if rd.status == 'Quitada' %}selected{% endif %}>Quitada</option>
+              <option {% if rd.status == 'Cancelada' %}selected{% endif %}>Cancelada</option>
+            </select>
+          </div>
+
+          <div class="field field-full">
+            <label>Observação</label>
+            <textarea class="input-like textarea-like">{{ rd.observacao }}</textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="om-side">
+        <div class="resume-card">
+          <div class="resume-title">Resumo</div>
+          <div class="resume-row">
+            <span>Total positivo</span>
+            <strong>R$ {{ '%.2f'|format(total_positivo) }}</strong>
+          </div>
+          <div class="resume-row">
+            <span>Total negativo</span>
+            <strong>R$ {{ '%.2f'|format(total_negativo) }}</strong>
+          </div>
+          <div class="resume-row resume-total">
+            <span>Saldo atual</span>
+            <strong>R$ {{ '%.2f'|format(rd.saldo) }}</strong>
+          </div>
+        </div>
+
+        <div class="resume-card">
+          <div class="resume-title">Ações</div>
+          <div class="action-list">
+            <a href="#" class="btn btn-primary btn-block">Adicionar despesa</a>
+            <a href="#" class="btn btn-block">Registrar pagamento</a>
+            <a href="#" class="btn btn-block">Solicitar exclusão</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="om-card">
+      <div class="card-head-inline">
+        <div class="card-title">Linhas da RD</div>
+        <a class="btn btn-sm" href="#">Adicionar linha</a>
+      </div>
+
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Tipo</th>
+              <th>Descrição</th>
+              <th>Categoria</th>
+              <th>Aplicação</th>
+              <th>Sinal</th>
+              <th style="text-align:right;">Valor</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for linha in rd.linhas %}
+            <tr>
+              <td>{{ linha.data }}</td>
+              <td>{{ linha.tipo }}</td>
+              <td>{{ linha.descricao }}</td>
+              <td>{{ linha.categoria }}</td>
+              <td>{{ linha.aplicacao }}</td>
+              <td>{{ linha.sinal }}</td>
+              <td style="text-align:right;">R$ {{ '%.2f'|format(linha.valor) }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </section>
+
+</div>
+
+<style>
+  .om-grid{
+    display:grid;
+    grid-template-columns:minmax(0, 2fr) minmax(280px, 1fr);
+    gap:16px;
+    margin-bottom:16px;
+  }
+
+  .om-card,
+  .resume-card{
+    background:#fff;
+    border:1px solid #d8e1ec;
+    border-radius:18px;
+    padding:18px;
+    box-shadow:0 6px 18px rgba(15, 23, 42, 0.05);
+  }
+
+  .card-title,
+  .resume-title{
+    font-size:18px;
+    font-weight:700;
+    color:#16324F;
+    margin-bottom:14px;
+  }
+
+  .card-head-inline{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:12px;
+    margin-bottom:14px;
+    flex-wrap:wrap;
+  }
+
+  .form-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));
+    gap:14px;
+  }
+
+  .field label{
+    display:block;
+    margin-bottom:6px;
+    font-size:13px;
+    font-weight:600;
+    color:#334155;
+  }
+
+  .field-full{
+    grid-column:1 / -1;
+  }
+
+  .input-like{
+    width:100%;
+    height:42px;
+    border:1px solid #d8e1ec;
+    border-radius:12px;
+    padding:0 12px;
+    font-size:14px;
+    background:#fff;
+  }
+
+  .textarea-like{
+    min-height:96px;
+    padding:12px;
+    resize:vertical;
+  }
+
+  .resume-row{
+    display:flex;
+    justify-content:space-between;
+    gap:12px;
+    padding:10px 0;
+    border-bottom:1px solid #edf2f7;
+    font-size:14px;
+  }
+
+  .resume-row:last-child{
+    border-bottom:none;
+  }
+
+  .resume-total{
+    font-size:15px;
+    font-weight:700;
+  }
+
+  .action-list{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+  }
+
+  .btn-block{
+    width:100%;
+    text-align:center;
+  }
+
+  .table-wrap{
+    overflow:auto;
+  }
+
+  .btn-sm{
+    padding:7px 10px;
+    font-size:12px;
+    line-height:1;
+  }
+
+  @media (max-width: 980px){
+    .om-grid{
+      grid-template-columns:1fr;
+    }
+  }
+</style>
+{% endblock %}
