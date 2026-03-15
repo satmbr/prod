@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, session, url_for, abort, request, redirect, flash
-from routes.auth import login_required, permission_required
-from db import get_engine
 from sqlalchemy import text
+from db import get_engine
+from routes.auth import login_required, permission_required
 
 bp = Blueprint("financeiro_dois", __name__, url_prefix="/financeiro-dois")
 
@@ -26,6 +26,7 @@ def build_financeiro_dois_subnav(active: str | None):
         links.append({"text": "Cadastros", "href": url_for("financeiro_dois.cadastros"), "active": active == "cadastros"})
 
     return links
+
 
 def _nome_preenchido(valor: str | None) -> str:
     return (valor or "").strip()
@@ -65,6 +66,7 @@ def _toggle_status_generico(tabela: str, item_id: int, campo_nome: str = "nome")
 
     flash(f"Status alterado para {novo_status}.", "success")
     return _redirect_cadastros()
+
 
 @bp.route("/")
 @login_required
@@ -115,7 +117,7 @@ def cadastros():
         """)).mappings().all()
 
         descricoes = conn.execute(text("""
-            SELECT d.id, d.nome, COALESCE(c.nome, '') AS categoria_nome, d.status
+            SELECT d.id, d.nome, d.categoria_id, COALESCE(c.nome, '') AS categoria_nome, d.status
             FROM financeiro2_cad_descricoes d
             LEFT JOIN financeiro2_cad_categorias c ON c.id = d.categoria_id
             ORDER BY d.id
@@ -184,6 +186,11 @@ def cadastros():
         parametros=parametros,
         empresas_nd=empresas_nd,
     )
+
+
+# =========================
+# CADASTROS
+# =========================
 
 @bp.route("/cadastros/categorias/nova", methods=["POST"])
 @login_required
@@ -267,7 +274,101 @@ def categoria_editar(item_id: int):
 @permission_required("financeiro", "visualizar")
 def categoria_toggle_status(item_id: int):
     return _toggle_status_generico("financeiro2_cad_categorias", item_id)
-    
+
+
+@bp.route("/cadastros/descricoes/nova", methods=["POST"])
+@login_required
+@permission_required("financeiro", "visualizar")
+def descricao_nova():
+    nome = _nome_preenchido(request.form.get("nome"))
+    categoria_id = request.form.get("categoria_id")
+
+    if not nome:
+        flash("Informe o nome da descrição.", "warning")
+        return _redirect_cadastros()
+
+    categoria_id_int = int(categoria_id) if categoria_id and categoria_id.isdigit() else None
+
+    engine = get_engine()
+    with engine.begin() as conn:
+        existe = conn.execute(
+            text("""
+                SELECT id
+                FROM financeiro2_cad_descricoes
+                WHERE LOWER(nome) = LOWER(:nome)
+                LIMIT 1
+            """),
+            {"nome": nome}
+        ).fetchone()
+
+        if existe:
+            flash("Já existe uma descrição com esse nome.", "warning")
+            return _redirect_cadastros()
+
+        conn.execute(
+            text("""
+                INSERT INTO financeiro2_cad_descricoes (nome, categoria_id, status)
+                VALUES (:nome, :categoria_id, 'Ativo')
+            """),
+            {"nome": nome, "categoria_id": categoria_id_int}
+        )
+
+    flash("Descrição cadastrada com sucesso.", "success")
+    return _redirect_cadastros()
+
+
+@bp.route("/cadastros/descricoes/<int:item_id>/editar", methods=["POST"])
+@login_required
+@permission_required("financeiro", "visualizar")
+def descricao_editar(item_id: int):
+    nome = _nome_preenchido(request.form.get("nome"))
+    categoria_id = request.form.get("categoria_id")
+
+    if not nome:
+        flash("Informe o nome da descrição.", "warning")
+        return _redirect_cadastros()
+
+    categoria_id_int = int(categoria_id) if categoria_id and categoria_id.isdigit() else None
+
+    engine = get_engine()
+    with engine.begin() as conn:
+        existe = conn.execute(
+            text("""
+                SELECT id
+                FROM financeiro2_cad_descricoes
+                WHERE LOWER(nome) = LOWER(:nome)
+                  AND id <> :id
+                LIMIT 1
+            """),
+            {"nome": nome, "id": item_id}
+        ).fetchone()
+
+        if existe:
+            flash("Já existe outra descrição com esse nome.", "warning")
+            return _redirect_cadastros()
+
+        conn.execute(
+            text("""
+                UPDATE financeiro2_cad_descricoes
+                SET nome = :nome,
+                    categoria_id = :categoria_id,
+                    atualizado_em = CURRENT_TIMESTAMP
+                WHERE id = :id
+            """),
+            {"nome": nome, "categoria_id": categoria_id_int, "id": item_id}
+        )
+
+    flash("Descrição atualizada com sucesso.", "success")
+    return _redirect_cadastros()
+
+
+@bp.route("/cadastros/descricoes/<int:item_id>/toggle-status", methods=["POST"])
+@login_required
+@permission_required("financeiro", "visualizar")
+def descricao_toggle_status(item_id: int):
+    return _toggle_status_generico("financeiro2_cad_descricoes", item_id)
+
+
 @bp.route("/cadastros/aplicacoes/nova", methods=["POST"])
 @login_required
 @permission_required("financeiro", "visualizar")
@@ -350,7 +451,8 @@ def aplicacao_editar(item_id: int):
 @permission_required("financeiro", "visualizar")
 def aplicacao_toggle_status(item_id: int):
     return _toggle_status_generico("financeiro2_cad_aplicacoes", item_id)
-    
+
+
 @bp.route("/cadastros/moedas/nova", methods=["POST"])
 @login_required
 @permission_required("financeiro", "visualizar")
@@ -441,7 +543,8 @@ def moeda_editar(item_id: int):
 @permission_required("financeiro", "visualizar")
 def moeda_toggle_status(item_id: int):
     return _toggle_status_generico("financeiro2_cad_moedas", item_id)
-    
+
+
 @bp.route("/cadastros/centros-custo/novo", methods=["POST"])
 @login_required
 @permission_required("financeiro", "visualizar")
@@ -524,7 +627,8 @@ def centro_custo_editar(item_id: int):
 @permission_required("financeiro", "visualizar")
 def centro_custo_toggle_status(item_id: int):
     return _toggle_status_generico("financeiro2_cad_centros_custo", item_id)
-    
+
+
 @bp.route("/cadastros/status-despesa/novo", methods=["POST"])
 @login_required
 @permission_required("financeiro", "visualizar")
@@ -607,7 +711,8 @@ def status_despesa_editar(item_id: int):
 @permission_required("financeiro", "visualizar")
 def status_despesa_toggle_status(item_id: int):
     return _toggle_status_generico("financeiro2_cad_status_despesa", item_id)
-    
+
+
 @bp.route("/cadastros/status-nd/novo", methods=["POST"])
 @login_required
 @permission_required("financeiro", "visualizar")
@@ -690,7 +795,8 @@ def status_nd_editar(item_id: int):
 @permission_required("financeiro", "visualizar")
 def status_nd_toggle_status(item_id: int):
     return _toggle_status_generico("financeiro2_cad_status_nd", item_id)
-    
+
+
 @bp.route("/cadastros/tipos-documento/novo", methods=["POST"])
 @login_required
 @permission_required("financeiro", "visualizar")
@@ -773,7 +879,8 @@ def tipo_documento_editar(item_id: int):
 @permission_required("financeiro", "visualizar")
 def tipo_documento_toggle_status(item_id: int):
     return _toggle_status_generico("financeiro2_cad_tipos_documento", item_id)
-    
+
+
 @bp.route("/cadastros/parametros/novo", methods=["POST"])
 @login_required
 @permission_required("financeiro", "visualizar")
@@ -864,7 +971,8 @@ def parametro_editar(item_id: int):
 @permission_required("financeiro", "visualizar")
 def parametro_toggle_status(item_id: int):
     return _toggle_status_generico("financeiro2_cad_parametros", item_id, campo_nome="chave")
-    
+
+
 @bp.route("/cadastros/empresas-nd/nova", methods=["POST"])
 @login_required
 @permission_required("financeiro", "visualizar")
@@ -948,118 +1056,10 @@ def empresa_nd_editar(item_id: int):
 def empresa_nd_toggle_status(item_id: int):
     return _toggle_status_generico("financeiro2_cad_empresas_nd", item_id)
 
-@bp.route("/cadastros/categorias/nova", methods=["POST"])
-@login_required
-@permission_required("financeiro", "visualizar")
-def categoria_nova():
-    nome = (request.form.get("nome") or "").strip()
 
-    if not nome:
-        flash("Informe o nome da categoria.", "warning")
-        return redirect(url_for("financeiro_dois.cadastros"))
-
-    engine = get_engine()
-    with engine.begin() as conn:
-        existe = conn.execute(
-            text("""
-                SELECT id
-                FROM financeiro2_cad_categorias
-                WHERE LOWER(nome) = LOWER(:nome)
-                LIMIT 1
-            """),
-            {"nome": nome}
-        ).fetchone()
-
-        if existe:
-            flash("Já existe uma categoria com esse nome.", "warning")
-            return redirect(url_for("financeiro_dois.cadastros"))
-
-        conn.execute(
-            text("""
-                INSERT INTO financeiro2_cad_categorias (nome, status)
-                VALUES (:nome, 'Ativo')
-            """),
-            {"nome": nome}
-        )
-
-    flash("Categoria cadastrada com sucesso.", "success")
-    return redirect(url_for("financeiro_dois.cadastros"))
-
-
-@bp.route("/cadastros/categorias/<int:item_id>/editar", methods=["POST"])
-@login_required
-@permission_required("financeiro", "visualizar")
-def categoria_editar(item_id: int):
-    nome = (request.form.get("nome") or "").strip()
-
-    if not nome:
-        flash("Informe o nome da categoria.", "warning")
-        return redirect(url_for("financeiro_dois.cadastros"))
-
-    engine = get_engine()
-    with engine.begin() as conn:
-        existe = conn.execute(
-            text("""
-                SELECT id
-                FROM financeiro2_cad_categorias
-                WHERE LOWER(nome) = LOWER(:nome)
-                  AND id <> :id
-                LIMIT 1
-            """),
-            {"nome": nome, "id": item_id}
-        ).fetchone()
-
-        if existe:
-            flash("Já existe outra categoria com esse nome.", "warning")
-            return redirect(url_for("financeiro_dois.cadastros"))
-
-        conn.execute(
-            text("""
-                UPDATE financeiro2_cad_categorias
-                SET nome = :nome,
-                    atualizado_em = CURRENT_TIMESTAMP
-                WHERE id = :id
-            """),
-            {"nome": nome, "id": item_id}
-        )
-
-    flash("Categoria atualizada com sucesso.", "success")
-    return redirect(url_for("financeiro_dois.cadastros"))
-
-
-@bp.route("/cadastros/categorias/<int:item_id>/toggle-status", methods=["POST"])
-@login_required
-@permission_required("financeiro", "visualizar")
-def categoria_toggle_status(item_id: int):
-    engine = get_engine()
-    with engine.begin() as conn:
-        item = conn.execute(
-            text("""
-                SELECT id, status
-                FROM financeiro2_cad_categorias
-                WHERE id = :id
-            """),
-            {"id": item_id}
-        ).mappings().first()
-
-        if not item:
-            flash("Categoria não encontrada.", "danger")
-            return redirect(url_for("financeiro_dois.cadastros"))
-
-        novo_status = "Inativo" if item["status"] == "Ativo" else "Ativo"
-
-        conn.execute(
-            text("""
-                UPDATE financeiro2_cad_categorias
-                SET status = :status,
-                    atualizado_em = CURRENT_TIMESTAMP
-                WHERE id = :id
-            """),
-            {"status": novo_status, "id": item_id}
-        )
-
-    flash(f"Categoria alterada para {novo_status}.", "success")
-    return redirect(url_for("financeiro_dois.cadastros"))
+# =========================
+# OM
+# =========================
 
 @bp.route("/om")
 @login_required
@@ -1120,6 +1120,10 @@ def om_editar(om_id: int):
         total_negativo=total_negativo,
     )
 
+
+# =========================
+# RD
+# =========================
 
 @bp.route("/rd")
 @login_required
@@ -1184,6 +1188,10 @@ def rd_editar(rd_id: int):
     )
 
 
+# =========================
+# DESPESAS
+# =========================
+
 @bp.route("/despesas")
 @login_required
 @permission_required("financeiro", "visualizar")
@@ -1234,6 +1242,10 @@ def despesa_editar(despesa_id: int):
     )
 
 
+# =========================
+# PREVISAO
+# =========================
+
 @bp.route("/previsao")
 @login_required
 @permission_required("financeiro", "visualizar")
@@ -1245,6 +1257,10 @@ def previsao():
     ]
     return render_template("financeiro_dois/previsao.html", subnav_links=build_financeiro_dois_subnav("previsao"), previsoes=previsoes)
 
+
+# =========================
+# REEMBOLSOS
+# =========================
 
 @bp.route("/reembolsos")
 @login_required
@@ -1294,6 +1310,10 @@ def reembolso_editar(reembolso_id: int):
     )
 
 
+# =========================
+# APROVACOES
+# =========================
+
 @bp.route("/aprovacoes")
 @login_required
 @permission_required("financeiro", "visualizar")
@@ -1306,23 +1326,18 @@ def aprovacoes():
     return render_template("financeiro_dois/aprovacoes.html", subnav_links=build_financeiro_dois_subnav("aprovacoes"), solicitacoes=solicitacoes)
 
 
+# =========================
+# NOTAS DE DEBITO
+# =========================
+
 @bp.route("/notas-debito")
 @login_required
 @permission_required("financeiro", "visualizar")
 def notas_debito():
     notas = [
-        {
-            "id": 1, "numero_nd": "ND-2026-0001", "empresa_origem": "MATISA", "data_criacao": "15/03/2026",
-            "status": "Aberta", "total": 1730.30,
-        },
-        {
-            "id": 2, "numero_nd": "ND-2026-0002", "empresa_origem": "PRUMAT", "data_criacao": "14/03/2026",
-            "status": "Fechada", "total": 950.00,
-        },
-        {
-            "id": 3, "numero_nd": "ND-2026-0003", "empresa_origem": "MATISA", "data_criacao": "13/03/2026",
-            "status": "Exportada", "total": 420.50,
-        },
+        {"id": 1, "numero_nd": "ND-2026-0001", "empresa_origem": "MATISA", "data_criacao": "15/03/2026", "status": "Aberta", "total": 1730.30},
+        {"id": 2, "numero_nd": "ND-2026-0002", "empresa_origem": "PRUMAT", "data_criacao": "14/03/2026", "status": "Fechada", "total": 950.00},
+        {"id": 3, "numero_nd": "ND-2026-0003", "empresa_origem": "MATISA", "data_criacao": "13/03/2026", "status": "Exportada", "total": 420.50},
     ]
 
     return render_template(
