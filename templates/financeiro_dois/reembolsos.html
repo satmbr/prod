@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Reembolsos | Financeiro Dois{% endblock %}
+
+{% block content %}
+<div class="page-wrap">
+  <section class="zone">
+    <div class="zone-head">
+      <div class="zone-left">
+        <div class="zone-icon">💳</div>
+        <div>
+          <div class="zone-title">Reembolsos</div>
+          <div class="muted">Solicitação, aprovação e pagamento com comprovante.</div>
+        </div>
+      </div>
+      <div class="zone-actions">
+        <a class="btn btn-primary" href="#">Novo reembolso</a>
+      </div>
+    </div>
+
+    <div class="filters-card">
+      <div class="filters-grid">
+        <div class="field">
+          <label>Busca</label>
+          <input type="text" class="input-like" placeholder="Matrícula, colaborador ou descrição" />
+        </div>
+        <div class="field">
+          <label>Status</label>
+          <select class="input-like">
+            <option>Todos</option>
+            <option>Solicitado</option>
+            <option>Aprovado</option>
+            <option>Pago</option>
+            <option>Recusado</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Aprovação</label>
+          <select class="input-like">
+            <option>Todas</option>
+            <option>Pendente</option>
+            <option>Aprovado</option>
+            <option>Recusado</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Matrícula</th>
+            <th>Colaborador</th>
+            <th>PIX</th>
+            <th>Data</th>
+            <th>Descrição</th>
+            <th>Status</th>
+            <th>Aprovação</th>
+            <th>Fonte pagadora</th>
+            <th style="text-align:right;">Valor</th>
+            <th style="width:160px;">Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in reembolsos %}
+          <tr>
+            <td>{{ item.matricula }}</td>
+            <td>{{ item.colaborador }}</td>
+            <td>{{ item.pix }}</td>
+            <td>{{ item.data_solicitacao }}</td>
+            <td>{{ item.descricao }}</td>
+            <td>{{ item.status }}</td>
+            <td>{{ item.aprovacao }}</td>
+            <td>{{ item.fonte_pagadora }}</td>
+            <td style="text-align:right;">R$ {{ '%.2f'|format(item.valor) }}</td>
+            <td>
+              <div class="table-actions">
+                <a class="btn btn-sm" href="{{ url_for('financeiro_dois.reembolso_editar', reembolso_id=item.id) }}">Editar</a>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+<style>
+  .filters-card{background:#fff;border:1px solid #d8e1ec;border-radius:18px;padding:18px;margin-bottom:16px;box-shadow:0 6px 18px rgba(15,23,42,.05);}
+  .filters-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;}
+  .field label{display:block;margin-bottom:6px;font-size:13px;font-weight:600;color:#334155;}
+  .input-like{width:100%;height:42px;border:1px solid #d8e1ec;border-radius:12px;padding:0 12px;font-size:14px;background:#fff;}
+  .input-like:focus{outline:none;border-color:#9db6cf;box-shadow:0 0 0 3px rgba(22,50,79,.08);}
+  .table-wrap{overflow:auto;}
+  .table-actions{display:flex;gap:8px;flex-wrap:wrap;}
+  .btn-sm{padding:7px 10px;font-size:12px;line-height:1;}
+</style>
+{% endblock %}

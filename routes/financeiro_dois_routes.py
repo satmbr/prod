@@ -19,9 +19,9 @@ def build_financeiro_dois_subnav(active: str | None):
         links.append({"text": "RD", "href": url_for("financeiro_dois.rd"), "active": active == "rd"})
         links.append({"text": "Despesas", "href": url_for("financeiro_dois.despesas"), "active": active == "despesas"})
         links.append({"text": "Previsão", "href": url_for("financeiro_dois.previsao"), "active": active == "previsao"})
-        links.append({"text": "Reembolsos", "href": "#", "active": active == "reembolsos"})
+        links.append({"text": "Reembolsos", "href": url_for("financeiro_dois.reembolsos"), "active": active == "reembolsos"})
         links.append({"text": "Notas de Débito", "href": "#", "active": active == "nd"})
-        links.append({"text": "Aprovações", "href": "#", "active": active == "aprovacoes"})
+        links.append({"text": "Aprovações", "href": url_for("financeiro_dois.aprovacoes"), "active": active == "aprovacoes"})
         links.append({"text": "Cadastros", "href": url_for("financeiro_dois.cadastros"), "active": active == "cadastros"})
 
     return links
@@ -36,9 +36,9 @@ def index():
         {"titulo": "RD", "descricao": "Relatórios de despesas por período, colaborador e centro de custo.", "href": url_for("financeiro_dois.rd"), "icone": "🧾"},
         {"titulo": "Despesas", "descricao": "Despesas avulsas ou importadas, com controle de pagamento e vínculo.", "href": url_for("financeiro_dois.despesas"), "icone": "💸"},
         {"titulo": "Previsão", "descricao": "Despesas não vinculadas, em espera ou rejeitadas para ND.", "href": url_for("financeiro_dois.previsao"), "icone": "📊"},
-        {"titulo": "Reembolsos", "descricao": "Solicitação, aprovação e pagamento com comprovante.", "href": "#", "icone": "💳"},
+        {"titulo": "Reembolsos", "descricao": "Solicitação, aprovação e pagamento com comprovante.", "href": url_for("financeiro_dois.reembolsos"), "icone": "💳"},
         {"titulo": "Notas de Débito", "descricao": "Criação, edição, vínculo de despesas e exportação em PDF.", "href": "#", "icone": "🗂️"},
-        {"titulo": "Aprovações", "descricao": "Fila de aprovações para exclusões e alterações sensíveis.", "href": "#", "icone": "✅"},
+        {"titulo": "Aprovações", "descricao": "Fila de aprovações para exclusões e alterações sensíveis.", "href": url_for("financeiro_dois.aprovacoes"), "icone": "✅"},
         {"titulo": "Cadastros", "descricao": "Página única com abas para categorias, moedas, CC e parâmetros.", "href": url_for("financeiro_dois.cadastros"), "icone": "⚙️"},
     ]
 
@@ -211,21 +211,9 @@ def rd_editar(rd_id: int):
 @permission_required("financeiro", "visualizar")
 def despesas():
     despesas_lista = [
-        {
-            "id": 1, "data": "15/03/2026", "vencimento": "20/03/2026", "tipo_documento": "NF", "numero_documento": "NF-4587",
-            "fornecedor": "Hotel Exemplo", "descricao": "Hospedagem equipe", "centro_custo": "ADM", "valor": 950.00,
-            "status_despesa": "Pendente", "status_nd": "Não vinculada", "origem": "Avulsa",
-        },
-        {
-            "id": 2, "data": "14/03/2026", "vencimento": "18/03/2026", "tipo_documento": "Fatura", "numero_documento": "FAT-9001",
-            "fornecedor": "Posto Modelo", "descricao": "Combustível", "centro_custo": "OPERACAO", "valor": 420.50,
-            "status_despesa": "Paga", "status_nd": "Em espera", "origem": "OM",
-        },
-        {
-            "id": 3, "data": "13/03/2026", "vencimento": "25/03/2026", "tipo_documento": "NFS", "numero_documento": "NFS-1102",
-            "fornecedor": "Serviço X", "descricao": "Serviço de apoio", "centro_custo": "MANUTENCAO", "valor": 780.30,
-            "status_despesa": "Pendente", "status_nd": "Rejeitada", "origem": "RD",
-        },
+        {"id": 1, "data": "15/03/2026", "vencimento": "20/03/2026", "tipo_documento": "NF", "numero_documento": "NF-4587", "fornecedor": "Hotel Exemplo", "descricao": "Hospedagem equipe", "centro_custo": "ADM", "valor": 950.00, "status_despesa": "Pendente", "status_nd": "Não vinculada", "origem": "Avulsa"},
+        {"id": 2, "data": "14/03/2026", "vencimento": "18/03/2026", "tipo_documento": "Fatura", "numero_documento": "FAT-9001", "fornecedor": "Posto Modelo", "descricao": "Combustível", "centro_custo": "OPERACAO", "valor": 420.50, "status_despesa": "Paga", "status_nd": "Em espera", "origem": "OM"},
+        {"id": 3, "data": "13/03/2026", "vencimento": "25/03/2026", "tipo_documento": "NFS", "numero_documento": "NFS-1102", "fornecedor": "Serviço X", "descricao": "Serviço de apoio", "centro_custo": "MANUTENCAO", "valor": 780.30, "status_despesa": "Pendente", "status_nd": "Rejeitada", "origem": "RD"},
     ]
 
     return render_template(
@@ -278,25 +266,107 @@ def despesa_editar(despesa_id: int):
 @permission_required("financeiro", "visualizar")
 def previsao():
     previsoes = [
-        {
-            "id": 1, "data": "15/03/2026", "vencimento": "20/03/2026", "tipo_documento": "NF", "numero_documento": "NF-4587",
-            "fornecedor": "Hotel Exemplo", "descricao": "Hospedagem equipe", "centro_custo": "ADM", "valor": 950.00,
-            "status_despesa": "Pendente", "status_nd": "Não vinculada", "motivo_status_nd": "",
-        },
-        {
-            "id": 2, "data": "14/03/2026", "vencimento": "18/03/2026", "tipo_documento": "Fatura", "numero_documento": "FAT-9001",
-            "fornecedor": "Posto Modelo", "descricao": "Combustível", "centro_custo": "OPERACAO", "valor": 420.50,
-            "status_despesa": "Paga", "status_nd": "Em espera", "motivo_status_nd": "Aguardando decisão da área",
-        },
-        {
-            "id": 3, "data": "13/03/2026", "vencimento": "25/03/2026", "tipo_documento": "NFS", "numero_documento": "NFS-1102",
-            "fornecedor": "Serviço X", "descricao": "Serviço de apoio", "centro_custo": "MANUTENCAO", "valor": 780.30,
-            "status_despesa": "Pendente", "status_nd": "Rejeitada", "motivo_status_nd": "Fora do escopo da ND atual",
-        },
+        {"id": 1, "data": "15/03/2026", "vencimento": "20/03/2026", "tipo_documento": "NF", "numero_documento": "NF-4587", "fornecedor": "Hotel Exemplo", "descricao": "Hospedagem equipe", "centro_custo": "ADM", "valor": 950.00, "status_despesa": "Pendente", "status_nd": "Não vinculada", "motivo_status_nd": ""},
+        {"id": 2, "data": "14/03/2026", "vencimento": "18/03/2026", "tipo_documento": "Fatura", "numero_documento": "FAT-9001", "fornecedor": "Posto Modelo", "descricao": "Combustível", "centro_custo": "OPERACAO", "valor": 420.50, "status_despesa": "Paga", "status_nd": "Em espera", "motivo_status_nd": "Aguardando decisão da área"},
+        {"id": 3, "data": "13/03/2026", "vencimento": "25/03/2026", "tipo_documento": "NFS", "numero_documento": "NFS-1102", "fornecedor": "Serviço X", "descricao": "Serviço de apoio", "centro_custo": "MANUTENCAO", "valor": 780.30, "status_despesa": "Pendente", "status_nd": "Rejeitada", "motivo_status_nd": "Fora do escopo da ND atual"},
     ]
 
     return render_template(
         "financeiro_dois/previsao.html",
         subnav_links=build_financeiro_dois_subnav("previsao"),
         previsoes=previsoes,
+    )
+
+
+@bp.route("/reembolsos")
+@login_required
+@permission_required("financeiro", "visualizar")
+def reembolsos():
+    reembolsos_lista = [
+        {
+            "id": 1, "matricula": "LME", "colaborador": "Laercio Melo", "pix": "11999999999",
+            "data_solicitacao": "15/03/2026", "descricao": "Reembolso alimentação viagem", "valor": 180.00,
+            "status": "Solicitado", "fonte_pagadora": "", "aprovacao": "Pendente",
+        },
+        {
+            "id": 2, "matricula": "ABC", "colaborador": "Colaborador Exemplo", "pix": "abc@email.com",
+            "data_solicitacao": "14/03/2026", "descricao": "Reembolso táxi", "valor": 75.50,
+            "status": "Aprovado", "fonte_pagadora": "OM-2026-0002", "aprovacao": "Aprovado",
+        },
+        {
+            "id": 3, "matricula": "XYZ", "colaborador": "Outro Colaborador", "pix": "123.456.789-00",
+            "data_solicitacao": "13/03/2026", "descricao": "Reembolso combustível", "valor": 220.00,
+            "status": "Pago", "fonte_pagadora": "RD-2026-02-XYZ", "aprovacao": "Aprovado",
+        },
+    ]
+
+    return render_template(
+        "financeiro_dois/reembolsos.html",
+        subnav_links=build_financeiro_dois_subnav("reembolsos"),
+        reembolsos=reembolsos_lista,
+    )
+
+
+@bp.route("/reembolsos/<int:reembolso_id>")
+@login_required
+@permission_required("financeiro", "visualizar")
+def reembolso_editar(reembolso_id: int):
+    reembolsos_map = {
+        1: {
+            "id": 1, "matricula": "LME", "colaborador": "Laercio Melo", "pix": "11999999999",
+            "data_solicitacao": "15/03/2026", "descricao": "Reembolso alimentação viagem", "valor": 180.00,
+            "status": "Solicitado", "aprovacao": "Pendente", "fonte_pagadora": "", "comprovante_solicitacao": "anexo_refeicao.pdf",
+            "comprovante_pagamento": "", "observacao": "Aguardando aprovação para pagamento.",
+        },
+        2: {
+            "id": 2, "matricula": "ABC", "colaborador": "Colaborador Exemplo", "pix": "abc@email.com",
+            "data_solicitacao": "14/03/2026", "descricao": "Reembolso táxi", "valor": 75.50,
+            "status": "Aprovado", "aprovacao": "Aprovado", "fonte_pagadora": "OM-2026-0002", "comprovante_solicitacao": "taxi_1403.pdf",
+            "comprovante_pagamento": "", "observacao": "Pronto para pagamento.",
+        },
+        3: {
+            "id": 3, "matricula": "XYZ", "colaborador": "Outro Colaborador", "pix": "123.456.789-00",
+            "data_solicitacao": "13/03/2026", "descricao": "Reembolso combustível", "valor": 220.00,
+            "status": "Pago", "aprovacao": "Aprovado", "fonte_pagadora": "RD-2026-02-XYZ", "comprovante_solicitacao": "combustivel_xyz.pdf",
+            "comprovante_pagamento": "pix_220_xyz.pdf", "observacao": "Pagamento realizado com comprovante salvo.",
+        },
+    }
+
+    reembolso = reembolsos_map.get(reembolso_id)
+    if not reembolso:
+        abort(404)
+
+    return render_template(
+        "financeiro_dois/reembolso_editar.html",
+        subnav_links=build_financeiro_dois_subnav("reembolsos"),
+        reembolso=reembolso,
+    )
+
+
+@bp.route("/aprovacoes")
+@login_required
+@permission_required("financeiro", "visualizar")
+def aprovacoes():
+    solicitacoes = [
+        {
+            "id": 1, "tipo": "Aprovação de reembolso", "modulo": "Reembolsos", "referencia": "REB-0001",
+            "motivo": "Solicitação inicial de pagamento", "solicitado_por": "LME", "data_solicitacao": "15/03/2026",
+            "status": "Pendente", "aprovado_por": "", "data_aprovacao": "",
+        },
+        {
+            "id": 2, "tipo": "Solicitar alteração", "modulo": "Despesas", "referencia": "FAT-9001",
+            "motivo": "Despesa importada de OM", "solicitado_por": "ABC", "data_solicitacao": "14/03/2026",
+            "status": "Aprovado", "aprovado_por": "ADM", "data_aprovacao": "15/03/2026",
+        },
+        {
+            "id": 3, "tipo": "Solicitar exclusão", "modulo": "OM", "referencia": "OM-2026-0002",
+            "motivo": "Registro duplicado", "solicitado_por": "XYZ", "data_solicitacao": "13/03/2026",
+            "status": "Recusado", "aprovado_por": "ADM", "data_aprovacao": "14/03/2026",
+        },
+    ]
+
+    return render_template(
+        "financeiro_dois/aprovacoes.html",
+        subnav_links=build_financeiro_dois_subnav("aprovacoes"),
+        solicitacoes=solicitacoes,
     )
