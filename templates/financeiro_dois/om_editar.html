@@ -18,7 +18,6 @@
 
       <div class="zone-actions">
         <a class="btn" href="{{ url_for('financeiro_dois.om') }}">Voltar</a>
-        <a class="btn btn-primary" href="#">Salvar alterações</a>
       </div>
     </div>
 
@@ -26,37 +25,43 @@
       <div class="om-card">
         <div class="card-title">Dados principais</div>
 
-        <div class="form-grid">
-          <div class="field">
-            <label>Número OM</label>
-            <input class="input-like" type="text" value="{{ om.numero }}" />
+        <form method="post" action="{{ url_for('financeiro_dois.om_salvar', om_id=om.id) }}">
+          <div class="form-grid">
+            <div class="field">
+              <label>Número OM</label>
+              <input class="input-like" type="text" name="numero" value="{{ om.numero }}" required />
+            </div>
+
+            <div class="field">
+              <label>Matrícula</label>
+              <input class="input-like" type="text" name="matricula" value="{{ om.matricula }}" required />
+            </div>
+
+            <div class="field">
+              <label>Colaborador</label>
+              <input class="input-like" type="text" name="colaborador" value="{{ om.colaborador }}" required />
+            </div>
+
+            <div class="field">
+              <label>Status</label>
+              <select class="input-like" name="status">
+                <option value="Aberta" {% if om.status == 'Aberta' %}selected{% endif %}>Aberta</option>
+                <option value="Parcial" {% if om.status == 'Parcial' %}selected{% endif %}>Parcial</option>
+                <option value="Quitada" {% if om.status == 'Quitada' %}selected{% endif %}>Quitada</option>
+                <option value="Cancelada" {% if om.status == 'Cancelada' %}selected{% endif %}>Cancelada</option>
+              </select>
+            </div>
+
+            <div class="field field-full">
+              <label>Observação</label>
+              <textarea class="input-like textarea-like" name="observacao">{{ om.observacao }}</textarea>
+            </div>
           </div>
 
-          <div class="field">
-            <label>Matrícula</label>
-            <input class="input-like" type="text" value="{{ om.matricula }}" />
+          <div class="form-actions-top">
+            <button type="submit" class="btn btn-primary">Salvar alterações</button>
           </div>
-
-          <div class="field">
-            <label>Colaborador</label>
-            <input class="input-like" type="text" value="{{ om.colaborador }}" />
-          </div>
-
-          <div class="field">
-            <label>Status</label>
-            <select class="input-like">
-              <option {% if om.status == 'Aberta' %}selected{% endif %}>Aberta</option>
-              <option {% if om.status == 'Parcial' %}selected{% endif %}>Parcial</option>
-              <option {% if om.status == 'Quitada' %}selected{% endif %}>Quitada</option>
-              <option {% if om.status == 'Cancelada' %}selected{% endif %}>Cancelada</option>
-            </select>
-          </div>
-
-          <div class="field field-full">
-            <label>Observação</label>
-            <textarea class="input-like textarea-like">{{ om.observacao }}</textarea>
-          </div>
-        </div>
+        </form>
       </div>
 
       <div class="om-side">
@@ -79,19 +84,66 @@
         <div class="resume-card">
           <div class="resume-title">Ações</div>
           <div class="action-list">
-            <a href="#" class="btn btn-primary btn-block">Adicionar despesa</a>
-            <a href="#" class="btn btn-block">Registrar adiantamento</a>
-            <a href="#" class="btn btn-block">Registrar pagamento</a>
-            <a href="#" class="btn btn-block">Solicitar exclusão</a>
+            <button type="button" class="btn btn-primary btn-block" onclick="toggleNovaLinha()">Adicionar linha</button>
           </div>
         </div>
       </div>
     </div>
 
+    <div id="novaLinhaBox" class="om-card" style="display:none; margin-bottom:16px;">
+      <div class="card-title">Nova linha da OM</div>
+
+      <form method="post" action="{{ url_for('financeiro_dois.om_linha_nova', om_id=om.id) }}">
+        <div class="form-grid">
+          <div class="field">
+            <label>Data</label>
+            <input class="input-like" type="date" name="data_lancamento" required>
+          </div>
+
+          <div class="field">
+            <label>Tipo</label>
+            <input class="input-like" type="text" name="tipo_linha" placeholder="Ex.: Despesa, Pagamento, Adiantamento" required>
+          </div>
+
+          <div class="field">
+            <label>Sinal</label>
+            <select class="input-like" name="sinal" required>
+              <option value="+">+</option>
+              <option value="-">-</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label>Valor</label>
+            <input class="input-like" type="text" name="valor" placeholder="Ex.: 150.00" required>
+          </div>
+
+          <div class="field field-full">
+            <label>Descrição</label>
+            <input class="input-like" type="text" name="descricao" required>
+          </div>
+
+          <div class="field">
+            <label>Categoria</label>
+            <input class="input-like" type="text" name="categoria" placeholder="Ex.: Alimentação">
+          </div>
+
+          <div class="field">
+            <label>Aplicação</label>
+            <input class="input-like" type="text" name="aplicacao" placeholder="Ex.: MATISA">
+          </div>
+        </div>
+
+        <div class="form-actions-top">
+          <button type="submit" class="btn btn-primary">Salvar linha</button>
+          <button type="button" class="btn" onclick="toggleNovaLinha()">Cancelar</button>
+        </div>
+      </form>
+    </div>
+
     <div class="om-card">
       <div class="card-head-inline">
         <div class="card-title">Linhas da OM</div>
-        <a class="btn btn-sm" href="#">Adicionar linha</a>
       </div>
 
       <div class="table-wrap">
@@ -117,6 +169,10 @@
               <td>{{ linha.aplicacao }}</td>
               <td>{{ linha.sinal }}</td>
               <td style="text-align:right;">R$ {{ '%.2f'|format(linha.valor) }}</td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="7">Sem linhas lançadas.</td>
             </tr>
             {% endfor %}
           </tbody>
@@ -229,10 +285,11 @@
     overflow:auto;
   }
 
-  .btn-sm{
-    padding:7px 10px;
-    font-size:12px;
-    line-height:1;
+  .form-actions-top{
+    display:flex;
+    gap:10px;
+    margin-top:16px;
+    flex-wrap:wrap;
   }
 
   @media (max-width: 980px){
@@ -241,4 +298,12 @@
     }
   }
 </style>
+
+<script>
+  function toggleNovaLinha() {
+    const box = document.getElementById("novaLinhaBox");
+    if (!box) return;
+    box.style.display = box.style.display === "none" ? "block" : "none";
+  }
+</script>
 {% endblock %}

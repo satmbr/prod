@@ -1202,6 +1202,135 @@ def om_editar(om_id: int):
         total_positivo=total_positivo,
         total_negativo=total_negativo,
     )
+    
+@bp.route("/om/<int:om_id>/salvar", methods=["POST"])
+@login_required
+@permission_required("financeiro", "visualizar")
+def om_salvar(om_id: int):
+    numero = _nome_preenchido(request.form.get("numero"))
+    matricula = _nome_preenchido(request.form.get("matricula"))
+    colaborador = _nome_preenchido(request.form.get("colaborador"))
+    status = _nome_preenchido(request.form.get("status")) or "Aberta"
+    observacao = _nome_preenchido(request.form.get("observacao"))
+
+    if not numero or not matricula or not colaborador:
+        flash("Preencha número, matrícula e colaborador.", "warning")
+        return redirect(url_for("financeiro_dois.om_editar", om_id=om_id))
+
+    engine = get_engine()
+    with engine.begin() as conn:
+        om = conn.execute(text("""
+            SELECT id
+            FROM financeiro2_om
+            WHERE id = :id
+        """), {"id": om_id}).mappings().first()
+
+        if not om:
+            flash("OM não encontrada.", "danger")
+            return redirect(url_for("financeiro_dois.om"))
+
+        existe = conn.execute(text("""
+            SELECT id
+            FROM financeiro2_om
+            WHERE numero_om = :numero
+              AND id <> :id
+            LIMIT 1
+        """), {"numero": numero, "id": om_id}).mappings().first()
+
+        if existe:
+            flash(f"Já existe outra OM com o número {numero}.", "warning")
+            return redirect(url_for("financeiro_dois.om_editar", om_id=om_id))
+
+        conn.execute(text("""
+            UPDATE financeiro2_om
+            SET numero_om = :numero,
+                matricula_colaborador = :matricula,
+                nome_colaborador = :colaborador,
+                status = :status,
+                observacao = :observacao,
+                atualizado_em = CURRENT_TIMESTAMP
+            WHERE id = :id
+        """), {
+            "numero": numero,
+            "matricula": matricula,
+            "colaborador": colaborador,
+            "status": status,
+            "observacao": observacao,
+            "id": om_id
+        })
+
+    flash("OM atualizada com sucesso.", "success")
+    return redirect(url_for("financeiro_dois.om_editar", om_id=om_id))
+
+
+@bp.route("/om/<int:om_id>/linhas/nova", methods=["POST"])
+@login_required
+@permission_required("financeiro", "visualizar")
+def om_linha_nova(om_id: int):
+    data_lancamento = _nome_preenchido(request.form.get("data_lancamento"))
+    tipo_linha = _nome_preenchido(request.form.get("tipo_linha"))
+    descricao = _nome_preenchido(request.form.get("descricao"))
+    categoria = _nome_preenchido(request.form.get("categoria"))
+    aplicacao = _nome_preenchido(request.form.get("aplicacao"))
+    valor_txt = _nome_preenchido(request.form.get("valor")).replace(",", ".")
+    sinal = _nome_preenchido(request.form.get("sinal"))
+
+    if not data_lancamento or not tipo_linha or not descricao or not valor_txt or sinal not in ("+", "-"):
+        flash("Preencha data, tipo, descrição, valor e sinal da linha.", "warning")
+        return redirect(url_for("financeiro_dois.om_editar", om_id=om_id))
+
+    try:
+        valor = float(valor_txt)
+    except ValueError:
+        flash("Valor inválido para a linha.", "warning")
+        return redirect(url_for("financeiro_dois.om_editar", om_id=om_id))
+
+    engine = get_engine()
+    with engine.begin() as conn:
+        om = conn.execute(text("""
+            SELECT id
+            FROM financeiro2_om
+            WHERE id = :id
+        """), {"id": om_id}).mappings().first()
+
+        if not om:
+            flash("OM não encontrada.", "danger")
+            return redirect(url_for("financeiro_dois.om"))
+
+        conn.execute(text("""
+            INSERT INTO financeiro2_om_linhas (
+                om_id,
+                data_lancamento,
+                tipo_linha,
+                descricao,
+                categoria,
+                aplicacao,
+                valor,
+                sinal
+            )
+            VALUES (
+                :om_id,
+                :data_lancamento,
+                :tipo_linha,
+                :descricao,
+                :categoria,
+                :aplicacao,
+                :valor,
+                :sinal
+            )
+        """), {
+            "om_id": om_id,
+            "data_lancamento": data_lancamento,
+            "tipo_linha": tipo_linha,
+            "descricao": descricao,
+            "categoria": categoria or None,
+            "aplicacao": aplicacao or None,
+            "valor": valor,
+            "sinal": sinal
+        })
+
+    flash("Linha adicionada com sucesso.", "success")
+    return redirect(url_for("financeiro_dois.om_editar", om_id=om_id))
 
 # =========================
 # RD
