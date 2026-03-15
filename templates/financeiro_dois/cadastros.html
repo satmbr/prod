@@ -11,7 +11,7 @@
         <div>
           <div class="zone-title">Cadastros Financeiros</div>
           <div class="muted">
-            Base auxiliar do Financeiro Dois. Nesta etapa, vamos estruturar as abas e o layout.
+            Base auxiliar do Financeiro Dois com dados reais do banco.
           </div>
         </div>
       </div>
@@ -31,64 +31,397 @@
       </div>
 
       <div class="f2-tab-panels">
-        {% for aba in abas %}
-          <div
-            class="f2-tab-panel {% if loop.first %}active{% endif %}"
-            id="tab-{{ aba.id }}"
-          >
-            <div class="cad-card">
-              <div class="cad-card-head">
-                <div>
-                  <div class="cad-card-title">{{ aba.titulo }}</div>
-                  <div class="muted">Estrutura inicial do cadastro.</div>
-                </div>
-                <button type="button" class="btn btn-primary">Novo</button>
+
+        <!-- Categorias -->
+        <div class="f2-tab-panel active" id="tab-categorias">
+          <div class="cad-card">
+            <div class="cad-card-head">
+              <div>
+                <div class="cad-card-title">Categorias</div>
+                <div class="muted">Lista real carregada do banco.</div>
               </div>
+              <button type="button" class="btn btn-primary">Novo</button>
+            </div>
 
-              <div class="cad-form-grid">
-                <div class="field">
-                  <label>Nome</label>
-                  <input type="text" class="input-like" placeholder="Digite um nome" />
-                </div>
-
-                <div class="field">
-                  <label>Status</label>
-                  <select class="input-like">
-                    <option>Ativo</option>
-                    <option>Inativo</option>
-                  </select>
-                </div>
-              </div>
-
-              <div class="cad-table-wrap">
-                <table class="table">
-                  <thead>
-                    <tr>
-                      <th style="width: 80px;">ID</th>
-                      <th>Nome</th>
-                      <th style="width: 140px;">Status</th>
-                      <th style="width: 160px;">Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td>—</td>
-                      <td>Sem registros por enquanto</td>
-                      <td>—</td>
-                      <td>
-                        <div class="table-actions">
-                          <button type="button" class="btn btn-sm">Editar</button>
-                          <button type="button" class="btn btn-sm btn-danger">Excluir</button>
-                        </div>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-
+            <div class="cad-table-wrap">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th style="width:80px;">ID</th>
+                    <th>Nome</th>
+                    <th style="width:140px;">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for item in categorias %}
+                  <tr>
+                    <td>{{ item.id }}</td>
+                    <td>{{ item.nome }}</td>
+                    <td>{{ item.status }}</td>
+                  </tr>
+                  {% else %}
+                  <tr>
+                    <td colspan="3">Sem registros.</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
             </div>
           </div>
-        {% endfor %}
+        </div>
+
+        <!-- Descrições -->
+        <div class="f2-tab-panel" id="tab-descricoes">
+          <div class="cad-card">
+            <div class="cad-card-head">
+              <div>
+                <div class="cad-card-title">Descrições padrão</div>
+                <div class="muted">Lista real carregada do banco.</div>
+              </div>
+              <button type="button" class="btn btn-primary">Novo</button>
+            </div>
+
+            <div class="cad-table-wrap">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th style="width:80px;">ID</th>
+                    <th>Nome</th>
+                    <th>Categoria</th>
+                    <th style="width:140px;">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for item in descricoes %}
+                  <tr>
+                    <td>{{ item.id }}</td>
+                    <td>{{ item.nome }}</td>
+                    <td>{{ item.categoria_nome }}</td>
+                    <td>{{ item.status }}</td>
+                  </tr>
+                  {% else %}
+                  <tr>
+                    <td colspan="4">Sem registros.</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Aplicações -->
+        <div class="f2-tab-panel" id="tab-aplicacoes">
+          <div class="cad-card">
+            <div class="cad-card-head">
+              <div>
+                <div class="cad-card-title">Aplicações</div>
+                <div class="muted">Lista real carregada do banco.</div>
+              </div>
+              <button type="button" class="btn btn-primary">Novo</button>
+            </div>
+
+            <div class="cad-table-wrap">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th style="width:80px;">ID</th>
+                    <th>Nome</th>
+                    <th style="width:140px;">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for item in aplicacoes %}
+                  <tr>
+                    <td>{{ item.id }}</td>
+                    <td>{{ item.nome }}</td>
+                    <td>{{ item.status }}</td>
+                  </tr>
+                  {% else %}
+                  <tr>
+                    <td colspan="3">Sem registros.</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Moedas -->
+        <div class="f2-tab-panel" id="tab-moedas">
+          <div class="cad-card">
+            <div class="cad-card-head">
+              <div>
+                <div class="cad-card-title">Moedas</div>
+                <div class="muted">Lista real carregada do banco.</div>
+              </div>
+              <button type="button" class="btn btn-primary">Novo</button>
+            </div>
+
+            <div class="cad-table-wrap">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th style="width:80px;">ID</th>
+                    <th>Código</th>
+                    <th>Nome</th>
+                    <th>Câmbio padrão</th>
+                    <th style="width:140px;">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for item in moedas %}
+                  <tr>
+                    <td>{{ item.id }}</td>
+                    <td>{{ item.codigo }}</td>
+                    <td>{{ item.nome }}</td>
+                    <td>{{ item.cambio_padrao }}</td>
+                    <td>{{ item.status }}</td>
+                  </tr>
+                  {% else %}
+                  <tr>
+                    <td colspan="5">Sem registros.</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Centros de custo -->
+        <div class="f2-tab-panel" id="tab-centros_custo">
+          <div class="cad-card">
+            <div class="cad-card-head">
+              <div>
+                <div class="cad-card-title">Centros de custo</div>
+                <div class="muted">Lista real carregada do banco.</div>
+              </div>
+              <button type="button" class="btn btn-primary">Novo</button>
+            </div>
+
+            <div class="cad-table-wrap">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th style="width:80px;">ID</th>
+                    <th>Nome</th>
+                    <th style="width:140px;">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for item in centros_custo %}
+                  <tr>
+                    <td>{{ item.id }}</td>
+                    <td>{{ item.nome }}</td>
+                    <td>{{ item.status }}</td>
+                  </tr>
+                  {% else %}
+                  <tr>
+                    <td colspan="3">Sem registros.</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Status despesa -->
+        <div class="f2-tab-panel" id="tab-status_despesa">
+          <div class="cad-card">
+            <div class="cad-card-head">
+              <div>
+                <div class="cad-card-title">Status despesa</div>
+                <div class="muted">Lista real carregada do banco.</div>
+              </div>
+              <button type="button" class="btn btn-primary">Novo</button>
+            </div>
+
+            <div class="cad-table-wrap">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th style="width:80px;">ID</th>
+                    <th>Nome</th>
+                    <th style="width:140px;">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for item in status_despesa %}
+                  <tr>
+                    <td>{{ item.id }}</td>
+                    <td>{{ item.nome }}</td>
+                    <td>{{ item.status }}</td>
+                  </tr>
+                  {% else %}
+                  <tr>
+                    <td colspan="3">Sem registros.</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Status ND -->
+        <div class="f2-tab-panel" id="tab-status_nd">
+          <div class="cad-card">
+            <div class="cad-card-head">
+              <div>
+                <div class="cad-card-title">Status ND</div>
+                <div class="muted">Lista real carregada do banco.</div>
+              </div>
+              <button type="button" class="btn btn-primary">Novo</button>
+            </div>
+
+            <div class="cad-table-wrap">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th style="width:80px;">ID</th>
+                    <th>Nome</th>
+                    <th style="width:140px;">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for item in status_nd %}
+                  <tr>
+                    <td>{{ item.id }}</td>
+                    <td>{{ item.nome }}</td>
+                    <td>{{ item.status }}</td>
+                  </tr>
+                  {% else %}
+                  <tr>
+                    <td colspan="3">Sem registros.</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tipos documento -->
+        <div class="f2-tab-panel" id="tab-tipos_documento">
+          <div class="cad-card">
+            <div class="cad-card-head">
+              <div>
+                <div class="cad-card-title">Tipos de documento</div>
+                <div class="muted">Lista real carregada do banco.</div>
+              </div>
+              <button type="button" class="btn btn-primary">Novo</button>
+            </div>
+
+            <div class="cad-table-wrap">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th style="width:80px;">ID</th>
+                    <th>Nome</th>
+                    <th style="width:140px;">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for item in tipos_documento %}
+                  <tr>
+                    <td>{{ item.id }}</td>
+                    <td>{{ item.nome }}</td>
+                    <td>{{ item.status }}</td>
+                  </tr>
+                  {% else %}
+                  <tr>
+                    <td colspan="3">Sem registros.</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Parâmetros -->
+        <div class="f2-tab-panel" id="tab-parametros">
+          <div class="cad-card">
+            <div class="cad-card-head">
+              <div>
+                <div class="cad-card-title">Parâmetros</div>
+                <div class="muted">Lista real carregada do banco.</div>
+              </div>
+              <button type="button" class="btn btn-primary">Novo</button>
+            </div>
+
+            <div class="cad-table-wrap">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th style="width:80px;">ID</th>
+                    <th>Chave</th>
+                    <th>Valor</th>
+                    <th>Descrição</th>
+                    <th style="width:140px;">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for item in parametros %}
+                  <tr>
+                    <td>{{ item.id }}</td>
+                    <td>{{ item.chave }}</td>
+                    <td>{{ item.valor }}</td>
+                    <td>{{ item.descricao }}</td>
+                    <td>{{ item.status }}</td>
+                  </tr>
+                  {% else %}
+                  <tr>
+                    <td colspan="5">Sem registros.</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Empresas ND -->
+        <div class="f2-tab-panel" id="tab-empresas_nd">
+          <div class="cad-card">
+            <div class="cad-card-head">
+              <div>
+                <div class="cad-card-title">Empresas ND</div>
+                <div class="muted">Lista real carregada do banco.</div>
+              </div>
+              <button type="button" class="btn btn-primary">Novo</button>
+            </div>
+
+            <div class="cad-table-wrap">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th style="width:80px;">ID</th>
+                    <th>Nome</th>
+                    <th style="width:140px;">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for item in empresas_nd %}
+                  <tr>
+                    <td>{{ item.id }}</td>
+                    <td>{{ item.nome }}</td>
+                    <td>{{ item.status }}</td>
+                  </tr>
+                  {% else %}
+                  <tr>
+                    <td colspan="3">Sem registros.</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
   </section>
@@ -163,57 +496,8 @@
     color:#16324F;
   }
 
-  .cad-form-grid{
-    display:grid;
-    grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));
-    gap:14px;
-    margin-bottom:18px;
-  }
-
-  .field label{
-    display:block;
-    margin-bottom:6px;
-    font-size:13px;
-    font-weight:600;
-    color:#334155;
-  }
-
-  .input-like{
-    width:100%;
-    height:42px;
-    border:1px solid #d8e1ec;
-    border-radius:12px;
-    padding:0 12px;
-    font-size:14px;
-    background:#fff;
-  }
-
-  .input-like:focus{
-    outline:none;
-    border-color:#9db6cf;
-    box-shadow:0 0 0 3px rgba(22, 50, 79, 0.08);
-  }
-
   .cad-table-wrap{
     overflow:auto;
-  }
-
-  .table-actions{
-    display:flex;
-    gap:8px;
-    flex-wrap:wrap;
-  }
-
-  .btn-sm{
-    padding:7px 10px;
-    font-size:12px;
-    line-height:1;
-  }
-
-  .btn-danger{
-    background:#fff1f2;
-    border:1px solid #fecdd3;
-    color:#be123c;
   }
 
   @media (max-width: 768px){

@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, session, url_for, abort
 
 from routes.auth import login_required, permission_required
+from db import get_db_connection
 
 bp = Blueprint("financeiro_dois", __name__, url_prefix="/financeiro-dois")
 
@@ -66,10 +67,97 @@ def cadastros():
         {"id": "empresas_nd", "titulo": "Empresas ND"},
     ]
 
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT id, nome, status
+        FROM financeiro2_cad_categorias
+        ORDER BY id
+    """)
+    categorias = cur.fetchall()
+
+    cur.execute("""
+        SELECT d.id, d.nome, COALESCE(c.nome, '') AS categoria_nome, d.status
+        FROM financeiro2_cad_descricoes d
+        LEFT JOIN financeiro2_cad_categorias c ON c.id = d.categoria_id
+        ORDER BY d.id
+    """)
+    descricoes = cur.fetchall()
+
+    cur.execute("""
+        SELECT id, nome, status
+        FROM financeiro2_cad_aplicacoes
+        ORDER BY id
+    """)
+    aplicacoes = cur.fetchall()
+
+    cur.execute("""
+        SELECT id, codigo, nome, cambio_padrao, status
+        FROM financeiro2_cad_moedas
+        ORDER BY id
+    """)
+    moedas = cur.fetchall()
+
+    cur.execute("""
+        SELECT id, nome, status
+        FROM financeiro2_cad_centros_custo
+        ORDER BY id
+    """)
+    centros_custo = cur.fetchall()
+
+    cur.execute("""
+        SELECT id, nome, status
+        FROM financeiro2_cad_status_despesa
+        ORDER BY id
+    """)
+    status_despesa = cur.fetchall()
+
+    cur.execute("""
+        SELECT id, nome, status
+        FROM financeiro2_cad_status_nd
+        ORDER BY id
+    """)
+    status_nd = cur.fetchall()
+
+    cur.execute("""
+        SELECT id, nome, status
+        FROM financeiro2_cad_tipos_documento
+        ORDER BY id
+    """)
+    tipos_documento = cur.fetchall()
+
+    cur.execute("""
+        SELECT id, chave, valor, COALESCE(descricao, '') AS descricao, status
+        FROM financeiro2_cad_parametros
+        ORDER BY id
+    """)
+    parametros = cur.fetchall()
+
+    cur.execute("""
+        SELECT id, nome, status
+        FROM financeiro2_cad_empresas_nd
+        ORDER BY id
+    """)
+    empresas_nd = cur.fetchall()
+
+    cur.close()
+    conn.close()
+
     return render_template(
         "financeiro_dois/cadastros.html",
         subnav_links=build_financeiro_dois_subnav("cadastros"),
         abas=abas,
+        categorias=categorias,
+        descricoes=descricoes,
+        aplicacoes=aplicacoes,
+        moedas=moedas,
+        centros_custo=centros_custo,
+        status_despesa=status_despesa,
+        status_nd=status_nd,
+        tipos_documento=tipos_documento,
+        parametros=parametros,
+        empresas_nd=empresas_nd,
     )
 
 
