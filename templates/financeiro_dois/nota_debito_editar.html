@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block title %}{{ nd.numero_nd }} | Financeiro Dois{% endblock %}
+
+{% block content %}
+<div class="page-wrap">
+  <section class="zone">
+    <div class="zone-head">
+      <div class="zone-left">
+        <div class="zone-icon">🗂️</div>
+        <div>
+          <div class="zone-title">{{ nd.numero_nd }}</div>
+          <div class="muted">Edição da ND com linhas vinculadas e total consolidado.</div>
+        </div>
+      </div>
+      <div class="zone-actions">
+        <a class="btn" href="{{ url_for('financeiro_dois.notas_debito') }}">Voltar</a>
+        <a class="btn btn-primary" href="#">Salvar alterações</a>
+      </div>
+    </div>
+
+    <div class="om-grid">
+      <div class="om-card">
+        <div class="card-title">Dados da ND</div>
+        <div class="form-grid">
+          <div class="field">
+            <label>Número ND</label>
+            <input class="input-like" type="text" value="{{ nd.numero_nd }}" />
+          </div>
+          <div class="field">
+            <label>Empresa origem</label>
+            <input class="input-like" type="text" value="{{ nd.empresa_origem }}" />
+          </div>
+          <div class="field">
+            <label>Data criação</label>
+            <input class="input-like" type="text" value="{{ nd.data_criacao }}" />
+          </div>
+          <div class="field">
+            <label>Status</label>
+            <input class="input-like" type="text" value="{{ nd.status }}" />
+          </div>
+          <div class="field field-full">
+            <label>Observação</label>
+            <textarea class="input-like textarea-like">{{ nd.observacao }}</textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="om-side">
+        <div class="resume-card">
+          <div class="resume-title">Resumo</div>
+          <div class="resume-row"><span>Status</span><strong>{{ nd.status }}</strong></div>
+          <div class="resume-row"><span>Empresa</span><strong>{{ nd.empresa_origem }}</strong></div>
+          <div class="resume-row resume-total"><span>Total ND</span><strong>R$ {{ '%.2f'|format(total_nd) }}</strong></div>
+        </div>
+
+        <div class="resume-card">
+          <div class="resume-title">Ações</div>
+          <div class="action-list">
+            <a href="#" class="btn btn-primary btn-block">Inserir despesas</a>
+            <a href="#" class="btn btn-block">Exportar PDF</a>
+            <a href="#" class="btn btn-block">Solicitar alteração</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="om-card">
+      <div class="card-head-inline">
+        <div class="card-title">Linhas da ND</div>
+        <a class="btn btn-sm" href="#">Adicionar linha</a>
+      </div>
+
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Descrição</th>
+              <th>Tipo</th>
+              <th>Número documento</th>
+              <th style="text-align:right;">Valor</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for linha in nd.linhas %}
+            <tr>
+              <td>{{ linha.data }}</td>
+              <td>{{ linha.descricao }}</td>
+              <td>{{ linha.tipo }}</td>
+              <td>{{ linha.numero_documento }}</td>
+              <td style="text-align:right;">R$ {{ '%.2f'|format(linha.valor) }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</div>
+
+<style>
+  .om-grid{display:grid;grid-template-columns:minmax(0,2fr) minmax(280px,1fr);gap:16px;margin-bottom:16px;}
+  .om-card,.resume-card{background:#fff;border:1px solid #d8e1ec;border-radius:18px;padding:18px;box-shadow:0 6px 18px rgba(15,23,42,.05);}
+  .card-title,.resume-title{font-size:18px;font-weight:700;color:#16324F;margin-bottom:14px;}
+  .card-head-inline{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap;}
+  .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;}
+  .field label{display:block;margin-bottom:6px;font-size:13px;font-weight:600;color:#334155;}
+  .field-full{grid-column:1 / -1;}
+  .input-like{width:100%;height:42px;border:1px solid #d8e1ec;border-radius:12px;padding:0 12px;font-size:14px;background:#fff;}
+  .textarea-like{min-height:96px;padding:12px;resize:vertical;}
+  .resume-row{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid #edf2f7;font-size:14px;}
+  .resume-row:last-child{border-bottom:none;}
+  .resume-total{font-size:15px;font-weight:700;}
+  .action-list{display:flex;flex-direction:column;gap:10px;}
+  .btn-block{width:100%;text-align:center;}
+  .table-wrap{overflow:auto;}
+  .btn-sm{padding:7px 10px;font-size:12px;line-height:1;}
+  @media (max-width:980px){.om-grid{grid-template-columns:1fr;}}
+</style>
+{% endblock %}

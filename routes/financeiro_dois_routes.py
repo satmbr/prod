@@ -20,7 +20,7 @@ def build_financeiro_dois_subnav(active: str | None):
         links.append({"text": "Despesas", "href": url_for("financeiro_dois.despesas"), "active": active == "despesas"})
         links.append({"text": "Previsão", "href": url_for("financeiro_dois.previsao"), "active": active == "previsao"})
         links.append({"text": "Reembolsos", "href": url_for("financeiro_dois.reembolsos"), "active": active == "reembolsos"})
-        links.append({"text": "Notas de Débito", "href": "#", "active": active == "nd"})
+        links.append({"text": "Notas de Débito", "href": url_for("financeiro_dois.notas_debito"), "active": active == "nd"})
         links.append({"text": "Aprovações", "href": url_for("financeiro_dois.aprovacoes"), "active": active == "aprovacoes"})
         links.append({"text": "Cadastros", "href": url_for("financeiro_dois.cadastros"), "active": active == "cadastros"})
 
@@ -37,7 +37,7 @@ def index():
         {"titulo": "Despesas", "descricao": "Despesas avulsas ou importadas, com controle de pagamento e vínculo.", "href": url_for("financeiro_dois.despesas"), "icone": "💸"},
         {"titulo": "Previsão", "descricao": "Despesas não vinculadas, em espera ou rejeitadas para ND.", "href": url_for("financeiro_dois.previsao"), "icone": "📊"},
         {"titulo": "Reembolsos", "descricao": "Solicitação, aprovação e pagamento com comprovante.", "href": url_for("financeiro_dois.reembolsos"), "icone": "💳"},
-        {"titulo": "Notas de Débito", "descricao": "Criação, edição, vínculo de despesas e exportação em PDF.", "href": "#", "icone": "🗂️"},
+        {"titulo": "Notas de Débito", "descricao": "Criação, edição, vínculo de despesas e exportação em PDF.", "href": url_for("financeiro_dois.notas_debito"), "icone": "🗂️"},
         {"titulo": "Aprovações", "descricao": "Fila de aprovações para exclusões e alterações sensíveis.", "href": url_for("financeiro_dois.aprovacoes"), "icone": "✅"},
         {"titulo": "Cadastros", "descricao": "Página única com abas para categorias, moedas, CC e parâmetros.", "href": url_for("financeiro_dois.cadastros"), "icone": "⚙️"},
     ]
@@ -82,12 +82,7 @@ def om():
         {"id": 2, "numero": "OM-2026-0002", "matricula": "ABC", "colaborador": "Colaborador Exemplo", "status": "Parcial", "saldo": 420.75, "criada_em": "14/03/2026"},
         {"id": 3, "numero": "OM-2026-0003", "matricula": "XYZ", "colaborador": "Outro Colaborador", "status": "Quitada", "saldo": 0.00, "criada_em": "10/03/2026"},
     ]
-
-    return render_template(
-        "financeiro_dois/om.html",
-        subnav_links=build_financeiro_dois_subnav("om"),
-        oms=oms,
-    )
+    return render_template("financeiro_dois/om.html", subnav_links=build_financeiro_dois_subnav("om"), oms=oms)
 
 
 @bp.route("/om/<int:om_id>")
@@ -147,12 +142,7 @@ def rd():
         {"id": 2, "numero": "RD-2026-03-ABC", "periodo": "03/2026", "matricula": "ABC", "colaborador": "Colaborador Exemplo", "centro_custo": "OPERACAO", "status": "Parcial", "saldo": 180.20, "criada_em": "14/03/2026"},
         {"id": 3, "numero": "RD-2026-02-XYZ", "periodo": "02/2026", "matricula": "XYZ", "colaborador": "Outro Colaborador", "centro_custo": "MANUTENCAO", "status": "Quitada", "saldo": 0.00, "criada_em": "28/02/2026"},
     ]
-
-    return render_template(
-        "financeiro_dois/rd.html",
-        subnav_links=build_financeiro_dois_subnav("rd"),
-        rds=rds,
-    )
+    return render_template("financeiro_dois/rd.html", subnav_links=build_financeiro_dois_subnav("rd"), rds=rds)
 
 
 @bp.route("/rd/<int:rd_id>")
@@ -215,12 +205,7 @@ def despesas():
         {"id": 2, "data": "14/03/2026", "vencimento": "18/03/2026", "tipo_documento": "Fatura", "numero_documento": "FAT-9001", "fornecedor": "Posto Modelo", "descricao": "Combustível", "centro_custo": "OPERACAO", "valor": 420.50, "status_despesa": "Paga", "status_nd": "Em espera", "origem": "OM"},
         {"id": 3, "data": "13/03/2026", "vencimento": "25/03/2026", "tipo_documento": "NFS", "numero_documento": "NFS-1102", "fornecedor": "Serviço X", "descricao": "Serviço de apoio", "centro_custo": "MANUTENCAO", "valor": 780.30, "status_despesa": "Pendente", "status_nd": "Rejeitada", "origem": "RD"},
     ]
-
-    return render_template(
-        "financeiro_dois/despesas.html",
-        subnav_links=build_financeiro_dois_subnav("despesas"),
-        despesas=despesas_lista,
-    )
+    return render_template("financeiro_dois/despesas.html", subnav_links=build_financeiro_dois_subnav("despesas"), despesas=despesas_lista)
 
 
 @bp.route("/despesas/<int:despesa_id>")
@@ -270,12 +255,7 @@ def previsao():
         {"id": 2, "data": "14/03/2026", "vencimento": "18/03/2026", "tipo_documento": "Fatura", "numero_documento": "FAT-9001", "fornecedor": "Posto Modelo", "descricao": "Combustível", "centro_custo": "OPERACAO", "valor": 420.50, "status_despesa": "Paga", "status_nd": "Em espera", "motivo_status_nd": "Aguardando decisão da área"},
         {"id": 3, "data": "13/03/2026", "vencimento": "25/03/2026", "tipo_documento": "NFS", "numero_documento": "NFS-1102", "fornecedor": "Serviço X", "descricao": "Serviço de apoio", "centro_custo": "MANUTENCAO", "valor": 780.30, "status_despesa": "Pendente", "status_nd": "Rejeitada", "motivo_status_nd": "Fora do escopo da ND atual"},
     ]
-
-    return render_template(
-        "financeiro_dois/previsao.html",
-        subnav_links=build_financeiro_dois_subnav("previsao"),
-        previsoes=previsoes,
-    )
+    return render_template("financeiro_dois/previsao.html", subnav_links=build_financeiro_dois_subnav("previsao"), previsoes=previsoes)
 
 
 @bp.route("/reembolsos")
@@ -283,28 +263,11 @@ def previsao():
 @permission_required("financeiro", "visualizar")
 def reembolsos():
     reembolsos_lista = [
-        {
-            "id": 1, "matricula": "LME", "colaborador": "Laercio Melo", "pix": "11999999999",
-            "data_solicitacao": "15/03/2026", "descricao": "Reembolso alimentação viagem", "valor": 180.00,
-            "status": "Solicitado", "fonte_pagadora": "", "aprovacao": "Pendente",
-        },
-        {
-            "id": 2, "matricula": "ABC", "colaborador": "Colaborador Exemplo", "pix": "abc@email.com",
-            "data_solicitacao": "14/03/2026", "descricao": "Reembolso táxi", "valor": 75.50,
-            "status": "Aprovado", "fonte_pagadora": "OM-2026-0002", "aprovacao": "Aprovado",
-        },
-        {
-            "id": 3, "matricula": "XYZ", "colaborador": "Outro Colaborador", "pix": "123.456.789-00",
-            "data_solicitacao": "13/03/2026", "descricao": "Reembolso combustível", "valor": 220.00,
-            "status": "Pago", "fonte_pagadora": "RD-2026-02-XYZ", "aprovacao": "Aprovado",
-        },
+        {"id": 1, "matricula": "LME", "colaborador": "Laercio Melo", "pix": "11999999999", "data_solicitacao": "15/03/2026", "descricao": "Reembolso alimentação viagem", "valor": 180.00, "status": "Solicitado", "fonte_pagadora": "", "aprovacao": "Pendente"},
+        {"id": 2, "matricula": "ABC", "colaborador": "Colaborador Exemplo", "pix": "abc@email.com", "data_solicitacao": "14/03/2026", "descricao": "Reembolso táxi", "valor": 75.50, "status": "Aprovado", "fonte_pagadora": "OM-2026-0002", "aprovacao": "Aprovado"},
+        {"id": 3, "matricula": "XYZ", "colaborador": "Outro Colaborador", "pix": "123.456.789-00", "data_solicitacao": "13/03/2026", "descricao": "Reembolso combustível", "valor": 220.00, "status": "Pago", "fonte_pagadora": "RD-2026-02-XYZ", "aprovacao": "Aprovado"},
     ]
-
-    return render_template(
-        "financeiro_dois/reembolsos.html",
-        subnav_links=build_financeiro_dois_subnav("reembolsos"),
-        reembolsos=reembolsos_lista,
-    )
+    return render_template("financeiro_dois/reembolsos.html", subnav_links=build_financeiro_dois_subnav("reembolsos"), reembolsos=reembolsos_lista)
 
 
 @bp.route("/reembolsos/<int:reembolso_id>")
@@ -348,25 +311,90 @@ def reembolso_editar(reembolso_id: int):
 @permission_required("financeiro", "visualizar")
 def aprovacoes():
     solicitacoes = [
+        {"id": 1, "tipo": "Aprovação de reembolso", "modulo": "Reembolsos", "referencia": "REB-0001", "motivo": "Solicitação inicial de pagamento", "solicitado_por": "LME", "data_solicitacao": "15/03/2026", "status": "Pendente", "aprovado_por": "", "data_aprovacao": ""},
+        {"id": 2, "tipo": "Solicitar alteração", "modulo": "Despesas", "referencia": "FAT-9001", "motivo": "Despesa importada de OM", "solicitado_por": "ABC", "data_solicitacao": "14/03/2026", "status": "Aprovado", "aprovado_por": "ADM", "data_aprovacao": "15/03/2026"},
+        {"id": 3, "tipo": "Solicitar exclusão", "modulo": "OM", "referencia": "OM-2026-0002", "motivo": "Registro duplicado", "solicitado_por": "XYZ", "data_solicitacao": "13/03/2026", "status": "Recusado", "aprovado_por": "ADM", "data_aprovacao": "14/03/2026"},
+    ]
+    return render_template("financeiro_dois/aprovacoes.html", subnav_links=build_financeiro_dois_subnav("aprovacoes"), solicitacoes=solicitacoes)
+
+
+@bp.route("/notas-debito")
+@login_required
+@permission_required("financeiro", "visualizar")
+def notas_debito():
+    notas = [
         {
-            "id": 1, "tipo": "Aprovação de reembolso", "modulo": "Reembolsos", "referencia": "REB-0001",
-            "motivo": "Solicitação inicial de pagamento", "solicitado_por": "LME", "data_solicitacao": "15/03/2026",
-            "status": "Pendente", "aprovado_por": "", "data_aprovacao": "",
+            "id": 1, "numero_nd": "ND-2026-0001", "empresa_origem": "MATISA", "data_criacao": "15/03/2026",
+            "status": "Aberta", "total": 1730.30,
         },
         {
-            "id": 2, "tipo": "Solicitar alteração", "modulo": "Despesas", "referencia": "FAT-9001",
-            "motivo": "Despesa importada de OM", "solicitado_por": "ABC", "data_solicitacao": "14/03/2026",
-            "status": "Aprovado", "aprovado_por": "ADM", "data_aprovacao": "15/03/2026",
+            "id": 2, "numero_nd": "ND-2026-0002", "empresa_origem": "PRUMAT", "data_criacao": "14/03/2026",
+            "status": "Fechada", "total": 950.00,
         },
         {
-            "id": 3, "tipo": "Solicitar exclusão", "modulo": "OM", "referencia": "OM-2026-0002",
-            "motivo": "Registro duplicado", "solicitado_por": "XYZ", "data_solicitacao": "13/03/2026",
-            "status": "Recusado", "aprovado_por": "ADM", "data_aprovacao": "14/03/2026",
+            "id": 3, "numero_nd": "ND-2026-0003", "empresa_origem": "MATISA", "data_criacao": "13/03/2026",
+            "status": "Exportada", "total": 420.50,
         },
     ]
 
     return render_template(
-        "financeiro_dois/aprovacoes.html",
-        subnav_links=build_financeiro_dois_subnav("aprovacoes"),
-        solicitacoes=solicitacoes,
+        "financeiro_dois/notas_debito.html",
+        subnav_links=build_financeiro_dois_subnav("nd"),
+        notas=notas,
+    )
+
+
+@bp.route("/notas-debito/<int:nd_id>")
+@login_required
+@permission_required("financeiro", "visualizar")
+def nota_debito_editar(nd_id: int):
+    notas_map = {
+        1: {
+            "id": 1,
+            "numero_nd": "ND-2026-0001",
+            "empresa_origem": "MATISA",
+            "data_criacao": "15/03/2026",
+            "status": "Aberta",
+            "observacao": "ND em montagem com despesas ainda em análise.",
+            "linhas": [
+                {"data": "15/03/2026", "descricao": "Hospedagem equipe", "tipo": "NF", "numero_documento": "NF-4587", "valor": 950.00},
+                {"data": "14/03/2026", "descricao": "Combustível", "tipo": "Fatura", "numero_documento": "FAT-9001", "valor": 420.50},
+                {"data": "13/03/2026", "descricao": "Serviço de apoio", "tipo": "NFS", "numero_documento": "NFS-1102", "valor": 359.80},
+            ],
+        },
+        2: {
+            "id": 2,
+            "numero_nd": "ND-2026-0002",
+            "empresa_origem": "PRUMAT",
+            "data_criacao": "14/03/2026",
+            "status": "Fechada",
+            "observacao": "ND já conferida e fechada.",
+            "linhas": [
+                {"data": "14/03/2026", "descricao": "Hospedagem equipe", "tipo": "NF", "numero_documento": "NF-4587", "valor": 950.00},
+            ],
+        },
+        3: {
+            "id": 3,
+            "numero_nd": "ND-2026-0003",
+            "empresa_origem": "MATISA",
+            "data_criacao": "13/03/2026",
+            "status": "Exportada",
+            "observacao": "ND exportada em PDF e travada para edição direta.",
+            "linhas": [
+                {"data": "14/03/2026", "descricao": "Combustível", "tipo": "Fatura", "numero_documento": "FAT-9001", "valor": 420.50},
+            ],
+        },
+    }
+
+    nd = notas_map.get(nd_id)
+    if not nd:
+        abort(404)
+
+    total_nd = sum(item["valor"] for item in nd["linhas"])
+
+    return render_template(
+        "financeiro_dois/nota_debito_editar.html",
+        subnav_links=build_financeiro_dois_subnav("nd"),
+        nd=nd,
+        total_nd=total_nd,
     )
