@@ -1065,52 +1065,80 @@ def empresa_nd_toggle_status(item_id: int):
 @login_required
 @permission_required("financeiro", "visualizar")
 def om():
-    oms = [
-        {"id": 1, "numero": "OM-2026-0001", "matricula": "LME", "colaborador": "Laercio Melo", "status": "Aberta", "saldo": 1850.40, "criada_em": "15/03/2026"},
-        {"id": 2, "numero": "OM-2026-0002", "matricula": "ABC", "colaborador": "Colaborador Exemplo", "status": "Parcial", "saldo": 420.75, "criada_em": "14/03/2026"},
-        {"id": 3, "numero": "OM-2026-0003", "matricula": "XYZ", "colaborador": "Outro Colaborador", "status": "Quitada", "saldo": 0.00, "criada_em": "10/03/2026"},
-    ]
-    return render_template("financeiro_dois/om.html", subnav_links=build_financeiro_dois_subnav("om"), oms=oms)
+    engine = get_engine()
 
+    with engine.connect() as conn:
+        oms = conn.execute(text("""
+            SELECT
+                o.id,
+                o.numero_om AS numero,
+                o.matricula_colaborador AS matricula,
+                o.nome_colaborador AS colaborador,
+                o.status,
+                TO_CHAR(o.criado_em, 'DD/MM/YYYY') AS criada_em,
+                COALESCE(SUM(
+                    CASE
+                        WHEN l.sinal = '+' THEN l.valor
+                        WHEN l.sinal = '-' THEN -l.valor
+                        ELSE 0
+                    END
+                ), 0) AS saldo
+            FROM financeiro2_om o
+            LEFT JOIN financeiro2_om_linhas l ON l.om_id = o.id
+            GROUP BY o.id, o.numero_om, o.matricula_colaborador, o.nome_colaborador, o.status, o.criado_em
+            ORDER BY o.id
+        """)).mappings().all()
+
+    return render_template(
+        "financeiro_dois/om.html",
+        subnav_links=build_financeiro_dois_subnav("om"),
+        oms=oms,
+    )
 
 @bp.route("/om/<int:om_id>")
 @login_required
 @permission_required("financeiro", "visualizar")
 def om_editar(om_id: int):
-    oms = {
-        1: {
-            "id": 1, "numero": "OM-2026-0001", "matricula": "LME", "colaborador": "Laercio Melo", "status": "Aberta",
-            "saldo": 1850.40, "criada_em": "15/03/2026", "observacao": "OM inicial para estrutura do financeiro_dois.",
-            "linhas": [
-                {"data": "15/03/2026", "tipo": "Despesa", "descricao": "Hospedagem", "categoria": "Hospedagem", "aplicacao": "MATISA", "valor": 950.00, "sinal": "+"},
-                {"data": "15/03/2026", "tipo": "Adiantamento", "descricao": "PIX adiantado", "categoria": "Adiantamento", "aplicacao": "MATISA", "valor": 300.00, "sinal": "-"},
-                {"data": "15/03/2026", "tipo": "Despesa", "descricao": "Alimentação", "categoria": "Alimentação", "aplicacao": "MATISA", "valor": 1200.40, "sinal": "+"},
-            ],
-        },
-        2: {
-            "id": 2, "numero": "OM-2026-0002", "matricula": "ABC", "colaborador": "Colaborador Exemplo", "status": "Parcial",
-            "saldo": 420.75, "criada_em": "14/03/2026", "observacao": "OM com saldo parcial.",
-            "linhas": [
-                {"data": "14/03/2026", "tipo": "Despesa", "descricao": "Táxi", "categoria": "Transporte", "aplicacao": "PRUMAT", "valor": 220.75, "sinal": "+"},
-                {"data": "14/03/2026", "tipo": "Pagamento", "descricao": "Reembolso parcial", "categoria": "Pagamento", "aplicacao": "PRUMAT", "valor": 200.00, "sinal": "-"},
-            ],
-        },
-        3: {
-            "id": 3, "numero": "OM-2026-0003", "matricula": "XYZ", "colaborador": "Outro Colaborador", "status": "Quitada",
-            "saldo": 0.00, "criada_em": "10/03/2026", "observacao": "OM quitada e fechada.",
-            "linhas": [
-                {"data": "10/03/2026", "tipo": "Despesa", "descricao": "Combustível", "categoria": "Transporte", "aplicacao": "GERAL", "valor": 300.00, "sinal": "+"},
-                {"data": "10/03/2026", "tipo": "Pagamento", "descricao": "Quitação", "categoria": "Pagamento", "aplicacao": "GERAL", "valor": 300.00, "sinal": "-"},
-            ],
-        },
-    }
+    engine = get_engine()
 
-    om = oms.get(om_id)
-    if not om:
-        abort(404)
+    with engine.connect() as conn:
+        om = conn.execute(text("""
+            SELECT
+                id,
+                numero_om AS numero,
+                matricula_colaborador AS matricula,
+                nome_colaborador AS colaborador,
+                status,
+                TO_CHAR(criado_em, 'DD/MM/YYYY') AS criada_em,
+                COALESCE(observacao, '') AS observacao
+            FROM financeiro2_om
+            WHERE id = :id
+        """), {"id": om_id}).mappings().first()
 
-    total_positivo = sum(item["valor"] for item in om["linhas"] if item["sinal"] == "+")
-    total_negativo = sum(item["valor"] for item in om["linhas"] if item["sinal"] == "-")
+        if not om:
+            abort(404)
+
+        linhas = conn.execute(text("""
+            SELECT
+                TO_CHAR(data_lancamento, 'DD/MM/YYYY') AS data,
+                tipo_linha AS tipo,
+                descricao,
+                COALESCE(categoria, '') AS categoria,
+                COALESCE(aplicacao, '') AS aplicacao,
+                valor,
+                sinal
+            FROM financeiro2_om_linhas
+            WHERE om_id = :id
+            ORDER BY id
+        """), {"id": om_id}).mappings().all()
+
+    total_positivo = sum(float(item["valor"]) for item in linhas if item["sinal"] == "+")
+    total_negativo = sum(float(item["valor"]) for item in linhas if item["sinal"] == "-")
+    saldo = total_positivo - total_negativo
+
+    om = dict(om)
+    om["saldo"] = saldo
+    om["linhas"] = linhas
 
     return render_template(
         "financeiro_dois/om_editar.html",
@@ -1119,7 +1147,6 @@ def om_editar(om_id: int):
         total_positivo=total_positivo,
         total_negativo=total_negativo,
     )
-
 
 # =========================
 # RD
