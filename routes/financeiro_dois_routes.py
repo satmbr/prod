@@ -1094,6 +1094,65 @@ def om():
         subnav_links=build_financeiro_dois_subnav("om"),
         oms=oms,
     )
+    
+@bp.route("/om/nova", methods=["POST"])
+@login_required
+@permission_required("financeiro", "visualizar")
+def om_nova():
+    matricula = _nome_preenchido(request.form.get("matricula_colaborador"))
+    nome_colaborador = _nome_preenchido(request.form.get("nome_colaborador"))
+    observacao = _nome_preenchido(request.form.get("observacao"))
+
+    if not matricula or not nome_colaborador:
+        flash("Informe a matrícula e o nome do colaborador.", "warning")
+        return redirect(url_for("financeiro_dois.om"))
+
+    engine = get_engine()
+
+    with engine.begin() as conn:
+        ultimo = conn.execute(text("""
+            SELECT numero_om
+            FROM financeiro2_om
+            WHERE numero_om LIKE 'OM-2026-%'
+            ORDER BY id DESC
+            LIMIT 1
+        """)).mappings().first()
+
+        if ultimo and ultimo["numero_om"]:
+            try:
+                sequencial = int(ultimo["numero_om"].split("-")[-1]) + 1
+            except Exception:
+                sequencial = 1
+        else:
+            sequencial = 1
+
+        numero_om = f"OM-2026-{sequencial:04d}"
+
+        novo_id = conn.execute(text("""
+            INSERT INTO financeiro2_om (
+                numero_om,
+                matricula_colaborador,
+                nome_colaborador,
+                status,
+                observacao
+            )
+            VALUES (
+                :numero_om,
+                :matricula_colaborador,
+                :nome_colaborador,
+                'Aberta',
+                :observacao
+            )
+            RETURNING id
+        """), {
+            "numero_om": numero_om,
+            "matricula_colaborador": matricula,
+            "nome_colaborador": nome_colaborador,
+            "observacao": observacao,
+        }).scalar()
+
+    flash(f"OM {numero_om} criada com sucesso.", "success")
+    return redirect(url_for("financeiro_dois.om_editar", om_id=novo_id))
 
 @bp.route("/om/<int:om_id>")
 @login_required

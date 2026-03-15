@@ -17,8 +17,34 @@
       </div>
 
       <div class="zone-actions">
-        <a class="btn btn-primary" href="#">Nova OM</a>
+        <button type="button" class="btn btn-primary" onclick="toggleNovaOm()">Nova OM</button>
       </div>
+    </div>
+
+    <div id="novaOmBox" class="filters-card" style="display:none; margin-bottom:16px;">
+      <form method="post" action="{{ url_for('financeiro_dois.om_nova') }}">
+        <div class="filters-grid">
+          <div class="field">
+            <label>Matrícula</label>
+            <input type="text" name="matricula_colaborador" class="input-like" placeholder="Ex.: LME" required>
+          </div>
+
+          <div class="field">
+            <label>Nome do colaborador</label>
+            <input type="text" name="nome_colaborador" class="input-like" placeholder="Nome completo" required>
+          </div>
+
+          <div class="field field-full">
+            <label>Observação</label>
+            <input type="text" name="observacao" class="input-like" placeholder="Observação inicial da OM">
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">Criar OM</button>
+          <button type="button" class="btn" onclick="toggleNovaOm()">Cancelar</button>
+        </div>
+      </form>
     </div>
 
     <div class="filters-card">
@@ -82,6 +108,10 @@
               </div>
             </td>
           </tr>
+          {% else %}
+          <tr>
+            <td colspan="7">Sem OMs cadastradas.</td>
+          </tr>
           {% endfor %}
         </tbody>
       </table>
@@ -114,6 +144,10 @@
     color:#334155;
   }
 
+  .field-full{
+    grid-column:1 / -1;
+  }
+
   .input-like{
     width:100%;
     height:42px;
@@ -128,6 +162,13 @@
     outline:none;
     border-color:#9db6cf;
     box-shadow:0 0 0 3px rgba(22, 50, 79, 0.08);
+  }
+
+  .form-actions{
+    display:flex;
+    gap:10px;
+    margin-top:16px;
+    flex-wrap:wrap;
   }
 
   .table-wrap{
@@ -172,4 +213,12 @@
     color:#047857;
   }
 </style>
+
+<script>
+  function toggleNovaOm() {
+    const box = document.getElementById("novaOmBox");
+    if (!box) return;
+    box.style.display = box.style.display === "none" ? "block" : "none";
+  }
+</script>
 {% endblock %}
