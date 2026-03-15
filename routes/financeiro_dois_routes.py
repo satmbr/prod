@@ -27,6 +27,44 @@ def build_financeiro_dois_subnav(active: str | None):
 
     return links
 
+def _nome_preenchido(valor: str | None) -> str:
+    return (valor or "").strip()
+
+
+def _redirect_cadastros():
+    return redirect(url_for("financeiro_dois.cadastros"))
+
+
+def _toggle_status_generico(tabela: str, item_id: int, campo_nome: str = "nome"):
+    engine = get_engine()
+    with engine.begin() as conn:
+        item = conn.execute(
+            text(f"""
+                SELECT id, status, {campo_nome}
+                FROM {tabela}
+                WHERE id = :id
+            """),
+            {"id": item_id}
+        ).mappings().first()
+
+        if not item:
+            flash("Registro não encontrado.", "danger")
+            return _redirect_cadastros()
+
+        novo_status = "Inativo" if item["status"] == "Ativo" else "Ativo"
+
+        conn.execute(
+            text(f"""
+                UPDATE {tabela}
+                SET status = :status,
+                    atualizado_em = CURRENT_TIMESTAMP
+                WHERE id = :id
+            """),
+            {"status": novo_status, "id": item_id}
+        )
+
+    flash(f"Status alterado para {novo_status}.", "success")
+    return _redirect_cadastros()
 
 @bp.route("/")
 @login_required
@@ -146,6 +184,769 @@ def cadastros():
         parametros=parametros,
         empresas_nd=empresas_nd,
     )
+
+@bp.route("/cadastros/categorias/nova", methods=["POST"])
+@login_required
+@permission_required("financeiro", "visualizar")
+def categoria_nova():
+    nome = _nome_preenchido(request.form.get("nome"))
+    if not nome:
+        flash("Informe o nome da categoria.", "warning")
+        return _redirect_cadastros()
+
+    engine = get_engine()
+    with engine.begin() as conn:
+        existe = conn.execute(
+            text("""
+                SELECT id
+                FROM financeiro2_cad_categorias
+                WHERE LOWER(nome) = LOWER(:nome)
+                LIMIT 1
+            """),
+            {"nome": nome}
+        ).fetchone()
+
+        if existe:
+            flash("Já existe uma categoria com esse nome.", "warning")
+            return _redirect_cadastros()
+
+        conn.execute(
+            text("""
+                INSERT INTO financeiro2_cad_categorias (nome, status)
+                VALUES (:nome, 'Ativo')
+            """),
+            {"nome": nome}
+        )
+
+    flash("Categoria cadastrada com sucesso.", "success")
+    return _redirect_cadastros()
+
+
+@bp.route("/cadastros/categorias/<int:item_id>/editar", methods=["POST"])
+@login_required
+@permission_required("financeiro", "visualizar")
+def categoria_editar(item_id: int):
+    nome = _nome_preenchido(request.form.get("nome"))
+    if not nome:
+        flash("Informe o nome da categoria.", "warning")
+        return _redirect_cadastros()
+
+    engine = get_engine()
+    with engine.begin() as conn:
+        existe = conn.execute(
+            text("""
+                SELECT id
+                FROM financeiro2_cad_categorias
+                WHERE LOWER(nome) = LOWER(:nome)
+                  AND id <> :id
+                LIMIT 1
+            """),
+            {"nome": nome, "id": item_id}
+        ).fetchone()
+
+        if existe:
+            flash("Já existe outra categoria com esse nome.", "warning")
+            return _redirect_cadastros()
+
+        conn.execute(
+            text("""
+                UPDATE financeiro2_cad_categorias
+                SET nome = :nome,
+                    atualizado_em = CURRENT_TIMESTAMP
+                WHERE id = :id
+            """),
+            {"nome": nome, "id": item_id}
+        )
+
+    flash("Categoria atualizada com sucesso.", "success")
+    return _redirect_cadastros()
+
+
+@bp.route("/cadastros/categorias/<int:item_id>/toggle-status", methods=["POST"])
+@login_required
+@permission_required("financeiro", "visualizar")
+def categoria_toggle_status(item_id: int):
+    return _toggle_status_generico("financeiro2_cad_categorias", item_id)
+    
+@bp.route("/cadastros/aplicacoes/nova", methods=["POST"])
+@login_required
+@permission_required("financeiro", "visualizar")
+def aplicacao_nova():
+    nome = _nome_preenchido(request.form.get("nome"))
+    if not nome:
+        flash("Informe o nome da aplicação.", "warning")
+        return _redirect_cadastros()
+
+    engine = get_engine()
+    with engine.begin() as conn:
+        existe = conn.execute(
+            text("""
+                SELECT id
+                FROM financeiro2_cad_aplicacoes
+                WHERE LOWER(nome) = LOWER(:nome)
+                LIMIT 1
+            """),
+            {"nome": nome}
+        ).fetchone()
+
+        if existe:
+            flash("Já existe uma aplicação com esse nome.", "warning")
+            return _redirect_cadastros()
+
+        conn.execute(
+            text("""
+                INSERT INTO financeiro2_cad_aplicacoes (nome, status)
+                VALUES (:nome, 'Ativo')
+            """),
+            {"nome": nome}
+        )
+
+    flash("Aplicação cadastrada com sucesso.", "success")
+    return _redirect_cadastros()
+
+
+@bp.route("/cadastros/aplicacoes/<int:item_id>/editar", methods=["POST"])
+@login_required
+@permission_required("financeiro", "visualizar")
+def aplicacao_editar(item_id: int):
+    nome = _nome_preenchido(request.form.get("nome"))
+    if not nome:
+        flash("Informe o nome da aplicação.", "warning")
+        return _redirect_cadastros()
+
+    engine = get_engine()
+    with engine.begin() as conn:
+        existe = conn.execute(
+            text("""
+                SELECT id
+                FROM financeiro2_cad_aplicacoes
+                WHERE LOWER(nome) = LOWER(:nome)
+                  AND id <> :id
+                LIMIT 1
+            """),
+            {"nome": nome, "id": item_id}
+        ).fetchone()
+
+        if existe:
+            flash("Já existe outra aplicação com esse nome.", "warning")
+            return _redirect_cadastros()
+
+        conn.execute(
+            text("""
+                UPDATE financeiro2_cad_aplicacoes
+                SET nome = :nome,
+                    atualizado_em = CURRENT_TIMESTAMP
+                WHERE id = :id
+            """),
+            {"nome": nome, "id": item_id}
+        )
+
+    flash("Aplicação atualizada com sucesso.", "success")
+    return _redirect_cadastros()
+
+
+@bp.route("/cadastros/aplicacoes/<int:item_id>/toggle-status", methods=["POST"])
+@login_required
+@permission_required("financeiro", "visualizar")
+def aplicacao_toggle_status(item_id: int):
+    return _toggle_status_generico("financeiro2_cad_aplicacoes", item_id)
+    
+@bp.route("/cadastros/moedas/nova", methods=["POST"])
+@login_required
+@permission_required("financeiro", "visualizar")
+def moeda_nova():
+    codigo = _nome_preenchido(request.form.get("codigo")).upper()
+    nome = _nome_preenchido(request.form.get("nome"))
+    cambio_padrao = _nome_preenchido(request.form.get("cambio_padrao")) or "1"
+
+    if not codigo or not nome:
+        flash("Informe código e nome da moeda.", "warning")
+        return _redirect_cadastros()
+
+    engine = get_engine()
+    with engine.begin() as conn:
+        existe = conn.execute(
+            text("""
+                SELECT id
+                FROM financeiro2_cad_moedas
+                WHERE UPPER(codigo) = UPPER(:codigo)
+                LIMIT 1
+            """),
+            {"codigo": codigo}
+        ).fetchone()
+
+        if existe:
+            flash("Já existe uma moeda com esse código.", "warning")
+            return _redirect_cadastros()
+
+        conn.execute(
+            text("""
+                INSERT INTO financeiro2_cad_moedas (codigo, nome, cambio_padrao, status)
+                VALUES (:codigo, :nome, :cambio_padrao, 'Ativo')
+            """),
+            {"codigo": codigo, "nome": nome, "cambio_padrao": cambio_padrao}
+        )
+
+    flash("Moeda cadastrada com sucesso.", "success")
+    return _redirect_cadastros()
+
+
+@bp.route("/cadastros/moedas/<int:item_id>/editar", methods=["POST"])
+@login_required
+@permission_required("financeiro", "visualizar")
+def moeda_editar(item_id: int):
+    codigo = _nome_preenchido(request.form.get("codigo")).upper()
+    nome = _nome_preenchido(request.form.get("nome"))
+    cambio_padrao = _nome_preenchido(request.form.get("cambio_padrao")) or "1"
+
+    if not codigo or not nome:
+        flash("Informe código e nome da moeda.", "warning")
+        return _redirect_cadastros()
+
+    engine = get_engine()
+    with engine.begin() as conn:
+        existe = conn.execute(
+            text("""
+                SELECT id
+                FROM financeiro2_cad_moedas
+                WHERE UPPER(codigo) = UPPER(:codigo)
+                  AND id <> :id
+                LIMIT 1
+            """),
+            {"codigo": codigo, "id": item_id}
+        ).fetchone()
+
+        if existe:
+            flash("Já existe outra moeda com esse código.", "warning")
+            return _redirect_cadastros()
+
+        conn.execute(
+            text("""
+                UPDATE financeiro2_cad_moedas
+                SET codigo = :codigo,
+                    nome = :nome,
+                    cambio_padrao = :cambio_padrao,
+                    atualizado_em = CURRENT_TIMESTAMP
+                WHERE id = :id
+            """),
+            {"codigo": codigo, "nome": nome, "cambio_padrao": cambio_padrao, "id": item_id}
+        )
+
+    flash("Moeda atualizada com sucesso.", "success")
+    return _redirect_cadastros()
+
+
+@bp.route("/cadastros/moedas/<int:item_id>/toggle-status", methods=["POST"])
+@login_required
+@permission_required("financeiro", "visualizar")
+def moeda_toggle_status(item_id: int):
+    return _toggle_status_generico("financeiro2_cad_moedas", item_id)
+    
+@bp.route("/cadastros/centros-custo/novo", methods=["POST"])
+@login_required
+@permission_required("financeiro", "visualizar")
+def centro_custo_novo():
+    nome = _nome_preenchido(request.form.get("nome"))
+    if not nome:
+        flash("Informe o nome do centro de custo.", "warning")
+        return _redirect_cadastros()
+
+    engine = get_engine()
+    with engine.begin() as conn:
+        existe = conn.execute(
+            text("""
+                SELECT id
+                FROM financeiro2_cad_centros_custo
+                WHERE LOWER(nome) = LOWER(:nome)
+                LIMIT 1
+            """),
+            {"nome": nome}
+        ).fetchone()
+
+        if existe:
+            flash("Já existe um centro de custo com esse nome.", "warning")
+            return _redirect_cadastros()
+
+        conn.execute(
+            text("""
+                INSERT INTO financeiro2_cad_centros_custo (nome, status)
+                VALUES (:nome, 'Ativo')
+            """),
+            {"nome": nome}
+        )
+
+    flash("Centro de custo cadastrado com sucesso.", "success")
+    return _redirect_cadastros()
+
+
+@bp.route("/cadastros/centros-custo/<int:item_id>/editar", methods=["POST"])
+@login_required
+@permission_required("financeiro", "visualizar")
+def centro_custo_editar(item_id: int):
+    nome = _nome_preenchido(request.form.get("nome"))
+    if not nome:
+        flash("Informe o nome do centro de custo.", "warning")
+        return _redirect_cadastros()
+
+    engine = get_engine()
+    with engine.begin() as conn:
+        existe = conn.execute(
+            text("""
+                SELECT id
+                FROM financeiro2_cad_centros_custo
+                WHERE LOWER(nome) = LOWER(:nome)
+                  AND id <> :id
+                LIMIT 1
+            """),
+            {"nome": nome, "id": item_id}
+        ).fetchone()
+
+        if existe:
+            flash("Já existe outro centro de custo com esse nome.", "warning")
+            return _redirect_cadastros()
+
+        conn.execute(
+            text("""
+                UPDATE financeiro2_cad_centros_custo
+                SET nome = :nome,
+                    atualizado_em = CURRENT_TIMESTAMP
+                WHERE id = :id
+            """),
+            {"nome": nome, "id": item_id}
+        )
+
+    flash("Centro de custo atualizado com sucesso.", "success")
+    return _redirect_cadastros()
+
+
+@bp.route("/cadastros/centros-custo/<int:item_id>/toggle-status", methods=["POST"])
+@login_required
+@permission_required("financeiro", "visualizar")
+def centro_custo_toggle_status(item_id: int):
+    return _toggle_status_generico("financeiro2_cad_centros_custo", item_id)
+    
+@bp.route("/cadastros/status-despesa/novo", methods=["POST"])
+@login_required
+@permission_required("financeiro", "visualizar")
+def status_despesa_novo():
+    nome = _nome_preenchido(request.form.get("nome"))
+    if not nome:
+        flash("Informe o nome do status.", "warning")
+        return _redirect_cadastros()
+
+    engine = get_engine()
+    with engine.begin() as conn:
+        existe = conn.execute(
+            text("""
+                SELECT id
+                FROM financeiro2_cad_status_despesa
+                WHERE LOWER(nome) = LOWER(:nome)
+                LIMIT 1
+            """),
+            {"nome": nome}
+        ).fetchone()
+
+        if existe:
+            flash("Já existe um status de despesa com esse nome.", "warning")
+            return _redirect_cadastros()
+
+        conn.execute(
+            text("""
+                INSERT INTO financeiro2_cad_status_despesa (nome, status)
+                VALUES (:nome, 'Ativo')
+            """),
+            {"nome": nome}
+        )
+
+    flash("Status de despesa cadastrado com sucesso.", "success")
+    return _redirect_cadastros()
+
+
+@bp.route("/cadastros/status-despesa/<int:item_id>/editar", methods=["POST"])
+@login_required
+@permission_required("financeiro", "visualizar")
+def status_despesa_editar(item_id: int):
+    nome = _nome_preenchido(request.form.get("nome"))
+    if not nome:
+        flash("Informe o nome do status.", "warning")
+        return _redirect_cadastros()
+
+    engine = get_engine()
+    with engine.begin() as conn:
+        existe = conn.execute(
+            text("""
+                SELECT id
+                FROM financeiro2_cad_status_despesa
+                WHERE LOWER(nome) = LOWER(:nome)
+                  AND id <> :id
+                LIMIT 1
+            """),
+            {"nome": nome, "id": item_id}
+        ).fetchone()
+
+        if existe:
+            flash("Já existe outro status de despesa com esse nome.", "warning")
+            return _redirect_cadastros()
+
+        conn.execute(
+            text("""
+                UPDATE financeiro2_cad_status_despesa
+                SET nome = :nome,
+                    atualizado_em = CURRENT_TIMESTAMP
+                WHERE id = :id
+            """),
+            {"nome": nome, "id": item_id}
+        )
+
+    flash("Status de despesa atualizado com sucesso.", "success")
+    return _redirect_cadastros()
+
+
+@bp.route("/cadastros/status-despesa/<int:item_id>/toggle-status", methods=["POST"])
+@login_required
+@permission_required("financeiro", "visualizar")
+def status_despesa_toggle_status(item_id: int):
+    return _toggle_status_generico("financeiro2_cad_status_despesa", item_id)
+    
+@bp.route("/cadastros/status-nd/novo", methods=["POST"])
+@login_required
+@permission_required("financeiro", "visualizar")
+def status_nd_novo():
+    nome = _nome_preenchido(request.form.get("nome"))
+    if not nome:
+        flash("Informe o nome do status ND.", "warning")
+        return _redirect_cadastros()
+
+    engine = get_engine()
+    with engine.begin() as conn:
+        existe = conn.execute(
+            text("""
+                SELECT id
+                FROM financeiro2_cad_status_nd
+                WHERE LOWER(nome) = LOWER(:nome)
+                LIMIT 1
+            """),
+            {"nome": nome}
+        ).fetchone()
+
+        if existe:
+            flash("Já existe um status ND com esse nome.", "warning")
+            return _redirect_cadastros()
+
+        conn.execute(
+            text("""
+                INSERT INTO financeiro2_cad_status_nd (nome, status)
+                VALUES (:nome, 'Ativo')
+            """),
+            {"nome": nome}
+        )
+
+    flash("Status ND cadastrado com sucesso.", "success")
+    return _redirect_cadastros()
+
+
+@bp.route("/cadastros/status-nd/<int:item_id>/editar", methods=["POST"])
+@login_required
+@permission_required("financeiro", "visualizar")
+def status_nd_editar(item_id: int):
+    nome = _nome_preenchido(request.form.get("nome"))
+    if not nome:
+        flash("Informe o nome do status ND.", "warning")
+        return _redirect_cadastros()
+
+    engine = get_engine()
+    with engine.begin() as conn:
+        existe = conn.execute(
+            text("""
+                SELECT id
+                FROM financeiro2_cad_status_nd
+                WHERE LOWER(nome) = LOWER(:nome)
+                  AND id <> :id
+                LIMIT 1
+            """),
+            {"nome": nome, "id": item_id}
+        ).fetchone()
+
+        if existe:
+            flash("Já existe outro status ND com esse nome.", "warning")
+            return _redirect_cadastros()
+
+        conn.execute(
+            text("""
+                UPDATE financeiro2_cad_status_nd
+                SET nome = :nome,
+                    atualizado_em = CURRENT_TIMESTAMP
+                WHERE id = :id
+            """),
+            {"nome": nome, "id": item_id}
+        )
+
+    flash("Status ND atualizado com sucesso.", "success")
+    return _redirect_cadastros()
+
+
+@bp.route("/cadastros/status-nd/<int:item_id>/toggle-status", methods=["POST"])
+@login_required
+@permission_required("financeiro", "visualizar")
+def status_nd_toggle_status(item_id: int):
+    return _toggle_status_generico("financeiro2_cad_status_nd", item_id)
+    
+@bp.route("/cadastros/tipos-documento/novo", methods=["POST"])
+@login_required
+@permission_required("financeiro", "visualizar")
+def tipo_documento_novo():
+    nome = _nome_preenchido(request.form.get("nome"))
+    if not nome:
+        flash("Informe o nome do tipo de documento.", "warning")
+        return _redirect_cadastros()
+
+    engine = get_engine()
+    with engine.begin() as conn:
+        existe = conn.execute(
+            text("""
+                SELECT id
+                FROM financeiro2_cad_tipos_documento
+                WHERE LOWER(nome) = LOWER(:nome)
+                LIMIT 1
+            """),
+            {"nome": nome}
+        ).fetchone()
+
+        if existe:
+            flash("Já existe um tipo de documento com esse nome.", "warning")
+            return _redirect_cadastros()
+
+        conn.execute(
+            text("""
+                INSERT INTO financeiro2_cad_tipos_documento (nome, status)
+                VALUES (:nome, 'Ativo')
+            """),
+            {"nome": nome}
+        )
+
+    flash("Tipo de documento cadastrado com sucesso.", "success")
+    return _redirect_cadastros()
+
+
+@bp.route("/cadastros/tipos-documento/<int:item_id>/editar", methods=["POST"])
+@login_required
+@permission_required("financeiro", "visualizar")
+def tipo_documento_editar(item_id: int):
+    nome = _nome_preenchido(request.form.get("nome"))
+    if not nome:
+        flash("Informe o nome do tipo de documento.", "warning")
+        return _redirect_cadastros()
+
+    engine = get_engine()
+    with engine.begin() as conn:
+        existe = conn.execute(
+            text("""
+                SELECT id
+                FROM financeiro2_cad_tipos_documento
+                WHERE LOWER(nome) = LOWER(:nome)
+                  AND id <> :id
+                LIMIT 1
+            """),
+            {"nome": nome, "id": item_id}
+        ).fetchone()
+
+        if existe:
+            flash("Já existe outro tipo de documento com esse nome.", "warning")
+            return _redirect_cadastros()
+
+        conn.execute(
+            text("""
+                UPDATE financeiro2_cad_tipos_documento
+                SET nome = :nome,
+                    atualizado_em = CURRENT_TIMESTAMP
+                WHERE id = :id
+            """),
+            {"nome": nome, "id": item_id}
+        )
+
+    flash("Tipo de documento atualizado com sucesso.", "success")
+    return _redirect_cadastros()
+
+
+@bp.route("/cadastros/tipos-documento/<int:item_id>/toggle-status", methods=["POST"])
+@login_required
+@permission_required("financeiro", "visualizar")
+def tipo_documento_toggle_status(item_id: int):
+    return _toggle_status_generico("financeiro2_cad_tipos_documento", item_id)
+    
+@bp.route("/cadastros/parametros/novo", methods=["POST"])
+@login_required
+@permission_required("financeiro", "visualizar")
+def parametro_novo():
+    chave = _nome_preenchido(request.form.get("chave"))
+    valor = _nome_preenchido(request.form.get("valor"))
+    descricao = _nome_preenchido(request.form.get("descricao"))
+
+    if not chave or not valor:
+        flash("Informe a chave e o valor do parâmetro.", "warning")
+        return _redirect_cadastros()
+
+    engine = get_engine()
+    with engine.begin() as conn:
+        existe = conn.execute(
+            text("""
+                SELECT id
+                FROM financeiro2_cad_parametros
+                WHERE LOWER(chave) = LOWER(:chave)
+                LIMIT 1
+            """),
+            {"chave": chave}
+        ).fetchone()
+
+        if existe:
+            flash("Já existe um parâmetro com essa chave.", "warning")
+            return _redirect_cadastros()
+
+        conn.execute(
+            text("""
+                INSERT INTO financeiro2_cad_parametros (chave, valor, descricao, status)
+                VALUES (:chave, :valor, :descricao, 'Ativo')
+            """),
+            {"chave": chave, "valor": valor, "descricao": descricao}
+        )
+
+    flash("Parâmetro cadastrado com sucesso.", "success")
+    return _redirect_cadastros()
+
+
+@bp.route("/cadastros/parametros/<int:item_id>/editar", methods=["POST"])
+@login_required
+@permission_required("financeiro", "visualizar")
+def parametro_editar(item_id: int):
+    chave = _nome_preenchido(request.form.get("chave"))
+    valor = _nome_preenchido(request.form.get("valor"))
+    descricao = _nome_preenchido(request.form.get("descricao"))
+
+    if not chave or not valor:
+        flash("Informe a chave e o valor do parâmetro.", "warning")
+        return _redirect_cadastros()
+
+    engine = get_engine()
+    with engine.begin() as conn:
+        existe = conn.execute(
+            text("""
+                SELECT id
+                FROM financeiro2_cad_parametros
+                WHERE LOWER(chave) = LOWER(:chave)
+                  AND id <> :id
+                LIMIT 1
+            """),
+            {"chave": chave, "id": item_id}
+        ).fetchone()
+
+        if existe:
+            flash("Já existe outro parâmetro com essa chave.", "warning")
+            return _redirect_cadastros()
+
+        conn.execute(
+            text("""
+                UPDATE financeiro2_cad_parametros
+                SET chave = :chave,
+                    valor = :valor,
+                    descricao = :descricao,
+                    atualizado_em = CURRENT_TIMESTAMP
+                WHERE id = :id
+            """),
+            {"chave": chave, "valor": valor, "descricao": descricao, "id": item_id}
+        )
+
+    flash("Parâmetro atualizado com sucesso.", "success")
+    return _redirect_cadastros()
+
+
+@bp.route("/cadastros/parametros/<int:item_id>/toggle-status", methods=["POST"])
+@login_required
+@permission_required("financeiro", "visualizar")
+def parametro_toggle_status(item_id: int):
+    return _toggle_status_generico("financeiro2_cad_parametros", item_id, campo_nome="chave")
+    
+@bp.route("/cadastros/empresas-nd/nova", methods=["POST"])
+@login_required
+@permission_required("financeiro", "visualizar")
+def empresa_nd_nova():
+    nome = _nome_preenchido(request.form.get("nome"))
+    if not nome:
+        flash("Informe o nome da empresa ND.", "warning")
+        return _redirect_cadastros()
+
+    engine = get_engine()
+    with engine.begin() as conn:
+        existe = conn.execute(
+            text("""
+                SELECT id
+                FROM financeiro2_cad_empresas_nd
+                WHERE LOWER(nome) = LOWER(:nome)
+                LIMIT 1
+            """),
+            {"nome": nome}
+        ).fetchone()
+
+        if existe:
+            flash("Já existe uma empresa ND com esse nome.", "warning")
+            return _redirect_cadastros()
+
+        conn.execute(
+            text("""
+                INSERT INTO financeiro2_cad_empresas_nd (nome, status)
+                VALUES (:nome, 'Ativo')
+            """),
+            {"nome": nome}
+        )
+
+    flash("Empresa ND cadastrada com sucesso.", "success")
+    return _redirect_cadastros()
+
+
+@bp.route("/cadastros/empresas-nd/<int:item_id>/editar", methods=["POST"])
+@login_required
+@permission_required("financeiro", "visualizar")
+def empresa_nd_editar(item_id: int):
+    nome = _nome_preenchido(request.form.get("nome"))
+    if not nome:
+        flash("Informe o nome da empresa ND.", "warning")
+        return _redirect_cadastros()
+
+    engine = get_engine()
+    with engine.begin() as conn:
+        existe = conn.execute(
+            text("""
+                SELECT id
+                FROM financeiro2_cad_empresas_nd
+                WHERE LOWER(nome) = LOWER(:nome)
+                  AND id <> :id
+                LIMIT 1
+            """),
+            {"nome": nome, "id": item_id}
+        ).fetchone()
+
+        if existe:
+            flash("Já existe outra empresa ND com esse nome.", "warning")
+            return _redirect_cadastros()
+
+        conn.execute(
+            text("""
+                UPDATE financeiro2_cad_empresas_nd
+                SET nome = :nome,
+                    atualizado_em = CURRENT_TIMESTAMP
+                WHERE id = :id
+            """),
+            {"nome": nome, "id": item_id}
+        )
+
+    flash("Empresa ND atualizada com sucesso.", "success")
+    return _redirect_cadastros()
+
+
+@bp.route("/cadastros/empresas-nd/<int:item_id>/toggle-status", methods=["POST"])
+@login_required
+@permission_required("financeiro", "visualizar")
+def empresa_nd_toggle_status(item_id: int):
+    return _toggle_status_generico("financeiro2_cad_empresas_nd", item_id)
 
 @bp.route("/cadastros/categorias/nova", methods=["POST"])
 @login_required

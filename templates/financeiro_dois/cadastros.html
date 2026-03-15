@@ -3,16 +3,13 @@
 
 {% block content %}
 <div class="page-wrap">
-
   <section class="zone">
     <div class="zone-head">
       <div class="zone-left">
         <div class="zone-icon">⚙️</div>
         <div>
           <div class="zone-title">Cadastros Financeiros</div>
-          <div class="muted">
-            Base auxiliar do Financeiro Dois com dados reais do banco.
-          </div>
+          <div class="muted">Base auxiliar do Financeiro Dois com manutenção completa.</div>
         </div>
       </div>
     </div>
@@ -20,11 +17,7 @@
     <div class="f2-tabs-wrap">
       <div class="f2-tabs" id="f2Tabs">
         {% for aba in abas %}
-          <button
-            type="button"
-            class="f2-tab-btn {% if loop.first %}active{% endif %}"
-            data-tab="{{ aba.id }}"
-          >
+          <button type="button" class="f2-tab-btn {% if loop.first %}active{% endif %}" data-tab="{{ aba.id }}">
             {{ aba.titulo }}
           </button>
         {% endfor %}
@@ -32,112 +25,125 @@
 
       <div class="f2-tab-panels">
 
-		<!-- Categorias -->
-		<div class="f2-tab-panel active" id="tab-categorias">
-		  <div class="cad-card">
-			<div class="cad-card-head">
-			  <div>
-				<div class="cad-card-title">Categorias</div>
-				<div class="muted">Lista real carregada do banco.</div>
-			  </div>
-			  <button type="button" class="btn btn-primary" onclick="toggleCategoriaNova()">Novo</button>
-			</div>
+        <!-- CATEGORIAS -->
+        <div class="f2-tab-panel active" id="tab-categorias">
+          <div class="cad-card">
+            <div class="cad-card-head">
+              <div>
+                <div class="cad-card-title">Categorias</div>
+                <div class="muted">Cadastro simples de categorias.</div>
+              </div>
+              <button type="button" class="btn btn-primary" onclick="toggleBox('box-categorias')">Novo</button>
+            </div>
 
-			<div id="categoriaNovaBox" class="cad-form-box" style="display:none;">
-			  <form method="post" action="{{ url_for('financeiro_dois.categoria_nova') }}">
-				<div class="cad-form-grid">
-				  <div class="field">
-					<label>Nome da categoria</label>
-					<input type="text" name="nome" class="input-like" placeholder="Digite o nome" required>
-				  </div>
-				</div>
+            <div id="box-categorias" class="cad-form-box" style="display:none;">
+              <form method="post" action="{{ url_for('financeiro_dois.categoria_nova') }}">
+                <div class="cad-form-grid">
+                  <div class="field">
+                    <label>Nome</label>
+                    <input type="text" name="nome" class="input-like" required>
+                  </div>
+                </div>
+                <div class="cad-form-actions">
+                  <button type="submit" class="btn btn-primary">Salvar</button>
+                  <button type="button" class="btn" onclick="toggleBox('box-categorias')">Cancelar</button>
+                </div>
+              </form>
+            </div>
 
-				<div class="cad-form-actions">
-				  <button type="submit" class="btn btn-primary">Salvar</button>
-				  <button type="button" class="btn" onclick="toggleCategoriaNova()">Cancelar</button>
-				</div>
-			  </form>
-			</div>
+            <div class="cad-table-wrap">
+              <table class="table">
+                <thead><tr><th>ID</th><th>Nome</th><th>Status</th><th>Ações</th></tr></thead>
+                <tbody>
+                  {% for item in categorias %}
+                  <tr>
+                    <td>{{ item.id }}</td>
+                    <td>
+                      <form method="post" action="{{ url_for('financeiro_dois.categoria_editar', item_id=item.id) }}" class="inline-edit-form">
+                        <input type="text" name="nome" value="{{ item.nome }}" class="input-like input-like-sm" required>
+                        <button type="submit" class="btn btn-sm">Salvar</button>
+                      </form>
+                    </td>
+                    <td>{{ item.status }}</td>
+                    <td>
+                      <form method="post" action="{{ url_for('financeiro_dois.categoria_toggle_status', item_id=item.id) }}">
+                        <button type="submit" class="btn btn-sm">{% if item.status == 'Ativo' %}Inativar{% else %}Reativar{% endif %}</button>
+                      </form>
+                    </td>
+                  </tr>
+                  {% else %}
+                  <tr><td colspan="4">Sem registros.</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
 
-			<div class="cad-table-wrap">
-			  <table class="table">
-				<thead>
-				  <tr>
-					<th style="width:80px;">ID</th>
-					<th>Nome</th>
-					<th style="width:140px;">Status</th>
-					<th style="width:220px;">Ações</th>
-				  </tr>
-				</thead>
-				<tbody>
-				  {% for item in categorias %}
-				  <tr>
-					<td>{{ item.id }}</td>
-					<td>
-					  <form method="post"
-							action="{{ url_for('financeiro_dois.categoria_editar', item_id=item.id) }}"
-							class="inline-edit-form">
-						<input type="text" name="nome" value="{{ item.nome }}" class="input-like input-like-sm" required>
-						<button type="submit" class="btn btn-sm">Salvar</button>
-					  </form>
-					</td>
-					<td>{{ item.status }}</td>
-					<td>
-					  <div class="table-actions">
-						<form method="post"
-							  action="{{ url_for('financeiro_dois.categoria_toggle_status', item_id=item.id) }}"
-							  style="display:inline;">
-						  <button type="submit" class="btn btn-sm">
-							{% if item.status == 'Ativo' %}Inativar{% else %}Reativar{% endif %}
-						  </button>
-						</form>
-					  </div>
-					</td>
-				  </tr>
-				  {% else %}
-				  <tr>
-					<td colspan="4">Sem registros.</td>
-				  </tr>
-				  {% endfor %}
-				</tbody>
-			  </table>
-			</div>
-		  </div>
-		</div>
-
-        <!-- Descrições -->
+        <!-- DESCRICOES -->
         <div class="f2-tab-panel" id="tab-descricoes">
           <div class="cad-card">
             <div class="cad-card-head">
               <div>
                 <div class="cad-card-title">Descrições padrão</div>
-                <div class="muted">Lista real carregada do banco.</div>
+                <div class="muted">Cadastro com vínculo opcional à categoria.</div>
               </div>
-              <button type="button" class="btn btn-primary">Novo</button>
+              <button type="button" class="btn btn-primary" onclick="toggleBox('box-descricoes')">Novo</button>
+            </div>
+
+            <div id="box-descricoes" class="cad-form-box" style="display:none;">
+              <form method="post" action="{{ url_for('financeiro_dois.descricao_nova') }}">
+                <div class="cad-form-grid">
+                  <div class="field">
+                    <label>Nome</label>
+                    <input type="text" name="nome" class="input-like" required>
+                  </div>
+                  <div class="field">
+                    <label>Categoria</label>
+                    <select name="categoria_id" class="input-like">
+                      <option value="">Sem categoria</option>
+                      {% for cat in categorias %}
+                      <option value="{{ cat.id }}">{{ cat.nome }}</option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                </div>
+                <div class="cad-form-actions">
+                  <button type="submit" class="btn btn-primary">Salvar</button>
+                  <button type="button" class="btn" onclick="toggleBox('box-descricoes')">Cancelar</button>
+                </div>
+              </form>
             </div>
 
             <div class="cad-table-wrap">
               <table class="table">
-                <thead>
-                  <tr>
-                    <th style="width:80px;">ID</th>
-                    <th>Nome</th>
-                    <th>Categoria</th>
-                    <th style="width:140px;">Status</th>
-                  </tr>
-                </thead>
+                <thead><tr><th>ID</th><th>Nome</th><th>Categoria</th><th>Status</th><th>Ações</th></tr></thead>
                 <tbody>
                   {% for item in descricoes %}
                   <tr>
                     <td>{{ item.id }}</td>
-                    <td>{{ item.nome }}</td>
+                    <td>
+                      <form method="post" action="{{ url_for('financeiro_dois.descricao_editar', item_id=item.id) }}" class="inline-edit-form stacked">
+                        <input type="text" name="nome" value="{{ item.nome }}" class="input-like input-like-sm" required>
+                        <select name="categoria_id" class="input-like input-like-sm">
+                          <option value="">Sem categoria</option>
+                          {% for cat in categorias %}
+                          <option value="{{ cat.id }}" {% if item.categoria_nome == cat.nome %}selected{% endif %}>{{ cat.nome }}</option>
+                          {% endfor %}
+                        </select>
+                        <button type="submit" class="btn btn-sm">Salvar</button>
+                      </form>
+                    </td>
                     <td>{{ item.categoria_nome }}</td>
                     <td>{{ item.status }}</td>
+                    <td>
+                      <form method="post" action="{{ url_for('financeiro_dois.descricao_toggle_status', item_id=item.id) }}">
+                        <button type="submit" class="btn btn-sm">{% if item.status == 'Ativo' %}Inativar{% else %}Reativar{% endif %}</button>
+                      </form>
+                    </td>
                   </tr>
                   {% else %}
-                  <tr>
-                    <td colspan="4">Sem registros.</td>
-                  </tr>
+                  <tr><td colspan="5">Sem registros.</td></tr>
                   {% endfor %}
                 </tbody>
               </table>
@@ -145,37 +151,48 @@
           </div>
         </div>
 
-        <!-- Aplicações -->
+        <!-- APLICACOES -->
         <div class="f2-tab-panel" id="tab-aplicacoes">
           <div class="cad-card">
             <div class="cad-card-head">
-              <div>
-                <div class="cad-card-title">Aplicações</div>
-                <div class="muted">Lista real carregada do banco.</div>
-              </div>
-              <button type="button" class="btn btn-primary">Novo</button>
+              <div><div class="cad-card-title">Aplicações</div><div class="muted">Cadastro simples.</div></div>
+              <button type="button" class="btn btn-primary" onclick="toggleBox('box-aplicacoes')">Novo</button>
+            </div>
+
+            <div id="box-aplicacoes" class="cad-form-box" style="display:none;">
+              <form method="post" action="{{ url_for('financeiro_dois.aplicacao_nova') }}">
+                <div class="cad-form-grid">
+                  <div class="field"><label>Nome</label><input type="text" name="nome" class="input-like" required></div>
+                </div>
+                <div class="cad-form-actions">
+                  <button type="submit" class="btn btn-primary">Salvar</button>
+                  <button type="button" class="btn" onclick="toggleBox('box-aplicacoes')">Cancelar</button>
+                </div>
+              </form>
             </div>
 
             <div class="cad-table-wrap">
               <table class="table">
-                <thead>
-                  <tr>
-                    <th style="width:80px;">ID</th>
-                    <th>Nome</th>
-                    <th style="width:140px;">Status</th>
-                  </tr>
-                </thead>
+                <thead><tr><th>ID</th><th>Nome</th><th>Status</th><th>Ações</th></tr></thead>
                 <tbody>
                   {% for item in aplicacoes %}
                   <tr>
                     <td>{{ item.id }}</td>
-                    <td>{{ item.nome }}</td>
+                    <td>
+                      <form method="post" action="{{ url_for('financeiro_dois.aplicacao_editar', item_id=item.id) }}" class="inline-edit-form">
+                        <input type="text" name="nome" value="{{ item.nome }}" class="input-like input-like-sm" required>
+                        <button type="submit" class="btn btn-sm">Salvar</button>
+                      </form>
+                    </td>
                     <td>{{ item.status }}</td>
+                    <td>
+                      <form method="post" action="{{ url_for('financeiro_dois.aplicacao_toggle_status', item_id=item.id) }}">
+                        <button type="submit" class="btn btn-sm">{% if item.status == 'Ativo' %}Inativar{% else %}Reativar{% endif %}</button>
+                      </form>
+                    </td>
                   </tr>
                   {% else %}
-                  <tr>
-                    <td colspan="3">Sem registros.</td>
-                  </tr>
+                  <tr><td colspan="4">Sem registros.</td></tr>
                   {% endfor %}
                 </tbody>
               </table>
@@ -183,41 +200,52 @@
           </div>
         </div>
 
-        <!-- Moedas -->
+        <!-- MOEDAS -->
         <div class="f2-tab-panel" id="tab-moedas">
           <div class="cad-card">
             <div class="cad-card-head">
-              <div>
-                <div class="cad-card-title">Moedas</div>
-                <div class="muted">Lista real carregada do banco.</div>
-              </div>
-              <button type="button" class="btn btn-primary">Novo</button>
+              <div><div class="cad-card-title">Moedas</div><div class="muted">Código, nome e câmbio padrão.</div></div>
+              <button type="button" class="btn btn-primary" onclick="toggleBox('box-moedas')">Novo</button>
+            </div>
+
+            <div id="box-moedas" class="cad-form-box" style="display:none;">
+              <form method="post" action="{{ url_for('financeiro_dois.moeda_nova') }}">
+                <div class="cad-form-grid">
+                  <div class="field"><label>Código</label><input type="text" name="codigo" class="input-like" required></div>
+                  <div class="field"><label>Nome</label><input type="text" name="nome" class="input-like" required></div>
+                  <div class="field"><label>Câmbio padrão</label><input type="text" name="cambio_padrao" class="input-like" value="1" required></div>
+                </div>
+                <div class="cad-form-actions">
+                  <button type="submit" class="btn btn-primary">Salvar</button>
+                  <button type="button" class="btn" onclick="toggleBox('box-moedas')">Cancelar</button>
+                </div>
+              </form>
             </div>
 
             <div class="cad-table-wrap">
               <table class="table">
-                <thead>
-                  <tr>
-                    <th style="width:80px;">ID</th>
-                    <th>Código</th>
-                    <th>Nome</th>
-                    <th>Câmbio padrão</th>
-                    <th style="width:140px;">Status</th>
-                  </tr>
-                </thead>
+                <thead><tr><th>ID</th><th>Código</th><th>Nome</th><th>Câmbio</th><th>Status</th><th>Ações</th></tr></thead>
                 <tbody>
                   {% for item in moedas %}
                   <tr>
                     <td>{{ item.id }}</td>
-                    <td>{{ item.codigo }}</td>
-                    <td>{{ item.nome }}</td>
-                    <td>{{ item.cambio_padrao }}</td>
+                    <td>
+                      <form method="post" action="{{ url_for('financeiro_dois.moeda_editar', item_id=item.id) }}" class="inline-edit-form stacked">
+                        <input type="text" name="codigo" value="{{ item.codigo }}" class="input-like input-like-sm" required>
+                    </td>
+                    <td><input type="text" name="nome" value="{{ item.nome }}" class="input-like input-like-sm" required></td>
+                    <td><input type="text" name="cambio_padrao" value="{{ item.cambio_padrao }}" class="input-like input-like-sm" required></td>
                     <td>{{ item.status }}</td>
+                    <td>
+                        <button type="submit" class="btn btn-sm">Salvar</button>
+                      </form>
+                      <form method="post" action="{{ url_for('financeiro_dois.moeda_toggle_status', item_id=item.id) }}" style="margin-top:6px;">
+                        <button type="submit" class="btn btn-sm">{% if item.status == 'Ativo' %}Inativar{% else %}Reativar{% endif %}</button>
+                      </form>
+                    </td>
                   </tr>
                   {% else %}
-                  <tr>
-                    <td colspan="5">Sem registros.</td>
-                  </tr>
+                  <tr><td colspan="6">Sem registros.</td></tr>
                   {% endfor %}
                 </tbody>
               </table>
@@ -225,37 +253,48 @@
           </div>
         </div>
 
-        <!-- Centros de custo -->
+        <!-- CENTROS CUSTO -->
         <div class="f2-tab-panel" id="tab-centros_custo">
           <div class="cad-card">
             <div class="cad-card-head">
-              <div>
-                <div class="cad-card-title">Centros de custo</div>
-                <div class="muted">Lista real carregada do banco.</div>
-              </div>
-              <button type="button" class="btn btn-primary">Novo</button>
+              <div><div class="cad-card-title">Centros de custo</div><div class="muted">Cadastro simples.</div></div>
+              <button type="button" class="btn btn-primary" onclick="toggleBox('box-cc')">Novo</button>
+            </div>
+
+            <div id="box-cc" class="cad-form-box" style="display:none;">
+              <form method="post" action="{{ url_for('financeiro_dois.centro_custo_novo') }}">
+                <div class="cad-form-grid">
+                  <div class="field"><label>Nome</label><input type="text" name="nome" class="input-like" required></div>
+                </div>
+                <div class="cad-form-actions">
+                  <button type="submit" class="btn btn-primary">Salvar</button>
+                  <button type="button" class="btn" onclick="toggleBox('box-cc')">Cancelar</button>
+                </div>
+              </form>
             </div>
 
             <div class="cad-table-wrap">
               <table class="table">
-                <thead>
-                  <tr>
-                    <th style="width:80px;">ID</th>
-                    <th>Nome</th>
-                    <th style="width:140px;">Status</th>
-                  </tr>
-                </thead>
+                <thead><tr><th>ID</th><th>Nome</th><th>Status</th><th>Ações</th></tr></thead>
                 <tbody>
                   {% for item in centros_custo %}
                   <tr>
                     <td>{{ item.id }}</td>
-                    <td>{{ item.nome }}</td>
+                    <td>
+                      <form method="post" action="{{ url_for('financeiro_dois.centro_custo_editar', item_id=item.id) }}" class="inline-edit-form">
+                        <input type="text" name="nome" value="{{ item.nome }}" class="input-like input-like-sm" required>
+                        <button type="submit" class="btn btn-sm">Salvar</button>
+                      </form>
+                    </td>
                     <td>{{ item.status }}</td>
+                    <td>
+                      <form method="post" action="{{ url_for('financeiro_dois.centro_custo_toggle_status', item_id=item.id) }}">
+                        <button type="submit" class="btn btn-sm">{% if item.status == 'Ativo' %}Inativar{% else %}Reativar{% endif %}</button>
+                      </form>
+                    </td>
                   </tr>
                   {% else %}
-                  <tr>
-                    <td colspan="3">Sem registros.</td>
-                  </tr>
+                  <tr><td colspan="4">Sem registros.</td></tr>
                   {% endfor %}
                 </tbody>
               </table>
@@ -263,37 +302,48 @@
           </div>
         </div>
 
-        <!-- Status despesa -->
+        <!-- STATUS DESPESA -->
         <div class="f2-tab-panel" id="tab-status_despesa">
           <div class="cad-card">
             <div class="cad-card-head">
-              <div>
-                <div class="cad-card-title">Status despesa</div>
-                <div class="muted">Lista real carregada do banco.</div>
-              </div>
-              <button type="button" class="btn btn-primary">Novo</button>
+              <div><div class="cad-card-title">Status despesa</div><div class="muted">Cadastro simples.</div></div>
+              <button type="button" class="btn btn-primary" onclick="toggleBox('box-status-despesa')">Novo</button>
+            </div>
+
+            <div id="box-status-despesa" class="cad-form-box" style="display:none;">
+              <form method="post" action="{{ url_for('financeiro_dois.status_despesa_novo') }}">
+                <div class="cad-form-grid">
+                  <div class="field"><label>Nome</label><input type="text" name="nome" class="input-like" required></div>
+                </div>
+                <div class="cad-form-actions">
+                  <button type="submit" class="btn btn-primary">Salvar</button>
+                  <button type="button" class="btn" onclick="toggleBox('box-status-despesa')">Cancelar</button>
+                </div>
+              </form>
             </div>
 
             <div class="cad-table-wrap">
               <table class="table">
-                <thead>
-                  <tr>
-                    <th style="width:80px;">ID</th>
-                    <th>Nome</th>
-                    <th style="width:140px;">Status</th>
-                  </tr>
-                </thead>
+                <thead><tr><th>ID</th><th>Nome</th><th>Status</th><th>Ações</th></tr></thead>
                 <tbody>
                   {% for item in status_despesa %}
                   <tr>
                     <td>{{ item.id }}</td>
-                    <td>{{ item.nome }}</td>
+                    <td>
+                      <form method="post" action="{{ url_for('financeiro_dois.status_despesa_editar', item_id=item.id) }}" class="inline-edit-form">
+                        <input type="text" name="nome" value="{{ item.nome }}" class="input-like input-like-sm" required>
+                        <button type="submit" class="btn btn-sm">Salvar</button>
+                      </form>
+                    </td>
                     <td>{{ item.status }}</td>
+                    <td>
+                      <form method="post" action="{{ url_for('financeiro_dois.status_despesa_toggle_status', item_id=item.id) }}">
+                        <button type="submit" class="btn btn-sm">{% if item.status == 'Ativo' %}Inativar{% else %}Reativar{% endif %}</button>
+                      </form>
+                    </td>
                   </tr>
                   {% else %}
-                  <tr>
-                    <td colspan="3">Sem registros.</td>
-                  </tr>
+                  <tr><td colspan="4">Sem registros.</td></tr>
                   {% endfor %}
                 </tbody>
               </table>
@@ -301,37 +351,48 @@
           </div>
         </div>
 
-        <!-- Status ND -->
+        <!-- STATUS ND -->
         <div class="f2-tab-panel" id="tab-status_nd">
           <div class="cad-card">
             <div class="cad-card-head">
-              <div>
-                <div class="cad-card-title">Status ND</div>
-                <div class="muted">Lista real carregada do banco.</div>
-              </div>
-              <button type="button" class="btn btn-primary">Novo</button>
+              <div><div class="cad-card-title">Status ND</div><div class="muted">Cadastro simples.</div></div>
+              <button type="button" class="btn btn-primary" onclick="toggleBox('box-status-nd')">Novo</button>
+            </div>
+
+            <div id="box-status-nd" class="cad-form-box" style="display:none;">
+              <form method="post" action="{{ url_for('financeiro_dois.status_nd_novo') }}">
+                <div class="cad-form-grid">
+                  <div class="field"><label>Nome</label><input type="text" name="nome" class="input-like" required></div>
+                </div>
+                <div class="cad-form-actions">
+                  <button type="submit" class="btn btn-primary">Salvar</button>
+                  <button type="button" class="btn" onclick="toggleBox('box-status-nd')">Cancelar</button>
+                </div>
+              </form>
             </div>
 
             <div class="cad-table-wrap">
               <table class="table">
-                <thead>
-                  <tr>
-                    <th style="width:80px;">ID</th>
-                    <th>Nome</th>
-                    <th style="width:140px;">Status</th>
-                  </tr>
-                </thead>
+                <thead><tr><th>ID</th><th>Nome</th><th>Status</th><th>Ações</th></tr></thead>
                 <tbody>
                   {% for item in status_nd %}
                   <tr>
                     <td>{{ item.id }}</td>
-                    <td>{{ item.nome }}</td>
+                    <td>
+                      <form method="post" action="{{ url_for('financeiro_dois.status_nd_editar', item_id=item.id) }}" class="inline-edit-form">
+                        <input type="text" name="nome" value="{{ item.nome }}" class="input-like input-like-sm" required>
+                        <button type="submit" class="btn btn-sm">Salvar</button>
+                      </form>
+                    </td>
                     <td>{{ item.status }}</td>
+                    <td>
+                      <form method="post" action="{{ url_for('financeiro_dois.status_nd_toggle_status', item_id=item.id) }}">
+                        <button type="submit" class="btn btn-sm">{% if item.status == 'Ativo' %}Inativar{% else %}Reativar{% endif %}</button>
+                      </form>
+                    </td>
                   </tr>
                   {% else %}
-                  <tr>
-                    <td colspan="3">Sem registros.</td>
-                  </tr>
+                  <tr><td colspan="4">Sem registros.</td></tr>
                   {% endfor %}
                 </tbody>
               </table>
@@ -339,37 +400,48 @@
           </div>
         </div>
 
-        <!-- Tipos documento -->
+        <!-- TIPOS DOCUMENTO -->
         <div class="f2-tab-panel" id="tab-tipos_documento">
           <div class="cad-card">
             <div class="cad-card-head">
-              <div>
-                <div class="cad-card-title">Tipos de documento</div>
-                <div class="muted">Lista real carregada do banco.</div>
-              </div>
-              <button type="button" class="btn btn-primary">Novo</button>
+              <div><div class="cad-card-title">Tipos de documento</div><div class="muted">Cadastro simples.</div></div>
+              <button type="button" class="btn btn-primary" onclick="toggleBox('box-tipos-documento')">Novo</button>
+            </div>
+
+            <div id="box-tipos-documento" class="cad-form-box" style="display:none;">
+              <form method="post" action="{{ url_for('financeiro_dois.tipo_documento_novo') }}">
+                <div class="cad-form-grid">
+                  <div class="field"><label>Nome</label><input type="text" name="nome" class="input-like" required></div>
+                </div>
+                <div class="cad-form-actions">
+                  <button type="submit" class="btn btn-primary">Salvar</button>
+                  <button type="button" class="btn" onclick="toggleBox('box-tipos-documento')">Cancelar</button>
+                </div>
+              </form>
             </div>
 
             <div class="cad-table-wrap">
               <table class="table">
-                <thead>
-                  <tr>
-                    <th style="width:80px;">ID</th>
-                    <th>Nome</th>
-                    <th style="width:140px;">Status</th>
-                  </tr>
-                </thead>
+                <thead><tr><th>ID</th><th>Nome</th><th>Status</th><th>Ações</th></tr></thead>
                 <tbody>
                   {% for item in tipos_documento %}
                   <tr>
                     <td>{{ item.id }}</td>
-                    <td>{{ item.nome }}</td>
+                    <td>
+                      <form method="post" action="{{ url_for('financeiro_dois.tipo_documento_editar', item_id=item.id) }}" class="inline-edit-form">
+                        <input type="text" name="nome" value="{{ item.nome }}" class="input-like input-like-sm" required>
+                        <button type="submit" class="btn btn-sm">Salvar</button>
+                      </form>
+                    </td>
                     <td>{{ item.status }}</td>
+                    <td>
+                      <form method="post" action="{{ url_for('financeiro_dois.tipo_documento_toggle_status', item_id=item.id) }}">
+                        <button type="submit" class="btn btn-sm">{% if item.status == 'Ativo' %}Inativar{% else %}Reativar{% endif %}</button>
+                      </form>
+                    </td>
                   </tr>
                   {% else %}
-                  <tr>
-                    <td colspan="3">Sem registros.</td>
-                  </tr>
+                  <tr><td colspan="4">Sem registros.</td></tr>
                   {% endfor %}
                 </tbody>
               </table>
@@ -377,41 +449,52 @@
           </div>
         </div>
 
-        <!-- Parâmetros -->
+        <!-- PARAMETROS -->
         <div class="f2-tab-panel" id="tab-parametros">
           <div class="cad-card">
             <div class="cad-card-head">
-              <div>
-                <div class="cad-card-title">Parâmetros</div>
-                <div class="muted">Lista real carregada do banco.</div>
-              </div>
-              <button type="button" class="btn btn-primary">Novo</button>
+              <div><div class="cad-card-title">Parâmetros</div><div class="muted">Chave, valor e descrição.</div></div>
+              <button type="button" class="btn btn-primary" onclick="toggleBox('box-parametros')">Novo</button>
+            </div>
+
+            <div id="box-parametros" class="cad-form-box" style="display:none;">
+              <form method="post" action="{{ url_for('financeiro_dois.parametro_novo') }}">
+                <div class="cad-form-grid">
+                  <div class="field"><label>Chave</label><input type="text" name="chave" class="input-like" required></div>
+                  <div class="field"><label>Valor</label><input type="text" name="valor" class="input-like" required></div>
+                  <div class="field field-full"><label>Descrição</label><input type="text" name="descricao" class="input-like"></div>
+                </div>
+                <div class="cad-form-actions">
+                  <button type="submit" class="btn btn-primary">Salvar</button>
+                  <button type="button" class="btn" onclick="toggleBox('box-parametros')">Cancelar</button>
+                </div>
+              </form>
             </div>
 
             <div class="cad-table-wrap">
               <table class="table">
-                <thead>
-                  <tr>
-                    <th style="width:80px;">ID</th>
-                    <th>Chave</th>
-                    <th>Valor</th>
-                    <th>Descrição</th>
-                    <th style="width:140px;">Status</th>
-                  </tr>
-                </thead>
+                <thead><tr><th>ID</th><th>Chave</th><th>Valor</th><th>Descrição</th><th>Status</th><th>Ações</th></tr></thead>
                 <tbody>
                   {% for item in parametros %}
                   <tr>
                     <td>{{ item.id }}</td>
-                    <td>{{ item.chave }}</td>
-                    <td>{{ item.valor }}</td>
-                    <td>{{ item.descricao }}</td>
+                    <td>
+                      <form method="post" action="{{ url_for('financeiro_dois.parametro_editar', item_id=item.id) }}" class="inline-edit-form stacked">
+                        <input type="text" name="chave" value="{{ item.chave }}" class="input-like input-like-sm" required>
+                    </td>
+                    <td><input type="text" name="valor" value="{{ item.valor }}" class="input-like input-like-sm" required></td>
+                    <td><input type="text" name="descricao" value="{{ item.descricao }}" class="input-like input-like-sm"></td>
                     <td>{{ item.status }}</td>
+                    <td>
+                        <button type="submit" class="btn btn-sm">Salvar</button>
+                      </form>
+                      <form method="post" action="{{ url_for('financeiro_dois.parametro_toggle_status', item_id=item.id) }}" style="margin-top:6px;">
+                        <button type="submit" class="btn btn-sm">{% if item.status == 'Ativo' %}Inativar{% else %}Reativar{% endif %}</button>
+                      </form>
+                    </td>
                   </tr>
                   {% else %}
-                  <tr>
-                    <td colspan="5">Sem registros.</td>
-                  </tr>
+                  <tr><td colspan="6">Sem registros.</td></tr>
                   {% endfor %}
                 </tbody>
               </table>
@@ -419,37 +502,48 @@
           </div>
         </div>
 
-        <!-- Empresas ND -->
+        <!-- EMPRESAS ND -->
         <div class="f2-tab-panel" id="tab-empresas_nd">
           <div class="cad-card">
             <div class="cad-card-head">
-              <div>
-                <div class="cad-card-title">Empresas ND</div>
-                <div class="muted">Lista real carregada do banco.</div>
-              </div>
-              <button type="button" class="btn btn-primary">Novo</button>
+              <div><div class="cad-card-title">Empresas ND</div><div class="muted">Cadastro simples.</div></div>
+              <button type="button" class="btn btn-primary" onclick="toggleBox('box-empresas-nd')">Novo</button>
+            </div>
+
+            <div id="box-empresas-nd" class="cad-form-box" style="display:none;">
+              <form method="post" action="{{ url_for('financeiro_dois.empresa_nd_nova') }}">
+                <div class="cad-form-grid">
+                  <div class="field"><label>Nome</label><input type="text" name="nome" class="input-like" required></div>
+                </div>
+                <div class="cad-form-actions">
+                  <button type="submit" class="btn btn-primary">Salvar</button>
+                  <button type="button" class="btn" onclick="toggleBox('box-empresas-nd')">Cancelar</button>
+                </div>
+              </form>
             </div>
 
             <div class="cad-table-wrap">
               <table class="table">
-                <thead>
-                  <tr>
-                    <th style="width:80px;">ID</th>
-                    <th>Nome</th>
-                    <th style="width:140px;">Status</th>
-                  </tr>
-                </thead>
+                <thead><tr><th>ID</th><th>Nome</th><th>Status</th><th>Ações</th></tr></thead>
                 <tbody>
                   {% for item in empresas_nd %}
                   <tr>
                     <td>{{ item.id }}</td>
-                    <td>{{ item.nome }}</td>
+                    <td>
+                      <form method="post" action="{{ url_for('financeiro_dois.empresa_nd_editar', item_id=item.id) }}" class="inline-edit-form">
+                        <input type="text" name="nome" value="{{ item.nome }}" class="input-like input-like-sm" required>
+                        <button type="submit" class="btn btn-sm">Salvar</button>
+                      </form>
+                    </td>
                     <td>{{ item.status }}</td>
+                    <td>
+                      <form method="post" action="{{ url_for('financeiro_dois.empresa_nd_toggle_status', item_id=item.id) }}">
+                        <button type="submit" class="btn btn-sm">{% if item.status == 'Ativo' %}Inativar{% else %}Reativar{% endif %}</button>
+                      </form>
+                    </td>
                   </tr>
                   {% else %}
-                  <tr>
-                    <td colspan="3">Sem registros.</td>
-                  </tr>
+                  <tr><td colspan="4">Sem registros.</td></tr>
                   {% endfor %}
                 </tbody>
               </table>
@@ -460,136 +554,30 @@
       </div>
     </div>
   </section>
-
 </div>
 
 <style>
-  .f2-tabs-wrap{
-    display:flex;
-    flex-direction:column;
-    gap:16px;
-  }
-
-  .f2-tabs{
-    display:flex;
-    flex-wrap:wrap;
-    gap:10px;
-    padding-bottom:4px;
-  }
-
-  .f2-tab-btn{
-    border:1px solid #d8e1ec;
-    background:#fff;
-    color:#16324F;
-    border-radius:12px;
-    padding:10px 14px;
-    font-size:14px;
-    font-weight:600;
-    cursor:pointer;
-    transition:.15s ease;
-  }
-
-  .f2-tab-btn:hover{
-    background:#f7fafc;
-    border-color:#c3d3e3;
-  }
-
-  .f2-tab-btn.active{
-    background:#16324F;
-    color:#fff;
-    border-color:#16324F;
-  }
-
-  .f2-tab-panel{
-    display:none;
-  }
-
-  .f2-tab-panel.active{
-    display:block;
-  }
-
-  .cad-card{
-    background:#fff;
-    border:1px solid #d8e1ec;
-    border-radius:18px;
-    padding:18px;
-    box-shadow:0 6px 18px rgba(15, 23, 42, 0.05);
-  }
-
-  .cad-card-head{
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    gap:16px;
-    flex-wrap:wrap;
-    margin-bottom:18px;
-  }
-
-  .cad-card-title{
-    font-size:20px;
-    font-weight:700;
-    color:#16324F;
-  }
-
-  .cad-table-wrap{
-    overflow:auto;
-  }
-
-  @media (max-width: 768px){
-    .cad-card-head{
-      align-items:stretch;
-    }
-  }
-	.cad-form-box{
-	  background:#f8fbff;
-	  border:1px solid #d8e1ec;
-	  border-radius:16px;
-	  padding:16px;
-	  margin-bottom:18px;
-	}
-
-	.cad-form-grid{
-	  display:grid;
-	  grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));
-	  gap:14px;
-	}
-
-	.field label{
-	  display:block;
-	  margin-bottom:6px;
-	  font-size:13px;
-	  font-weight:600;
-	  color:#334155;
-	}
-
-	.input-like{
-	  width:100%;
-	  height:42px;
-	  border:1px solid #d8e1ec;
-	  border-radius:12px;
-	  padding:0 12px;
-	  font-size:14px;
-	  background:#fff;
-	}
-
-	.input-like-sm{
-	  height:36px;
-	  min-width:180px;
-	}
-
-	.cad-form-actions{
-	  display:flex;
-	  gap:10px;
-	  margin-top:14px;
-	  flex-wrap:wrap;
-	}
-
-	.inline-edit-form{
-	  display:flex;
-	  gap:8px;
-	  align-items:center;
-	  flex-wrap:wrap;
-	}
+  .f2-tabs-wrap{display:flex;flex-direction:column;gap:16px;}
+  .f2-tabs{display:flex;flex-wrap:wrap;gap:10px;padding-bottom:4px;}
+  .f2-tab-btn{border:1px solid #d8e1ec;background:#fff;color:#16324F;border-radius:12px;padding:10px 14px;font-size:14px;font-weight:600;cursor:pointer;transition:.15s ease;}
+  .f2-tab-btn:hover{background:#f7fafc;border-color:#c3d3e3;}
+  .f2-tab-btn.active{background:#16324F;color:#fff;border-color:#16324F;}
+  .f2-tab-panel{display:none;}
+  .f2-tab-panel.active{display:block;}
+  .cad-card{background:#fff;border:1px solid #d8e1ec;border-radius:18px;padding:18px;box-shadow:0 6px 18px rgba(15,23,42,.05);}
+  .cad-card-head{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:18px;}
+  .cad-card-title{font-size:20px;font-weight:700;color:#16324F;}
+  .cad-form-box{background:#f8fbff;border:1px solid #d8e1ec;border-radius:16px;padding:16px;margin-bottom:18px;}
+  .cad-form-grid{display:grid;grid-template-columns:repeat(auto-fit, minmax(220px,1fr));gap:14px;}
+  .field label{display:block;margin-bottom:6px;font-size:13px;font-weight:600;color:#334155;}
+  .field-full{grid-column:1 / -1;}
+  .input-like{width:100%;height:42px;border:1px solid #d8e1ec;border-radius:12px;padding:0 12px;font-size:14px;background:#fff;}
+  .input-like-sm{height:36px;min-width:150px;}
+  .cad-form-actions{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;}
+  .cad-table-wrap{overflow:auto;}
+  .inline-edit-form{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+  .inline-edit-form.stacked{align-items:flex-start;}
+  @media (max-width:768px){.cad-card-head{align-items:stretch;}}
 </style>
 
 <script>
@@ -600,20 +588,18 @@
     buttons.forEach((button) => {
       button.addEventListener("click", () => {
         const target = button.dataset.tab;
-
         buttons.forEach((btn) => btn.classList.remove("active"));
         panels.forEach((panel) => panel.classList.remove("active"));
-
         button.classList.add("active");
         document.getElementById(`tab-${target}`).classList.add("active");
       });
     });
   });
-  
-	function toggleCategoriaNova() {
-	  const box = document.getElementById("categoriaNovaBox");
-	  if (!box) return;
-	  box.style.display = box.style.display === "none" ? "block" : "none";
-	}
+
+  function toggleBox(id) {
+    const box = document.getElementById(id);
+    if (!box) return;
+    box.style.display = box.style.display === "none" ? "block" : "none";
+  }
 </script>
 {% endblock %}
