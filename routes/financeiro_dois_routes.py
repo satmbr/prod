@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, session, url_for, abort
+from flask import Blueprint, render_template, session, url_for, abort, request, redirect, flash
 from routes.auth import login_required, permission_required
 from db import get_engine
 from sqlalchemy import text
@@ -147,6 +147,118 @@ def cadastros():
         empresas_nd=empresas_nd,
     )
 
+@bp.route("/cadastros/categorias/nova", methods=["POST"])
+@login_required
+@permission_required("financeiro", "visualizar")
+def categoria_nova():
+    nome = (request.form.get("nome") or "").strip()
+
+    if not nome:
+        flash("Informe o nome da categoria.", "warning")
+        return redirect(url_for("financeiro_dois.cadastros"))
+
+    engine = get_engine()
+    with engine.begin() as conn:
+        existe = conn.execute(
+            text("""
+                SELECT id
+                FROM financeiro2_cad_categorias
+                WHERE LOWER(nome) = LOWER(:nome)
+                LIMIT 1
+            """),
+            {"nome": nome}
+        ).fetchone()
+
+        if existe:
+            flash("Já existe uma categoria com esse nome.", "warning")
+            return redirect(url_for("financeiro_dois.cadastros"))
+
+        conn.execute(
+            text("""
+                INSERT INTO financeiro2_cad_categorias (nome, status)
+                VALUES (:nome, 'Ativo')
+            """),
+            {"nome": nome}
+        )
+
+    flash("Categoria cadastrada com sucesso.", "success")
+    return redirect(url_for("financeiro_dois.cadastros"))
+
+
+@bp.route("/cadastros/categorias/<int:item_id>/editar", methods=["POST"])
+@login_required
+@permission_required("financeiro", "visualizar")
+def categoria_editar(item_id: int):
+    nome = (request.form.get("nome") or "").strip()
+
+    if not nome:
+        flash("Informe o nome da categoria.", "warning")
+        return redirect(url_for("financeiro_dois.cadastros"))
+
+    engine = get_engine()
+    with engine.begin() as conn:
+        existe = conn.execute(
+            text("""
+                SELECT id
+                FROM financeiro2_cad_categorias
+                WHERE LOWER(nome) = LOWER(:nome)
+                  AND id <> :id
+                LIMIT 1
+            """),
+            {"nome": nome, "id": item_id}
+        ).fetchone()
+
+        if existe:
+            flash("Já existe outra categoria com esse nome.", "warning")
+            return redirect(url_for("financeiro_dois.cadastros"))
+
+        conn.execute(
+            text("""
+                UPDATE financeiro2_cad_categorias
+                SET nome = :nome,
+                    atualizado_em = CURRENT_TIMESTAMP
+                WHERE id = :id
+            """),
+            {"nome": nome, "id": item_id}
+        )
+
+    flash("Categoria atualizada com sucesso.", "success")
+    return redirect(url_for("financeiro_dois.cadastros"))
+
+
+@bp.route("/cadastros/categorias/<int:item_id>/toggle-status", methods=["POST"])
+@login_required
+@permission_required("financeiro", "visualizar")
+def categoria_toggle_status(item_id: int):
+    engine = get_engine()
+    with engine.begin() as conn:
+        item = conn.execute(
+            text("""
+                SELECT id, status
+                FROM financeiro2_cad_categorias
+                WHERE id = :id
+            """),
+            {"id": item_id}
+        ).mappings().first()
+
+        if not item:
+            flash("Categoria não encontrada.", "danger")
+            return redirect(url_for("financeiro_dois.cadastros"))
+
+        novo_status = "Inativo" if item["status"] == "Ativo" else "Ativo"
+
+        conn.execute(
+            text("""
+                UPDATE financeiro2_cad_categorias
+                SET status = :status,
+                    atualizado_em = CURRENT_TIMESTAMP
+                WHERE id = :id
+            """),
+            {"status": novo_status, "id": item_id}
+        )
+
+    flash(f"Categoria alterada para {novo_status}.", "success")
+    return redirect(url_for("financeiro_dois.cadastros"))
 
 @bp.route("/om")
 @login_required

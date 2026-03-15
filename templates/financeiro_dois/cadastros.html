@@ -32,43 +32,78 @@
 
       <div class="f2-tab-panels">
 
-        <!-- Categorias -->
-        <div class="f2-tab-panel active" id="tab-categorias">
-          <div class="cad-card">
-            <div class="cad-card-head">
-              <div>
-                <div class="cad-card-title">Categorias</div>
-                <div class="muted">Lista real carregada do banco.</div>
-              </div>
-              <button type="button" class="btn btn-primary">Novo</button>
-            </div>
+		<!-- Categorias -->
+		<div class="f2-tab-panel active" id="tab-categorias">
+		  <div class="cad-card">
+			<div class="cad-card-head">
+			  <div>
+				<div class="cad-card-title">Categorias</div>
+				<div class="muted">Lista real carregada do banco.</div>
+			  </div>
+			  <button type="button" class="btn btn-primary" onclick="toggleCategoriaNova()">Novo</button>
+			</div>
 
-            <div class="cad-table-wrap">
-              <table class="table">
-                <thead>
-                  <tr>
-                    <th style="width:80px;">ID</th>
-                    <th>Nome</th>
-                    <th style="width:140px;">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {% for item in categorias %}
-                  <tr>
-                    <td>{{ item.id }}</td>
-                    <td>{{ item.nome }}</td>
-                    <td>{{ item.status }}</td>
-                  </tr>
-                  {% else %}
-                  <tr>
-                    <td colspan="3">Sem registros.</td>
-                  </tr>
-                  {% endfor %}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
+			<div id="categoriaNovaBox" class="cad-form-box" style="display:none;">
+			  <form method="post" action="{{ url_for('financeiro_dois.categoria_nova') }}">
+				<div class="cad-form-grid">
+				  <div class="field">
+					<label>Nome da categoria</label>
+					<input type="text" name="nome" class="input-like" placeholder="Digite o nome" required>
+				  </div>
+				</div>
+
+				<div class="cad-form-actions">
+				  <button type="submit" class="btn btn-primary">Salvar</button>
+				  <button type="button" class="btn" onclick="toggleCategoriaNova()">Cancelar</button>
+				</div>
+			  </form>
+			</div>
+
+			<div class="cad-table-wrap">
+			  <table class="table">
+				<thead>
+				  <tr>
+					<th style="width:80px;">ID</th>
+					<th>Nome</th>
+					<th style="width:140px;">Status</th>
+					<th style="width:220px;">Ações</th>
+				  </tr>
+				</thead>
+				<tbody>
+				  {% for item in categorias %}
+				  <tr>
+					<td>{{ item.id }}</td>
+					<td>
+					  <form method="post"
+							action="{{ url_for('financeiro_dois.categoria_editar', item_id=item.id) }}"
+							class="inline-edit-form">
+						<input type="text" name="nome" value="{{ item.nome }}" class="input-like input-like-sm" required>
+						<button type="submit" class="btn btn-sm">Salvar</button>
+					  </form>
+					</td>
+					<td>{{ item.status }}</td>
+					<td>
+					  <div class="table-actions">
+						<form method="post"
+							  action="{{ url_for('financeiro_dois.categoria_toggle_status', item_id=item.id) }}"
+							  style="display:inline;">
+						  <button type="submit" class="btn btn-sm">
+							{% if item.status == 'Ativo' %}Inativar{% else %}Reativar{% endif %}
+						  </button>
+						</form>
+					  </div>
+					</td>
+				  </tr>
+				  {% else %}
+				  <tr>
+					<td colspan="4">Sem registros.</td>
+				  </tr>
+				  {% endfor %}
+				</tbody>
+			  </table>
+			</div>
+		  </div>
+		</div>
 
         <!-- Descrições -->
         <div class="f2-tab-panel" id="tab-descricoes">
@@ -505,6 +540,56 @@
       align-items:stretch;
     }
   }
+	.cad-form-box{
+	  background:#f8fbff;
+	  border:1px solid #d8e1ec;
+	  border-radius:16px;
+	  padding:16px;
+	  margin-bottom:18px;
+	}
+
+	.cad-form-grid{
+	  display:grid;
+	  grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));
+	  gap:14px;
+	}
+
+	.field label{
+	  display:block;
+	  margin-bottom:6px;
+	  font-size:13px;
+	  font-weight:600;
+	  color:#334155;
+	}
+
+	.input-like{
+	  width:100%;
+	  height:42px;
+	  border:1px solid #d8e1ec;
+	  border-radius:12px;
+	  padding:0 12px;
+	  font-size:14px;
+	  background:#fff;
+	}
+
+	.input-like-sm{
+	  height:36px;
+	  min-width:180px;
+	}
+
+	.cad-form-actions{
+	  display:flex;
+	  gap:10px;
+	  margin-top:14px;
+	  flex-wrap:wrap;
+	}
+
+	.inline-edit-form{
+	  display:flex;
+	  gap:8px;
+	  align-items:center;
+	  flex-wrap:wrap;
+	}
 </style>
 
 <script>
@@ -524,5 +609,11 @@
       });
     });
   });
+  
+	function toggleCategoriaNova() {
+	  const box = document.getElementById("categoriaNovaBox");
+	  if (!box) return;
+	  box.style.display = box.style.display === "none" ? "block" : "none";
+	}
 </script>
 {% endblock %}
