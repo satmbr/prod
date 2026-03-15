@@ -23,22 +23,28 @@
 
     <div id="novaOmBox" class="filters-card" style="display:none; margin-bottom:16px;">
       <form method="post" action="{{ url_for('financeiro_dois.om_nova') }}">
-        <div class="filters-grid">
-          <div class="field">
-            <label>Matrícula</label>
-            <input type="text" name="matricula_colaborador" class="input-like" placeholder="Ex.: LME" required>
-          </div>
 
-          <div class="field">
-            <label>Nome do colaborador</label>
-            <input type="text" name="nome_colaborador" class="input-like" placeholder="Nome completo" required>
-          </div>
+		<div class="filters-grid">
+		  <div class="field">
+			<label>Número da OM</label>
+			<input type="text" name="numero_om" class="input-like" placeholder="Ex.: OM-2026-0004" required>
+		  </div>
 
-          <div class="field field-full">
-            <label>Observação</label>
-            <input type="text" name="observacao" class="input-like" placeholder="Observação inicial da OM">
-          </div>
-        </div>
+		  <div class="field">
+			<label>Matrícula</label>
+			<input type="text" name="matricula_colaborador" class="input-like" placeholder="Ex.: LME" required>
+		  </div>
+
+		  <div class="field">
+			<label>Nome do colaborador</label>
+			<input type="text" name="nome_colaborador" class="input-like" placeholder="Nome completo" required>
+		  </div>
+
+		  <div class="field field-full">
+			<label>Observação</label>
+			<input type="text" name="observacao" class="input-like" placeholder="Observação inicial da OM">
+		  </div>
+		</div>
 
         <div class="form-actions">
           <button type="submit" class="btn btn-primary">Criar OM</button>

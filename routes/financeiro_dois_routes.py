@@ -1099,34 +1099,30 @@ def om():
 @login_required
 @permission_required("financeiro", "visualizar")
 def om_nova():
+    numero_om = _nome_preenchido(request.form.get("numero_om"))
     matricula = _nome_preenchido(request.form.get("matricula_colaborador"))
     nome_colaborador = _nome_preenchido(request.form.get("nome_colaborador"))
     observacao = _nome_preenchido(request.form.get("observacao"))
 
-    if not matricula or not nome_colaborador:
-        flash("Informe a matrícula e o nome do colaborador.", "warning")
+    if not numero_om or not matricula or not nome_colaborador:
+        flash("Informe o número da OM, a matrícula e o nome do colaborador.", "warning")
         return redirect(url_for("financeiro_dois.om"))
 
     engine = get_engine()
 
     with engine.begin() as conn:
-        ultimo = conn.execute(text("""
-            SELECT numero_om
+        existe = conn.execute(text("""
+            SELECT id
             FROM financeiro2_om
-            WHERE numero_om LIKE 'OM-2026-%'
-            ORDER BY id DESC
+            WHERE numero_om = :numero_om
             LIMIT 1
-        """)).mappings().first()
+        """), {
+            "numero_om": numero_om
+        }).mappings().first()
 
-        if ultimo and ultimo["numero_om"]:
-            try:
-                sequencial = int(ultimo["numero_om"].split("-")[-1]) + 1
-            except Exception:
-                sequencial = 1
-        else:
-            sequencial = 1
-
-        numero_om = f"OM-2026-{sequencial:04d}"
+        if existe:
+            flash(f"Já existe uma OM com o número {numero_om}.", "warning")
+            return redirect(url_for("financeiro_dois.om"))
 
         novo_id = conn.execute(text("""
             INSERT INTO financeiro2_om (
