@@ -11,7 +11,7 @@
         <div>
           <div class="zone-title">{{ om.numero }}</div>
           <div class="muted">
-            Edição da OM com cabeçalho, linhas e resumo de saldo.
+            Edição da OM com cabeçalho, linhas, ações e saldo em BRL.
           </div>
         </div>
       </div>
@@ -26,74 +26,86 @@
         <div class="card-title">Dados principais</div>
 
         <form method="post" action="{{ url_for('financeiro_dois.om_salvar', om_id=om.id) }}">
-          <div class="form-grid">
-            <div class="field">
-              <label>Número OM</label>
-              <input class="input-like" type="text" name="numero" value="{{ om.numero }}" required />
+          <fieldset {% if om.bloqueada %}disabled{% endif %} style="border:none;padding:0;margin:0;">
+            <div class="form-grid">
+              <div class="field">
+                <label>Número OM</label>
+                <input class="input-like" type="text" name="numero" value="{{ om.numero }}" required />
+              </div>
+
+              <div class="field">
+                <label>Matrícula</label>
+                <input class="input-like" type="text" name="matricula" value="{{ om.matricula }}" required />
+              </div>
+
+              <div class="field">
+                <label>Colaborador</label>
+                <input class="input-like" type="text" name="colaborador" value="{{ om.colaborador }}" required />
+              </div>
+
+              <div class="field">
+                <label>Status</label>
+                <select class="input-like" name="status">
+                  <option value="Aberta" {% if om.status == 'Aberta' %}selected{% endif %}>Aberta</option>
+                  <option value="Parcial" {% if om.status == 'Parcial' %}selected{% endif %}>Parcial</option>
+                  <option value="Paga" {% if om.status == 'Paga' %}selected{% endif %}>Paga</option>
+                  <option value="Cancelada" {% if om.status == 'Cancelada' %}selected{% endif %}>Cancelada</option>
+                </select>
+              </div>
+
+              <div class="field field-full">
+                <label>Observação</label>
+                <textarea class="input-like textarea-like" name="observacao">{{ om.observacao }}</textarea>
+              </div>
             </div>
 
-            <div class="field">
-              <label>Matrícula</label>
-              <input class="input-like" type="text" name="matricula" value="{{ om.matricula }}" required />
+            {% if not om.bloqueada %}
+            <div class="form-actions-top">
+              <button type="submit" class="btn btn-primary">Salvar alterações</button>
             </div>
-
-            <div class="field">
-              <label>Colaborador</label>
-              <input class="input-like" type="text" name="colaborador" value="{{ om.colaborador }}" required />
-            </div>
-
-            <div class="field">
-              <label>Status</label>
-              <select class="input-like" name="status">
-                <option value="Aberta" {% if om.status == 'Aberta' %}selected{% endif %}>Aberta</option>
-                <option value="Parcial" {% if om.status == 'Parcial' %}selected{% endif %}>Parcial</option>
-                <option value="Quitada" {% if om.status == 'Quitada' %}selected{% endif %}>Quitada</option>
-                <option value="Cancelada" {% if om.status == 'Cancelada' %}selected{% endif %}>Cancelada</option>
-              </select>
-            </div>
-
-            <div class="field field-full">
-              <label>Observação</label>
-              <textarea class="input-like textarea-like" name="observacao">{{ om.observacao }}</textarea>
-            </div>
-          </div>
-
-          <div class="form-actions-top">
-            <button type="submit" class="btn btn-primary">Salvar alterações</button>
-          </div>
+            {% endif %}
+          </fieldset>
         </form>
+
+        {% if om.bloqueada %}
+        <div class="warn-box">
+          Esta OM está paga e bloqueada para edição. Apenas visualização e exportação estão liberadas. Alterações só por aprovação.
+        </div>
+        {% endif %}
       </div>
 
       <div class="om-side">
         <div class="resume-card">
           <div class="resume-title">Resumo</div>
           <div class="resume-row">
-            <span>Total positivo</span>
-            <strong>R$ {{ '%.2f'|format(total_positivo) }}</strong>
-          </div>
-          <div class="resume-row">
-            <span>Total negativo</span>
-            <strong>R$ {{ '%.2f'|format(total_negativo) }}</strong>
+            <span>Status</span>
+            <strong>{{ om.status }}</strong>
           </div>
           <div class="resume-row resume-total">
-            <span>Saldo atual</span>
-            <strong>R$ {{ '%.2f'|format(om.saldo) }}</strong>
+            <span>Saldo atual (BRL)</span>
+            <strong>R$ {{ '%.2f'|format(total_brl) }}</strong>
           </div>
         </div>
 
         <div class="resume-card">
           <div class="resume-title">Ações</div>
           <div class="action-list">
+            {% if not om.bloqueada %}
             <button type="button" class="btn btn-primary btn-block" onclick="toggleNovaLinha()">Adicionar linha</button>
+            <a href="#" class="btn btn-block">Adiantar OM</a>
+            <a href="#" class="btn btn-block">Pagar OM</a>
+            {% endif %}
+            <a href="#" class="btn btn-block">Exportar OM</a>
           </div>
         </div>
       </div>
     </div>
 
+    {% if not om.bloqueada %}
     <div id="novaLinhaBox" class="om-card" style="display:none; margin-bottom:16px;">
       <div class="card-title">Nova linha da OM</div>
 
-      <form method="post" action="{{ url_for('financeiro_dois.om_linha_nova', om_id=om.id) }}">
+      <form method="post" action="{{ url_for('financeiro_dois.om_linha_nova', om_id=om.id) }}" enctype="multipart/form-data">
         <div class="form-grid">
           <div class="field">
             <label>Data</label>
@@ -101,15 +113,32 @@
           </div>
 
           <div class="field">
-            <label>Tipo</label>
-            <input class="input-like" type="text" name="tipo_linha" placeholder="Ex.: Despesa, Pagamento, Adiantamento" required>
+            <label>Descrição</label>
+            <select class="input-like" name="descricao" required>
+              <option value="">Selecione</option>
+              {% for item in descricoes %}
+              <option value="{{ item.nome }}">{{ item.nome }}</option>
+              {% endfor %}
+            </select>
           </div>
 
           <div class="field">
-            <label>Sinal</label>
-            <select class="input-like" name="sinal" required>
-              <option value="+">+</option>
-              <option value="-">-</option>
+            <label>Categoria</label>
+            <select class="input-like" name="categoria" required>
+              <option value="">Selecione</option>
+              {% for item in categorias %}
+              <option value="{{ item.nome }}">{{ item.nome }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="field">
+            <label>Aplicação</label>
+            <select class="input-like" name="aplicacao" required>
+              <option value="">Selecione</option>
+              {% for item in aplicacoes %}
+              <option value="{{ item.nome }}">{{ item.nome }}</option>
+              {% endfor %}
             </select>
           </div>
 
@@ -118,19 +147,25 @@
             <input class="input-like" type="text" name="valor" placeholder="Ex.: 150.00" required>
           </div>
 
+          <div class="field">
+            <label>Moeda</label>
+            <select class="input-like" name="moeda_codigo" required>
+              {% for item in moedas %}
+              <option value="{{ item.codigo }}" {% if item.codigo == 'BRL' %}selected{% endif %}>
+                {{ item.codigo }} - {{ item.nome }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+
           <div class="field field-full">
-            <label>Descrição</label>
-            <input class="input-like" type="text" name="descricao" required>
+            <label>Detalhes</label>
+            <input class="input-like" type="text" name="detalhes">
           </div>
 
-          <div class="field">
-            <label>Categoria</label>
-            <input class="input-like" type="text" name="categoria" placeholder="Ex.: Alimentação">
-          </div>
-
-          <div class="field">
-            <label>Aplicação</label>
-            <input class="input-like" type="text" name="aplicacao" placeholder="Ex.: MATISA">
+          <div class="field field-full">
+            <label>Anexo do recibo (imagem ou PDF)</label>
+            <input class="input-like" type="file" name="anexo_recibo" accept=".pdf,image/*">
           </div>
         </div>
 
@@ -140,6 +175,7 @@
         </div>
       </form>
     </div>
+    {% endif %}
 
     <div class="om-card">
       <div class="card-head-inline">
@@ -151,28 +187,42 @@
           <thead>
             <tr>
               <th>Data</th>
-              <th>Tipo</th>
+              <th>Recibo</th>
               <th>Descrição</th>
+              <th>Detalhes</th>
               <th>Categoria</th>
               <th>Aplicação</th>
-              <th>Sinal</th>
               <th style="text-align:right;">Valor</th>
+              <th>Moeda</th>
+              <th style="text-align:right;">Câmbio</th>
+              <th style="text-align:right;">Valor BRL</th>
+              <th>Anexo</th>
             </tr>
           </thead>
           <tbody>
             {% for linha in om.linhas %}
             <tr>
               <td>{{ linha.data }}</td>
-              <td>{{ linha.tipo }}</td>
+              <td>{{ linha.recibo }}</td>
               <td>{{ linha.descricao }}</td>
+              <td>{{ linha.detalhes }}</td>
               <td>{{ linha.categoria }}</td>
               <td>{{ linha.aplicacao }}</td>
-              <td>{{ linha.sinal }}</td>
-              <td style="text-align:right;">R$ {{ '%.2f'|format(linha.valor) }}</td>
+              <td style="text-align:right;">{{ '%.2f'|format(linha.valor) }}</td>
+              <td>{{ linha.moeda_codigo }}</td>
+              <td style="text-align:right;">{{ '%.6f'|format(linha.cambio) }}</td>
+              <td style="text-align:right;">R$ {{ '%.2f'|format(linha.valor_brl) }}</td>
+              <td>
+                {% if linha.anexo_recibo %}
+                  <a class="btn btn-sm" href="{{ url_for('static', filename='uploads/financeiro2/om_recibos/' ~ linha.anexo_recibo) }}" target="_blank">Abrir</a>
+                {% else %}
+                  —
+                {% endif %}
+              </td>
             </tr>
             {% else %}
             <tr>
-              <td colspan="7">Sem linhas lançadas.</td>
+              <td colspan="11">Sem linhas lançadas.</td>
             </tr>
             {% endfor %}
           </tbody>
@@ -238,7 +288,7 @@
 
   .input-like{
     width:100%;
-    height:42px;
+    min-height:42px;
     border:1px solid #d8e1ec;
     border-radius:12px;
     padding:0 12px;
@@ -290,6 +340,16 @@
     gap:10px;
     margin-top:16px;
     flex-wrap:wrap;
+  }
+
+  .warn-box{
+    margin-top:14px;
+    padding:12px 14px;
+    border-radius:12px;
+    background:#fff7ed;
+    border:1px solid #fed7aa;
+    color:#9a3412;
+    font-size:14px;
   }
 
   @media (max-width: 980px){

@@ -1175,32 +1175,68 @@ def om_editar(om_id: int):
 
         linhas = conn.execute(text("""
             SELECT
+                id,
+                TO_CHAR(data_lancamento, 'YYYY-MM-DD') AS data_form,
                 TO_CHAR(data_lancamento, 'DD/MM/YYYY') AS data,
-                tipo_linha AS tipo,
-                descricao,
+                COALESCE(recibo, id) AS recibo,
+                COALESCE(tipo_linha, '') AS descricao,
+                COALESCE(detalhes, COALESCE(descricao, '')) AS detalhes,
                 COALESCE(categoria, '') AS categoria,
                 COALESCE(aplicacao, '') AS aplicacao,
-                valor,
-                sinal
+                COALESCE(valor, 0) AS valor,
+                COALESCE(moeda_codigo, 'BRL') AS moeda_codigo,
+                COALESCE(cambio, 1) AS cambio,
+                COALESCE(valor_brl, 0) AS valor_brl,
+                COALESCE(anexo_recibo, '') AS anexo_recibo
             FROM financeiro2_om_linhas
             WHERE om_id = :id
-            ORDER BY id
+            ORDER BY recibo, id
         """), {"id": om_id}).mappings().all()
 
-    total_positivo = sum(float(item["valor"]) for item in linhas if item["sinal"] == "+")
-    total_negativo = sum(float(item["valor"]) for item in linhas if item["sinal"] == "-")
-    saldo = total_positivo - total_negativo
+        descricoes = conn.execute(text("""
+            SELECT nome
+            FROM financeiro2_cad_descricoes
+            WHERE status = 'Ativo'
+            ORDER BY nome
+        """)).mappings().all()
+
+        categorias = conn.execute(text("""
+            SELECT nome
+            FROM financeiro2_cad_categorias
+            WHERE status = 'Ativo'
+            ORDER BY nome
+        """)).mappings().all()
+
+        aplicacoes = conn.execute(text("""
+            SELECT nome
+            FROM financeiro2_cad_aplicacoes
+            WHERE status = 'Ativo'
+            ORDER BY nome
+        """)).mappings().all()
+
+        moedas = conn.execute(text("""
+            SELECT codigo, nome, cambio_padrao
+            FROM financeiro2_cad_moedas
+            WHERE status = 'Ativo'
+            ORDER BY codigo
+        """)).mappings().all()
+
+    total_brl = sum(float(item["valor_brl"]) for item in linhas)
 
     om = dict(om)
-    om["saldo"] = saldo
+    om["saldo"] = total_brl
     om["linhas"] = linhas
+    om["bloqueada"] = om["status"] == "Paga"
 
     return render_template(
         "financeiro_dois/om_editar.html",
         subnav_links=build_financeiro_dois_subnav("om"),
         om=om,
-        total_positivo=total_positivo,
-        total_negativo=total_negativo,
+        total_brl=total_brl,
+        descricoes=descricoes,
+        categorias=categorias,
+        aplicacoes=aplicacoes,
+        moedas=moedas,
     )
     
 @bp.route("/om/<int:om_id>/salvar", methods=["POST"])
@@ -1268,27 +1304,27 @@ def om_salvar(om_id: int):
 @permission_required("financeiro", "visualizar")
 def om_linha_nova(om_id: int):
     data_lancamento = _nome_preenchido(request.form.get("data_lancamento"))
-    tipo_linha = _nome_preenchido(request.form.get("tipo_linha"))
     descricao = _nome_preenchido(request.form.get("descricao"))
+    detalhes = _nome_preenchido(request.form.get("detalhes"))
     categoria = _nome_preenchido(request.form.get("categoria"))
     aplicacao = _nome_preenchido(request.form.get("aplicacao"))
     valor_txt = _nome_preenchido(request.form.get("valor")).replace(",", ".")
-    sinal = _nome_preenchido(request.form.get("sinal"))
+    moeda_codigo = _nome_preenchido(request.form.get("moeda_codigo")) or "BRL"
 
-    if not data_lancamento or not tipo_linha or not descricao or not valor_txt or sinal not in ("+", "-"):
-        flash("Preencha data, tipo, descrição, valor e sinal da linha.", "warning")
+    if not data_lancamento or not descricao or not categoria or not aplicacao or not valor_txt:
+        flash("Preencha data, descrição, categoria, aplicação e valor.", "warning")
         return redirect(url_for("financeiro_dois.om_editar", om_id=om_id))
 
     try:
         valor = float(valor_txt)
     except ValueError:
-        flash("Valor inválido para a linha.", "warning")
+        flash("Valor inválido.", "warning")
         return redirect(url_for("financeiro_dois.om_editar", om_id=om_id))
 
     engine = get_engine()
     with engine.begin() as conn:
         om = conn.execute(text("""
-            SELECT id
+            SELECT id, status
             FROM financeiro2_om
             WHERE id = :id
         """), {"id": om_id}).mappings().first()
@@ -1297,36 +1333,97 @@ def om_linha_nova(om_id: int):
             flash("OM não encontrada.", "danger")
             return redirect(url_for("financeiro_dois.om"))
 
+        if om["status"] == "Paga":
+            flash("Esta OM está paga e bloqueada para edição.", "warning")
+            return redirect(url_for("financeiro_dois.om_editar", om_id=om_id))
+
+        moeda = conn.execute(text("""
+            SELECT codigo, cambio_padrao
+            FROM financeiro2_cad_moedas
+            WHERE codigo = :codigo
+            LIMIT 1
+        """), {"codigo": moeda_codigo}).mappings().first()
+
+        if not moeda:
+            flash("Moeda inválida.", "warning")
+            return redirect(url_for("financeiro_dois.om_editar", om_id=om_id))
+
+        cambio = float(moeda["cambio_padrao"] or 1)
+        if cambio == 0:
+            cambio = 1
+
+        valor_brl = round(valor / cambio, 2)
+
+        proximo_recibo = conn.execute(text("""
+            SELECT COALESCE(MAX(recibo), 0) + 1 AS proximo
+            FROM financeiro2_om_linhas
+            WHERE om_id = :om_id
+        """), {"om_id": om_id}).mappings().first()["proximo"]
+
+        arquivo = request.files.get("anexo_recibo")
+        nome_arquivo = None
+
+        if arquivo and arquivo.filename:
+            import os
+            import uuid
+            from werkzeug.utils import secure_filename
+
+            pasta = os.path.join("static", "uploads", "financeiro2", "om_recibos")
+            os.makedirs(pasta, exist_ok=True)
+
+            nome_seguro = secure_filename(arquivo.filename)
+            extensao = os.path.splitext(nome_seguro)[1].lower()
+            nome_arquivo = f"{uuid.uuid4().hex}{extensao}"
+            caminho = os.path.join(pasta, nome_arquivo)
+            arquivo.save(caminho)
+
         conn.execute(text("""
             INSERT INTO financeiro2_om_linhas (
                 om_id,
                 data_lancamento,
+                recibo,
                 tipo_linha,
                 descricao,
+                detalhes,
                 categoria,
                 aplicacao,
                 valor,
+                moeda_codigo,
+                cambio,
+                valor_brl,
+                anexo_recibo,
                 sinal
             )
             VALUES (
                 :om_id,
                 :data_lancamento,
+                :recibo,
                 :tipo_linha,
-                :descricao,
+                :descricao_antiga,
+                :detalhes,
                 :categoria,
                 :aplicacao,
                 :valor,
-                :sinal
+                :moeda_codigo,
+                :cambio,
+                :valor_brl,
+                :anexo_recibo,
+                '+'
             )
         """), {
             "om_id": om_id,
             "data_lancamento": data_lancamento,
-            "tipo_linha": tipo_linha,
-            "descricao": descricao,
-            "categoria": categoria or None,
-            "aplicacao": aplicacao or None,
+            "recibo": proximo_recibo,
+            "tipo_linha": descricao,
+            "descricao_antiga": detalhes,
+            "detalhes": detalhes,
+            "categoria": categoria,
+            "aplicacao": aplicacao,
             "valor": valor,
-            "sinal": sinal
+            "moeda_codigo": moeda_codigo,
+            "cambio": cambio,
+            "valor_brl": valor_brl,
+            "anexo_recibo": nome_arquivo,
         })
 
     flash("Linha adicionada com sucesso.", "success")
