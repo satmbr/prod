@@ -1,0 +1,244 @@
+{% extends "base.html" %}
+{% block title %}Cadastros | Financeiro Dois{% endblock %}
+
+{% block content %}
+<div class="page-wrap">
+
+  <section class="zone">
+    <div class="zone-head">
+      <div class="zone-left">
+        <div class="zone-icon">⚙️</div>
+        <div>
+          <div class="zone-title">Cadastros Financeiros</div>
+          <div class="muted">
+            Base auxiliar do Financeiro Dois. Nesta etapa, vamos estruturar as abas e o layout.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="f2-tabs-wrap">
+      <div class="f2-tabs" id="f2Tabs">
+        {% for aba in abas %}
+          <button
+            type="button"
+            class="f2-tab-btn {% if loop.first %}active{% endif %}"
+            data-tab="{{ aba.id }}"
+          >
+            {{ aba.titulo }}
+          </button>
+        {% endfor %}
+      </div>
+
+      <div class="f2-tab-panels">
+        {% for aba in abas %}
+          <div
+            class="f2-tab-panel {% if loop.first %}active{% endif %}"
+            id="tab-{{ aba.id }}"
+          >
+            <div class="cad-card">
+              <div class="cad-card-head">
+                <div>
+                  <div class="cad-card-title">{{ aba.titulo }}</div>
+                  <div class="muted">Estrutura inicial do cadastro.</div>
+                </div>
+                <button type="button" class="btn btn-primary">Novo</button>
+              </div>
+
+              <div class="cad-form-grid">
+                <div class="field">
+                  <label>Nome</label>
+                  <input type="text" class="input-like" placeholder="Digite um nome" />
+                </div>
+
+                <div class="field">
+                  <label>Status</label>
+                  <select class="input-like">
+                    <option>Ativo</option>
+                    <option>Inativo</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="cad-table-wrap">
+                <table class="table">
+                  <thead>
+                    <tr>
+                      <th style="width: 80px;">ID</th>
+                      <th>Nome</th>
+                      <th style="width: 140px;">Status</th>
+                      <th style="width: 160px;">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>—</td>
+                      <td>Sem registros por enquanto</td>
+                      <td>—</td>
+                      <td>
+                        <div class="table-actions">
+                          <button type="button" class="btn btn-sm">Editar</button>
+                          <button type="button" class="btn btn-sm btn-danger">Excluir</button>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<style>
+  .f2-tabs-wrap{
+    display:flex;
+    flex-direction:column;
+    gap:16px;
+  }
+
+  .f2-tabs{
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+    padding-bottom:4px;
+  }
+
+  .f2-tab-btn{
+    border:1px solid #d8e1ec;
+    background:#fff;
+    color:#16324F;
+    border-radius:12px;
+    padding:10px 14px;
+    font-size:14px;
+    font-weight:600;
+    cursor:pointer;
+    transition:.15s ease;
+  }
+
+  .f2-tab-btn:hover{
+    background:#f7fafc;
+    border-color:#c3d3e3;
+  }
+
+  .f2-tab-btn.active{
+    background:#16324F;
+    color:#fff;
+    border-color:#16324F;
+  }
+
+  .f2-tab-panel{
+    display:none;
+  }
+
+  .f2-tab-panel.active{
+    display:block;
+  }
+
+  .cad-card{
+    background:#fff;
+    border:1px solid #d8e1ec;
+    border-radius:18px;
+    padding:18px;
+    box-shadow:0 6px 18px rgba(15, 23, 42, 0.05);
+  }
+
+  .cad-card-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:16px;
+    flex-wrap:wrap;
+    margin-bottom:18px;
+  }
+
+  .cad-card-title{
+    font-size:20px;
+    font-weight:700;
+    color:#16324F;
+  }
+
+  .cad-form-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));
+    gap:14px;
+    margin-bottom:18px;
+  }
+
+  .field label{
+    display:block;
+    margin-bottom:6px;
+    font-size:13px;
+    font-weight:600;
+    color:#334155;
+  }
+
+  .input-like{
+    width:100%;
+    height:42px;
+    border:1px solid #d8e1ec;
+    border-radius:12px;
+    padding:0 12px;
+    font-size:14px;
+    background:#fff;
+  }
+
+  .input-like:focus{
+    outline:none;
+    border-color:#9db6cf;
+    box-shadow:0 0 0 3px rgba(22, 50, 79, 0.08);
+  }
+
+  .cad-table-wrap{
+    overflow:auto;
+  }
+
+  .table-actions{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+  }
+
+  .btn-sm{
+    padding:7px 10px;
+    font-size:12px;
+    line-height:1;
+  }
+
+  .btn-danger{
+    background:#fff1f2;
+    border:1px solid #fecdd3;
+    color:#be123c;
+  }
+
+  @media (max-width: 768px){
+    .cad-card-head{
+      align-items:stretch;
+    }
+  }
+</style>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const buttons = document.querySelectorAll(".f2-tab-btn");
+    const panels = document.querySelectorAll(".f2-tab-panel");
+
+    buttons.forEach((button) => {
+      button.addEventListener("click", () => {
+        const target = button.dataset.tab;
+
+        buttons.forEach((btn) => btn.classList.remove("active"));
+        panels.forEach((panel) => panel.classList.remove("active"));
+
+        button.classList.add("active");
+        document.getElementById(`tab-${target}`).classList.add("active");
+      });
+    });
+  });
+</script>
+{% endblock %}

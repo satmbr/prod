@@ -56,7 +56,7 @@ def build_financeiro_dois_subnav(active: str | None):
         })
         links.append({
             "text": "Cadastros",
-            "href": "#",
+            "href": url_for("financeiro_dois.cadastros"),
             "active": active == "cadastros",
         })
 
@@ -68,58 +68,42 @@ def build_financeiro_dois_subnav(active: str | None):
 @permission_required("financeiro", "visualizar")
 def index():
     cards = [
-        {
-            "titulo": "OM",
-            "descricao": "Ordens com saldo automático, despesas, adiantamentos e pagamentos.",
-            "href": "#",
-            "icone": "📄",
-        },
-        {
-            "titulo": "RD",
-            "descricao": "Relatórios de despesas por período, colaborador e centro de custo.",
-            "href": "#",
-            "icone": "🧾",
-        },
-        {
-            "titulo": "Despesas",
-            "descricao": "Despesas avulsas ou importadas, com controle de pagamento e vínculo.",
-            "href": "#",
-            "icone": "💸",
-        },
-        {
-            "titulo": "Previsão",
-            "descricao": "Despesas não vinculadas, em espera ou rejeitadas para ND.",
-            "href": "#",
-            "icone": "📊",
-        },
-        {
-            "titulo": "Reembolsos",
-            "descricao": "Solicitação, aprovação e pagamento com comprovante.",
-            "href": "#",
-            "icone": "💳",
-        },
-        {
-            "titulo": "Notas de Débito",
-            "descricao": "Criação, edição, vínculo de despesas e exportação em PDF.",
-            "href": "#",
-            "icone": "🗂️",
-        },
-        {
-            "titulo": "Aprovações",
-            "descricao": "Fila de aprovações para exclusões e alterações sensíveis.",
-            "href": "#",
-            "icone": "✅",
-        },
-        {
-            "titulo": "Cadastros",
-            "descricao": "Página única com abas para categorias, moedas, CC e parâmetros.",
-            "href": "#",
-            "icone": "⚙️",
-        },
+        {"titulo": "OM", "descricao": "Ordens com saldo automático, despesas, adiantamentos e pagamentos.", "href": "#", "icone": "📄"},
+        {"titulo": "RD", "descricao": "Relatórios de despesas por período, colaborador e centro de custo.", "href": "#", "icone": "🧾"},
+        {"titulo": "Despesas", "descricao": "Despesas avulsas ou importadas, com controle de pagamento e vínculo.", "href": "#", "icone": "💸"},
+        {"titulo": "Previsão", "descricao": "Despesas não vinculadas, em espera ou rejeitadas para ND.", "href": "#", "icone": "📊"},
+        {"titulo": "Reembolsos", "descricao": "Solicitação, aprovação e pagamento com comprovante.", "href": "#", "icone": "💳"},
+        {"titulo": "Notas de Débito", "descricao": "Criação, edição, vínculo de despesas e exportação em PDF.", "href": "#", "icone": "🗂️"},
+        {"titulo": "Aprovações", "descricao": "Fila de aprovações para exclusões e alterações sensíveis.", "href": "#", "icone": "✅"},
+        {"titulo": "Cadastros", "descricao": "Página única com abas para categorias, moedas, CC e parâmetros.", "href": url_for("financeiro_dois.cadastros"), "icone": "⚙️"},
     ]
 
     return render_template(
         "financeiro_dois/index.html",
         subnav_links=build_financeiro_dois_subnav("index"),
         cards=cards,
+    )
+
+
+@bp.route("/cadastros")
+@login_required
+@permission_required("financeiro", "visualizar")
+def cadastros():
+    abas = [
+        {"id": "categorias", "titulo": "Categorias"},
+        {"id": "descricoes", "titulo": "Descrições padrão"},
+        {"id": "aplicacoes", "titulo": "Aplicações"},
+        {"id": "moedas", "titulo": "Moedas"},
+        {"id": "centros_custo", "titulo": "Centros de custo"},
+        {"id": "status_despesa", "titulo": "Status despesa"},
+        {"id": "status_nd", "titulo": "Status ND"},
+        {"id": "tipos_documento", "titulo": "Tipos de documento"},
+        {"id": "parametros", "titulo": "Parâmetros"},
+        {"id": "empresas_nd", "titulo": "Empresas ND"},
+    ]
+
+    return render_template(
+        "financeiro_dois/cadastros.html",
+        subnav_links=build_financeiro_dois_subnav("cadastros"),
+        abas=abas,
     )
