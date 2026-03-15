@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block title %}Despesas | Financeiro Dois{% endblock %}
+
+{% block content %}
+<div class="page-wrap">
+  <section class="zone">
+    <div class="zone-head">
+      <div class="zone-left">
+        <div class="zone-icon">💸</div>
+        <div>
+          <div class="zone-title">Despesas</div>
+          <div class="muted">Despesas avulsas ou importadas, com controle de pagamento e vínculo.</div>
+        </div>
+      </div>
+      <div class="zone-actions">
+        <a class="btn btn-primary" href="#">Nova despesa</a>
+      </div>
+    </div>
+
+    <div class="filters-card">
+      <div class="filters-grid">
+        <div class="field">
+          <label>Busca</label>
+          <input type="text" class="input-like" placeholder="Fornecedor, número ou descrição" />
+        </div>
+        <div class="field">
+          <label>Status despesa</label>
+          <select class="input-like">
+            <option>Todos</option>
+            <option>Pendente</option>
+            <option>Paga</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Status ND</label>
+          <select class="input-like">
+            <option>Todos</option>
+            <option>Não vinculada</option>
+            <option>Em espera</option>
+            <option>Rejeitada</option>
+            <option>Vinculada</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Origem</label>
+          <select class="input-like">
+            <option>Todas</option>
+            <option>Avulsa</option>
+            <option>OM</option>
+            <option>RD</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Data</th>
+            <th>Tipo</th>
+            <th>Número</th>
+            <th>Fornecedor</th>
+            <th>Descrição</th>
+            <th>CC</th>
+            <th>Status despesa</th>
+            <th>Status ND</th>
+            <th>Origem</th>
+            <th style="text-align:right;">Valor</th>
+            <th style="width:160px;">Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in despesas %}
+          <tr>
+            <td>{{ item.data }}</td>
+            <td>{{ item.tipo_documento }}</td>
+            <td><strong>{{ item.numero_documento }}</strong></td>
+            <td>{{ item.fornecedor }}</td>
+            <td>{{ item.descricao }}</td>
+            <td>{{ item.centro_custo }}</td>
+            <td>{{ item.status_despesa }}</td>
+            <td>{{ item.status_nd }}</td>
+            <td>{{ item.origem }}</td>
+            <td style="text-align:right;">R$ {{ '%.2f'|format(item.valor) }}</td>
+            <td>
+              <div class="table-actions">
+                <a class="btn btn-sm" href="{{ url_for('financeiro_dois.despesa_editar', despesa_id=item.id) }}">Editar</a>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+<style>
+  .filters-card{background:#fff;border:1px solid #d8e1ec;border-radius:18px;padding:18px;margin-bottom:16px;box-shadow:0 6px 18px rgba(15,23,42,.05);}
+  .filters-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;}
+  .field label{display:block;margin-bottom:6px;font-size:13px;font-weight:600;color:#334155;}
+  .input-like{width:100%;height:42px;border:1px solid #d8e1ec;border-radius:12px;padding:0 12px;font-size:14px;background:#fff;}
+  .input-like:focus{outline:none;border-color:#9db6cf;box-shadow:0 0 0 3px rgba(22,50,79,.08);}
+  .table-wrap{overflow:auto;}
+  .table-actions{display:flex;gap:8px;flex-wrap:wrap;}
+  .btn-sm{padding:7px 10px;font-size:12px;line-height:1;}
+</style>
+{% endblock %}
