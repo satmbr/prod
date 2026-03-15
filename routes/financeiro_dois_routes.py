@@ -67,82 +67,69 @@ def cadastros():
         {"id": "empresas_nd", "titulo": "Empresas ND"},
     ]
 
-    conn = get_db_connection()
-    cur = conn.cursor()
+    engine = get_engine()
 
-    cur.execute("""
-        SELECT id, nome, status
-        FROM financeiro2_cad_categorias
-        ORDER BY id
-    """)
-    categorias = cur.fetchall()
+    with engine.connect() as conn:
+        categorias = conn.execute(text("""
+            SELECT id, nome, status
+            FROM financeiro2_cad_categorias
+            ORDER BY id
+        """)).mappings().all()
 
-    cur.execute("""
-        SELECT d.id, d.nome, COALESCE(c.nome, '') AS categoria_nome, d.status
-        FROM financeiro2_cad_descricoes d
-        LEFT JOIN financeiro2_cad_categorias c ON c.id = d.categoria_id
-        ORDER BY d.id
-    """)
-    descricoes = cur.fetchall()
+        descricoes = conn.execute(text("""
+            SELECT d.id, d.nome, COALESCE(c.nome, '') AS categoria_nome, d.status
+            FROM financeiro2_cad_descricoes d
+            LEFT JOIN financeiro2_cad_categorias c ON c.id = d.categoria_id
+            ORDER BY d.id
+        """)).mappings().all()
 
-    cur.execute("""
-        SELECT id, nome, status
-        FROM financeiro2_cad_aplicacoes
-        ORDER BY id
-    """)
-    aplicacoes = cur.fetchall()
+        aplicacoes = conn.execute(text("""
+            SELECT id, nome, status
+            FROM financeiro2_cad_aplicacoes
+            ORDER BY id
+        """)).mappings().all()
 
-    cur.execute("""
-        SELECT id, codigo, nome, cambio_padrao, status
-        FROM financeiro2_cad_moedas
-        ORDER BY id
-    """)
-    moedas = cur.fetchall()
+        moedas = conn.execute(text("""
+            SELECT id, codigo, nome, cambio_padrao, status
+            FROM financeiro2_cad_moedas
+            ORDER BY id
+        """)).mappings().all()
 
-    cur.execute("""
-        SELECT id, nome, status
-        FROM financeiro2_cad_centros_custo
-        ORDER BY id
-    """)
-    centros_custo = cur.fetchall()
+        centros_custo = conn.execute(text("""
+            SELECT id, nome, status
+            FROM financeiro2_cad_centros_custo
+            ORDER BY id
+        """)).mappings().all()
 
-    cur.execute("""
-        SELECT id, nome, status
-        FROM financeiro2_cad_status_despesa
-        ORDER BY id
-    """)
-    status_despesa = cur.fetchall()
+        status_despesa = conn.execute(text("""
+            SELECT id, nome, status
+            FROM financeiro2_cad_status_despesa
+            ORDER BY id
+        """)).mappings().all()
 
-    cur.execute("""
-        SELECT id, nome, status
-        FROM financeiro2_cad_status_nd
-        ORDER BY id
-    """)
-    status_nd = cur.fetchall()
+        status_nd = conn.execute(text("""
+            SELECT id, nome, status
+            FROM financeiro2_cad_status_nd
+            ORDER BY id
+        """)).mappings().all()
 
-    cur.execute("""
-        SELECT id, nome, status
-        FROM financeiro2_cad_tipos_documento
-        ORDER BY id
-    """)
-    tipos_documento = cur.fetchall()
+        tipos_documento = conn.execute(text("""
+            SELECT id, nome, status
+            FROM financeiro2_cad_tipos_documento
+            ORDER BY id
+        """)).mappings().all()
 
-    cur.execute("""
-        SELECT id, chave, valor, COALESCE(descricao, '') AS descricao, status
-        FROM financeiro2_cad_parametros
-        ORDER BY id
-    """)
-    parametros = cur.fetchall()
+        parametros = conn.execute(text("""
+            SELECT id, chave, valor, COALESCE(descricao, '') AS descricao, status
+            FROM financeiro2_cad_parametros
+            ORDER BY id
+        """)).mappings().all()
 
-    cur.execute("""
-        SELECT id, nome, status
-        FROM financeiro2_cad_empresas_nd
-        ORDER BY id
-    """)
-    empresas_nd = cur.fetchall()
-
-    cur.close()
-    conn.close()
+        empresas_nd = conn.execute(text("""
+            SELECT id, nome, status
+            FROM financeiro2_cad_empresas_nd
+            ORDER BY id
+        """)).mappings().all()
 
     return render_template(
         "financeiro_dois/cadastros.html",
