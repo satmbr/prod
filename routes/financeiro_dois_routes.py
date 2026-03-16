@@ -2266,23 +2266,23 @@ def rd_editar(rd_id: int):
             ORDER BY nome
         """)).mappings().all()
 
-    total_valor = sum(float(item["valor"]) for item in linhas if item["status"] == "Ativo")
+        total_valor = sum(float(item["valor"]) for item in linhas if item["status"] == "Ativo")
 
-        rd = dict(rd)
-        rd["saldo"] = total_valor
-        rd["linhas"] = linhas
-        rd["bloqueada"] = str(rd["status"]).upper() == "QUITADA"
+            rd = dict(rd)
+            rd["saldo"] = total_valor
+            rd["linhas"] = linhas
+            rd["bloqueada"] = str(rd["status"]).upper() == "QUITADA"
 
-        return render_template(
-            "financeiro_dois/rd_editar.html",
-            subnav_links=build_financeiro_dois_subnav("rd"),
-            rd=rd,
-            total_valor=total_valor,
-            descricoes=descricoes,
-            categorias=categorias,
-            aplicacoes=aplicacoes,
-            centros_custo_lista=centros_custo_lista,
-        )
+            return render_template(
+                "financeiro_dois/rd_editar.html",
+                subnav_links=build_financeiro_dois_subnav("rd"),
+                rd=rd,
+                total_valor=total_valor,
+                descricoes=descricoes,
+                categorias=categorias,
+                aplicacoes=aplicacoes,
+                centros_custo_lista=centros_custo_lista,
+            )
     
 @bp.route("/rd/<int:rd_id>/salvar", methods=["POST"])
 @login_required
