@@ -5,3 +5,4 @@ psycopg[binary]==3.2.3
 openpyxl
 xlrd
 pandas
+reportlab
