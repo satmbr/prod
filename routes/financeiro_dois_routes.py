@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, session, url_for, abort, request, redirect, flash, send_file
+from flask import Blueprint, render_template, session, url_for, abort, request, redirect, flash, send_file, current_app
 from sqlalchemy import text
 from db import get_engine
 from routes.auth import login_required, permission_required
@@ -6,6 +6,10 @@ from io import BytesIO
 from openpyxl import Workbook
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
+from pypdf import PdfReader, PdfWriter
+from PIL import Image
+import os
+from reportlab.lib.utils import ImageReader
 
 bp = Blueprint("financeiro_dois", __name__, url_prefix="/financeiro-dois")
 
@@ -1762,22 +1766,26 @@ def om_exportar_pdf(om_id: int):
 
         linhas = conn.execute(text("""
             SELECT
+                id,
                 TO_CHAR(data_lancamento, 'DD/MM/YYYY') AS data,
                 COALESCE(recibo, id) AS recibo,
                 COALESCE(tipo_linha, '') AS descricao,
                 COALESCE(detalhes, '') AS detalhes,
                 COALESCE(categoria, '') AS categoria,
                 COALESCE(aplicacao, '') AS aplicacao,
-                COALESCE(valor_brl, 0) AS valor_brl
+                COALESCE(valor_brl, 0) AS valor_brl,
+                COALESCE(anexo_recibo, '') AS anexo_recibo,
+                COALESCE(status, 'Ativo') AS status
             FROM financeiro2_om_linhas
             WHERE om_id = :id
             ORDER BY recibo, id
         """), {"id": om_id}).mappings().all()
 
-    total_brl = sum(float(l["valor_brl"]) for l in linhas)
+    total_brl = sum(float(l["valor_brl"]) for l in linhas if l["status"] == "Ativo")
 
-    buffer = BytesIO()
-    pdf = canvas.Canvas(buffer, pagesize=A4)
+    # 1) Gera o PDF base da OM
+    buffer_base = BytesIO()
+    pdf = canvas.Canvas(buffer_base, pagesize=A4)
     largura, altura = A4
     y = altura - 40
 
@@ -1799,9 +1807,9 @@ def om_exportar_pdf(om_id: int):
     pdf.drawString(40, y, "Data")
     pdf.drawString(90, y, "Recibo")
     pdf.drawString(135, y, "Descrição")
-    pdf.drawString(270, y, "Categoria")
-    pdf.drawString(360, y, "Aplicação")
-    pdf.drawString(460, y, "Valor BRL")
+    pdf.drawString(260, y, "Categoria")
+    pdf.drawString(350, y, "Aplicação")
+    pdf.drawString(470, y, "Valor BRL")
     y -= 15
 
     pdf.setFont("Helvetica", 8)
@@ -1809,25 +1817,112 @@ def om_exportar_pdf(om_id: int):
         if y < 50:
             pdf.showPage()
             y = altura - 40
+            pdf.setFont("Helvetica-Bold", 9)
+            pdf.drawString(40, y, "Data")
+            pdf.drawString(90, y, "Recibo")
+            pdf.drawString(135, y, "Descrição")
+            pdf.drawString(260, y, "Categoria")
+            pdf.drawString(350, y, "Aplicação")
+            pdf.drawString(470, y, "Valor BRL")
+            y -= 15
             pdf.setFont("Helvetica", 8)
 
         pdf.drawString(40, y, str(linha["data"]))
         pdf.drawString(90, y, str(linha["recibo"]))
-        pdf.drawString(135, y, str(linha["descricao"])[:24])
-        pdf.drawString(270, y, str(linha["categoria"])[:14])
-        pdf.drawString(360, y, str(linha["aplicacao"])[:16])
+        pdf.drawString(135, y, str(linha["descricao"])[:22])
+        pdf.drawString(260, y, str(linha["categoria"])[:14])
+        pdf.drawString(350, y, str(linha["aplicacao"])[:18])
         pdf.drawRightString(540, y, f"{float(linha['valor_brl']):.2f}")
         y -= 13
 
     y -= 10
     pdf.setFont("Helvetica-Bold", 10)
     pdf.drawRightString(540, y, f"Saldo BRL: {total_brl:.2f}")
-
     pdf.save()
-    buffer.seek(0)
+    buffer_base.seek(0)
+
+    # 2) Monta o PDF final
+    writer = PdfWriter()
+
+    # adiciona páginas do PDF base
+    base_reader = PdfReader(buffer_base)
+    for page in base_reader.pages:
+        writer.add_page(page)
+
+    # 3) Anexa os recibos na ordem das linhas
+    for linha in linhas:
+        nome_anexo = (linha["anexo_recibo"] or "").strip()
+        if not nome_anexo:
+            continue
+
+        caminho = os.path.join(
+            current_app.root_path,
+            "static",
+            "uploads",
+            "financeiro2",
+            "om_recibos",
+            nome_anexo
+        )
+
+        if not os.path.exists(caminho):
+            continue
+
+        extensao = os.path.splitext(caminho)[1].lower()
+
+        try:
+            # PDF: adiciona todas as páginas
+            if extensao == ".pdf":
+                anexo_reader = PdfReader(caminho)
+                for page in anexo_reader.pages:
+                    writer.add_page(page)
+
+            # Imagem: cria 1 página PDF com a imagem
+            elif extensao in [".jpg", ".jpeg", ".png", ".bmp", ".webp"]:
+                img = Image.open(caminho)
+                if img.mode in ("RGBA", "P"):
+                    img = img.convert("RGB")
+
+                img_buffer = BytesIO()
+                c = canvas.Canvas(img_buffer, pagesize=A4)
+                largura_pg, altura_pg = A4
+
+                iw, ih = img.size
+                margem = 30
+                area_w = largura_pg - 2 * margem
+                area_h = altura_pg - 2 * margem
+
+                escala = min(area_w / iw, area_h / ih)
+                novo_w = iw * escala
+                novo_h = ih * escala
+
+                x = (largura_pg - novo_w) / 2
+                y_img = (altura_pg - novo_h) / 2
+
+                img_temp = BytesIO()
+                img.save(img_temp, format="JPEG")
+                img_temp.seek(0)
+
+                c.setFont("Helvetica-Bold", 11)
+                c.drawString(30, altura_pg - 20, f"RECIBO {linha['recibo']} - OM {om['numero_om']}")
+                c.drawImage(ImageReader(img_temp), x, y_img, width=novo_w, height=novo_h)
+                c.showPage()
+                c.save()
+
+                img_buffer.seek(0)
+                img_reader = PdfReader(img_buffer)
+                for page in img_reader.pages:
+                    writer.add_page(page)
+
+        except Exception:
+            # se algum anexo der erro, ele é ignorado sem quebrar a exportação inteira
+            continue
+
+    saida = BytesIO()
+    writer.write(saida)
+    saida.seek(0)
 
     return send_file(
-        buffer,
+        saida,
         as_attachment=True,
         download_name=f"{om['numero_om']}.pdf",
         mimetype="application/pdf",
