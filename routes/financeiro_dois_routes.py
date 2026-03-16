@@ -2091,62 +2091,90 @@ def om_linha_toggle_status(om_id: int, linha_id: int):
 @login_required
 @permission_required("financeiro", "visualizar")
 def rd():
-    rds = [
-        {"id": 1, "numero": "RD-2026-03-LME", "periodo": "03/2026", "matricula": "LME", "colaborador": "Laercio Melo", "centro_custo": "ADM", "status": "Aberta", "saldo": 920.50, "criada_em": "15/03/2026"},
-        {"id": 2, "numero": "RD-2026-03-ABC", "periodo": "03/2026", "matricula": "ABC", "colaborador": "Colaborador Exemplo", "centro_custo": "OPERACAO", "status": "Parcial", "saldo": 180.20, "criada_em": "14/03/2026"},
-        {"id": 3, "numero": "RD-2026-02-XYZ", "periodo": "02/2026", "matricula": "XYZ", "colaborador": "Outro Colaborador", "centro_custo": "MANUTENCAO", "status": "Quitada", "saldo": 0.00, "criada_em": "28/02/2026"},
-    ]
-    return render_template("financeiro_dois/rd.html", subnav_links=build_financeiro_dois_subnav("rd"), rds=rds)
+    engine = get_engine()
 
+    with engine.connect() as conn:
+        rds = conn.execute(text("""
+            SELECT
+                r.id,
+                r.numero_rd AS numero,
+                r.periodo,
+                r.matricula_colaborador AS matricula,
+                r.nome_colaborador AS colaborador,
+                r.centro_custo,
+                r.status,
+                TO_CHAR(r.criado_em, 'DD/MM/YYYY') AS criada_em,
+                COALESCE(SUM(
+                    CASE
+                        WHEN COALESCE(l.status, 'Ativo') = 'Ativo' THEN COALESCE(l.valor, 0)
+                        ELSE 0
+                    END
+                ), 0) AS saldo
+            FROM financeiro2_rd r
+            LEFT JOIN financeiro2_rd_linhas l ON l.rd_id = r.id
+            GROUP BY
+                r.id, r.numero_rd, r.periodo,
+                r.matricula_colaborador, r.nome_colaborador,
+                r.centro_custo, r.status, r.criado_em
+            ORDER BY r.id
+        """)).mappings().all()
+
+    return render_template(
+        "financeiro_dois/rd.html",
+        subnav_links=build_financeiro_dois_subnav("rd"),
+        rds=rds,
+    )
 
 @bp.route("/rd/<int:rd_id>")
 @login_required
 @permission_required("financeiro", "visualizar")
 def rd_editar(rd_id: int):
-    rds = {
-        1: {
-            "id": 1, "numero": "RD-2026-03-LME", "periodo": "03/2026", "matricula": "LME", "colaborador": "Laercio Melo",
-            "centro_custo": "ADM", "status": "Aberta", "saldo": 920.50, "criada_em": "15/03/2026",
-            "observacao": "RD inicial para estrutura do financeiro_dois.",
-            "linhas": [
-                {"data": "15/03/2026", "tipo": "Despesa", "descricao": "Almoço", "categoria": "Alimentação", "aplicacao": "MATISA", "valor": 120.50, "sinal": "+"},
-                {"data": "15/03/2026", "tipo": "Despesa", "descricao": "Hotel", "categoria": "Hospedagem", "aplicacao": "MATISA", "valor": 900.00, "sinal": "+"},
-                {"data": "15/03/2026", "tipo": "Pagamento", "descricao": "Acerto parcial", "categoria": "Pagamento", "aplicacao": "MATISA", "valor": 100.00, "sinal": "-"},
-            ],
-        },
-        2: {
-            "id": 2, "numero": "RD-2026-03-ABC", "periodo": "03/2026", "matricula": "ABC", "colaborador": "Colaborador Exemplo",
-            "centro_custo": "OPERACAO", "status": "Parcial", "saldo": 180.20, "criada_em": "14/03/2026",
-            "observacao": "RD com pagamento parcial.",
-            "linhas": [
-                {"data": "14/03/2026", "tipo": "Despesa", "descricao": "Táxi", "categoria": "Transporte", "aplicacao": "PRUMAT", "valor": 220.20, "sinal": "+"},
-                {"data": "14/03/2026", "tipo": "Pagamento", "descricao": "Reembolso parcial", "categoria": "Pagamento", "aplicacao": "PRUMAT", "valor": 40.00, "sinal": "-"},
-            ],
-        },
-        3: {
-            "id": 3, "numero": "RD-2026-02-XYZ", "periodo": "02/2026", "matricula": "XYZ", "colaborador": "Outro Colaborador",
-            "centro_custo": "MANUTENCAO", "status": "Quitada", "saldo": 0.00, "criada_em": "28/02/2026",
-            "observacao": "RD encerrada.",
-            "linhas": [
-                {"data": "28/02/2026", "tipo": "Despesa", "descricao": "Combustível", "categoria": "Transporte", "aplicacao": "GERAL", "valor": 300.00, "sinal": "+"},
-                {"data": "28/02/2026", "tipo": "Pagamento", "descricao": "Quitação", "categoria": "Pagamento", "aplicacao": "GERAL", "valor": 300.00, "sinal": "-"},
-            ],
-        },
-    }
+    engine = get_engine()
 
-    rd = rds.get(rd_id)
-    if not rd:
-        abort(404)
+    with engine.connect() as conn:
+        rd = conn.execute(text("""
+            SELECT
+                id,
+                numero_rd AS numero,
+                periodo,
+                matricula_colaborador AS matricula,
+                nome_colaborador AS colaborador,
+                centro_custo,
+                status,
+                TO_CHAR(criado_em, 'DD/MM/YYYY') AS criada_em,
+                COALESCE(observacao, '') AS observacao
+            FROM financeiro2_rd
+            WHERE id = :id
+        """), {"id": rd_id}).mappings().first()
 
-    total_positivo = sum(item["valor"] for item in rd["linhas"] if item["sinal"] == "+")
-    total_negativo = sum(item["valor"] for item in rd["linhas"] if item["sinal"] == "-")
+        if not rd:
+            abort(404)
+
+        linhas = conn.execute(text("""
+            SELECT
+                TO_CHAR(data_lancamento, 'DD/MM/YYYY') AS data,
+                descricao,
+                COALESCE(categoria, '') AS categoria,
+                COALESCE(aplicacao, '') AS aplicacao,
+                COALESCE(valor, 0) AS valor,
+                COALESCE(status, 'Ativo') AS status
+            FROM financeiro2_rd_linhas
+            WHERE rd_id = :id
+            ORDER BY id
+        """), {"id": rd_id}).mappings().all()
+
+    total_valor = sum(float(item["valor"]) for item in linhas if item["status"] == "Ativo")
+
+    rd = dict(rd)
+    rd["saldo"] = total_valor
+    rd["linhas"] = linhas
 
     return render_template(
         "financeiro_dois/rd_editar.html",
         subnav_links=build_financeiro_dois_subnav("rd"),
         rd=rd,
-        total_positivo=total_positivo,
-        total_negativo=total_negativo,
+        total_positivo=total_valor,
+        total_negativo=0,
     )
 
 
