@@ -1087,8 +1087,7 @@ def om():
                 TO_CHAR(o.criado_em, 'DD/MM/YYYY') AS criada_em,
                 COALESCE(SUM(
                     CASE
-                        WHEN l.sinal = '+' THEN l.valor
-                        WHEN l.sinal = '-' THEN -l.valor
+                        WHEN COALESCE(l.status, 'Ativo') = 'Ativo' THEN COALESCE(l.valor_brl, 0)
                         ELSE 0
                     END
                 ), 0) AS saldo
@@ -1108,10 +1107,10 @@ def om():
 @login_required
 @permission_required("financeiro", "visualizar")
 def om_nova():
-    numero_om = _nome_preenchido(request.form.get("numero_om"))
-    matricula = _nome_preenchido(request.form.get("matricula_colaborador"))
-    nome_colaborador = _nome_preenchido(request.form.get("nome_colaborador"))
-    observacao = _nome_preenchido(request.form.get("observacao"))
+    matricula = _nome_preenchido(request.form.get("matricula_colaborador")).upper()
+    nome_colaborador = _nome_preenchido(request.form.get("nome_colaborador")).upper()
+    observacao = _nome_preenchido(request.form.get("observacao")).upper()
+    numero_om = _nome_preenchido(request.form.get("numero_om")).upper()
 
     if not numero_om or not matricula or not nome_colaborador:
         flash("Informe o número da OM, a matrícula e o nome do colaborador.", "warning")
@@ -1253,11 +1252,11 @@ def om_editar(om_id: int):
 @login_required
 @permission_required("financeiro", "visualizar")
 def om_salvar(om_id: int):
-    numero = _nome_preenchido(request.form.get("numero"))
-    matricula = _nome_preenchido(request.form.get("matricula"))
-    colaborador = _nome_preenchido(request.form.get("colaborador"))
-    status = _nome_preenchido(request.form.get("status")) or "Aberta"
-    observacao = _nome_preenchido(request.form.get("observacao"))
+    numero = _nome_preenchido(request.form.get("numero")).upper()
+    matricula = _nome_preenchido(request.form.get("matricula")).upper()
+    colaborador = _nome_preenchido(request.form.get("colaborador")).upper()
+    observacao = _nome_preenchido(request.form.get("observacao")).upper()
+    status = (_nome_preenchido(request.form.get("status")) or "ABERTA").upper()
 
     if not numero or not matricula or not colaborador:
         flash("Preencha número, matrícula e colaborador.", "warning")
@@ -1308,27 +1307,30 @@ def om_salvar(om_id: int):
     flash("OM atualizada com sucesso.", "success")
     return redirect(url_for("financeiro_dois.om_editar", om_id=om_id))
 
-
 @bp.route("/om/<int:om_id>/linhas/nova", methods=["POST"])
 @login_required
 @permission_required("financeiro", "visualizar")
 def om_linha_nova(om_id: int):
     data_lancamento = _nome_preenchido(request.form.get("data_lancamento"))
-    descricao = _nome_preenchido(request.form.get("descricao"))
-    detalhes = _nome_preenchido(request.form.get("detalhes"))
-    categoria = _nome_preenchido(request.form.get("categoria"))
-    aplicacao = _nome_preenchido(request.form.get("aplicacao"))
+    descricao = _nome_preenchido(request.form.get("descricao")).upper()
+    detalhes = _nome_preenchido(request.form.get("detalhes")).upper()
+    categoria = _nome_preenchido(request.form.get("categoria")).upper()
+    aplicacao = _nome_preenchido(request.form.get("aplicacao")).upper()
     valor_txt = _nome_preenchido(request.form.get("valor")).replace(",", ".")
-    moeda_codigo = _nome_preenchido(request.form.get("moeda_codigo")) or "BRL"
+    moeda_codigo = _nome_preenchido(request.form.get("moeda_codigo")).upper() or "BRL"
 
     if not data_lancamento or not descricao or not categoria or not aplicacao or not valor_txt:
-        flash("Preencha data, descrição, categoria, aplicação e valor.", "warning")
+        flash("PREENCHA DATA, DESCRIÇÃO, CATEGORIA, APLICAÇÃO E VALOR.", "warning")
         return redirect(url_for("financeiro_dois.om_editar", om_id=om_id))
 
     try:
         valor = float(valor_txt)
     except ValueError:
-        flash("Valor inválido.", "warning")
+        flash("VALOR INVÁLIDO.", "warning")
+        return redirect(url_for("financeiro_dois.om_editar", om_id=om_id))
+
+    if valor <= 0:
+        flash("A LINHA NORMAL DA OM ACEITA APENAS VALOR POSITIVO. VALORES NEGATIVOS SOMENTE EM ADIANTAR OM OU PAGAR OM.", "warning")
         return redirect(url_for("financeiro_dois.om_editar", om_id=om_id))
 
     engine = get_engine()
@@ -1340,22 +1342,22 @@ def om_linha_nova(om_id: int):
         """), {"id": om_id}).mappings().first()
 
         if not om:
-            flash("OM não encontrada.", "danger")
+            flash("OM NÃO ENCONTRADA.", "danger")
             return redirect(url_for("financeiro_dois.om"))
 
         if om["status"] == "Paga":
-            flash("Esta OM está paga e bloqueada para edição.", "warning")
+            flash("ESTA OM ESTÁ PAGA E BLOQUEADA PARA EDIÇÃO.", "warning")
             return redirect(url_for("financeiro_dois.om_editar", om_id=om_id))
 
         moeda = conn.execute(text("""
             SELECT codigo, cambio_padrao
             FROM financeiro2_cad_moedas
-            WHERE codigo = :codigo
+            WHERE UPPER(codigo) = UPPER(:codigo)
             LIMIT 1
         """), {"codigo": moeda_codigo}).mappings().first()
 
         if not moeda:
-            flash("Moeda inválida.", "warning")
+            flash("MOEDA INVÁLIDA.", "warning")
             return redirect(url_for("financeiro_dois.om_editar", om_id=om_id))
 
         cambio = float(moeda["cambio_padrao"] or 1)
@@ -1418,26 +1420,27 @@ def om_linha_nova(om_id: int):
                 :moeda_codigo,
                 :cambio,
                 :valor_brl,
-                NULL,
-                '-',
+                :anexo_recibo,
+                '+',
                 'Ativo'
             )
         """), {
             "om_id": om_id,
             "data_lancamento": data_lancamento,
             "recibo": proximo_recibo,
-            "tipo_linha": "PIX adiantado",
-            "descricao_antiga": f"Adiantamento da OM ({om['numero_om']})",
-            "detalhes": f"Adiantamento da OM ({om['numero_om']})",
-            "categoria": "Adiantamento",
+            "tipo_linha": descricao,
+            "descricao_antiga": detalhes,
+            "detalhes": detalhes,
+            "categoria": categoria,
             "aplicacao": aplicacao,
-            "valor": -abs(valor),
+            "valor": valor,
             "moeda_codigo": moeda_codigo,
             "cambio": cambio,
-            "valor_brl": -abs(valor_brl),
+            "valor_brl": valor_brl,
+            "anexo_recibo": nome_arquivo,
         })
 
-    flash("Linha adicionada com sucesso.", "success")
+    flash("LINHA ADICIONADA COM SUCESSO.", "success")
     return redirect(url_for("financeiro_dois.om_editar", om_id=om_id))
     
 @bp.route("/om/<int:om_id>/adiantar", methods=["POST"])
@@ -1445,9 +1448,9 @@ def om_linha_nova(om_id: int):
 @permission_required("financeiro", "visualizar")
 def om_adiantar(om_id: int):
     data_lancamento = _nome_preenchido(request.form.get("data_lancamento"))
-    aplicacao = _nome_preenchido(request.form.get("aplicacao"))
+    aplicacao = _nome_preenchido(request.form.get("aplicacao")).upper()
     valor_txt = _nome_preenchido(request.form.get("valor")).replace(",", ".")
-    moeda_codigo = _nome_preenchido(request.form.get("moeda_codigo")) or "BRL"
+    moeda_codigo = _nome_preenchido(request.form.get("moeda_codigo")).upper() or "BRL"
 
     if not data_lancamento or not aplicacao or not valor_txt:
         flash("Preencha data, aplicação e valor do adiantamento.", "warning")
@@ -1562,7 +1565,7 @@ def om_adiantar(om_id: int):
 @permission_required("financeiro", "visualizar")
 def om_pagar(om_id: int):
     data_lancamento = _nome_preenchido(request.form.get("data_lancamento"))
-    aplicacao = _nome_preenchido(request.form.get("aplicacao")) or "GERAL"
+    aplicacao = _nome_preenchido(request.form.get("aplicacao")).upper() or "GERAL"
 
     if not data_lancamento:
         flash("Informe a data do pagamento.", "warning")
