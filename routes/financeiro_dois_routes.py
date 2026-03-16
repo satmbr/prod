@@ -1,15 +1,26 @@
-from flask import Blueprint, render_template, session, url_for, abort, request, redirect, flash
+from flask import Blueprint, render_template, session, url_for, abort, request, redirect, flash, send_file
 from sqlalchemy import text
 from db import get_engine
 from routes.auth import login_required, permission_required
+from io import BytesIO
+from openpyxl import Workbook
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfgen import canvas
 
 bp = Blueprint("financeiro_dois", __name__, url_prefix="/financeiro-dois")
 
+def _calcular_saldo_om(conn, om_id: int) -> float:
+    saldo = conn.execute(text("""
+        SELECT COALESCE(SUM(valor_brl), 0) AS saldo
+        FROM financeiro2_om_linhas
+        WHERE om_id = :om_id
+    """), {"om_id": om_id}).mappings().first()
+
+    return float(saldo["saldo"] or 0)
 
 def user_can(chave: str) -> bool:
     permissoes = session.get("permissoes", [])
     return chave in permissoes or "auth:administrar" in permissoes
-
 
 def build_financeiro_dois_subnav(active: str | None):
     links = []
@@ -27,14 +38,12 @@ def build_financeiro_dois_subnav(active: str | None):
 
     return links
 
-
 def _nome_preenchido(valor: str | None) -> str:
     return (valor or "").strip()
 
 
 def _redirect_cadastros():
     return redirect(url_for("financeiro_dois.cadastros"))
-
 
 def _toggle_status_generico(tabela: str, item_id: int, campo_nome: str = "nome"):
     engine = get_engine()
@@ -66,7 +75,6 @@ def _toggle_status_generico(tabela: str, item_id: int, campo_nome: str = "nome")
 
     flash(f"Status alterado para {novo_status}.", "success")
     return _redirect_cadastros()
-
 
 @bp.route("/")
 @login_required
@@ -1428,6 +1436,394 @@ def om_linha_nova(om_id: int):
 
     flash("Linha adicionada com sucesso.", "success")
     return redirect(url_for("financeiro_dois.om_editar", om_id=om_id))
+    
+@bp.route("/om/<int:om_id>/adiantar", methods=["POST"])
+@login_required
+@permission_required("financeiro", "visualizar")
+def om_adiantar(om_id: int):
+    data_lancamento = _nome_preenchido(request.form.get("data_lancamento"))
+    aplicacao = _nome_preenchido(request.form.get("aplicacao"))
+    valor_txt = _nome_preenchido(request.form.get("valor")).replace(",", ".")
+    moeda_codigo = _nome_preenchido(request.form.get("moeda_codigo")) or "BRL"
+
+    if not data_lancamento or not aplicacao or not valor_txt:
+        flash("Preencha data, aplicação e valor do adiantamento.", "warning")
+        return redirect(url_for("financeiro_dois.om_editar", om_id=om_id))
+
+    try:
+        valor = float(valor_txt)
+    except ValueError:
+        flash("Valor inválido para o adiantamento.", "warning")
+        return redirect(url_for("financeiro_dois.om_editar", om_id=om_id))
+
+    engine = get_engine()
+    with engine.begin() as conn:
+        om = conn.execute(text("""
+            SELECT id, numero_om, status
+            FROM financeiro2_om
+            WHERE id = :id
+        """), {"id": om_id}).mappings().first()
+
+        if not om:
+            flash("OM não encontrada.", "danger")
+            return redirect(url_for("financeiro_dois.om"))
+
+        if om["status"] == "Paga":
+            flash("Esta OM está paga e bloqueada para edição.", "warning")
+            return redirect(url_for("financeiro_dois.om_editar", om_id=om_id))
+
+        moeda = conn.execute(text("""
+            SELECT codigo, cambio_padrao
+            FROM financeiro2_cad_moedas
+            WHERE codigo = :codigo
+            LIMIT 1
+        """), {"codigo": moeda_codigo}).mappings().first()
+
+        if not moeda:
+            flash("Moeda inválida.", "warning")
+            return redirect(url_for("financeiro_dois.om_editar", om_id=om_id))
+
+        cambio = float(moeda["cambio_padrao"] or 1)
+        if cambio == 0:
+            cambio = 1
+
+        valor_brl = round(valor / cambio, 2)
+
+        proximo_recibo = conn.execute(text("""
+            SELECT COALESCE(MAX(recibo), 0) + 1 AS proximo
+            FROM financeiro2_om_linhas
+            WHERE om_id = :om_id
+        """), {"om_id": om_id}).mappings().first()["proximo"]
+
+        conn.execute(text("""
+            INSERT INTO financeiro2_om_linhas (
+                om_id,
+                data_lancamento,
+                recibo,
+                tipo_linha,
+                descricao,
+                detalhes,
+                categoria,
+                aplicacao,
+                valor,
+                moeda_codigo,
+                cambio,
+                valor_brl,
+                anexo_recibo,
+                sinal
+            )
+            VALUES (
+                :om_id,
+                :data_lancamento,
+                :recibo,
+                :tipo_linha,
+                :descricao_antiga,
+                :detalhes,
+                :categoria,
+                :aplicacao,
+                :valor,
+                :moeda_codigo,
+                :cambio,
+                :valor_brl,
+                NULL,
+                '-'
+            )
+        """), {
+            "om_id": om_id,
+            "data_lancamento": data_lancamento,
+            "recibo": proximo_recibo,
+            "tipo_linha": "PIX adiantado",
+            "descricao_antiga": f"Adiantamento da OM ({om['numero_om']})",
+            "detalhes": f"Adiantamento da OM ({om['numero_om']})",
+            "categoria": "Adiantamento",
+            "aplicacao": aplicacao,
+            "valor": -abs(valor),
+            "moeda_codigo": moeda_codigo,
+            "cambio": cambio,
+            "valor_brl": -abs(valor_brl),
+        })
+
+        conn.execute(text("""
+            UPDATE financeiro2_om
+            SET status = 'Parcial',
+                atualizado_em = CURRENT_TIMESTAMP
+            WHERE id = :id
+              AND status = 'Aberta'
+        """), {"id": om_id})
+
+    flash("Adiantamento registrado com sucesso.", "success")
+    return redirect(url_for("financeiro_dois.om_editar", om_id=om_id))
+    
+@bp.route("/om/<int:om_id>/pagar", methods=["POST"])
+@login_required
+@permission_required("financeiro", "visualizar")
+def om_pagar(om_id: int):
+    data_lancamento = _nome_preenchido(request.form.get("data_lancamento"))
+    aplicacao = _nome_preenchido(request.form.get("aplicacao")) or "GERAL"
+
+    if not data_lancamento:
+        flash("Informe a data do pagamento.", "warning")
+        return redirect(url_for("financeiro_dois.om_editar", om_id=om_id))
+
+    engine = get_engine()
+    with engine.begin() as conn:
+        om = conn.execute(text("""
+            SELECT id, numero_om, status
+            FROM financeiro2_om
+            WHERE id = :id
+        """), {"id": om_id}).mappings().first()
+
+        if not om:
+            flash("OM não encontrada.", "danger")
+            return redirect(url_for("financeiro_dois.om"))
+
+        if om["status"] == "Paga":
+            flash("Esta OM já está paga.", "warning")
+            return redirect(url_for("financeiro_dois.om_editar", om_id=om_id))
+
+        saldo_atual = _calcular_saldo_om(conn, om_id)
+
+        if saldo_atual <= 0:
+            flash("A OM não possui saldo positivo para pagamento.", "warning")
+            return redirect(url_for("financeiro_dois.om_editar", om_id=om_id))
+
+        proximo_recibo = conn.execute(text("""
+            SELECT COALESCE(MAX(recibo), 0) + 1 AS proximo
+            FROM financeiro2_om_linhas
+            WHERE om_id = :om_id
+        """), {"om_id": om_id}).mappings().first()["proximo"]
+
+        conn.execute(text("""
+            INSERT INTO financeiro2_om_linhas (
+                om_id,
+                data_lancamento,
+                recibo,
+                tipo_linha,
+                descricao,
+                detalhes,
+                categoria,
+                aplicacao,
+                valor,
+                moeda_codigo,
+                cambio,
+                valor_brl,
+                anexo_recibo,
+                sinal
+            )
+            VALUES (
+                :om_id,
+                :data_lancamento,
+                :recibo,
+                :tipo_linha,
+                :descricao_antiga,
+                :detalhes,
+                :categoria,
+                :aplicacao,
+                :valor,
+                'BRL',
+                1,
+                :valor_brl,
+                NULL,
+                '-'
+            )
+        """), {
+            "om_id": om_id,
+            "data_lancamento": data_lancamento,
+            "recibo": proximo_recibo,
+            "tipo_linha": "Pagamento de reembolso",
+            "descricao_antiga": f"Pagamento da OM ({om['numero_om']})",
+            "detalhes": f"Pagamento da OM ({om['numero_om']})",
+            "categoria": "Pagamento",
+            "aplicacao": aplicacao,
+            "valor": -abs(saldo_atual),
+            "valor_brl": -abs(saldo_atual),
+        })
+
+        conn.execute(text("""
+            UPDATE financeiro2_om
+            SET status = 'Paga',
+                atualizado_em = CURRENT_TIMESTAMP
+            WHERE id = :id
+        """), {"id": om_id})
+
+    flash("Pagamento da OM registrado com sucesso.", "success")
+    return redirect(url_for("financeiro_dois.om_editar", om_id=om_id))
+    
+@bp.route("/om/<int:om_id>/exportar/excel")
+@login_required
+@permission_required("financeiro", "visualizar")
+def om_exportar_excel(om_id: int):
+    engine = get_engine()
+
+    with engine.connect() as conn:
+        om = conn.execute(text("""
+            SELECT
+                id,
+                numero_om,
+                matricula_colaborador,
+                nome_colaborador,
+                status,
+                COALESCE(observacao, '') AS observacao
+            FROM financeiro2_om
+            WHERE id = :id
+        """), {"id": om_id}).mappings().first()
+
+        if not om:
+            abort(404)
+
+        linhas = conn.execute(text("""
+            SELECT
+                TO_CHAR(data_lancamento, 'DD/MM/YYYY') AS data,
+                COALESCE(recibo, id) AS recibo,
+                COALESCE(tipo_linha, '') AS descricao,
+                COALESCE(detalhes, '') AS detalhes,
+                COALESCE(categoria, '') AS categoria,
+                COALESCE(aplicacao, '') AS aplicacao,
+                COALESCE(valor, 0) AS valor,
+                COALESCE(moeda_codigo, 'BRL') AS moeda,
+                COALESCE(cambio, 1) AS cambio,
+                COALESCE(valor_brl, 0) AS valor_brl
+            FROM financeiro2_om_linhas
+            WHERE om_id = :id
+            ORDER BY recibo, id
+        """), {"id": om_id}).mappings().all()
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "OM"
+
+    ws.append(["Número OM", om["numero_om"]])
+    ws.append(["Matrícula", om["matricula_colaborador"]])
+    ws.append(["Colaborador", om["nome_colaborador"]])
+    ws.append(["Status", om["status"]])
+    ws.append(["Observação", om["observacao"]])
+    ws.append([])
+    ws.append(["Data", "Recibo", "Descrição", "Detalhes", "Categoria", "Aplicação", "Valor", "Moeda", "Câmbio", "Valor BRL"])
+
+    total_brl = 0
+    for linha in linhas:
+        ws.append([
+            linha["data"],
+            linha["recibo"],
+            linha["descricao"],
+            linha["detalhes"],
+            linha["categoria"],
+            linha["aplicacao"],
+            float(linha["valor"]),
+            linha["moeda"],
+            float(linha["cambio"]),
+            float(linha["valor_brl"]),
+        ])
+        total_brl += float(linha["valor_brl"])
+
+    ws.append([])
+    ws.append(["", "", "", "", "", "", "", "", "Saldo BRL", total_brl])
+
+    arquivo = BytesIO()
+    wb.save(arquivo)
+    arquivo.seek(0)
+
+    return send_file(
+        arquivo,
+        as_attachment=True,
+        download_name=f"{om['numero_om']}.xlsx",
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    
+@bp.route("/om/<int:om_id>/exportar/pdf")
+@login_required
+@permission_required("financeiro", "visualizar")
+def om_exportar_pdf(om_id: int):
+    engine = get_engine()
+
+    with engine.connect() as conn:
+        om = conn.execute(text("""
+            SELECT
+                id,
+                numero_om,
+                matricula_colaborador,
+                nome_colaborador,
+                status,
+                COALESCE(observacao, '') AS observacao
+            FROM financeiro2_om
+            WHERE id = :id
+        """), {"id": om_id}).mappings().first()
+
+        if not om:
+            abort(404)
+
+        linhas = conn.execute(text("""
+            SELECT
+                TO_CHAR(data_lancamento, 'DD/MM/YYYY') AS data,
+                COALESCE(recibo, id) AS recibo,
+                COALESCE(tipo_linha, '') AS descricao,
+                COALESCE(detalhes, '') AS detalhes,
+                COALESCE(categoria, '') AS categoria,
+                COALESCE(aplicacao, '') AS aplicacao,
+                COALESCE(valor_brl, 0) AS valor_brl
+            FROM financeiro2_om_linhas
+            WHERE om_id = :id
+            ORDER BY recibo, id
+        """), {"id": om_id}).mappings().all()
+
+    total_brl = sum(float(l["valor_brl"]) for l in linhas)
+
+    buffer = BytesIO()
+    pdf = canvas.Canvas(buffer, pagesize=A4)
+    largura, altura = A4
+    y = altura - 40
+
+    pdf.setFont("Helvetica-Bold", 14)
+    pdf.drawString(40, y, f"OM {om['numero_om']}")
+    y -= 20
+
+    pdf.setFont("Helvetica", 10)
+    pdf.drawString(40, y, f"Matrícula: {om['matricula_colaborador']}")
+    y -= 15
+    pdf.drawString(40, y, f"Colaborador: {om['nome_colaborador']}")
+    y -= 15
+    pdf.drawString(40, y, f"Status: {om['status']}")
+    y -= 15
+    pdf.drawString(40, y, f"Observação: {om['observacao']}")
+    y -= 25
+
+    pdf.setFont("Helvetica-Bold", 9)
+    pdf.drawString(40, y, "Data")
+    pdf.drawString(90, y, "Recibo")
+    pdf.drawString(135, y, "Descrição")
+    pdf.drawString(270, y, "Categoria")
+    pdf.drawString(360, y, "Aplicação")
+    pdf.drawString(460, y, "Valor BRL")
+    y -= 15
+
+    pdf.setFont("Helvetica", 8)
+    for linha in linhas:
+        if y < 50:
+            pdf.showPage()
+            y = altura - 40
+            pdf.setFont("Helvetica", 8)
+
+        pdf.drawString(40, y, str(linha["data"]))
+        pdf.drawString(90, y, str(linha["recibo"]))
+        pdf.drawString(135, y, str(linha["descricao"])[:24])
+        pdf.drawString(270, y, str(linha["categoria"])[:14])
+        pdf.drawString(360, y, str(linha["aplicacao"])[:16])
+        pdf.drawRightString(540, y, f"{float(linha['valor_brl']):.2f}")
+        y -= 13
+
+    y -= 10
+    pdf.setFont("Helvetica-Bold", 10)
+    pdf.drawRightString(540, y, f"Saldo BRL: {total_brl:.2f}")
+
+    pdf.save()
+    buffer.seek(0)
+
+    return send_file(
+        buffer,
+        as_attachment=True,
+        download_name=f"{om['numero_om']}.pdf",
+        mimetype="application/pdf",
+    )
 
 # =========================
 # RD

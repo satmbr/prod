@@ -89,14 +89,15 @@
 
         <div class="resume-card">
           <div class="resume-title">Ações</div>
-          <div class="action-list">
-            {% if not om.bloqueada %}
-            <button type="button" class="btn btn-primary btn-block" onclick="toggleNovaLinha()">Adicionar linha</button>
-            <a href="#" class="btn btn-block">Adiantar OM</a>
-            <a href="#" class="btn btn-block">Pagar OM</a>
-            {% endif %}
-            <a href="#" class="btn btn-block">Exportar OM</a>
-          </div>
+			<div class="action-list">
+			  {% if not om.bloqueada %}
+			  <button type="button" class="btn btn-primary btn-block" onclick="toggleNovaLinha()">Adicionar linha</button>
+			  <button type="button" class="btn btn-block" onclick="toggleAdiantarOm()">Adiantar OM</button>
+			  <button type="button" class="btn btn-block" onclick="togglePagarOm()">Pagar OM</button>
+			  {% endif %}
+			  <a href="{{ url_for('financeiro_dois.om_exportar_pdf', om_id=om.id) }}" class="btn btn-block">Exportar PDF</a>
+			  <a href="{{ url_for('financeiro_dois.om_exportar_excel', om_id=om.id) }}" class="btn btn-block">Exportar Excel</a>
+			</div>
         </div>
       </div>
     </div>
@@ -176,6 +177,80 @@
       </form>
     </div>
     {% endif %}
+	
+	{% if not om.bloqueada %}
+	<div id="adiantarOmBox" class="om-card" style="display:none; margin-bottom:16px;">
+	  <div class="card-title">Adiantar OM</div>
+
+	  <form method="post" action="{{ url_for('financeiro_dois.om_adiantar', om_id=om.id) }}">
+		<div class="form-grid">
+		  <div class="field">
+			<label>Data</label>
+			<input class="input-like" type="date" name="data_lancamento" required>
+		  </div>
+
+		  <div class="field">
+			<label>Aplicação</label>
+			<select class="input-like" name="aplicacao" required>
+			  <option value="">Selecione</option>
+			  {% for item in aplicacoes %}
+			  <option value="{{ item.nome }}">{{ item.nome }}</option>
+			  {% endfor %}
+			</select>
+		  </div>
+
+		  <div class="field">
+			<label>Valor</label>
+			<input class="input-like" type="text" name="valor" placeholder="Ex.: 150.00" required>
+		  </div>
+
+		  <div class="field">
+			<label>Moeda</label>
+			<select class="input-like" name="moeda_codigo" required>
+			  {% for item in moedas %}
+			  <option value="{{ item.codigo }}" {% if item.codigo == 'BRL' %}selected{% endif %}>
+				{{ item.codigo }} - {{ item.nome }}
+			  </option>
+			  {% endfor %}
+			</select>
+		  </div>
+		</div>
+
+		<div class="form-actions-top">
+		  <button type="submit" class="btn btn-primary">Salvar adiantamento</button>
+		  <button type="button" class="btn" onclick="toggleAdiantarOm()">Cancelar</button>
+		</div>
+	  </form>
+	</div>
+
+	<div id="pagarOmBox" class="om-card" style="display:none; margin-bottom:16px;">
+	  <div class="card-title">Pagar OM</div>
+
+	  <form method="post" action="{{ url_for('financeiro_dois.om_pagar', om_id=om.id) }}">
+		<div class="form-grid">
+		  <div class="field">
+			<label>Data do pagamento</label>
+			<input class="input-like" type="date" name="data_lancamento" required>
+		  </div>
+
+		  <div class="field">
+			<label>Aplicação</label>
+			<select class="input-like" name="aplicacao" required>
+			  <option value="">Selecione</option>
+			  {% for item in aplicacoes %}
+			  <option value="{{ item.nome }}">{{ item.nome }}</option>
+			  {% endfor %}
+			</select>
+		  </div>
+		</div>
+
+		<div class="form-actions-top">
+		  <button type="submit" class="btn btn-primary">Confirmar pagamento</button>
+		  <button type="button" class="btn" onclick="togglePagarOm()">Cancelar</button>
+		</div>
+	  </form>
+	</div>
+	{% endif %}
 
     <div class="om-card">
       <div class="card-head-inline">
@@ -362,6 +437,18 @@
 <script>
   function toggleNovaLinha() {
     const box = document.getElementById("novaLinhaBox");
+    if (!box) return;
+    box.style.display = box.style.display === "none" ? "block" : "none";
+  }
+
+  function toggleAdiantarOm() {
+    const box = document.getElementById("adiantarOmBox");
+    if (!box) return;
+    box.style.display = box.style.display === "none" ? "block" : "none";
+  }
+
+  function togglePagarOm() {
+    const box = document.getElementById("pagarOmBox");
     if (!box) return;
     box.style.display = box.style.display === "none" ? "block" : "none";
   }
