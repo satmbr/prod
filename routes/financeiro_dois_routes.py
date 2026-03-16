@@ -2125,6 +2125,69 @@ def rd():
         rds=rds,
     )
 
+@bp.route("/rd/nova", methods=["POST"])
+@login_required
+@permission_required("financeiro", "visualizar")
+def rd_nova():
+    numero_rd = _nome_preenchido(request.form.get("numero_rd")).upper()
+    periodo = _nome_preenchido(request.form.get("periodo")).upper()
+    matricula = _nome_preenchido(request.form.get("matricula_colaborador")).upper()
+    nome_colaborador = _nome_preenchido(request.form.get("nome_colaborador")).upper()
+    centro_custo = _nome_preenchido(request.form.get("centro_custo")).upper()
+    observacao = _nome_preenchido(request.form.get("observacao")).upper()
+
+    if not numero_rd or not periodo or not matricula or not nome_colaborador or not centro_custo:
+        flash("INFORME NÚMERO DA RD, PERÍODO, MATRÍCULA, NOME DO COLABORADOR E CENTRO DE CUSTO.", "warning")
+        return redirect(url_for("financeiro_dois.rd"))
+
+    engine = get_engine()
+
+    with engine.begin() as conn:
+        existe = conn.execute(text("""
+            SELECT id
+            FROM financeiro2_rd
+            WHERE numero_rd = :numero_rd
+            LIMIT 1
+        """), {
+            "numero_rd": numero_rd
+        }).mappings().first()
+
+        if existe:
+            flash(f"JÁ EXISTE UMA RD COM O NÚMERO {numero_rd}.", "warning")
+            return redirect(url_for("financeiro_dois.rd"))
+
+        novo_id = conn.execute(text("""
+            INSERT INTO financeiro2_rd (
+                numero_rd,
+                periodo,
+                matricula_colaborador,
+                nome_colaborador,
+                centro_custo,
+                status,
+                observacao
+            )
+            VALUES (
+                :numero_rd,
+                :periodo,
+                :matricula_colaborador,
+                :nome_colaborador,
+                :centro_custo,
+                'Aberta',
+                :observacao
+            )
+            RETURNING id
+        """), {
+            "numero_rd": numero_rd,
+            "periodo": periodo,
+            "matricula_colaborador": matricula,
+            "nome_colaborador": nome_colaborador,
+            "centro_custo": centro_custo,
+            "observacao": observacao,
+        }).scalar()
+
+    flash(f"RD {numero_rd} CRIADA COM SUCESSO.", "success")
+    return redirect(url_for("financeiro_dois.rd_editar", rd_id=novo_id))
+
 @bp.route("/rd/<int:rd_id>")
 @login_required
 @permission_required("financeiro", "visualizar")

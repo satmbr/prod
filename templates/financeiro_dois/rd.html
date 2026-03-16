@@ -3,22 +3,59 @@
 
 {% block content %}
 <div class="page-wrap">
-
   <section class="zone">
     <div class="zone-head">
       <div class="zone-left">
         <div class="zone-icon">🧾</div>
         <div>
           <div class="zone-title">RD</div>
-          <div class="muted">
-            Relatórios de despesas por período, colaborador e centro de custo.
-          </div>
+          <div class="muted">Relatórios de despesas por período, colaborador e centro de custo.</div>
         </div>
       </div>
-
       <div class="zone-actions">
-        <a class="btn btn-primary" href="#">Nova RD</a>
+        <button type="button" class="btn btn-primary" onclick="toggleNovaRd()">Nova RD</button>
       </div>
+    </div>
+
+    <div id="novaRdBox" class="filters-card" style="display:none; margin-bottom:16px;">
+      <form method="post" action="{{ url_for('financeiro_dois.rd_nova') }}">
+        <div class="filters-grid">
+          <div class="field">
+            <label>Número da RD</label>
+            <input type="text" name="numero_rd" class="input-like" placeholder="Ex.: RD-2026-03-LME" required>
+          </div>
+
+          <div class="field">
+            <label>Período</label>
+            <input type="text" name="periodo" class="input-like" placeholder="Ex.: 03/2026" required>
+          </div>
+
+          <div class="field">
+            <label>Matrícula</label>
+            <input type="text" name="matricula_colaborador" class="input-like" placeholder="Ex.: LME" required>
+          </div>
+
+          <div class="field">
+            <label>Nome do colaborador</label>
+            <input type="text" name="nome_colaborador" class="input-like" placeholder="Nome completo" required>
+          </div>
+
+          <div class="field">
+            <label>Centro de custo</label>
+            <input type="text" name="centro_custo" class="input-like" placeholder="Ex.: ADM" required>
+          </div>
+
+          <div class="field field-full">
+            <label>Observação</label>
+            <input type="text" name="observacao" class="input-like" placeholder="Observação inicial da RD">
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">Criar RD</button>
+          <button type="button" class="btn" onclick="toggleNovaRd()">Cancelar</button>
+        </div>
+      </form>
     </div>
 
     <div class="filters-card">
@@ -27,7 +64,6 @@
           <label>Busca</label>
           <input type="text" class="input-like" placeholder="Número, matrícula ou colaborador" />
         </div>
-
         <div class="field">
           <label>Status</label>
           <select class="input-like">
@@ -38,12 +74,10 @@
             <option>Cancelada</option>
           </select>
         </div>
-
         <div class="field">
           <label>Período</label>
           <input type="text" class="input-like" placeholder="Ex.: 03/2026" />
         </div>
-
         <div class="field">
           <label>Centro de custo</label>
           <input type="text" class="input-like" placeholder="Ex.: ADM" />
@@ -91,12 +125,15 @@
               </div>
             </td>
           </tr>
+          {% else %}
+          <tr>
+            <td colspan="9">Sem RDs cadastradas.</td>
+          </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
   </section>
-
 </div>
 
 <style>
@@ -123,6 +160,10 @@
     color:#334155;
   }
 
+  .field-full{
+    grid-column:1 / -1;
+  }
+
   .input-like{
     width:100%;
     height:42px;
@@ -137,6 +178,13 @@
     outline:none;
     border-color:#9db6cf;
     box-shadow:0 0 0 3px rgba(22, 50, 79, 0.08);
+  }
+
+  .form-actions{
+    display:flex;
+    gap:10px;
+    margin-top:16px;
+    flex-wrap:wrap;
   }
 
   .table-wrap{
@@ -181,4 +229,12 @@
     color:#047857;
   }
 </style>
+
+<script>
+  function toggleNovaRd() {
+    const box = document.getElementById("novaRdBox");
+    if (!box) return;
+    box.style.display = box.style.display === "none" ? "block" : "none";
+  }
+</script>
 {% endblock %}
