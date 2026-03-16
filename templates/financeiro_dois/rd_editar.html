@@ -11,7 +11,7 @@
         <div>
           <div class="zone-title">{{ rd.numero }}</div>
           <div class="muted">
-            Edição da RD com cabeçalho, linhas e saldo.
+            Edição da RD com cabeçalho, linhas, ações e saldo.
           </div>
         </div>
       </div>
@@ -26,57 +26,67 @@
         <div class="card-title">Dados principais</div>
 
         <form method="post" action="{{ url_for('financeiro_dois.rd_salvar', rd_id=rd.id) }}">
-          <div class="form-grid">
-            <div class="field">
-              <label>Número RD</label>
-              <input class="input-like" type="text" name="numero" value="{{ rd.numero }}" required />
+          <fieldset {% if rd.bloqueada %}disabled{% endif %} style="border:none;padding:0;margin:0;">
+            <div class="form-grid">
+              <div class="field">
+                <label>Número RD</label>
+                <input class="input-like" type="text" name="numero" value="{{ rd.numero }}" required />
+              </div>
+
+              <div class="field">
+                <label>Período</label>
+                <input class="input-like" type="text" name="periodo" value="{{ rd.periodo }}" required />
+              </div>
+
+              <div class="field">
+                <label>Matrícula</label>
+                <input class="input-like" type="text" name="matricula" value="{{ rd.matricula }}" required />
+              </div>
+
+              <div class="field">
+                <label>Colaborador</label>
+                <input class="input-like" type="text" name="colaborador" value="{{ rd.colaborador }}" required />
+              </div>
+
+              <div class="field">
+                <label>Centro de custo</label>
+                <select class="input-like" name="centro_custo" required>
+                  <option value="">Selecione</option>
+                  {% for item in centros_custo_lista %}
+                  <option value="{{ item.nome }}" {% if rd.centro_custo == item.nome %}selected{% endif %}>{{ item.nome }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+
+              <div class="field">
+                <label>Status</label>
+                <select class="input-like" name="status">
+                  <option value="ABERTA" {% if rd.status|upper == 'ABERTA' %}selected{% endif %}>ABERTA</option>
+                  <option value="PARCIAL" {% if rd.status|upper == 'PARCIAL' %}selected{% endif %}>PARCIAL</option>
+                  <option value="QUITADA" {% if rd.status|upper == 'QUITADA' %}selected{% endif %}>QUITADA</option>
+                  <option value="CANCELADA" {% if rd.status|upper == 'CANCELADA' %}selected{% endif %}>CANCELADA</option>
+                </select>
+              </div>
+
+              <div class="field field-full">
+                <label>Observação</label>
+                <textarea class="input-like textarea-like" name="observacao">{{ rd.observacao }}</textarea>
+              </div>
             </div>
 
-            <div class="field">
-              <label>Período</label>
-              <input class="input-like" type="text" name="periodo" value="{{ rd.periodo }}" required />
+            {% if not rd.bloqueada %}
+            <div class="form-actions-top">
+              <button type="submit" class="btn btn-primary">Salvar alterações</button>
             </div>
-
-            <div class="field">
-              <label>Matrícula</label>
-              <input class="input-like" type="text" name="matricula" value="{{ rd.matricula }}" required />
-            </div>
-
-            <div class="field">
-              <label>Colaborador</label>
-              <input class="input-like" type="text" name="colaborador" value="{{ rd.colaborador }}" required />
-            </div>
-
-            <div class="field">
-              <label>Centro de custo</label>
-              <select class="input-like" name="centro_custo" required>
-                <option value="">Selecione</option>
-                {% for item in centros_custo_lista %}
-                <option value="{{ item.nome }}" {% if rd.centro_custo == item.nome %}selected{% endif %}>{{ item.nome }}</option>
-                {% endfor %}
-              </select>
-            </div>
-
-            <div class="field">
-              <label>Status</label>
-              <select class="input-like" name="status">
-                <option value="ABERTA" {% if rd.status == 'ABERTA' or rd.status == 'Aberta' %}selected{% endif %}>ABERTA</option>
-                <option value="PARCIAL" {% if rd.status == 'PARCIAL' or rd.status == 'Parcial' %}selected{% endif %}>PARCIAL</option>
-                <option value="QUITADA" {% if rd.status == 'QUITADA' or rd.status == 'Quitada' %}selected{% endif %}>QUITADA</option>
-                <option value="CANCELADA" {% if rd.status == 'CANCELADA' or rd.status == 'Cancelada' %}selected{% endif %}>CANCELADA</option>
-              </select>
-            </div>
-
-            <div class="field field-full">
-              <label>Observação</label>
-              <textarea class="input-like textarea-like" name="observacao">{{ rd.observacao }}</textarea>
-            </div>
-          </div>
-
-          <div class="form-actions-top">
-            <button type="submit" class="btn btn-primary">Salvar alterações</button>
-          </div>
+            {% endif %}
+          </fieldset>
         </form>
+
+        {% if rd.bloqueada %}
+        <div class="warn-box">
+          ESTA RD ESTÁ QUITADA E BLOQUEADA PARA EDIÇÃO. APENAS VISUALIZAÇÃO E EXPORTAÇÃO ESTÃO LIBERADAS.
+        </div>
+        {% endif %}
       </div>
 
       <div class="om-side">
@@ -95,12 +105,19 @@
         <div class="resume-card">
           <div class="resume-title">Ações</div>
           <div class="action-list">
+            {% if not rd.bloqueada %}
             <button type="button" class="btn btn-primary btn-block" onclick="toggleNovaLinhaRd()">Adicionar linha</button>
+            <button type="button" class="btn btn-block" onclick="toggleAdiantarRd()">Adiantar RD</button>
+            <button type="button" class="btn btn-block" onclick="togglePagarRd()">Pagar RD</button>
+            {% endif %}
+            <a href="{{ url_for('financeiro_dois.rd_exportar_pdf', rd_id=rd.id) }}" class="btn btn-block">Exportar PDF</a>
+            <a href="{{ url_for('financeiro_dois.rd_exportar_excel', rd_id=rd.id) }}" class="btn btn-block">Exportar Excel</a>
           </div>
         </div>
       </div>
     </div>
 
+    {% if not rd.bloqueada %}
     <div id="novaLinhaRdBox" class="om-card" style="display:none; margin-bottom:16px;">
       <div class="card-title">Nova linha da RD</div>
 
@@ -154,6 +171,68 @@
       </form>
     </div>
 
+    <div id="adiantarRdBox" class="om-card" style="display:none; margin-bottom:16px;">
+      <div class="card-title">Adiantar RD</div>
+
+      <form method="post" action="{{ url_for('financeiro_dois.rd_adiantar', rd_id=rd.id) }}">
+        <div class="form-grid">
+          <div class="field">
+            <label>Data</label>
+            <input class="input-like" type="date" name="data_lancamento" required>
+          </div>
+
+          <div class="field">
+            <label>Aplicação</label>
+            <select class="input-like" name="aplicacao" required>
+              <option value="">Selecione</option>
+              {% for item in aplicacoes %}
+              <option value="{{ item.nome }}">{{ item.nome }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="field">
+            <label>Valor</label>
+            <input class="input-like" type="text" name="valor" placeholder="Ex.: 150.00" required>
+          </div>
+        </div>
+
+        <div class="form-actions-top">
+          <button type="submit" class="btn btn-primary">Salvar adiantamento</button>
+          <button type="button" class="btn" onclick="toggleAdiantarRd()">Cancelar</button>
+        </div>
+      </form>
+    </div>
+
+    <div id="pagarRdBox" class="om-card" style="display:none; margin-bottom:16px;">
+      <div class="card-title">Pagar RD</div>
+
+      <form method="post" action="{{ url_for('financeiro_dois.rd_pagar', rd_id=rd.id) }}">
+        <div class="form-grid">
+          <div class="field">
+            <label>Data do pagamento</label>
+            <input class="input-like" type="date" name="data_lancamento" required>
+          </div>
+
+          <div class="field">
+            <label>Aplicação</label>
+            <select class="input-like" name="aplicacao" required>
+              <option value="">Selecione</option>
+              {% for item in aplicacoes %}
+              <option value="{{ item.nome }}">{{ item.nome }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <div class="form-actions-top">
+          <button type="submit" class="btn btn-primary">Confirmar pagamento</button>
+          <button type="button" class="btn" onclick="togglePagarRd()">Cancelar</button>
+        </div>
+      </form>
+    </div>
+    {% endif %}
+
     <div class="om-card">
       <div class="card-head-inline">
         <div class="card-title">Linhas da RD</div>
@@ -175,7 +254,7 @@
           <tbody>
             {% for linha in rd.linhas %}
             <tr class="{% if linha.status != 'Ativo' %}linha-inativa{% endif %}">
-              {% if linha.status == 'Ativo' %}
+              {% if not rd.bloqueada and linha.status == 'Ativo' %}
               <td>
                 <form method="post" action="{{ url_for('financeiro_dois.rd_linha_editar', rd_id=rd.id, linha_id=linha.id) }}" class="linha-form">
                   <input class="input-like input-like-sm" type="date" name="data_lancamento" value="{{ linha.data_form }}" required>
@@ -202,7 +281,7 @@
                   </select>
               </td>
               <td>
-                  <input class="input-like input-like-sm" type="text" name="valor" value="{{ '%.2f'|format(linha.valor) }}" required>
+                  <input class="input-like input-like-sm" type="text" name="valor" value="{{ '%.2f'|format(linha.valor|abs) }}" required>
               </td>
               <td>{{ linha.status }}</td>
               <td>
@@ -220,9 +299,15 @@
               <td style="text-align:right;">R$ {{ '%.2f'|format(linha.valor) }}</td>
               <td>{{ linha.status }}</td>
               <td>
+                {% if not rd.bloqueada %}
                 <form method="post" action="{{ url_for('financeiro_dois.rd_linha_toggle_status', rd_id=rd.id, linha_id=linha.id) }}">
-                  <button type="submit" class="btn btn-sm">Reativar</button>
+                  <button type="submit" class="btn btn-sm">
+                    {% if linha.status == 'Ativo' %}Inativar{% else %}Reativar{% endif %}
+                  </button>
                 </form>
+                {% else %}
+                —
+                {% endif %}
               </td>
               {% endif %}
             </tr>
@@ -353,12 +438,22 @@
   }
 
   .linha-inativa{
-    opacity: 0.6;
+    opacity:0.6;
     background:#fafafa;
   }
 
   .linha-form{
-    display: contents;
+    display:contents;
+  }
+
+  .warn-box{
+    margin-top:14px;
+    padding:12px 14px;
+    border-radius:12px;
+    background:#fff7ed;
+    border:1px solid #fed7aa;
+    color:#9a3412;
+    font-size:14px;
   }
 
   @media (max-width: 980px){
@@ -371,6 +466,18 @@
 <script>
   function toggleNovaLinhaRd() {
     const box = document.getElementById("novaLinhaRdBox");
+    if (!box) return;
+    box.style.display = box.style.display === "none" ? "block" : "none";
+  }
+
+  function toggleAdiantarRd() {
+    const box = document.getElementById("adiantarRdBox");
+    if (!box) return;
+    box.style.display = box.style.display === "none" ? "block" : "none";
+  }
+
+  function togglePagarRd() {
+    const box = document.getElementById("pagarRdBox");
     if (!box) return;
     box.style.display = box.style.display === "none" ? "block" : "none";
   }

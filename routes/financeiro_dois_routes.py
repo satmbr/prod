@@ -2268,20 +2268,21 @@ def rd_editar(rd_id: int):
 
     total_valor = sum(float(item["valor"]) for item in linhas if item["status"] == "Ativo")
 
-    rd = dict(rd)
-    rd["saldo"] = total_valor
-    rd["linhas"] = linhas
+        rd = dict(rd)
+        rd["saldo"] = total_valor
+        rd["linhas"] = linhas
+        rd["bloqueada"] = str(rd["status"]).upper() == "QUITADA"
 
-    return render_template(
-        "financeiro_dois/rd_editar.html",
-        subnav_links=build_financeiro_dois_subnav("rd"),
-        rd=rd,
-        total_valor=total_valor,
-        descricoes=descricoes,
-        categorias=categorias,
-        aplicacoes=aplicacoes,
-        centros_custo_lista=centros_custo_lista,
-    )
+        return render_template(
+            "financeiro_dois/rd_editar.html",
+            subnav_links=build_financeiro_dois_subnav("rd"),
+            rd=rd,
+            total_valor=total_valor,
+            descricoes=descricoes,
+            categorias=categorias,
+            aplicacoes=aplicacoes,
+            centros_custo_lista=centros_custo_lista,
+        )
     
 @bp.route("/rd/<int:rd_id>/salvar", methods=["POST"])
 @login_required
@@ -2586,6 +2587,329 @@ def despesa_editar(despesa_id: int):
         despesa=despesa,
     )
 
+@bp.route("/rd/<int:rd_id>/adiantar", methods=["POST"])
+@login_required
+@permission_required("financeiro", "visualizar")
+def rd_adiantar(rd_id: int):
+    data_lancamento = _nome_preenchido(request.form.get("data_lancamento"))
+    aplicacao = _nome_preenchido(request.form.get("aplicacao")).upper()
+    valor_txt = _nome_preenchido(request.form.get("valor")).replace(",", ".")
+
+    if not data_lancamento or not aplicacao or not valor_txt:
+        flash("PREENCHA DATA, APLICAÇÃO E VALOR DO ADIANTAMENTO.", "warning")
+        return redirect(url_for("financeiro_dois.rd_editar", rd_id=rd_id))
+
+    try:
+        valor = float(valor_txt)
+    except ValueError:
+        flash("VALOR INVÁLIDO PARA O ADIANTAMENTO.", "warning")
+        return redirect(url_for("financeiro_dois.rd_editar", rd_id=rd_id))
+
+    if valor <= 0:
+        flash("O ADIANTAMENTO DEVE SER MAIOR QUE ZERO.", "warning")
+        return redirect(url_for("financeiro_dois.rd_editar", rd_id=rd_id))
+
+    engine = get_engine()
+    with engine.begin() as conn:
+        rd = conn.execute(text("""
+            SELECT id, numero_rd, status
+            FROM financeiro2_rd
+            WHERE id = :id
+        """), {"id": rd_id}).mappings().first()
+
+        if not rd:
+            flash("RD NÃO ENCONTRADA.", "danger")
+            return redirect(url_for("financeiro_dois.rd"))
+
+        if str(rd["status"]).upper() == "QUITADA":
+            flash("ESTA RD ESTÁ QUITADA E BLOQUEADA PARA EDIÇÃO.", "warning")
+            return redirect(url_for("financeiro_dois.rd_editar", rd_id=rd_id))
+
+        conn.execute(text("""
+            INSERT INTO financeiro2_rd_linhas (
+                rd_id,
+                data_lancamento,
+                descricao,
+                categoria,
+                aplicacao,
+                valor,
+                status
+            )
+            VALUES (
+                :rd_id,
+                :data_lancamento,
+                :descricao,
+                :categoria,
+                :aplicacao,
+                :valor,
+                'Ativo'
+            )
+        """), {
+            "rd_id": rd_id,
+            "data_lancamento": data_lancamento,
+            "descricao": f"ADIANTAMENTO DA RD ({rd['numero_rd']})",
+            "categoria": "ADIANTAMENTO",
+            "aplicacao": aplicacao,
+            "valor": -abs(valor),
+        })
+
+        conn.execute(text("""
+            UPDATE financeiro2_rd
+            SET status = 'PARCIAL',
+                atualizado_em = CURRENT_TIMESTAMP
+            WHERE id = :id
+              AND UPPER(status) = 'ABERTA'
+        """), {"id": rd_id})
+
+    flash("ADIANTAMENTO DA RD REGISTRADO COM SUCESSO.", "success")
+    return redirect(url_for("financeiro_dois.rd_editar", rd_id=rd_id))
+    
+@bp.route("/rd/<int:rd_id>/pagar", methods=["POST"])
+@login_required
+@permission_required("financeiro", "visualizar")
+def rd_pagar(rd_id: int):
+    data_lancamento = _nome_preenchido(request.form.get("data_lancamento"))
+    aplicacao = (_nome_preenchido(request.form.get("aplicacao")) or "GERAL").upper()
+
+    if not data_lancamento:
+        flash("INFORME A DATA DO PAGAMENTO.", "warning")
+        return redirect(url_for("financeiro_dois.rd_editar", rd_id=rd_id))
+
+    engine = get_engine()
+    with engine.begin() as conn:
+        rd = conn.execute(text("""
+            SELECT id, numero_rd, status
+            FROM financeiro2_rd
+            WHERE id = :id
+        """), {"id": rd_id}).mappings().first()
+
+        if not rd:
+            flash("RD NÃO ENCONTRADA.", "danger")
+            return redirect(url_for("financeiro_dois.rd"))
+
+        if str(rd["status"]).upper() == "QUITADA":
+            flash("ESTA RD JÁ ESTÁ QUITADA.", "warning")
+            return redirect(url_for("financeiro_dois.rd_editar", rd_id=rd_id))
+
+        saldo_atual = _calcular_saldo_rd(conn, rd_id)
+
+        if saldo_atual <= 0:
+            flash("A RD NÃO POSSUI SALDO POSITIVO PARA PAGAMENTO.", "warning")
+            return redirect(url_for("financeiro_dois.rd_editar", rd_id=rd_id))
+
+        conn.execute(text("""
+            INSERT INTO financeiro2_rd_linhas (
+                rd_id,
+                data_lancamento,
+                descricao,
+                categoria,
+                aplicacao,
+                valor,
+                status
+            )
+            VALUES (
+                :rd_id,
+                :data_lancamento,
+                :descricao,
+                :categoria,
+                :aplicacao,
+                :valor,
+                'Ativo'
+            )
+        """), {
+            "rd_id": rd_id,
+            "data_lancamento": data_lancamento,
+            "descricao": f"PAGAMENTO DA RD ({rd['numero_rd']})",
+            "categoria": "PAGAMENTO",
+            "aplicacao": aplicacao,
+            "valor": -abs(saldo_atual),
+        })
+
+        conn.execute(text("""
+            UPDATE financeiro2_rd
+            SET status = 'QUITADA',
+                atualizado_em = CURRENT_TIMESTAMP
+            WHERE id = :id
+        """), {"id": rd_id})
+
+    flash("PAGAMENTO DA RD REGISTRADO COM SUCESSO.", "success")
+    return redirect(url_for("financeiro_dois.rd_editar", rd_id=rd_id))
+    
+@bp.route("/rd/<int:rd_id>/exportar/excel")
+@login_required
+@permission_required("financeiro", "visualizar")
+def rd_exportar_excel(rd_id: int):
+    engine = get_engine()
+
+    with engine.connect() as conn:
+        rd = conn.execute(text("""
+            SELECT
+                id,
+                numero_rd,
+                periodo,
+                matricula_colaborador,
+                nome_colaborador,
+                centro_custo,
+                status,
+                COALESCE(observacao, '') AS observacao
+            FROM financeiro2_rd
+            WHERE id = :id
+        """), {"id": rd_id}).mappings().first()
+
+        if not rd:
+            abort(404)
+
+        linhas = conn.execute(text("""
+            SELECT
+                TO_CHAR(data_lancamento, 'DD/MM/YYYY') AS data,
+                descricao,
+                COALESCE(categoria, '') AS categoria,
+                COALESCE(aplicacao, '') AS aplicacao,
+                COALESCE(valor, 0) AS valor,
+                COALESCE(status, 'Ativo') AS status
+            FROM financeiro2_rd_linhas
+            WHERE rd_id = :id
+            ORDER BY id
+        """), {"id": rd_id}).mappings().all()
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "RD"
+
+    ws.append(["Número RD", rd["numero_rd"]])
+    ws.append(["Período", rd["periodo"]])
+    ws.append(["Matrícula", rd["matricula_colaborador"]])
+    ws.append(["Colaborador", rd["nome_colaborador"]])
+    ws.append(["Centro de custo", rd["centro_custo"]])
+    ws.append(["Status", rd["status"]])
+    ws.append(["Observação", rd["observacao"]])
+    ws.append([])
+    ws.append(["Data", "Descrição", "Categoria", "Aplicação", "Valor", "Status"])
+
+    total = 0
+    for linha in linhas:
+        ws.append([
+            linha["data"],
+            linha["descricao"],
+            linha["categoria"],
+            linha["aplicacao"],
+            float(linha["valor"]),
+            linha["status"],
+        ])
+        if linha["status"] == "Ativo":
+            total += float(linha["valor"])
+
+    ws.append([])
+    ws.append(["", "", "", "Saldo", total, ""])
+
+    arquivo = BytesIO()
+    wb.save(arquivo)
+    arquivo.seek(0)
+
+    return send_file(
+        arquivo,
+        as_attachment=True,
+        download_name=f"{rd['numero_rd']}.xlsx",
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    
+@bp.route("/rd/<int:rd_id>/exportar/pdf")
+@login_required
+@permission_required("financeiro", "visualizar")
+def rd_exportar_pdf(rd_id: int):
+    engine = get_engine()
+
+    with engine.connect() as conn:
+        rd = conn.execute(text("""
+            SELECT
+                id,
+                numero_rd,
+                periodo,
+                matricula_colaborador,
+                nome_colaborador,
+                centro_custo,
+                status,
+                COALESCE(observacao, '') AS observacao
+            FROM financeiro2_rd
+            WHERE id = :id
+        """), {"id": rd_id}).mappings().first()
+
+        if not rd:
+            abort(404)
+
+        linhas = conn.execute(text("""
+            SELECT
+                TO_CHAR(data_lancamento, 'DD/MM/YYYY') AS data,
+                descricao,
+                COALESCE(categoria, '') AS categoria,
+                COALESCE(aplicacao, '') AS aplicacao,
+                COALESCE(valor, 0) AS valor,
+                COALESCE(status, 'Ativo') AS status
+            FROM financeiro2_rd_linhas
+            WHERE rd_id = :id
+            ORDER BY id
+        """), {"id": rd_id}).mappings().all()
+
+    total = sum(float(l["valor"]) for l in linhas if l["status"] == "Ativo")
+
+    buffer = BytesIO()
+    pdf = canvas.Canvas(buffer, pagesize=A4)
+    largura, altura = A4
+    y = altura - 40
+
+    pdf.setFont("Helvetica-Bold", 14)
+    pdf.drawString(40, y, f"RD {rd['numero_rd']}")
+    y -= 20
+
+    pdf.setFont("Helvetica", 10)
+    pdf.drawString(40, y, f"Período: {rd['periodo']}")
+    y -= 15
+    pdf.drawString(40, y, f"Matrícula: {rd['matricula_colaborador']}")
+    y -= 15
+    pdf.drawString(40, y, f"Colaborador: {rd['nome_colaborador']}")
+    y -= 15
+    pdf.drawString(40, y, f"Centro de custo: {rd['centro_custo']}")
+    y -= 15
+    pdf.drawString(40, y, f"Status: {rd['status']}")
+    y -= 15
+    pdf.drawString(40, y, f"Observação: {rd['observacao']}")
+    y -= 25
+
+    pdf.setFont("Helvetica-Bold", 9)
+    pdf.drawString(40, y, "Data")
+    pdf.drawString(90, y, "Descrição")
+    pdf.drawString(260, y, "Categoria")
+    pdf.drawString(360, y, "Aplicação")
+    pdf.drawString(500, y, "Valor")
+    y -= 15
+
+    pdf.setFont("Helvetica", 8)
+    for linha in linhas:
+        if y < 50:
+            pdf.showPage()
+            y = altura - 40
+            pdf.setFont("Helvetica", 8)
+
+        pdf.drawString(40, y, str(linha["data"]))
+        pdf.drawString(90, y, str(linha["descricao"])[:30])
+        pdf.drawString(260, y, str(linha["categoria"])[:15])
+        pdf.drawString(360, y, str(linha["aplicacao"])[:18])
+        pdf.drawRightString(540, y, f"{float(linha['valor']):.2f}")
+        y -= 13
+
+    y -= 10
+    pdf.setFont("Helvetica-Bold", 10)
+    pdf.drawRightString(540, y, f"Saldo: {total:.2f}")
+
+    pdf.save()
+    buffer.seek(0)
+
+    return send_file(
+        buffer,
+        as_attachment=True,
+        download_name=f"{rd['numero_rd']}.pdf",
+        mimetype="application/pdf",
+    )
 
 # =========================
 # PREVISAO
