@@ -252,58 +252,127 @@
 	</div>
 	{% endif %}
 
-    <div class="om-card">
-      <div class="card-head-inline">
-        <div class="card-title">Linhas da OM</div>
-      </div>
+	<div class="om-card">
+	  <div class="card-head-inline">
+		<div class="card-title">Linhas da OM</div>
+	  </div>
 
-      <div class="table-wrap">
-        <table class="table">
-          <thead>
-            <tr>
-              <th>Data</th>
-              <th>Recibo</th>
-              <th>Descrição</th>
-              <th>Detalhes</th>
-              <th>Categoria</th>
-              <th>Aplicação</th>
-              <th style="text-align:right;">Valor</th>
-              <th>Moeda</th>
-              <th style="text-align:right;">Câmbio</th>
-              <th style="text-align:right;">Valor BRL</th>
-              <th>Anexo</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for linha in om.linhas %}
-            <tr>
-              <td>{{ linha.data }}</td>
-              <td>{{ linha.recibo }}</td>
-              <td>{{ linha.descricao }}</td>
-              <td>{{ linha.detalhes }}</td>
-              <td>{{ linha.categoria }}</td>
-              <td>{{ linha.aplicacao }}</td>
-              <td style="text-align:right;">{{ '%.2f'|format(linha.valor) }}</td>
-              <td>{{ linha.moeda_codigo }}</td>
-              <td style="text-align:right;">{{ '%.6f'|format(linha.cambio) }}</td>
-              <td style="text-align:right;">R$ {{ '%.2f'|format(linha.valor_brl) }}</td>
-              <td>
-                {% if linha.anexo_recibo %}
-                  <a class="btn btn-sm" href="{{ url_for('static', filename='uploads/financeiro2/om_recibos/' ~ linha.anexo_recibo) }}" target="_blank">Abrir</a>
-                {% else %}
-                  —
-                {% endif %}
-              </td>
-            </tr>
-            {% else %}
-            <tr>
-              <td colspan="11">Sem linhas lançadas.</td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </div>
+	  <div class="table-wrap">
+		<table class="table">
+		  <thead>
+			<tr>
+			  <th>Data</th>
+			  <th>Recibo</th>
+			  <th>Descrição</th>
+			  <th>Detalhes</th>
+			  <th>Categoria</th>
+			  <th>Aplicação</th>
+			  <th style="text-align:right;">Valor</th>
+			  <th>Moeda</th>
+			  <th style="text-align:right;">Câmbio</th>
+			  <th style="text-align:right;">Valor BRL</th>
+			  <th>Status</th>
+			  <th>Anexo</th>
+			  <th>Ações</th>
+			</tr>
+		  </thead>
+		  <tbody>
+			{% for linha in om.linhas %}
+			<tr class="{% if linha.status != 'Ativo' %}linha-inativa{% endif %}">
+			  <td>
+				{% if not om.bloqueada and linha.status == 'Ativo' %}
+				<form method="post" action="{{ url_for('financeiro_dois.om_linha_editar', om_id=om.id, linha_id=linha.id) }}" class="linha-form">
+				  <input class="input-like input-like-sm" type="date" name="data_lancamento" value="{{ linha.data_form }}" required>
+			  </td>
+			  <td>{{ linha.recibo }}</td>
+			  <td>
+				  <select class="input-like input-like-sm" name="descricao" required>
+					{% for item in descricoes %}
+					<option value="{{ item.nome }}" {% if linha.descricao == item.nome %}selected{% endif %}>{{ item.nome }}</option>
+					{% endfor %}
+				  </select>
+			  </td>
+			  <td><input class="input-like input-like-sm" type="text" name="detalhes" value="{{ linha.detalhes }}"></td>
+			  <td>
+				  <select class="input-like input-like-sm" name="categoria" required>
+					{% for item in categorias %}
+					<option value="{{ item.nome }}" {% if linha.categoria == item.nome %}selected{% endif %}>{{ item.nome }}</option>
+					{% endfor %}
+				  </select>
+			  </td>
+			  <td>
+				  <select class="input-like input-like-sm" name="aplicacao" required>
+					{% for item in aplicacoes %}
+					<option value="{{ item.nome }}" {% if linha.aplicacao == item.nome %}selected{% endif %}>{{ item.nome }}</option>
+					{% endfor %}
+				  </select>
+			  </td>
+			  <td><input class="input-like input-like-sm" type="text" name="valor" value="{{ '%.2f'|format(linha.valor|abs) }}" required></td>
+			  <td>
+				  <select class="input-like input-like-sm" name="moeda_codigo" required>
+					{% for item in moedas %}
+					<option value="{{ item.codigo }}" {% if linha.moeda_codigo == item.codigo %}selected{% endif %}>{{ item.codigo }}</option>
+					{% endfor %}
+				  </select>
+			  </td>
+			  <td style="text-align:right;">{{ '%.6f'|format(linha.cambio) }}</td>
+			  <td style="text-align:right;">R$ {{ '%.2f'|format(linha.valor_brl) }}</td>
+			  <td>{{ linha.status }}</td>
+			  <td>
+				  {% if linha.anexo_recibo %}
+					<a class="btn btn-sm" href="{{ url_for('static', filename='uploads/financeiro2/om_recibos/' ~ linha.anexo_recibo) }}" target="_blank">Abrir</a>
+				  {% else %}
+					—
+				  {% endif %}
+			  </td>
+			  <td>
+				  <button type="submit" class="btn btn-sm">Salvar</button>
+				</form>
+				<form method="post" action="{{ url_for('financeiro_dois.om_linha_toggle_status', om_id=om.id, linha_id=linha.id) }}" style="margin-top:6px;">
+				  <button type="submit" class="btn btn-sm">Inativar</button>
+				</form>
+				{% else %}
+				  {{ linha.data }}
+			  </td>
+			  <td>{{ linha.recibo }}</td>
+			  <td>{{ linha.descricao }}</td>
+			  <td>{{ linha.detalhes }}</td>
+			  <td>{{ linha.categoria }}</td>
+			  <td>{{ linha.aplicacao }}</td>
+			  <td style="text-align:right;">{{ '%.2f'|format(linha.valor) }}</td>
+			  <td>{{ linha.moeda_codigo }}</td>
+			  <td style="text-align:right;">{{ '%.6f'|format(linha.cambio) }}</td>
+			  <td style="text-align:right;">R$ {{ '%.2f'|format(linha.valor_brl) }}</td>
+			  <td>{{ linha.status }}</td>
+			  <td>
+				  {% if linha.anexo_recibo %}
+					<a class="btn btn-sm" href="{{ url_for('static', filename='uploads/financeiro2/om_recibos/' ~ linha.anexo_recibo) }}" target="_blank">Abrir</a>
+				  {% else %}
+					—
+				  {% endif %}
+			  </td>
+			  <td>
+				  {% if not om.bloqueada %}
+				  <form method="post" action="{{ url_for('financeiro_dois.om_linha_toggle_status', om_id=om.id, linha_id=linha.id) }}">
+					<button type="submit" class="btn btn-sm">
+					  {% if linha.status == 'Ativo' %}Inativar{% else %}Reativar{% endif %}
+					</button>
+				  </form>
+				  {% else %}
+					—
+				  {% endif %}
+				{% endif %}
+			  </td>
+			</tr>
+			{% else %}
+			<tr>
+			  <td colspan="13">Sem linhas lançadas.</td>
+			</tr>
+			{% endfor %}
+		  </tbody>
+		</table>
+	  </div>
+	</div>
 
   </section>
 
@@ -432,6 +501,14 @@
       grid-template-columns:1fr;
     }
   }
+	.linha-inativa{
+	  opacity: 0.6;
+	  background: #fafafa;
+	}
+
+	.linha-form{
+	  display: contents;
+	}
 </style>
 
 <script>

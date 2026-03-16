@@ -14,6 +14,7 @@ def _calcular_saldo_om(conn, om_id: int) -> float:
         SELECT COALESCE(SUM(valor_brl), 0) AS saldo
         FROM financeiro2_om_linhas
         WHERE om_id = :om_id
+          AND status = 'Ativo'
     """), {"om_id": om_id}).mappings().first()
 
     return float(saldo["saldo"] or 0)
@@ -1195,7 +1196,8 @@ def om_editar(om_id: int):
                 COALESCE(moeda_codigo, 'BRL') AS moeda_codigo,
                 COALESCE(cambio, 1) AS cambio,
                 COALESCE(valor_brl, 0) AS valor_brl,
-                COALESCE(anexo_recibo, '') AS anexo_recibo
+                COALESCE(anexo_recibo, '') AS anexo_recibo,
+                COALESCE(status, 'Ativo') AS status
             FROM financeiro2_om_linhas
             WHERE om_id = :id
             ORDER BY recibo, id
@@ -1400,7 +1402,8 @@ def om_linha_nova(om_id: int):
                 cambio,
                 valor_brl,
                 anexo_recibo,
-                sinal
+                sinal,
+                status
             )
             VALUES (
                 :om_id,
@@ -1415,23 +1418,23 @@ def om_linha_nova(om_id: int):
                 :moeda_codigo,
                 :cambio,
                 :valor_brl,
-                :anexo_recibo,
-                '+'
+                NULL,
+                '-',
+                'Ativo'
             )
         """), {
             "om_id": om_id,
             "data_lancamento": data_lancamento,
             "recibo": proximo_recibo,
-            "tipo_linha": descricao,
-            "descricao_antiga": detalhes,
-            "detalhes": detalhes,
-            "categoria": categoria,
+            "tipo_linha": "PIX adiantado",
+            "descricao_antiga": f"Adiantamento da OM ({om['numero_om']})",
+            "detalhes": f"Adiantamento da OM ({om['numero_om']})",
+            "categoria": "Adiantamento",
             "aplicacao": aplicacao,
-            "valor": valor,
+            "valor": -abs(valor),
             "moeda_codigo": moeda_codigo,
             "cambio": cambio,
-            "valor_brl": valor_brl,
-            "anexo_recibo": nome_arquivo,
+            "valor_brl": -abs(valor_brl),
         })
 
     flash("Linha adicionada com sucesso.", "success")
@@ -1608,7 +1611,8 @@ def om_pagar(om_id: int):
                 cambio,
                 valor_brl,
                 anexo_recibo,
-                sinal
+                sinal,
+                status
             )
             VALUES (
                 :om_id,
@@ -1624,7 +1628,8 @@ def om_pagar(om_id: int):
                 1,
                 :valor_brl,
                 NULL,
-                '-'
+                '-',
+                'Ativo'
             )
         """), {
             "om_id": om_id,
@@ -1824,6 +1829,161 @@ def om_exportar_pdf(om_id: int):
         download_name=f"{om['numero_om']}.pdf",
         mimetype="application/pdf",
     )
+    
+@bp.route("/om/<int:om_id>/linhas/<int:linha_id>/editar", methods=["POST"])
+@login_required
+@permission_required("financeiro", "visualizar")
+def om_linha_editar(om_id: int, linha_id: int):
+    data_lancamento = _nome_preenchido(request.form.get("data_lancamento"))
+    descricao = _nome_preenchido(request.form.get("descricao"))
+    detalhes = _nome_preenchido(request.form.get("detalhes"))
+    categoria = _nome_preenchido(request.form.get("categoria"))
+    aplicacao = _nome_preenchido(request.form.get("aplicacao"))
+    valor_txt = _nome_preenchido(request.form.get("valor")).replace(",", ".")
+    moeda_codigo = _nome_preenchido(request.form.get("moeda_codigo")) or "BRL"
+
+    if not data_lancamento or not descricao or not categoria or not aplicacao or not valor_txt:
+        flash("Preencha data, descrição, categoria, aplicação e valor.", "warning")
+        return redirect(url_for("financeiro_dois.om_editar", om_id=om_id))
+
+    try:
+        valor = float(valor_txt)
+    except ValueError:
+        flash("Valor inválido.", "warning")
+        return redirect(url_for("financeiro_dois.om_editar", om_id=om_id))
+
+    engine = get_engine()
+    with engine.begin() as conn:
+        om = conn.execute(text("""
+            SELECT id, status
+            FROM financeiro2_om
+            WHERE id = :id
+        """), {"id": om_id}).mappings().first()
+
+        if not om:
+            flash("OM não encontrada.", "danger")
+            return redirect(url_for("financeiro_dois.om"))
+
+        if om["status"] == "Paga":
+            flash("Esta OM está paga e bloqueada para edição.", "warning")
+            return redirect(url_for("financeiro_dois.om_editar", om_id=om_id))
+
+        linha = conn.execute(text("""
+            SELECT id, sinal, status
+            FROM financeiro2_om_linhas
+            WHERE id = :linha_id
+              AND om_id = :om_id
+        """), {"linha_id": linha_id, "om_id": om_id}).mappings().first()
+
+        if not linha:
+            flash("Linha não encontrada.", "danger")
+            return redirect(url_for("financeiro_dois.om_editar", om_id=om_id))
+
+        if linha["status"] != "Ativo":
+            flash("A linha está inativa e não pode ser editada.", "warning")
+            return redirect(url_for("financeiro_dois.om_editar", om_id=om_id))
+
+        moeda = conn.execute(text("""
+            SELECT codigo, cambio_padrao
+            FROM financeiro2_cad_moedas
+            WHERE codigo = :codigo
+            LIMIT 1
+        """), {"codigo": moeda_codigo}).mappings().first()
+
+        if not moeda:
+            flash("Moeda inválida.", "warning")
+            return redirect(url_for("financeiro_dois.om_editar", om_id=om_id))
+
+        cambio = float(moeda["cambio_padrao"] or 1)
+        if cambio == 0:
+            cambio = 1
+
+        valor_brl = round(valor / cambio, 2)
+
+        sinal = linha["sinal"] or "+"
+        valor_final = valor if sinal == "+" else -abs(valor)
+        valor_brl_final = valor_brl if sinal == "+" else -abs(valor_brl)
+
+        conn.execute(text("""
+            UPDATE financeiro2_om_linhas
+            SET data_lancamento = :data_lancamento,
+                tipo_linha = :tipo_linha,
+                descricao = :descricao_antiga,
+                detalhes = :detalhes,
+                categoria = :categoria,
+                aplicacao = :aplicacao,
+                valor = :valor,
+                moeda_codigo = :moeda_codigo,
+                cambio = :cambio,
+                valor_brl = :valor_brl,
+                atualizado_em = CURRENT_TIMESTAMP
+            WHERE id = :linha_id
+              AND om_id = :om_id
+        """), {
+            "data_lancamento": data_lancamento,
+            "tipo_linha": descricao,
+            "descricao_antiga": detalhes,
+            "detalhes": detalhes,
+            "categoria": categoria,
+            "aplicacao": aplicacao,
+            "valor": valor_final,
+            "moeda_codigo": moeda_codigo,
+            "cambio": cambio,
+            "valor_brl": valor_brl_final,
+            "linha_id": linha_id,
+            "om_id": om_id
+        })
+
+    flash("Linha atualizada com sucesso.", "success")
+    return redirect(url_for("financeiro_dois.om_editar", om_id=om_id))
+    
+@bp.route("/om/<int:om_id>/linhas/<int:linha_id>/toggle-status", methods=["POST"])
+@login_required
+@permission_required("financeiro", "visualizar")
+def om_linha_toggle_status(om_id: int, linha_id: int):
+    engine = get_engine()
+    with engine.begin() as conn:
+        om = conn.execute(text("""
+            SELECT id, status
+            FROM financeiro2_om
+            WHERE id = :id
+        """), {"id": om_id}).mappings().first()
+
+        if not om:
+            flash("OM não encontrada.", "danger")
+            return redirect(url_for("financeiro_dois.om"))
+
+        if om["status"] == "Paga":
+            flash("Esta OM está paga e bloqueada para edição.", "warning")
+            return redirect(url_for("financeiro_dois.om_editar", om_id=om_id))
+
+        linha = conn.execute(text("""
+            SELECT id, status
+            FROM financeiro2_om_linhas
+            WHERE id = :linha_id
+              AND om_id = :om_id
+        """), {"linha_id": linha_id, "om_id": om_id}).mappings().first()
+
+        if not linha:
+            flash("Linha não encontrada.", "danger")
+            return redirect(url_for("financeiro_dois.om_editar", om_id=om_id))
+
+        novo_status = "Inativo" if linha["status"] == "Ativo" else "Ativo"
+
+        conn.execute(text("""
+            UPDATE financeiro2_om_linhas
+            SET status = :status,
+                atualizado_em = CURRENT_TIMESTAMP
+            WHERE id = :linha_id
+              AND om_id = :om_id
+        """), {
+            "status": novo_status,
+            "linha_id": linha_id,
+            "om_id": om_id
+        })
+
+    flash(f"Linha alterada para {novo_status}.", "success")
+    return redirect(url_for("financeiro_dois.om_editar", om_id=om_id))
 
 # =========================
 # RD
