@@ -11,14 +11,13 @@
         <div>
           <div class="zone-title">{{ rd.numero }}</div>
           <div class="muted">
-            Edição da RD com cabeçalho, linhas e resumo de saldo.
+            Edição da RD com cabeçalho, linhas e saldo.
           </div>
         </div>
       </div>
 
       <div class="zone-actions">
         <a class="btn" href="{{ url_for('financeiro_dois.rd') }}">Voltar</a>
-        <a class="btn btn-primary" href="#">Salvar alterações</a>
       </div>
     </div>
 
@@ -26,81 +25,138 @@
       <div class="om-card">
         <div class="card-title">Dados principais</div>
 
-        <div class="form-grid">
-          <div class="field">
-            <label>Número RD</label>
-            <input class="input-like" type="text" value="{{ rd.numero }}" />
+        <form method="post" action="{{ url_for('financeiro_dois.rd_salvar', rd_id=rd.id) }}">
+          <div class="form-grid">
+            <div class="field">
+              <label>Número RD</label>
+              <input class="input-like" type="text" name="numero" value="{{ rd.numero }}" required />
+            </div>
+
+            <div class="field">
+              <label>Período</label>
+              <input class="input-like" type="text" name="periodo" value="{{ rd.periodo }}" required />
+            </div>
+
+            <div class="field">
+              <label>Matrícula</label>
+              <input class="input-like" type="text" name="matricula" value="{{ rd.matricula }}" required />
+            </div>
+
+            <div class="field">
+              <label>Colaborador</label>
+              <input class="input-like" type="text" name="colaborador" value="{{ rd.colaborador }}" required />
+            </div>
+
+            <div class="field">
+              <label>Centro de custo</label>
+              <select class="input-like" name="centro_custo" required>
+                <option value="">Selecione</option>
+                {% for item in centros_custo_lista %}
+                <option value="{{ item.nome }}" {% if rd.centro_custo == item.nome %}selected{% endif %}>{{ item.nome }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="field">
+              <label>Status</label>
+              <select class="input-like" name="status">
+                <option value="ABERTA" {% if rd.status == 'ABERTA' or rd.status == 'Aberta' %}selected{% endif %}>ABERTA</option>
+                <option value="PARCIAL" {% if rd.status == 'PARCIAL' or rd.status == 'Parcial' %}selected{% endif %}>PARCIAL</option>
+                <option value="QUITADA" {% if rd.status == 'QUITADA' or rd.status == 'Quitada' %}selected{% endif %}>QUITADA</option>
+                <option value="CANCELADA" {% if rd.status == 'CANCELADA' or rd.status == 'Cancelada' %}selected{% endif %}>CANCELADA</option>
+              </select>
+            </div>
+
+            <div class="field field-full">
+              <label>Observação</label>
+              <textarea class="input-like textarea-like" name="observacao">{{ rd.observacao }}</textarea>
+            </div>
           </div>
 
-          <div class="field">
-            <label>Período</label>
-            <input class="input-like" type="text" value="{{ rd.periodo }}" />
+          <div class="form-actions-top">
+            <button type="submit" class="btn btn-primary">Salvar alterações</button>
           </div>
-
-          <div class="field">
-            <label>Matrícula</label>
-            <input class="input-like" type="text" value="{{ rd.matricula }}" />
-          </div>
-
-          <div class="field">
-            <label>Colaborador</label>
-            <input class="input-like" type="text" value="{{ rd.colaborador }}" />
-          </div>
-
-          <div class="field">
-            <label>Centro de custo</label>
-            <input class="input-like" type="text" value="{{ rd.centro_custo }}" />
-          </div>
-
-          <div class="field">
-            <label>Status</label>
-            <select class="input-like">
-              <option {% if rd.status == 'Aberta' %}selected{% endif %}>Aberta</option>
-              <option {% if rd.status == 'Parcial' %}selected{% endif %}>Parcial</option>
-              <option {% if rd.status == 'Quitada' %}selected{% endif %}>Quitada</option>
-              <option {% if rd.status == 'Cancelada' %}selected{% endif %}>Cancelada</option>
-            </select>
-          </div>
-
-          <div class="field field-full">
-            <label>Observação</label>
-            <textarea class="input-like textarea-like">{{ rd.observacao }}</textarea>
-          </div>
-        </div>
+        </form>
       </div>
 
       <div class="om-side">
         <div class="resume-card">
           <div class="resume-title">Resumo</div>
           <div class="resume-row">
-            <span>Total positivo</span>
-            <strong>R$ {{ '%.2f'|format(total_positivo) }}</strong>
-          </div>
-          <div class="resume-row">
-            <span>Total negativo</span>
-            <strong>R$ {{ '%.2f'|format(total_negativo) }}</strong>
+            <span>Status</span>
+            <strong>{{ rd.status }}</strong>
           </div>
           <div class="resume-row resume-total">
             <span>Saldo atual</span>
-            <strong>R$ {{ '%.2f'|format(rd.saldo) }}</strong>
+            <strong>R$ {{ '%.2f'|format(total_valor) }}</strong>
           </div>
         </div>
 
         <div class="resume-card">
           <div class="resume-title">Ações</div>
           <div class="action-list">
-            <a href="#" class="btn btn-primary btn-block">Adicionar despesa</a>
-            <a href="#" class="btn btn-block">Registrar pagamento</a>
-            <a href="#" class="btn btn-block">Solicitar exclusão</a>
+            <button type="button" class="btn btn-primary btn-block" onclick="toggleNovaLinhaRd()">Adicionar linha</button>
           </div>
         </div>
       </div>
     </div>
 
+    <div id="novaLinhaRdBox" class="om-card" style="display:none; margin-bottom:16px;">
+      <div class="card-title">Nova linha da RD</div>
+
+      <form method="post" action="{{ url_for('financeiro_dois.rd_linha_nova', rd_id=rd.id) }}">
+        <div class="form-grid">
+          <div class="field">
+            <label>Data</label>
+            <input class="input-like" type="date" name="data_lancamento" required>
+          </div>
+
+          <div class="field">
+            <label>Descrição</label>
+            <select class="input-like" name="descricao" required>
+              <option value="">Selecione</option>
+              {% for item in descricoes %}
+              <option value="{{ item.nome }}">{{ item.nome }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="field">
+            <label>Categoria</label>
+            <select class="input-like" name="categoria" required>
+              <option value="">Selecione</option>
+              {% for item in categorias %}
+              <option value="{{ item.nome }}">{{ item.nome }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="field">
+            <label>Aplicação</label>
+            <select class="input-like" name="aplicacao" required>
+              <option value="">Selecione</option>
+              {% for item in aplicacoes %}
+              <option value="{{ item.nome }}">{{ item.nome }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="field">
+            <label>Valor</label>
+            <input class="input-like" type="text" name="valor" placeholder="Ex.: 150.00" required>
+          </div>
+        </div>
+
+        <div class="form-actions-top">
+          <button type="submit" class="btn btn-primary">Salvar linha</button>
+          <button type="button" class="btn" onclick="toggleNovaLinhaRd()">Cancelar</button>
+        </div>
+      </form>
+    </div>
+
     <div class="om-card">
       <div class="card-head-inline">
         <div class="card-title">Linhas da RD</div>
-        <a class="btn btn-sm" href="#">Adicionar linha</a>
       </div>
 
       <div class="table-wrap">
@@ -108,24 +164,71 @@
           <thead>
             <tr>
               <th>Data</th>
-              <th>Tipo</th>
               <th>Descrição</th>
               <th>Categoria</th>
               <th>Aplicação</th>
-              <th>Sinal</th>
               <th style="text-align:right;">Valor</th>
+              <th>Status</th>
+              <th>Ações</th>
             </tr>
           </thead>
           <tbody>
             {% for linha in rd.linhas %}
-            <tr>
+            <tr class="{% if linha.status != 'Ativo' %}linha-inativa{% endif %}">
+              {% if linha.status == 'Ativo' %}
+              <td>
+                <form method="post" action="{{ url_for('financeiro_dois.rd_linha_editar', rd_id=rd.id, linha_id=linha.id) }}" class="linha-form">
+                  <input class="input-like input-like-sm" type="date" name="data_lancamento" value="{{ linha.data_form }}" required>
+              </td>
+              <td>
+                  <select class="input-like input-like-sm" name="descricao" required>
+                    {% for item in descricoes %}
+                    <option value="{{ item.nome }}" {% if linha.descricao == item.nome %}selected{% endif %}>{{ item.nome }}</option>
+                    {% endfor %}
+                  </select>
+              </td>
+              <td>
+                  <select class="input-like input-like-sm" name="categoria" required>
+                    {% for item in categorias %}
+                    <option value="{{ item.nome }}" {% if linha.categoria == item.nome %}selected{% endif %}>{{ item.nome }}</option>
+                    {% endfor %}
+                  </select>
+              </td>
+              <td>
+                  <select class="input-like input-like-sm" name="aplicacao" required>
+                    {% for item in aplicacoes %}
+                    <option value="{{ item.nome }}" {% if linha.aplicacao == item.nome %}selected{% endif %}>{{ item.nome }}</option>
+                    {% endfor %}
+                  </select>
+              </td>
+              <td>
+                  <input class="input-like input-like-sm" type="text" name="valor" value="{{ '%.2f'|format(linha.valor) }}" required>
+              </td>
+              <td>{{ linha.status }}</td>
+              <td>
+                  <button type="submit" class="btn btn-sm">Salvar</button>
+                </form>
+                <form method="post" action="{{ url_for('financeiro_dois.rd_linha_toggle_status', rd_id=rd.id, linha_id=linha.id) }}" style="margin-top:6px;">
+                  <button type="submit" class="btn btn-sm">Inativar</button>
+                </form>
+              </td>
+              {% else %}
               <td>{{ linha.data }}</td>
-              <td>{{ linha.tipo }}</td>
               <td>{{ linha.descricao }}</td>
               <td>{{ linha.categoria }}</td>
               <td>{{ linha.aplicacao }}</td>
-              <td>{{ linha.sinal }}</td>
               <td style="text-align:right;">R$ {{ '%.2f'|format(linha.valor) }}</td>
+              <td>{{ linha.status }}</td>
+              <td>
+                <form method="post" action="{{ url_for('financeiro_dois.rd_linha_toggle_status', rd_id=rd.id, linha_id=linha.id) }}">
+                  <button type="submit" class="btn btn-sm">Reativar</button>
+                </form>
+              </td>
+              {% endif %}
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="7">Sem linhas lançadas.</td>
             </tr>
             {% endfor %}
           </tbody>
@@ -191,12 +294,16 @@
 
   .input-like{
     width:100%;
-    height:42px;
+    min-height:42px;
     border:1px solid #d8e1ec;
     border-radius:12px;
     padding:0 12px;
     font-size:14px;
     background:#fff;
+  }
+
+  .input-like-sm{
+    min-height:36px;
   }
 
   .textarea-like{
@@ -238,10 +345,20 @@
     overflow:auto;
   }
 
-  .btn-sm{
-    padding:7px 10px;
-    font-size:12px;
-    line-height:1;
+  .form-actions-top{
+    display:flex;
+    gap:10px;
+    margin-top:16px;
+    flex-wrap:wrap;
+  }
+
+  .linha-inativa{
+    opacity: 0.6;
+    background:#fafafa;
+  }
+
+  .linha-form{
+    display: contents;
   }
 
   @media (max-width: 980px){
@@ -250,4 +367,12 @@
     }
   }
 </style>
+
+<script>
+  function toggleNovaLinhaRd() {
+    const box = document.getElementById("novaLinhaRdBox");
+    if (!box) return;
+    box.style.display = box.style.display === "none" ? "block" : "none";
+  }
+</script>
 {% endblock %}

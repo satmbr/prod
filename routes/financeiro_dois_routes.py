@@ -80,6 +80,16 @@ def _toggle_status_generico(tabela: str, item_id: int, campo_nome: str = "nome")
 
     flash(f"Status alterado para {novo_status}.", "success")
     return _redirect_cadastros()
+    
+def _calcular_saldo_rd(conn, rd_id: int) -> float:
+    saldo = conn.execute(text("""
+        SELECT COALESCE(SUM(valor), 0) AS saldo
+        FROM financeiro2_rd_linhas
+        WHERE rd_id = :rd_id
+          AND status = 'Ativo'
+    """), {"rd_id": rd_id}).mappings().first()
+
+    return float(saldo["saldo"] or 0)
 
 @bp.route("/")
 @login_required
@@ -2215,6 +2225,8 @@ def rd_editar(rd_id: int):
 
         linhas = conn.execute(text("""
             SELECT
+                id,
+                TO_CHAR(data_lancamento, 'YYYY-MM-DD') AS data_form,
                 TO_CHAR(data_lancamento, 'DD/MM/YYYY') AS data,
                 descricao,
                 COALESCE(categoria, '') AS categoria,
@@ -2226,6 +2238,34 @@ def rd_editar(rd_id: int):
             ORDER BY id
         """), {"id": rd_id}).mappings().all()
 
+        descricoes = conn.execute(text("""
+            SELECT nome
+            FROM financeiro2_cad_descricoes
+            WHERE status = 'Ativo'
+            ORDER BY nome
+        """)).mappings().all()
+
+        categorias = conn.execute(text("""
+            SELECT nome
+            FROM financeiro2_cad_categorias
+            WHERE status = 'Ativo'
+            ORDER BY nome
+        """)).mappings().all()
+
+        aplicacoes = conn.execute(text("""
+            SELECT nome
+            FROM financeiro2_cad_aplicacoes
+            WHERE status = 'Ativo'
+            ORDER BY nome
+        """)).mappings().all()
+
+        centros_custo_lista = conn.execute(text("""
+            SELECT nome
+            FROM financeiro2_cad_centros_custo
+            WHERE status = 'Ativo'
+            ORDER BY nome
+        """)).mappings().all()
+
     total_valor = sum(float(item["valor"]) for item in linhas if item["status"] == "Ativo")
 
     rd = dict(rd)
@@ -2236,10 +2276,262 @@ def rd_editar(rd_id: int):
         "financeiro_dois/rd_editar.html",
         subnav_links=build_financeiro_dois_subnav("rd"),
         rd=rd,
-        total_positivo=total_valor,
-        total_negativo=0,
+        total_valor=total_valor,
+        descricoes=descricoes,
+        categorias=categorias,
+        aplicacoes=aplicacoes,
+        centros_custo_lista=centros_custo_lista,
     )
+    
+@bp.route("/rd/<int:rd_id>/salvar", methods=["POST"])
+@login_required
+@permission_required("financeiro", "visualizar")
+def rd_salvar(rd_id: int):
+    numero = _nome_preenchido(request.form.get("numero")).upper()
+    periodo = _nome_preenchido(request.form.get("periodo")).upper()
+    matricula = _nome_preenchido(request.form.get("matricula")).upper()
+    colaborador = _nome_preenchido(request.form.get("colaborador")).upper()
+    centro_custo = _nome_preenchido(request.form.get("centro_custo")).upper()
+    status = (_nome_preenchido(request.form.get("status")) or "ABERTA").upper()
+    observacao = _nome_preenchido(request.form.get("observacao")).upper()
 
+    if not numero or not periodo or not matricula or not colaborador or not centro_custo:
+        flash("PREENCHA NÚMERO, PERÍODO, MATRÍCULA, COLABORADOR E CENTRO DE CUSTO.", "warning")
+        return redirect(url_for("financeiro_dois.rd_editar", rd_id=rd_id))
+
+    engine = get_engine()
+    with engine.begin() as conn:
+        rd = conn.execute(text("""
+            SELECT id
+            FROM financeiro2_rd
+            WHERE id = :id
+        """), {"id": rd_id}).mappings().first()
+
+        if not rd:
+            flash("RD NÃO ENCONTRADA.", "danger")
+            return redirect(url_for("financeiro_dois.rd"))
+
+        existe = conn.execute(text("""
+            SELECT id
+            FROM financeiro2_rd
+            WHERE numero_rd = :numero
+              AND id <> :id
+            LIMIT 1
+        """), {"numero": numero, "id": rd_id}).mappings().first()
+
+        if existe:
+            flash(f"JÁ EXISTE OUTRA RD COM O NÚMERO {numero}.", "warning")
+            return redirect(url_for("financeiro_dois.rd_editar", rd_id=rd_id))
+
+        conn.execute(text("""
+            UPDATE financeiro2_rd
+            SET numero_rd = :numero,
+                periodo = :periodo,
+                matricula_colaborador = :matricula,
+                nome_colaborador = :colaborador,
+                centro_custo = :centro_custo,
+                status = :status,
+                observacao = :observacao,
+                atualizado_em = CURRENT_TIMESTAMP
+            WHERE id = :id
+        """), {
+            "numero": numero,
+            "periodo": periodo,
+            "matricula": matricula,
+            "colaborador": colaborador,
+            "centro_custo": centro_custo,
+            "status": status,
+            "observacao": observacao,
+            "id": rd_id
+        })
+
+    flash("RD ATUALIZADA COM SUCESSO.", "success")
+    return redirect(url_for("financeiro_dois.rd_editar", rd_id=rd_id))
+    
+@bp.route("/rd/<int:rd_id>/linhas/nova", methods=["POST"])
+@login_required
+@permission_required("financeiro", "visualizar")
+def rd_linha_nova(rd_id: int):
+    data_lancamento = _nome_preenchido(request.form.get("data_lancamento"))
+    descricao = _nome_preenchido(request.form.get("descricao")).upper()
+    categoria = _nome_preenchido(request.form.get("categoria")).upper()
+    aplicacao = _nome_preenchido(request.form.get("aplicacao")).upper()
+    valor_txt = _nome_preenchido(request.form.get("valor")).replace(",", ".")
+
+    if not data_lancamento or not descricao or not categoria or not aplicacao or not valor_txt:
+        flash("PREENCHA DATA, DESCRIÇÃO, CATEGORIA, APLICAÇÃO E VALOR.", "warning")
+        return redirect(url_for("financeiro_dois.rd_editar", rd_id=rd_id))
+
+    try:
+        valor = float(valor_txt)
+    except ValueError:
+        flash("VALOR INVÁLIDO.", "warning")
+        return redirect(url_for("financeiro_dois.rd_editar", rd_id=rd_id))
+
+    if valor <= 0:
+        flash("A RD ACEITA APENAS VALORES POSITIVOS.", "warning")
+        return redirect(url_for("financeiro_dois.rd_editar", rd_id=rd_id))
+
+    engine = get_engine()
+    with engine.begin() as conn:
+        rd = conn.execute(text("""
+            SELECT id
+            FROM financeiro2_rd
+            WHERE id = :id
+        """), {"id": rd_id}).mappings().first()
+
+        if not rd:
+            flash("RD NÃO ENCONTRADA.", "danger")
+            return redirect(url_for("financeiro_dois.rd"))
+
+        conn.execute(text("""
+            INSERT INTO financeiro2_rd_linhas (
+                rd_id,
+                data_lancamento,
+                descricao,
+                categoria,
+                aplicacao,
+                valor,
+                status
+            )
+            VALUES (
+                :rd_id,
+                :data_lancamento,
+                :descricao,
+                :categoria,
+                :aplicacao,
+                :valor,
+                'Ativo'
+            )
+        """), {
+            "rd_id": rd_id,
+            "data_lancamento": data_lancamento,
+            "descricao": descricao,
+            "categoria": categoria,
+            "aplicacao": aplicacao,
+            "valor": valor
+        })
+
+    flash("LINHA ADICIONADA COM SUCESSO.", "success")
+    return redirect(url_for("financeiro_dois.rd_editar", rd_id=rd_id))
+
+@bp.route("/rd/<int:rd_id>/linhas/<int:linha_id>/editar", methods=["POST"])
+@login_required
+@permission_required("financeiro", "visualizar")
+def rd_linha_editar(rd_id: int, linha_id: int):
+    data_lancamento = _nome_preenchido(request.form.get("data_lancamento"))
+    descricao = _nome_preenchido(request.form.get("descricao")).upper()
+    categoria = _nome_preenchido(request.form.get("categoria")).upper()
+    aplicacao = _nome_preenchido(request.form.get("aplicacao")).upper()
+    valor_txt = _nome_preenchido(request.form.get("valor")).replace(",", ".")
+
+    if not data_lancamento or not descricao or not categoria or not aplicacao or not valor_txt:
+        flash("PREENCHA DATA, DESCRIÇÃO, CATEGORIA, APLICAÇÃO E VALOR.", "warning")
+        return redirect(url_for("financeiro_dois.rd_editar", rd_id=rd_id))
+
+    try:
+        valor = float(valor_txt)
+    except ValueError:
+        flash("VALOR INVÁLIDO.", "warning")
+        return redirect(url_for("financeiro_dois.rd_editar", rd_id=rd_id))
+
+    if valor <= 0:
+        flash("A RD ACEITA APENAS VALORES POSITIVOS.", "warning")
+        return redirect(url_for("financeiro_dois.rd_editar", rd_id=rd_id))
+
+    engine = get_engine()
+    with engine.begin() as conn:
+        rd = conn.execute(text("""
+            SELECT id
+            FROM financeiro2_rd
+            WHERE id = :id
+        """), {"id": rd_id}).mappings().first()
+
+        if not rd:
+            flash("RD NÃO ENCONTRADA.", "danger")
+            return redirect(url_for("financeiro_dois.rd"))
+
+        linha = conn.execute(text("""
+            SELECT id, status
+            FROM financeiro2_rd_linhas
+            WHERE id = :linha_id
+              AND rd_id = :rd_id
+        """), {"linha_id": linha_id, "rd_id": rd_id}).mappings().first()
+
+        if not linha:
+            flash("LINHA NÃO ENCONTRADA.", "danger")
+            return redirect(url_for("financeiro_dois.rd_editar", rd_id=rd_id))
+
+        if linha["status"] != "Ativo":
+            flash("A LINHA ESTÁ INATIVA E NÃO PODE SER EDITADA.", "warning")
+            return redirect(url_for("financeiro_dois.rd_editar", rd_id=rd_id))
+
+        conn.execute(text("""
+            UPDATE financeiro2_rd_linhas
+            SET data_lancamento = :data_lancamento,
+                descricao = :descricao,
+                categoria = :categoria,
+                aplicacao = :aplicacao,
+                valor = :valor,
+                atualizado_em = CURRENT_TIMESTAMP
+            WHERE id = :linha_id
+              AND rd_id = :rd_id
+        """), {
+            "data_lancamento": data_lancamento,
+            "descricao": descricao,
+            "categoria": categoria,
+            "aplicacao": aplicacao,
+            "valor": valor,
+            "linha_id": linha_id,
+            "rd_id": rd_id
+        })
+
+    flash("LINHA ATUALIZADA COM SUCESSO.", "success")
+    return redirect(url_for("financeiro_dois.rd_editar", rd_id=rd_id))
+
+@bp.route("/rd/<int:rd_id>/linhas/<int:linha_id>/toggle-status", methods=["POST"])
+@login_required
+@permission_required("financeiro", "visualizar")
+def rd_linha_toggle_status(rd_id: int, linha_id: int):
+    engine = get_engine()
+    with engine.begin() as conn:
+        rd = conn.execute(text("""
+            SELECT id
+            FROM financeiro2_rd
+            WHERE id = :id
+        """), {"id": rd_id}).mappings().first()
+
+        if not rd:
+            flash("RD NÃO ENCONTRADA.", "danger")
+            return redirect(url_for("financeiro_dois.rd"))
+
+        linha = conn.execute(text("""
+            SELECT id, status
+            FROM financeiro2_rd_linhas
+            WHERE id = :linha_id
+              AND rd_id = :rd_id
+        """), {"linha_id": linha_id, "rd_id": rd_id}).mappings().first()
+
+        if not linha:
+            flash("LINHA NÃO ENCONTRADA.", "danger")
+            return redirect(url_for("financeiro_dois.rd_editar", rd_id=rd_id))
+
+        novo_status = "Inativo" if linha["status"] == "Ativo" else "Ativo"
+
+        conn.execute(text("""
+            UPDATE financeiro2_rd_linhas
+            SET status = :status,
+                atualizado_em = CURRENT_TIMESTAMP
+            WHERE id = :linha_id
+              AND rd_id = :rd_id
+        """), {
+            "status": novo_status,
+            "linha_id": linha_id,
+            "rd_id": rd_id
+        })
+
+    flash(f"LINHA ALTERADA PARA {novo_status.upper()}.", "success")
+    return redirect(url_for("financeiro_dois.rd_editar", rd_id=rd_id))
 
 # =========================
 # DESPESAS
