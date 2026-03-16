@@ -1334,7 +1334,7 @@ def om_linha_nova(om_id: int):
     engine = get_engine()
     with engine.begin() as conn:
         om = conn.execute(text("""
-            SELECT id, status
+            SELECT id, numero_om, status
             FROM financeiro2_om
             WHERE id = :id
         """), {"id": om_id}).mappings().first()
