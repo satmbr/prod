@@ -2232,7 +2232,8 @@ def rd_editar(rd_id: int):
                 COALESCE(categoria, '') AS categoria,
                 COALESCE(aplicacao, '') AS aplicacao,
                 COALESCE(valor, 0) AS valor,
-                COALESCE(status, 'Ativo') AS status
+                COALESCE(status, 'Ativo') AS status,
+                COALESCE(anexo_recibo, '') AS anexo_recibo
             FROM financeiro2_rd_linhas
             WHERE rd_id = :id
             ORDER BY id
@@ -2376,7 +2377,7 @@ def rd_linha_nova(rd_id: int):
     engine = get_engine()
     with engine.begin() as conn:
         rd = conn.execute(text("""
-            SELECT id
+            SELECT id, status
             FROM financeiro2_rd
             WHERE id = :id
         """), {"id": rd_id}).mappings().first()
@@ -2384,6 +2385,27 @@ def rd_linha_nova(rd_id: int):
         if not rd:
             flash("RD NÃO ENCONTRADA.", "danger")
             return redirect(url_for("financeiro_dois.rd"))
+
+        if str(rd["status"]).upper() == "QUITADA":
+            flash("ESTA RD ESTÁ QUITADA E BLOQUEADA PARA EDIÇÃO.", "warning")
+            return redirect(url_for("financeiro_dois.rd_editar", rd_id=rd_id))
+
+        arquivo = request.files.get("anexo_recibo")
+        nome_arquivo = None
+
+        if arquivo and arquivo.filename:
+            import os
+            import uuid
+            from werkzeug.utils import secure_filename
+
+            pasta = os.path.join("static", "uploads", "financeiro2", "rd_recibos")
+            os.makedirs(pasta, exist_ok=True)
+
+            nome_seguro = secure_filename(arquivo.filename)
+            extensao = os.path.splitext(nome_seguro)[1].lower()
+            nome_arquivo = f"{uuid.uuid4().hex}{extensao}"
+            caminho = os.path.join(pasta, nome_arquivo)
+            arquivo.save(caminho)
 
         conn.execute(text("""
             INSERT INTO financeiro2_rd_linhas (
@@ -2393,7 +2415,8 @@ def rd_linha_nova(rd_id: int):
                 categoria,
                 aplicacao,
                 valor,
-                status
+                status,
+                anexo_recibo
             )
             VALUES (
                 :rd_id,
@@ -2402,7 +2425,8 @@ def rd_linha_nova(rd_id: int):
                 :categoria,
                 :aplicacao,
                 :valor,
-                'Ativo'
+                'Ativo',
+                :anexo_recibo
             )
         """), {
             "rd_id": rd_id,
@@ -2410,7 +2434,8 @@ def rd_linha_nova(rd_id: int):
             "descricao": descricao,
             "categoria": categoria,
             "aplicacao": aplicacao,
-            "valor": valor
+            "valor": valor,
+            "anexo_recibo": nome_arquivo
         })
 
     flash("LINHA ADICIONADA COM SUCESSO.", "success")
@@ -2436,14 +2461,10 @@ def rd_linha_editar(rd_id: int, linha_id: int):
         flash("VALOR INVÁLIDO.", "warning")
         return redirect(url_for("financeiro_dois.rd_editar", rd_id=rd_id))
 
-    if valor <= 0:
-        flash("A RD ACEITA APENAS VALORES POSITIVOS.", "warning")
-        return redirect(url_for("financeiro_dois.rd_editar", rd_id=rd_id))
-
     engine = get_engine()
     with engine.begin() as conn:
         rd = conn.execute(text("""
-            SELECT id
+            SELECT id, status
             FROM financeiro2_rd
             WHERE id = :id
         """), {"id": rd_id}).mappings().first()
@@ -2452,8 +2473,12 @@ def rd_linha_editar(rd_id: int, linha_id: int):
             flash("RD NÃO ENCONTRADA.", "danger")
             return redirect(url_for("financeiro_dois.rd"))
 
+        if str(rd["status"]).upper() == "QUITADA":
+            flash("ESTA RD ESTÁ QUITADA E BLOQUEADA PARA EDIÇÃO.", "warning")
+            return redirect(url_for("financeiro_dois.rd_editar", rd_id=rd_id))
+
         linha = conn.execute(text("""
-            SELECT id, status
+            SELECT id, status, anexo_recibo
             FROM financeiro2_rd_linhas
             WHERE id = :linha_id
               AND rd_id = :rd_id
@@ -2467,6 +2492,23 @@ def rd_linha_editar(rd_id: int, linha_id: int):
             flash("A LINHA ESTÁ INATIVA E NÃO PODE SER EDITADA.", "warning")
             return redirect(url_for("financeiro_dois.rd_editar", rd_id=rd_id))
 
+        nome_arquivo = linha["anexo_recibo"]
+
+        arquivo = request.files.get("anexo_recibo")
+        if arquivo and arquivo.filename:
+            import os
+            import uuid
+            from werkzeug.utils import secure_filename
+
+            pasta = os.path.join("static", "uploads", "financeiro2", "rd_recibos")
+            os.makedirs(pasta, exist_ok=True)
+
+            nome_seguro = secure_filename(arquivo.filename)
+            extensao = os.path.splitext(nome_seguro)[1].lower()
+            nome_arquivo = f"{uuid.uuid4().hex}{extensao}"
+            caminho = os.path.join(pasta, nome_arquivo)
+            arquivo.save(caminho)
+
         conn.execute(text("""
             UPDATE financeiro2_rd_linhas
             SET data_lancamento = :data_lancamento,
@@ -2474,6 +2516,7 @@ def rd_linha_editar(rd_id: int, linha_id: int):
                 categoria = :categoria,
                 aplicacao = :aplicacao,
                 valor = :valor,
+                anexo_recibo = :anexo_recibo,
                 atualizado_em = CURRENT_TIMESTAMP
             WHERE id = :linha_id
               AND rd_id = :rd_id
@@ -2483,6 +2526,7 @@ def rd_linha_editar(rd_id: int, linha_id: int):
             "categoria": categoria,
             "aplicacao": aplicacao,
             "valor": valor,
+            "anexo_recibo": nome_arquivo,
             "linha_id": linha_id,
             "rd_id": rd_id
         })
@@ -2839,12 +2883,14 @@ def rd_exportar_pdf(rd_id: int):
 
         linhas = conn.execute(text("""
             SELECT
+                id,
                 TO_CHAR(data_lancamento, 'DD/MM/YYYY') AS data,
                 descricao,
                 COALESCE(categoria, '') AS categoria,
                 COALESCE(aplicacao, '') AS aplicacao,
                 COALESCE(valor, 0) AS valor,
-                COALESCE(status, 'Ativo') AS status
+                COALESCE(status, 'Ativo') AS status,
+                COALESCE(anexo_recibo, '') AS anexo_recibo
             FROM financeiro2_rd_linhas
             WHERE rd_id = :id
             ORDER BY id
@@ -2852,8 +2898,8 @@ def rd_exportar_pdf(rd_id: int):
 
     total = sum(float(l["valor"]) for l in linhas if l["status"] == "Ativo")
 
-    buffer = BytesIO()
-    pdf = canvas.Canvas(buffer, pagesize=A4)
+    buffer_base = BytesIO()
+    pdf = canvas.Canvas(buffer_base, pagesize=A4)
     largura, altura = A4
     y = altura - 40
 
@@ -2900,12 +2946,84 @@ def rd_exportar_pdf(rd_id: int):
     y -= 10
     pdf.setFont("Helvetica-Bold", 10)
     pdf.drawRightString(540, y, f"Saldo: {total:.2f}")
-
     pdf.save()
-    buffer.seek(0)
+    buffer_base.seek(0)
+
+    writer = PdfWriter()
+    base_reader = PdfReader(buffer_base)
+    for page in base_reader.pages:
+        writer.add_page(page)
+
+    for linha in linhas:
+        nome_anexo = (linha["anexo_recibo"] or "").strip()
+        if not nome_anexo:
+            continue
+
+        caminho = os.path.join(
+            current_app.root_path,
+            "static",
+            "uploads",
+            "financeiro2",
+            "rd_recibos",
+            nome_anexo
+        )
+
+        if not os.path.exists(caminho):
+            continue
+
+        extensao = os.path.splitext(caminho)[1].lower()
+
+        try:
+            if extensao == ".pdf":
+                anexo_reader = PdfReader(caminho)
+                for page in anexo_reader.pages:
+                    writer.add_page(page)
+
+            elif extensao in [".jpg", ".jpeg", ".png", ".bmp", ".webp"]:
+                img = Image.open(caminho)
+                if img.mode in ("RGBA", "P"):
+                    img = img.convert("RGB")
+
+                img_buffer = BytesIO()
+                c = canvas.Canvas(img_buffer, pagesize=A4)
+                largura_pg, altura_pg = A4
+
+                iw, ih = img.size
+                margem = 30
+                area_w = largura_pg - 2 * margem
+                area_h = altura_pg - 2 * margem
+
+                escala = min(area_w / iw, area_h / ih)
+                novo_w = iw * escala
+                novo_h = ih * escala
+
+                x = (largura_pg - novo_w) / 2
+                y_img = (altura_pg - novo_h) / 2
+
+                img_temp = BytesIO()
+                img.save(img_temp, format="JPEG")
+                img_temp.seek(0)
+
+                c.setFont("Helvetica-Bold", 11)
+                c.drawString(30, altura_pg - 20, f"RECIBO RD {rd['numero_rd']}")
+                c.drawImage(ImageReader(img_temp), x, y_img, width=novo_w, height=novo_h)
+                c.showPage()
+                c.save()
+
+                img_buffer.seek(0)
+                img_reader = PdfReader(img_buffer)
+                for page in img_reader.pages:
+                    writer.add_page(page)
+
+        except Exception:
+            continue
+
+    saida = BytesIO()
+    writer.write(saida)
+    saida.seek(0)
 
     return send_file(
-        buffer,
+        saida,
         as_attachment=True,
         download_name=f"{rd['numero_rd']}.pdf",
         mimetype="application/pdf",

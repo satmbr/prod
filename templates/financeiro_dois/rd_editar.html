@@ -121,7 +121,7 @@
     <div id="novaLinhaRdBox" class="om-card" style="display:none; margin-bottom:16px;">
       <div class="card-title">Nova linha da RD</div>
 
-      <form method="post" action="{{ url_for('financeiro_dois.rd_linha_nova', rd_id=rd.id) }}">
+      <form method="post" action="{{ url_for('financeiro_dois.rd_linha_nova', rd_id=rd.id) }}" enctype="multipart/form-data">
         <div class="form-grid">
           <div class="field">
             <label>Data</label>
@@ -161,6 +161,11 @@
           <div class="field">
             <label>Valor</label>
             <input class="input-like" type="text" name="valor" placeholder="Ex.: 150.00" required>
+          </div>
+
+          <div class="field field-full">
+            <label>Anexo do recibo (imagem ou PDF)</label>
+            <input class="input-like" type="file" name="anexo_recibo" accept=".pdf,image/*">
           </div>
         </div>
 
@@ -248,6 +253,7 @@
               <th>Aplicação</th>
               <th style="text-align:right;">Valor</th>
               <th>Status</th>
+              <th>Anexo</th>
               <th>Ações</th>
             </tr>
           </thead>
@@ -256,35 +262,43 @@
             <tr class="{% if linha.status != 'Ativo' %}linha-inativa{% endif %}">
               {% if not rd.bloqueada and linha.status == 'Ativo' %}
               <td>
-                <form method="post" action="{{ url_for('financeiro_dois.rd_linha_editar', rd_id=rd.id, linha_id=linha.id) }}" class="linha-form">
-                  <input class="input-like input-like-sm" type="date" name="data_lancamento" value="{{ linha.data_form }}" required>
+                <input class="input-like input-like-sm" type="date" name="data_lancamento" value="{{ linha.data_form }}" form="linha-rd-{{ linha.id }}" required>
               </td>
               <td>
-                  <select class="input-like input-like-sm" name="descricao" required>
-                    {% for item in descricoes %}
-                    <option value="{{ item.nome }}" {% if linha.descricao == item.nome %}selected{% endif %}>{{ item.nome }}</option>
-                    {% endfor %}
-                  </select>
+                <select class="input-like input-like-sm" name="descricao" form="linha-rd-{{ linha.id }}" required>
+                  {% for item in descricoes %}
+                  <option value="{{ item.nome }}" {% if linha.descricao == item.nome %}selected{% endif %}>{{ item.nome }}</option>
+                  {% endfor %}
+                </select>
               </td>
               <td>
-                  <select class="input-like input-like-sm" name="categoria" required>
-                    {% for item in categorias %}
-                    <option value="{{ item.nome }}" {% if linha.categoria == item.nome %}selected{% endif %}>{{ item.nome }}</option>
-                    {% endfor %}
-                  </select>
+                <select class="input-like input-like-sm" name="categoria" form="linha-rd-{{ linha.id }}" required>
+                  {% for item in categorias %}
+                  <option value="{{ item.nome }}" {% if linha.categoria == item.nome %}selected{% endif %}>{{ item.nome }}</option>
+                  {% endfor %}
+                </select>
               </td>
               <td>
-                  <select class="input-like input-like-sm" name="aplicacao" required>
-                    {% for item in aplicacoes %}
-                    <option value="{{ item.nome }}" {% if linha.aplicacao == item.nome %}selected{% endif %}>{{ item.nome }}</option>
-                    {% endfor %}
-                  </select>
+                <select class="input-like input-like-sm" name="aplicacao" form="linha-rd-{{ linha.id }}" required>
+                  {% for item in aplicacoes %}
+                  <option value="{{ item.nome }}" {% if linha.aplicacao == item.nome %}selected{% endif %}>{{ item.nome }}</option>
+                  {% endfor %}
+                </select>
               </td>
               <td>
-                  <input class="input-like input-like-sm" type="text" name="valor" value="{{ '%.2f'|format(linha.valor|abs) }}" required>
+                <input class="input-like input-like-sm" type="text" name="valor" value="{{ '%.2f'|format(linha.valor) }}" form="linha-rd-{{ linha.id }}" required>
               </td>
               <td>{{ linha.status }}</td>
               <td>
+                {% if linha.anexo_recibo %}
+                <a class="btn btn-sm" href="{{ url_for('static', filename='uploads/financeiro2/rd_recibos/' ~ linha.anexo_recibo) }}" target="_blank">Abrir recibo</a>
+                {% else %}
+                —
+                {% endif %}
+              </td>
+              <td>
+                <form id="linha-rd-{{ linha.id }}" method="post" action="{{ url_for('financeiro_dois.rd_linha_editar', rd_id=rd.id, linha_id=linha.id) }}" enctype="multipart/form-data">
+                  <input type="file" name="anexo_recibo" class="input-like input-like-sm" style="margin-bottom:6px;">
                   <button type="submit" class="btn btn-sm">Salvar</button>
                 </form>
                 <form method="post" action="{{ url_for('financeiro_dois.rd_linha_toggle_status', rd_id=rd.id, linha_id=linha.id) }}" style="margin-top:6px;">
@@ -298,6 +312,13 @@
               <td>{{ linha.aplicacao }}</td>
               <td style="text-align:right;">R$ {{ '%.2f'|format(linha.valor) }}</td>
               <td>{{ linha.status }}</td>
+              <td>
+                {% if linha.anexo_recibo %}
+                <a class="btn btn-sm" href="{{ url_for('static', filename='uploads/financeiro2/rd_recibos/' ~ linha.anexo_recibo) }}" target="_blank">Abrir recibo</a>
+                {% else %}
+                —
+                {% endif %}
+              </td>
               <td>
                 {% if not rd.bloqueada %}
                 <form method="post" action="{{ url_for('financeiro_dois.rd_linha_toggle_status', rd_id=rd.id, linha_id=linha.id) }}">
@@ -313,7 +334,7 @@
             </tr>
             {% else %}
             <tr>
-              <td colspan="7">Sem linhas lançadas.</td>
+              <td colspan="8">Sem linhas lançadas.</td>
             </tr>
             {% endfor %}
           </tbody>
@@ -440,10 +461,6 @@
   .linha-inativa{
     opacity:0.6;
     background:#fafafa;
-  }
-
-  .linha-form{
-    display:contents;
   }
 
   .warn-box{
