@@ -19,31 +19,37 @@
       <div class="table-wrap">
         <table class="table">
           <thead>
-            <tr>
-              <th>Data</th>
-              <th>Recibo</th>
-              <th>Descrição</th>
-              <th>Detalhes</th>
-              <th>Valor</th>
-              <th>Anexo</th>
-            </tr>
+			<tr>
+			  <th>Origem</th>
+			  <th>Data</th>
+			  <th>Recibo</th>
+			  <th>Descrição</th>
+			  <th>Detalhes</th>
+			  <th>Categoria</th>
+			  <th>Aplicação</th>
+			  <th>Valor</th>
+			  <th>Anexo</th>
+			</tr>
           </thead>
           <tbody>
             {% for item in duplicadas %}
-            <tr>
-              <td>{{ item.data }}</td>
-              <td>{{ item.recibo }}</td>
-              <td>{{ item.descricao }}</td>
-              <td>{{ item.detalhes }}</td>
-              <td>R$ {{ '%.2f'|format(item.valor) }}</td>
-              <td>
-                {% if item.anexo_recibo %}
-                <a class="btn btn-sm" href="{{ url_for('static', filename='uploads/financeiro2/om_recibos/' ~ item.anexo_recibo) }}" target="_blank">Abrir recibo</a>
-                {% else %}
-                —
-                {% endif %}
-              </td>
-            </tr>
+			<tr>
+			  <td>{{ item.origem }}</td>
+			  <td>{{ item.data }}</td>
+			  <td>{{ item.recibo or '—' }}</td>
+			  <td>{{ item.descricao }}</td>
+			  <td>{{ item.detalhes or '—' }}</td>
+			  <td>{{ item.categoria or '—' }}</td>
+			  <td>{{ item.aplicacao or '—' }}</td>
+			  <td>R$ {{ '%.2f'|format(item.valor) }}</td>
+			  <td>
+				{% if item.anexo_recibo %}
+				<a class="btn btn-sm" href="{{ url_for('static', filename='uploads/financeiro2/' ~ item.pasta_recibo ~ '/' ~ item.anexo_recibo) }}" target="_blank">Abrir recibo</a>
+				{% else %}
+				—
+				{% endif %}
+			  </td>
+			</tr>
             {% endfor %}
           </tbody>
         </table>

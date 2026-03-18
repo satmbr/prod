@@ -1383,20 +1383,46 @@ def om_linha_nova(om_id: int):
 
         if not forcar_salvamento:
             duplicadas = conn.execute(text("""
-                SELECT
-                    id,
-                    TO_CHAR(data_lancamento, 'DD/MM/YYYY') AS data,
-                    COALESCE(recibo, id) AS recibo,
-                    COALESCE(tipo_linha, '') AS descricao,
-                    COALESCE(detalhes, '') AS detalhes,
-                    COALESCE(valor, 0) AS valor,
-                    COALESCE(anexo_recibo, '') AS anexo_recibo
-                FROM financeiro2_om_linhas
-                WHERE om_id = :om_id
-                  AND data_lancamento = :data_lancamento
-                  AND valor = :valor
-                  AND COALESCE(status, 'Ativo') = 'Ativo'
-                ORDER BY id
+                SELECT *
+                FROM (
+                    SELECT
+                        'OM' AS origem,
+                        id,
+                        TO_CHAR(data_lancamento, 'DD/MM/YYYY') AS data,
+                        COALESCE(recibo, id) AS recibo,
+                        COALESCE(tipo_linha, '') AS descricao,
+                        COALESCE(detalhes, '') AS detalhes,
+                        COALESCE(categoria, '') AS categoria,
+                        COALESCE(aplicacao, '') AS aplicacao,
+                        COALESCE(valor, 0) AS valor,
+                        COALESCE(anexo_recibo, '') AS anexo_recibo,
+                        'om_recibos' AS pasta_recibo
+                    FROM financeiro2_om_linhas
+                    WHERE om_id = :om_id
+                      AND data_lancamento = :data_lancamento
+                      AND valor = :valor
+                      AND COALESCE(status, 'Ativo') = 'Ativo'
+
+                    UNION ALL
+
+                    SELECT
+                        'RD' AS origem,
+                        id,
+                        TO_CHAR(data_lancamento, 'DD/MM/YYYY') AS data,
+                        NULL AS recibo,
+                        COALESCE(descricao, '') AS descricao,
+                        '' AS detalhes,
+                        COALESCE(categoria, '') AS categoria,
+                        COALESCE(aplicacao, '') AS aplicacao,
+                        COALESCE(valor, 0) AS valor,
+                        COALESCE(anexo_recibo, '') AS anexo_recibo,
+                        'rd_recibos' AS pasta_recibo
+                    FROM financeiro2_rd_linhas
+                    WHERE data_lancamento = :data_lancamento
+                      AND valor = :valor
+                      AND COALESCE(status, 'Ativo') = 'Ativo'
+                ) x
+                ORDER BY origem, id
             """), {
                 "om_id": om_id,
                 "data_lancamento": data_lancamento,
