@@ -2681,22 +2681,23 @@ def om_linha_confirmar_duplicidade(om_id: int):
         }).mappings().all()
 
     if not duplicadas:
-            return redirect(url_for("financeiro_dois.om_editar", om_id=om_id))
-        return render_template(
-            "financeiro_dois/om_confirmar_duplicidade.html",
-            subnav_links=build_financeiro_dois_subnav("om"),
-            om_id=om_id,
-            duplicadas=duplicadas,
-            form_data={
-                "data_lancamento": data_lancamento,
-                "descricao": descricao,
-                "detalhes": detalhes,
-                "categoria": categoria,
-                "aplicacao": aplicacao,
-                "valor": valor_txt,
-                "moeda_codigo": moeda_codigo,
-            }
-        )
+        return redirect(url_for("financeiro_dois.om_editar", om_id=om_id))
+
+    return render_template(
+        "financeiro_dois/om_confirmar_duplicidade.html",
+        subnav_links=build_financeiro_dois_subnav("om"),
+        om_id=om_id,
+        duplicadas=duplicadas,
+        form_data={
+            "data_lancamento": data_lancamento,
+            "descricao": descricao,
+            "detalhes": detalhes,
+            "categoria": categoria,
+            "aplicacao": aplicacao,
+            "valor": valor_txt,
+            "moeda_codigo": moeda_codigo,
+        }
+    )
     
 @bp.route("/rd/<int:rd_id>/linhas/confirmar-duplicidade", methods=["POST"])
 @login_required
