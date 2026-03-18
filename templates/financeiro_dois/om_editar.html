@@ -106,7 +106,7 @@
     <div id="novaLinhaBox" class="om-card" style="display:none; margin-bottom:16px;">
       <div class="card-title">Nova linha da OM</div>
 
-      <form method="post" action="{{ url_for('financeiro_dois.om_linha_nova', om_id=om.id) }}" enctype="multipart/form-data">
+      <form method="post" action="{{ url_for('financeiro_dois.om_linha_confirmar_duplicidade', om_id=om.id) }}" enctype="multipart/form-data">
         <div class="form-grid">
           <div class="field">
             <label>Data</label>
@@ -277,7 +277,7 @@
 			</tr>
 		  </thead>
 		  <tbody>
-			{% for linha in om.linhas %}
+			{% for linha in om.linhas if linha.status == 'Ativo' %}
 			<tr class="{% if linha.status != 'Ativo' %}linha-inativa{% endif %}">
 			  <td>
 				{% if not om.bloqueada and linha.status == 'Ativo' %}

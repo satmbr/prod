@@ -1402,7 +1402,75 @@ def om_linha_nova(om_id: int):
             nome_arquivo = f"{uuid.uuid4().hex}{extensao}"
             caminho = os.path.join(pasta, nome_arquivo)
             arquivo.save(caminho)
+            
+        duplicada = conn.execute(text("""
+            SELECT id
+            FROM financeiro2_om_linhas
+            WHERE om_id = :om_id
+              AND data_lancamento = :data_lancamento
+              AND valor = :valor
+              AND COALESCE(status, 'Ativo') = 'Ativo'
+            LIMIT 1
+        """), {
+            "om_id": om_id,
+            "data_lancamento": data_lancamento,
+            "valor": valor
+        }).mappings().first()
 
+        if duplicada and request.form.get("forcar_salvamento") != "1":
+            return redirect(url_for("financeiro_dois.om_editar", om_id=om_id) + "?duplicidade=1")
+            
+        if request.form.get("forcar_salvamento") != "1":
+            duplicada = conn.execute(text("""
+                SELECT id
+                FROM financeiro2_om_linhas
+                WHERE om_id = :om_id
+                  AND data_lancamento = :data_lancamento
+                  AND valor = :valor
+                  AND COALESCE(status, 'Ativo') = 'Ativo'
+                LIMIT 1
+            """), {
+                "om_id": om_id,
+                "data_lancamento": data_lancamento,
+                "valor": valor
+            }).mappings().first()
+
+            if duplicada:
+                return render_template(
+                    "financeiro_dois/om_confirmar_duplicidade.html",
+                    subnav_links=build_financeiro_dois_subnav("om"),
+                    om_id=om_id,
+                    duplicadas=conn.execute(text("""
+                        SELECT
+                            id,
+                            TO_CHAR(data_lancamento, 'DD/MM/YYYY') AS data,
+                            COALESCE(recibo, id) AS recibo,
+                            COALESCE(tipo_linha, '') AS descricao,
+                            COALESCE(detalhes, '') AS detalhes,
+                            COALESCE(valor, 0) AS valor,
+                            COALESCE(anexo_recibo, '') AS anexo_recibo
+                        FROM financeiro2_om_linhas
+                        WHERE om_id = :om_id
+                          AND data_lancamento = :data_lancamento
+                          AND valor = :valor
+                          AND COALESCE(status, 'Ativo') = 'Ativo'
+                        ORDER BY id
+                    """), {
+                        "om_id": om_id,
+                        "data_lancamento": data_lancamento,
+                        "valor": valor
+                    }).mappings().all(),
+                    form_data={
+                        "data_lancamento": data_lancamento,
+                        "descricao": descricao,
+                        "detalhes": detalhes,
+                        "categoria": categoria,
+                        "aplicacao": aplicacao,
+                        "valor": valor_txt,
+                        "moeda_codigo": moeda_codigo,
+                    }
+                )            
+            
         conn.execute(text("""
             INSERT INTO financeiro2_om_linhas (
                 om_id,
@@ -1707,6 +1775,7 @@ def om_exportar_excel(om_id: int):
                 COALESCE(valor_brl, 0) AS valor_brl
             FROM financeiro2_om_linhas
             WHERE om_id = :id
+              AND COALESCE(status, 'Ativo') = 'Ativo'
             ORDER BY recibo, id
         """), {"id": om_id}).mappings().all()
 
@@ -1788,6 +1857,7 @@ def om_exportar_pdf(om_id: int):
                 COALESCE(status, 'Ativo') AS status
             FROM financeiro2_om_linhas
             WHERE om_id = :id
+              AND COALESCE(status, 'Ativo') = 'Ativo'
             ORDER BY recibo, id
         """), {"id": om_id}).mappings().all()
 
@@ -2407,6 +2477,55 @@ def rd_linha_nova(rd_id: int):
             caminho = os.path.join(pasta, nome_arquivo)
             arquivo.save(caminho)
 
+        if request.form.get("forcar_salvamento") != "1":
+            duplicada = conn.execute(text("""
+                SELECT id
+                FROM financeiro2_rd_linhas
+                WHERE rd_id = :rd_id
+                  AND data_lancamento = :data_lancamento
+                  AND valor = :valor
+                  AND COALESCE(status, 'Ativo') = 'Ativo'
+                LIMIT 1
+            """), {
+                "rd_id": rd_id,
+                "data_lancamento": data_lancamento,
+                "valor": valor
+            }).mappings().first()
+
+            if duplicada:
+                return render_template(
+                    "financeiro_dois/rd_confirmar_duplicidade.html",
+                    subnav_links=build_financeiro_dois_subnav("rd"),
+                    rd_id=rd_id,
+                    duplicadas=conn.execute(text("""
+                        SELECT
+                            id,
+                            TO_CHAR(data_lancamento, 'DD/MM/YYYY') AS data,
+                            descricao,
+                            categoria,
+                            aplicacao,
+                            valor,
+                            COALESCE(anexo_recibo, '') AS anexo_recibo
+                        FROM financeiro2_rd_linhas
+                        WHERE rd_id = :rd_id
+                          AND data_lancamento = :data_lancamento
+                          AND valor = :valor
+                          AND COALESCE(status, 'Ativo') = 'Ativo'
+                        ORDER BY id
+                    """), {
+                        "rd_id": rd_id,
+                        "data_lancamento": data_lancamento,
+                        "valor": valor
+                    }).mappings().all(),
+                    form_data={
+                        "data_lancamento": data_lancamento,
+                        "descricao": descricao,
+                        "categoria": categoria,
+                        "aplicacao": aplicacao,
+                        "valor": valor_txt,
+                    }
+                )
+
         conn.execute(text("""
             INSERT INTO financeiro2_rd_linhas (
                 rd_id,
@@ -2558,6 +2677,116 @@ def rd_linha_toggle_status(rd_id: int, linha_id: int):
 
     flash(f"LINHA ALTERADA PARA {novo_status.upper()}.", "success")
     return redirect(url_for("financeiro_dois.rd_editar", rd_id=rd_id))
+    
+@bp.route("/om/<int:om_id>/linhas/confirmar-duplicidade", methods=["POST"])
+@login_required
+@permission_required("financeiro", "visualizar")
+def om_linha_confirmar_duplicidade(om_id: int):
+    data_lancamento = _nome_preenchido(request.form.get("data_lancamento"))
+    descricao = _nome_preenchido(request.form.get("descricao")).upper()
+    detalhes = _nome_preenchido(request.form.get("detalhes")).upper()
+    categoria = _nome_preenchido(request.form.get("categoria")).upper()
+    aplicacao = _nome_preenchido(request.form.get("aplicacao")).upper()
+    valor_txt = _nome_preenchido(request.form.get("valor")).replace(",", ".")
+    moeda_codigo = _nome_preenchido(request.form.get("moeda_codigo")).upper() or "BRL"
+
+    try:
+        valor = float(valor_txt)
+    except ValueError:
+        flash("VALOR INVÁLIDO.", "warning")
+        return redirect(url_for("financeiro_dois.om_editar", om_id=om_id))
+
+    engine = get_engine()
+    with engine.connect() as conn:
+        duplicadas = conn.execute(text("""
+            SELECT
+                id,
+                TO_CHAR(data_lancamento, 'DD/MM/YYYY') AS data,
+                COALESCE(recibo, id) AS recibo,
+                COALESCE(tipo_linha, '') AS descricao,
+                COALESCE(detalhes, '') AS detalhes,
+                COALESCE(valor, 0) AS valor,
+                COALESCE(anexo_recibo, '') AS anexo_recibo
+            FROM financeiro2_om_linhas
+            WHERE om_id = :om_id
+              AND data_lancamento = :data_lancamento
+              AND valor = :valor
+              AND COALESCE(status, 'Ativo') = 'Ativo'
+            ORDER BY id
+        """), {
+            "om_id": om_id,
+            "data_lancamento": data_lancamento,
+            "valor": valor
+        }).mappings().all()
+
+    return render_template(
+        "financeiro_dois/om_confirmar_duplicidade.html",
+        subnav_links=build_financeiro_dois_subnav("om"),
+        om_id=om_id,
+        duplicadas=duplicadas,
+        form_data={
+            "data_lancamento": data_lancamento,
+            "descricao": descricao,
+            "detalhes": detalhes,
+            "categoria": categoria,
+            "aplicacao": aplicacao,
+            "valor": valor_txt,
+            "moeda_codigo": moeda_codigo,
+        }
+    )
+    
+@bp.route("/rd/<int:rd_id>/linhas/confirmar-duplicidade", methods=["POST"])
+@login_required
+@permission_required("financeiro", "visualizar")
+def rd_linha_confirmar_duplicidade(rd_id: int):
+    data_lancamento = _nome_preenchido(request.form.get("data_lancamento"))
+    descricao = _nome_preenchido(request.form.get("descricao")).upper()
+    categoria = _nome_preenchido(request.form.get("categoria")).upper()
+    aplicacao = _nome_preenchido(request.form.get("aplicacao")).upper()
+    valor_txt = _nome_preenchido(request.form.get("valor")).replace(",", ".")
+
+    try:
+        valor = float(valor_txt)
+    except ValueError:
+        flash("VALOR INVÁLIDO.", "warning")
+        return redirect(url_for("financeiro_dois.rd_editar", rd_id=rd_id))
+
+    engine = get_engine()
+    with engine.connect() as conn:
+        duplicadas = conn.execute(text("""
+            SELECT
+                id,
+                TO_CHAR(data_lancamento, 'DD/MM/YYYY') AS data,
+                descricao,
+                categoria,
+                aplicacao,
+                valor,
+                COALESCE(anexo_recibo, '') AS anexo_recibo
+            FROM financeiro2_rd_linhas
+            WHERE rd_id = :rd_id
+              AND data_lancamento = :data_lancamento
+              AND valor = :valor
+              AND COALESCE(status, 'Ativo') = 'Ativo'
+            ORDER BY id
+        """), {
+            "rd_id": rd_id,
+            "data_lancamento": data_lancamento,
+            "valor": valor
+        }).mappings().all()
+
+    return render_template(
+        "financeiro_dois/rd_confirmar_duplicidade.html",
+        subnav_links=build_financeiro_dois_subnav("rd"),
+        rd_id=rd_id,
+        duplicadas=duplicadas,
+        form_data={
+            "data_lancamento": data_lancamento,
+            "descricao": descricao,
+            "categoria": categoria,
+            "aplicacao": aplicacao,
+            "valor": valor_txt,
+        }
+    )
 
 # =========================
 # DESPESAS
@@ -2794,6 +3023,7 @@ def rd_exportar_excel(rd_id: int):
                 COALESCE(status, 'Ativo') AS status
             FROM financeiro2_rd_linhas
             WHERE rd_id = :id
+              AND COALESCE(status, 'Ativo') = 'Ativo'
             ORDER BY id
         """), {"id": rd_id}).mappings().all()
 
@@ -2874,6 +3104,7 @@ def rd_exportar_pdf(rd_id: int):
                 COALESCE(anexo_recibo, '') AS anexo_recibo
             FROM financeiro2_rd_linhas
             WHERE rd_id = :id
+              AND COALESCE(status, 'Ativo') = 'Ativo'
             ORDER BY id
         """), {"id": rd_id}).mappings().all()
 

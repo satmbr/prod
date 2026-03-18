@@ -121,7 +121,7 @@
     <div id="novaLinhaRdBox" class="om-card" style="display:none; margin-bottom:16px;">
       <div class="card-title">Nova linha da RD</div>
 
-      <form method="post" action="{{ url_for('financeiro_dois.rd_linha_nova', rd_id=rd.id) }}" enctype="multipart/form-data">
+      <form method="post" action="{{ url_for('financeiro_dois.rd_linha_confirmar_duplicidade', rd_id=rd.id) }}" enctype="multipart/form-data">
         <div class="form-grid">
           <div class="field">
             <label>Data</label>

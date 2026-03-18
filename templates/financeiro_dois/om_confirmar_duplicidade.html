@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Confirmar possível duplicidade | OM{% endblock %}
+
+{% block content %}
+<div class="page-wrap">
+  <section class="zone">
+    <div class="zone-head">
+      <div class="zone-left">
+        <div class="zone-icon">⚠️</div>
+        <div>
+          <div class="zone-title">Possível despesa repetida na OM</div>
+          <div class="muted">Existe uma linha com a mesma data e o mesmo valor.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="om-card" style="margin-bottom:16px;">
+      <div class="card-title">Linhas encontradas</div>
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Recibo</th>
+              <th>Descrição</th>
+              <th>Detalhes</th>
+              <th>Valor</th>
+              <th>Anexo</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in duplicadas %}
+            <tr>
+              <td>{{ item.data }}</td>
+              <td>{{ item.recibo }}</td>
+              <td>{{ item.descricao }}</td>
+              <td>{{ item.detalhes }}</td>
+              <td>R$ {{ '%.2f'|format(item.valor) }}</td>
+              <td>
+                {% if item.anexo_recibo %}
+                <a class="btn btn-sm" href="{{ url_for('static', filename='uploads/financeiro2/om_recibos/' ~ item.anexo_recibo) }}" target="_blank">Abrir recibo</a>
+                {% else %}
+                —
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="om-card">
+      <div class="card-title">Deseja salvar mesmo assim?</div>
+
+      <form method="post" action="{{ url_for('financeiro_dois.om_linha_nova', om_id=om_id) }}">
+        {% for chave, valor in form_data.items() %}
+        <input type="hidden" name="{{ chave }}" value="{{ valor }}">
+        {% endfor %}
+        <input type="hidden" name="forcar_salvamento" value="1">
+
+        <div class="form-actions-top">
+          <button type="submit" class="btn btn-primary">Salvar mesmo assim</button>
+          <a class="btn" href="{{ url_for('financeiro_dois.om_editar', om_id=om_id) }}">Cancelar</a>
+        </div>
+      </form>
+    </div>
+  </section>
+</div>
+{% endblock %}
