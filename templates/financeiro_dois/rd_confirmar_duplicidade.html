@@ -21,6 +21,7 @@
           <thead>
             <tr>
               <th>ORIGEM</th>
+			  <th>NÚMERO</th>
               <th>DATA</th>
               <th>RECIBO</th>
               <th>DESCRIÇÃO</th>
@@ -34,8 +35,9 @@
           <tbody>
             {% for item in duplicadas %}
             <tr>
-              <td>{{ item.origem }}</td>
-              <td>{{ item.data }}</td>
+			  <td>{{ item.origem }}</td>
+			  <td>{{ item.origem_numero or '—' }}</td>
+			  <td>{{ item.data }}</td>
               <td>{{ item.recibo or '—' }}</td>
               <td>{{ item.descricao }}</td>
               <td>{{ item.detalhes or '—' }}</td>

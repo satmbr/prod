@@ -1332,6 +1332,7 @@ def om_linha_nova(om_id: int):
     aplicacao = _nome_preenchido(request.form.get("aplicacao")).upper()
     valor_txt = _nome_preenchido(request.form.get("valor")).replace(",", ".")
     moeda_codigo = _nome_preenchido(request.form.get("moeda_codigo")).upper() or "BRL"
+    anexo_recibo_salvo = _nome_preenchido(request.form.get("anexo_recibo_salvo"))
     forcar_salvamento = request.form.get("forcar_salvamento") == "1"
 
     if not data_lancamento or not descricao or not categoria or not aplicacao or not valor_txt:
@@ -1381,47 +1382,68 @@ def om_linha_nova(om_id: int):
 
         valor_brl = round(valor / cambio, 2)
 
+        nome_arquivo = anexo_recibo_salvo or None
+        arquivo = request.files.get("anexo_recibo")
+
+        if arquivo and arquivo.filename:
+            import os
+            import uuid
+            from werkzeug.utils import secure_filename
+
+            pasta = os.path.join("static", "uploads", "financeiro2", "om_recibos")
+            os.makedirs(pasta, exist_ok=True)
+
+            nome_seguro = secure_filename(arquivo.filename)
+            extensao = os.path.splitext(nome_seguro)[1].lower()
+            nome_arquivo = f"{uuid.uuid4().hex}{extensao}"
+            caminho = os.path.join(pasta, nome_arquivo)
+            arquivo.save(caminho)
+
         if not forcar_salvamento:
             duplicadas = conn.execute(text("""
                 SELECT *
                 FROM (
                     SELECT
                         'OM' AS origem,
-                        id,
-                        TO_CHAR(data_lancamento, 'DD/MM/YYYY') AS data,
-                        COALESCE(recibo, id) AS recibo,
-                        UPPER(COALESCE(tipo_linha, '')) AS descricao,
-                        UPPER(COALESCE(detalhes, '')) AS detalhes,
-                        UPPER(COALESCE(categoria, '')) AS categoria,
-                        UPPER(COALESCE(aplicacao, '')) AS aplicacao,
-                        COALESCE(valor, 0) AS valor,
-                        COALESCE(anexo_recibo, '') AS anexo_recibo,
+                        om.numero_om AS origem_numero,
+                        l.id,
+                        TO_CHAR(l.data_lancamento, 'DD/MM/YYYY') AS data,
+                        COALESCE(l.recibo, l.id) AS recibo,
+                        UPPER(COALESCE(l.tipo_linha, '')) AS descricao,
+                        UPPER(COALESCE(l.detalhes, '')) AS detalhes,
+                        UPPER(COALESCE(l.categoria, '')) AS categoria,
+                        UPPER(COALESCE(l.aplicacao, '')) AS aplicacao,
+                        COALESCE(l.valor, 0) AS valor,
+                        COALESCE(l.anexo_recibo, '') AS anexo_recibo,
                         'om_recibos' AS pasta_recibo
-                    FROM financeiro2_om_linhas
-                    WHERE data_lancamento = :data_lancamento
-                      AND valor = :valor
-                      AND COALESCE(status, 'Ativo') = 'Ativo'
+                    FROM financeiro2_om_linhas l
+                    JOIN financeiro2_om om ON om.id = l.om_id
+                    WHERE l.data_lancamento = :data_lancamento
+                      AND l.valor = :valor
+                      AND COALESCE(l.status, 'Ativo') = 'Ativo'
 
                     UNION ALL
 
                     SELECT
                         'RD' AS origem,
-                        id,
-                        TO_CHAR(data_lancamento, 'DD/MM/YYYY') AS data,
+                        rd.numero_rd AS origem_numero,
+                        l.id,
+                        TO_CHAR(l.data_lancamento, 'DD/MM/YYYY') AS data,
                         NULL AS recibo,
-                        UPPER(COALESCE(descricao, '')) AS descricao,
+                        UPPER(COALESCE(l.descricao, '')) AS descricao,
                         '' AS detalhes,
-                        UPPER(COALESCE(categoria, '')) AS categoria,
-                        UPPER(COALESCE(aplicacao, '')) AS aplicacao,
-                        COALESCE(valor, 0) AS valor,
-                        COALESCE(anexo_recibo, '') AS anexo_recibo,
+                        UPPER(COALESCE(l.categoria, '')) AS categoria,
+                        UPPER(COALESCE(l.aplicacao, '')) AS aplicacao,
+                        COALESCE(l.valor, 0) AS valor,
+                        COALESCE(l.anexo_recibo, '') AS anexo_recibo,
                         'rd_recibos' AS pasta_recibo
-                    FROM financeiro2_rd_linhas
-                    WHERE data_lancamento = :data_lancamento
-                      AND valor = :valor
-                      AND COALESCE(status, 'Ativo') = 'Ativo'
+                    FROM financeiro2_rd_linhas l
+                    JOIN financeiro2_rd rd ON rd.id = l.rd_id
+                    WHERE l.data_lancamento = :data_lancamento
+                      AND l.valor = :valor
+                      AND COALESCE(l.status, 'Ativo') = 'Ativo'
                 ) x
-                ORDER BY origem, id
+                ORDER BY origem, origem_numero, id
             """), {
                 "data_lancamento": data_lancamento,
                 "valor": valor
@@ -1441,6 +1463,7 @@ def om_linha_nova(om_id: int):
                         "aplicacao": aplicacao,
                         "valor": valor_txt,
                         "moeda_codigo": moeda_codigo,
+                        "anexo_recibo_salvo": nome_arquivo or "",
                     }
                 )
 
@@ -1449,23 +1472,6 @@ def om_linha_nova(om_id: int):
             FROM financeiro2_om_linhas
             WHERE om_id = :om_id
         """), {"om_id": om_id}).mappings().first()["proximo"]
-
-        arquivo = request.files.get("anexo_recibo")
-        nome_arquivo = None
-
-        if arquivo and arquivo.filename:
-            import os
-            import uuid
-            from werkzeug.utils import secure_filename
-
-            pasta = os.path.join("static", "uploads", "financeiro2", "om_recibos")
-            os.makedirs(pasta, exist_ok=True)
-
-            nome_seguro = secure_filename(arquivo.filename)
-            extensao = os.path.splitext(nome_seguro)[1].lower()
-            nome_arquivo = f"{uuid.uuid4().hex}{extensao}"
-            caminho = os.path.join(pasta, nome_arquivo)
-            arquivo.save(caminho)
 
         conn.execute(text("""
             INSERT INTO financeiro2_om_linhas (
@@ -2428,6 +2434,7 @@ def rd_linha_nova(rd_id: int):
     categoria = _nome_preenchido(request.form.get("categoria")).upper()
     aplicacao = _nome_preenchido(request.form.get("aplicacao")).upper()
     valor_txt = _nome_preenchido(request.form.get("valor")).replace(",", ".")
+    anexo_recibo_salvo = _nome_preenchido(request.form.get("anexo_recibo_salvo"))
     forcar_salvamento = request.form.get("forcar_salvamento") == "1"
 
     if not data_lancamento or not descricao or not categoria or not aplicacao or not valor_txt:
@@ -2460,47 +2467,68 @@ def rd_linha_nova(rd_id: int):
             flash("ESTA RD ESTÁ QUITADA E BLOQUEADA PARA EDIÇÃO.", "warning")
             return redirect(url_for("financeiro_dois.rd_editar", rd_id=rd_id))
 
+        nome_arquivo = anexo_recibo_salvo or None
+        arquivo = request.files.get("anexo_recibo")
+
+        if arquivo and arquivo.filename:
+            import os
+            import uuid
+            from werkzeug.utils import secure_filename
+
+            pasta = os.path.join("static", "uploads", "financeiro2", "rd_recibos")
+            os.makedirs(pasta, exist_ok=True)
+
+            nome_seguro = secure_filename(arquivo.filename)
+            extensao = os.path.splitext(nome_seguro)[1].lower()
+            nome_arquivo = f"{uuid.uuid4().hex}{extensao}"
+            caminho = os.path.join(pasta, nome_arquivo)
+            arquivo.save(caminho)
+
         if not forcar_salvamento:
             duplicadas = conn.execute(text("""
                 SELECT *
                 FROM (
                     SELECT
                         'RD' AS origem,
-                        id,
-                        TO_CHAR(data_lancamento, 'DD/MM/YYYY') AS data,
+                        rd.numero_rd AS origem_numero,
+                        l.id,
+                        TO_CHAR(l.data_lancamento, 'DD/MM/YYYY') AS data,
                         NULL AS recibo,
-                        UPPER(COALESCE(descricao, '')) AS descricao,
+                        UPPER(COALESCE(l.descricao, '')) AS descricao,
                         '' AS detalhes,
-                        UPPER(COALESCE(categoria, '')) AS categoria,
-                        UPPER(COALESCE(aplicacao, '')) AS aplicacao,
-                        COALESCE(valor, 0) AS valor,
-                        COALESCE(anexo_recibo, '') AS anexo_recibo,
+                        UPPER(COALESCE(l.categoria, '')) AS categoria,
+                        UPPER(COALESCE(l.aplicacao, '')) AS aplicacao,
+                        COALESCE(l.valor, 0) AS valor,
+                        COALESCE(l.anexo_recibo, '') AS anexo_recibo,
                         'rd_recibos' AS pasta_recibo
-                    FROM financeiro2_rd_linhas
-                    WHERE data_lancamento = :data_lancamento
-                      AND valor = :valor
-                      AND COALESCE(status, 'Ativo') = 'Ativo'
+                    FROM financeiro2_rd_linhas l
+                    JOIN financeiro2_rd rd ON rd.id = l.rd_id
+                    WHERE l.data_lancamento = :data_lancamento
+                      AND l.valor = :valor
+                      AND COALESCE(l.status, 'Ativo') = 'Ativo'
 
                     UNION ALL
 
                     SELECT
                         'OM' AS origem,
-                        id,
-                        TO_CHAR(data_lancamento, 'DD/MM/YYYY') AS data,
-                        COALESCE(recibo, id) AS recibo,
-                        UPPER(COALESCE(tipo_linha, '')) AS descricao,
-                        UPPER(COALESCE(detalhes, '')) AS detalhes,
-                        UPPER(COALESCE(categoria, '')) AS categoria,
-                        UPPER(COALESCE(aplicacao, '')) AS aplicacao,
-                        COALESCE(valor, 0) AS valor,
-                        COALESCE(anexo_recibo, '') AS anexo_recibo,
+                        om.numero_om AS origem_numero,
+                        l.id,
+                        TO_CHAR(l.data_lancamento, 'DD/MM/YYYY') AS data,
+                        COALESCE(l.recibo, l.id) AS recibo,
+                        UPPER(COALESCE(l.tipo_linha, '')) AS descricao,
+                        UPPER(COALESCE(l.detalhes, '')) AS detalhes,
+                        UPPER(COALESCE(l.categoria, '')) AS categoria,
+                        UPPER(COALESCE(l.aplicacao, '')) AS aplicacao,
+                        COALESCE(l.valor, 0) AS valor,
+                        COALESCE(l.anexo_recibo, '') AS anexo_recibo,
                         'om_recibos' AS pasta_recibo
-                    FROM financeiro2_om_linhas
-                    WHERE data_lancamento = :data_lancamento
-                      AND valor = :valor
-                      AND COALESCE(status, 'Ativo') = 'Ativo'
+                    FROM financeiro2_om_linhas l
+                    JOIN financeiro2_om om ON om.id = l.om_id
+                    WHERE l.data_lancamento = :data_lancamento
+                      AND l.valor = :valor
+                      AND COALESCE(l.status, 'Ativo') = 'Ativo'
                 ) x
-                ORDER BY origem, id
+                ORDER BY origem, origem_numero, id
             """), {
                 "data_lancamento": data_lancamento,
                 "valor": valor
@@ -2518,25 +2546,9 @@ def rd_linha_nova(rd_id: int):
                         "categoria": categoria,
                         "aplicacao": aplicacao,
                         "valor": valor_txt,
+                        "anexo_recibo_salvo": nome_arquivo or "",
                     }
                 )
-
-        arquivo = request.files.get("anexo_recibo")
-        nome_arquivo = None
-
-        if arquivo and arquivo.filename:
-            import os
-            import uuid
-            from werkzeug.utils import secure_filename
-
-            pasta = os.path.join("static", "uploads", "financeiro2", "rd_recibos")
-            os.makedirs(pasta, exist_ok=True)
-
-            nome_seguro = secure_filename(arquivo.filename)
-            extensao = os.path.splitext(nome_seguro)[1].lower()
-            nome_arquivo = f"{uuid.uuid4().hex}{extensao}"
-            caminho = os.path.join(pasta, nome_arquivo)
-            arquivo.save(caminho)
 
         conn.execute(text("""
             INSERT INTO financeiro2_rd_linhas (
@@ -2704,6 +2716,7 @@ def om_linha_confirmar_duplicidade(om_id: int):
     aplicacao = _nome_preenchido(request.form.get("aplicacao")).upper()
     valor_txt = _nome_preenchido(request.form.get("valor")).replace(",", ".")
     moeda_codigo = _nome_preenchido(request.form.get("moeda_codigo")).upper() or "BRL"
+    anexo_recibo_salvo = _nome_preenchido(request.form.get("anexo_recibo_salvo"))
 
     try:
         valor = float(valor_txt)
@@ -2718,41 +2731,45 @@ def om_linha_confirmar_duplicidade(om_id: int):
             FROM (
                 SELECT
                     'OM' AS origem,
-                    id,
-                    TO_CHAR(data_lancamento, 'DD/MM/YYYY') AS data,
-                    COALESCE(recibo, id) AS recibo,
-                    UPPER(COALESCE(tipo_linha, '')) AS descricao,
-                    UPPER(COALESCE(detalhes, '')) AS detalhes,
-                    UPPER(COALESCE(categoria, '')) AS categoria,
-                    UPPER(COALESCE(aplicacao, '')) AS aplicacao,
-                    COALESCE(valor, 0) AS valor,
-                    COALESCE(anexo_recibo, '') AS anexo_recibo,
+                    om.numero_om AS origem_numero,
+                    l.id,
+                    TO_CHAR(l.data_lancamento, 'DD/MM/YYYY') AS data,
+                    COALESCE(l.recibo, l.id) AS recibo,
+                    UPPER(COALESCE(l.tipo_linha, '')) AS descricao,
+                    UPPER(COALESCE(l.detalhes, '')) AS detalhes,
+                    UPPER(COALESCE(l.categoria, '')) AS categoria,
+                    UPPER(COALESCE(l.aplicacao, '')) AS aplicacao,
+                    COALESCE(l.valor, 0) AS valor,
+                    COALESCE(l.anexo_recibo, '') AS anexo_recibo,
                     'om_recibos' AS pasta_recibo
-                FROM financeiro2_om_linhas
-                WHERE data_lancamento = :data_lancamento
-                  AND valor = :valor
-                  AND COALESCE(status, 'Ativo') = 'Ativo'
+                FROM financeiro2_om_linhas l
+                JOIN financeiro2_om om ON om.id = l.om_id
+                WHERE l.data_lancamento = :data_lancamento
+                  AND l.valor = :valor
+                  AND COALESCE(l.status, 'Ativo') = 'Ativo'
 
                 UNION ALL
 
                 SELECT
                     'RD' AS origem,
-                    id,
-                    TO_CHAR(data_lancamento, 'DD/MM/YYYY') AS data,
+                    rd.numero_rd AS origem_numero,
+                    l.id,
+                    TO_CHAR(l.data_lancamento, 'DD/MM/YYYY') AS data,
                     NULL AS recibo,
-                    UPPER(COALESCE(descricao, '')) AS descricao,
+                    UPPER(COALESCE(l.descricao, '')) AS descricao,
                     '' AS detalhes,
-                    UPPER(COALESCE(categoria, '')) AS categoria,
-                    UPPER(COALESCE(aplicacao, '')) AS aplicacao,
-                    COALESCE(valor, 0) AS valor,
-                    COALESCE(anexo_recibo, '') AS anexo_recibo,
+                    UPPER(COALESCE(l.categoria, '')) AS categoria,
+                    UPPER(COALESCE(l.aplicacao, '')) AS aplicacao,
+                    COALESCE(l.valor, 0) AS valor,
+                    COALESCE(l.anexo_recibo, '') AS anexo_recibo,
                     'rd_recibos' AS pasta_recibo
-                FROM financeiro2_rd_linhas
-                WHERE data_lancamento = :data_lancamento
-                  AND valor = :valor
-                  AND COALESCE(status, 'Ativo') = 'Ativo'
+                FROM financeiro2_rd_linhas l
+                JOIN financeiro2_rd rd ON rd.id = l.rd_id
+                WHERE l.data_lancamento = :data_lancamento
+                  AND l.valor = :valor
+                  AND COALESCE(l.status, 'Ativo') = 'Ativo'
             ) x
-            ORDER BY origem, id
+            ORDER BY origem, origem_numero, id
         """), {
             "data_lancamento": data_lancamento,
             "valor": valor
@@ -2774,6 +2791,7 @@ def om_linha_confirmar_duplicidade(om_id: int):
             "aplicacao": aplicacao,
             "valor": valor_txt,
             "moeda_codigo": moeda_codigo,
+            "anexo_recibo_salvo": anexo_recibo_salvo,
         }
     )
 
@@ -2786,6 +2804,7 @@ def rd_linha_confirmar_duplicidade(rd_id: int):
     categoria = _nome_preenchido(request.form.get("categoria")).upper()
     aplicacao = _nome_preenchido(request.form.get("aplicacao")).upper()
     valor_txt = _nome_preenchido(request.form.get("valor")).replace(",", ".")
+    anexo_recibo_salvo = _nome_preenchido(request.form.get("anexo_recibo_salvo"))
 
     try:
         valor = float(valor_txt)
@@ -2800,41 +2819,45 @@ def rd_linha_confirmar_duplicidade(rd_id: int):
             FROM (
                 SELECT
                     'RD' AS origem,
-                    id,
-                    TO_CHAR(data_lancamento, 'DD/MM/YYYY') AS data,
+                    rd.numero_rd AS origem_numero,
+                    l.id,
+                    TO_CHAR(l.data_lancamento, 'DD/MM/YYYY') AS data,
                     NULL AS recibo,
-                    UPPER(COALESCE(descricao, '')) AS descricao,
+                    UPPER(COALESCE(l.descricao, '')) AS descricao,
                     '' AS detalhes,
-                    UPPER(COALESCE(categoria, '')) AS categoria,
-                    UPPER(COALESCE(aplicacao, '')) AS aplicacao,
-                    COALESCE(valor, 0) AS valor,
-                    COALESCE(anexo_recibo, '') AS anexo_recibo,
+                    UPPER(COALESCE(l.categoria, '')) AS categoria,
+                    UPPER(COALESCE(l.aplicacao, '')) AS aplicacao,
+                    COALESCE(l.valor, 0) AS valor,
+                    COALESCE(l.anexo_recibo, '') AS anexo_recibo,
                     'rd_recibos' AS pasta_recibo
-                FROM financeiro2_rd_linhas
-                WHERE data_lancamento = :data_lancamento
-                  AND valor = :valor
-                  AND COALESCE(status, 'Ativo') = 'Ativo'
+                FROM financeiro2_rd_linhas l
+                JOIN financeiro2_rd rd ON rd.id = l.rd_id
+                WHERE l.data_lancamento = :data_lancamento
+                  AND l.valor = :valor
+                  AND COALESCE(l.status, 'Ativo') = 'Ativo'
 
                 UNION ALL
 
                 SELECT
                     'OM' AS origem,
-                    id,
-                    TO_CHAR(data_lancamento, 'DD/MM/YYYY') AS data,
-                    COALESCE(recibo, id) AS recibo,
-                    UPPER(COALESCE(tipo_linha, '')) AS descricao,
-                    UPPER(COALESCE(detalhes, '')) AS detalhes,
-                    UPPER(COALESCE(categoria, '')) AS categoria,
-                    UPPER(COALESCE(aplicacao, '')) AS aplicacao,
-                    COALESCE(valor, 0) AS valor,
-                    COALESCE(anexo_recibo, '') AS anexo_recibo,
+                    om.numero_om AS origem_numero,
+                    l.id,
+                    TO_CHAR(l.data_lancamento, 'DD/MM/YYYY') AS data,
+                    COALESCE(l.recibo, l.id) AS recibo,
+                    UPPER(COALESCE(l.tipo_linha, '')) AS descricao,
+                    UPPER(COALESCE(l.detalhes, '')) AS detalhes,
+                    UPPER(COALESCE(l.categoria, '')) AS categoria,
+                    UPPER(COALESCE(l.aplicacao, '')) AS aplicacao,
+                    COALESCE(l.valor, 0) AS valor,
+                    COALESCE(l.anexo_recibo, '') AS anexo_recibo,
                     'om_recibos' AS pasta_recibo
-                FROM financeiro2_om_linhas
-                WHERE data_lancamento = :data_lancamento
-                  AND valor = :valor
-                  AND COALESCE(status, 'Ativo') = 'Ativo'
+                FROM financeiro2_om_linhas l
+                JOIN financeiro2_om om ON om.id = l.om_id
+                WHERE l.data_lancamento = :data_lancamento
+                  AND l.valor = :valor
+                  AND COALESCE(l.status, 'Ativo') = 'Ativo'
             ) x
-            ORDER BY origem, id
+            ORDER BY origem, origem_numero, id
         """), {
             "data_lancamento": data_lancamento,
             "valor": valor
@@ -2854,9 +2877,9 @@ def rd_linha_confirmar_duplicidade(rd_id: int):
             "categoria": categoria,
             "aplicacao": aplicacao,
             "valor": valor_txt,
+            "anexo_recibo_salvo": anexo_recibo_salvo,
         }
     )
-
 # =========================
 # DESPESAS
 # =========================

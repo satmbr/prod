@@ -30,22 +30,22 @@
             <div class="form-grid">
               <div class="field">
                 <label>Número RD</label>
-                <input class="input-like" type="text" name="numero" value="{{ rd.numero }}" required />
+                <input class="input-like" type="text" name="numero" value="{{ rd.numero|upper }}" required />
               </div>
 
               <div class="field">
                 <label>Período</label>
-                <input class="input-like" type="text" name="periodo" value="{{ rd.periodo }}" required />
+                <input class="input-like" type="text" name="periodo" value="{{ rd.periodo|upper }}" required />
               </div>
 
               <div class="field">
                 <label>Matrícula</label>
-                <input class="input-like" type="text" name="matricula" value="{{ rd.matricula }}" required />
+                <input class="input-like" type="text" name="matricula" value="{{ rd.matricula|upper }}" required />
               </div>
 
               <div class="field">
                 <label>Colaborador</label>
-                <input class="input-like" type="text" name="colaborador" value="{{ rd.colaborador }}" required />
+                <input class="input-like" type="text" name="colaborador" value="{{ rd.colaborador|upper }}" required />
               </div>
 
               <div class="field">
@@ -70,7 +70,7 @@
 
               <div class="field field-full">
                 <label>Observação</label>
-                <textarea class="input-like textarea-like" name="observacao">{{ rd.observacao }}</textarea>
+                <textarea class="input-like textarea-like" name="observacao">{{ rd.observacao|upper }}</textarea>
               </div>
             </div>
 
@@ -94,7 +94,7 @@
           <div class="resume-title">Resumo</div>
           <div class="resume-row">
             <span>Status</span>
-            <strong>{{ rd.status }}</strong>
+            <strong>{{ rd.status|upper }}</strong>
           </div>
           <div class="resume-row resume-total">
             <span>Saldo atual</span>
@@ -121,7 +121,7 @@
     <div id="novaLinhaRdBox" class="om-card" style="display:none; margin-bottom:16px;">
       <div class="card-title">Nova linha da RD</div>
 
-	   <form method="post" action="{{ url_for('financeiro_dois.rd_linha_nova', rd_id=rd.id) }}" enctype="multipart/form-data">
+      <form method="post" action="{{ url_for('financeiro_dois.rd_linha_nova', rd_id=rd.id) }}" enctype="multipart/form-data">
         <div class="form-grid">
           <div class="field">
             <label>Data</label>
@@ -266,6 +266,17 @@
               </td>
               <td>
                 <select class="input-like input-like-sm" name="descricao" form="linha-rd-{{ linha.id }}" required>
+                  {% set ns_desc = namespace(found=false) %}
+                  {% for item in descricoes %}
+                    {% if (linha.descricao or '')|upper == (item.nome or '')|upper %}
+                      {% set ns_desc.found = true %}
+                    {% endif %}
+                  {% endfor %}
+
+                  {% if linha.descricao and not ns_desc.found %}
+                    <option value="{{ linha.descricao|upper }}" selected>{{ linha.descricao|upper }}</option>
+                  {% endif %}
+
                   {% for item in descricoes %}
                   <option value="{{ item.nome|upper }}" {% if (linha.descricao or '')|upper == (item.nome or '')|upper %}selected{% endif %}>{{ item.nome|upper }}</option>
                   {% endfor %}
@@ -273,6 +284,17 @@
               </td>
               <td>
                 <select class="input-like input-like-sm" name="categoria" form="linha-rd-{{ linha.id }}" required>
+                  {% set ns_cat = namespace(found=false) %}
+                  {% for item in categorias %}
+                    {% if (linha.categoria or '')|upper == (item.nome or '')|upper %}
+                      {% set ns_cat.found = true %}
+                    {% endif %}
+                  {% endfor %}
+
+                  {% if linha.categoria and not ns_cat.found %}
+                    <option value="{{ linha.categoria|upper }}" selected>{{ linha.categoria|upper }}</option>
+                  {% endif %}
+
                   {% for item in categorias %}
                   <option value="{{ item.nome|upper }}" {% if (linha.categoria or '')|upper == (item.nome or '')|upper %}selected{% endif %}>{{ item.nome|upper }}</option>
                   {% endfor %}
@@ -280,6 +302,17 @@
               </td>
               <td>
                 <select class="input-like input-like-sm" name="aplicacao" form="linha-rd-{{ linha.id }}" required>
+                  {% set ns_apl = namespace(found=false) %}
+                  {% for item in aplicacoes %}
+                    {% if (linha.aplicacao or '')|upper == (item.nome or '')|upper %}
+                      {% set ns_apl.found = true %}
+                    {% endif %}
+                  {% endfor %}
+
+                  {% if linha.aplicacao and not ns_apl.found %}
+                    <option value="{{ linha.aplicacao|upper }}" selected>{{ linha.aplicacao|upper }}</option>
+                  {% endif %}
+
                   {% for item in aplicacoes %}
                   <option value="{{ item.nome|upper }}" {% if (linha.aplicacao or '')|upper == (item.nome or '')|upper %}selected{% endif %}>{{ item.nome|upper }}</option>
                   {% endfor %}
@@ -288,7 +321,7 @@
               <td>
                 <input class="input-like input-like-sm" type="text" name="valor" value="{{ '%.2f'|format(linha.valor) }}" form="linha-rd-{{ linha.id }}" required>
               </td>
-              <td>{{ linha.status }}</td>
+              <td>{{ linha.status|upper }}</td>
               <td>
                 {% if linha.anexo_recibo %}
                 <a class="btn btn-sm" href="{{ url_for('static', filename='uploads/financeiro2/rd_recibos/' ~ linha.anexo_recibo) }}" target="_blank">Abrir recibo</a>
@@ -310,7 +343,7 @@
               <td>{{ linha.categoria|upper }}</td>
               <td>{{ linha.aplicacao|upper }}</td>
               <td style="text-align:right;">R$ {{ '%.2f'|format(linha.valor) }}</td>
-              <td>{{ linha.status }}</td>
+              <td>{{ linha.status|upper }}</td>
               <td>
                 {% if linha.anexo_recibo %}
                 <a class="btn btn-sm" href="{{ url_for('static', filename='uploads/financeiro2/rd_recibos/' ~ linha.anexo_recibo) }}" target="_blank">Abrir recibo</a>
@@ -405,6 +438,7 @@
     padding:0 12px;
     font-size:14px;
     background:#fff;
+    text-transform:uppercase;
   }
 
   .input-like-sm{
@@ -457,15 +491,6 @@
     flex-wrap:wrap;
   }
 
-  
-  .input-like,
-  .input-like-sm,
-  .input-like option,
-  .table td,
-  .table th {
-    text-transform: uppercase;
-  }
-
   .linha-inativa{
     opacity:0.6;
     background:#fafafa;
@@ -479,6 +504,12 @@
     border:1px solid #fed7aa;
     color:#9a3412;
     font-size:14px;
+  }
+
+  .input-like option,
+  .table td,
+  .table th{
+    text-transform:uppercase;
   }
 
   @media (max-width: 980px){
