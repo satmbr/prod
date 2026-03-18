@@ -1201,12 +1201,12 @@ def om_editar(om_id: int):
                 TO_CHAR(data_lancamento, 'YYYY-MM-DD') AS data_form,
                 TO_CHAR(data_lancamento, 'DD/MM/YYYY') AS data,
                 COALESCE(recibo, id) AS recibo,
-                COALESCE(tipo_linha, '') AS descricao,
-                COALESCE(detalhes, COALESCE(descricao, '')) AS detalhes,
-                COALESCE(categoria, '') AS categoria,
-                COALESCE(aplicacao, '') AS aplicacao,
+                UPPER(COALESCE(tipo_linha, '')) AS descricao,
+                UPPER(COALESCE(detalhes, COALESCE(descricao, ''))) AS detalhes,
+                UPPER(COALESCE(categoria, '')) AS categoria,
+                UPPER(COALESCE(aplicacao, '')) AS aplicacao,
                 COALESCE(valor, 0) AS valor,
-                COALESCE(moeda_codigo, 'BRL') AS moeda_codigo,
+                UPPER(COALESCE(moeda_codigo, 'BRL')) AS moeda_codigo,
                 COALESCE(cambio, 1) AS cambio,
                 COALESCE(valor_brl, 0) AS valor_brl,
                 COALESCE(anexo_recibo, '') AS anexo_recibo,
@@ -1217,39 +1217,39 @@ def om_editar(om_id: int):
         """), {"id": om_id}).mappings().all()
 
         descricoes = conn.execute(text("""
-            SELECT nome
+            SELECT UPPER(nome) AS nome
             FROM financeiro2_cad_descricoes
             WHERE status = 'Ativo'
             ORDER BY nome
         """)).mappings().all()
 
         categorias = conn.execute(text("""
-            SELECT nome
+            SELECT UPPER(nome) AS nome
             FROM financeiro2_cad_categorias
             WHERE status = 'Ativo'
             ORDER BY nome
         """)).mappings().all()
 
         aplicacoes = conn.execute(text("""
-            SELECT nome
+            SELECT UPPER(nome) AS nome
             FROM financeiro2_cad_aplicacoes
             WHERE status = 'Ativo'
             ORDER BY nome
         """)).mappings().all()
 
         moedas = conn.execute(text("""
-            SELECT codigo, nome, cambio_padrao
+            SELECT UPPER(codigo) AS codigo, UPPER(nome) AS nome, cambio_padrao
             FROM financeiro2_cad_moedas
             WHERE status = 'Ativo'
             ORDER BY codigo
         """)).mappings().all()
 
-    total_brl = sum(float(item["valor_brl"]) for item in linhas)
+    total_brl = sum(float(item["valor_brl"]) for item in linhas if str(item["status"]) == "Ativo")
 
     om = dict(om)
     om["saldo"] = total_brl
     om["linhas"] = linhas
-    om["bloqueada"] = om["status"] == "Paga"
+    om["bloqueada"] = str(om["status"]).upper() == "PAGA"
 
     return render_template(
         "financeiro_dois/om_editar.html",
@@ -1261,7 +1261,7 @@ def om_editar(om_id: int):
         aplicacoes=aplicacoes,
         moedas=moedas,
     )
-    
+
 @bp.route("/om/<int:om_id>/salvar", methods=["POST"])
 @login_required
 @permission_required("financeiro", "visualizar")
@@ -1390,16 +1390,15 @@ def om_linha_nova(om_id: int):
                         id,
                         TO_CHAR(data_lancamento, 'DD/MM/YYYY') AS data,
                         COALESCE(recibo, id) AS recibo,
-                        COALESCE(tipo_linha, '') AS descricao,
-                        COALESCE(detalhes, '') AS detalhes,
-                        COALESCE(categoria, '') AS categoria,
-                        COALESCE(aplicacao, '') AS aplicacao,
+                        UPPER(COALESCE(tipo_linha, '')) AS descricao,
+                        UPPER(COALESCE(detalhes, '')) AS detalhes,
+                        UPPER(COALESCE(categoria, '')) AS categoria,
+                        UPPER(COALESCE(aplicacao, '')) AS aplicacao,
                         COALESCE(valor, 0) AS valor,
                         COALESCE(anexo_recibo, '') AS anexo_recibo,
                         'om_recibos' AS pasta_recibo
                     FROM financeiro2_om_linhas
-                    WHERE om_id = :om_id
-                      AND data_lancamento = :data_lancamento
+                    WHERE data_lancamento = :data_lancamento
                       AND valor = :valor
                       AND COALESCE(status, 'Ativo') = 'Ativo'
 
@@ -1410,10 +1409,10 @@ def om_linha_nova(om_id: int):
                         id,
                         TO_CHAR(data_lancamento, 'DD/MM/YYYY') AS data,
                         NULL AS recibo,
-                        COALESCE(descricao, '') AS descricao,
+                        UPPER(COALESCE(descricao, '')) AS descricao,
                         '' AS detalhes,
-                        COALESCE(categoria, '') AS categoria,
-                        COALESCE(aplicacao, '') AS aplicacao,
+                        UPPER(COALESCE(categoria, '')) AS categoria,
+                        UPPER(COALESCE(aplicacao, '')) AS aplicacao,
                         COALESCE(valor, 0) AS valor,
                         COALESCE(anexo_recibo, '') AS anexo_recibo,
                         'rd_recibos' AS pasta_recibo
@@ -1424,7 +1423,6 @@ def om_linha_nova(om_id: int):
                 ) x
                 ORDER BY origem, id
             """), {
-                "om_id": om_id,
                 "data_lancamento": data_lancamento,
                 "valor": valor
             }).mappings().all()
@@ -1472,42 +1470,45 @@ def om_linha_nova(om_id: int):
         conn.execute(text("""
             INSERT INTO financeiro2_om_linhas (
                 om_id,
-                data_lancamento,
                 recibo,
+                data_lancamento,
                 tipo_linha,
                 descricao,
                 detalhes,
                 categoria,
                 aplicacao,
                 valor,
+                sinal,
                 moeda_codigo,
                 cambio,
                 valor_brl,
                 anexo_recibo,
-                sinal,
-                status
-            )
-            VALUES (
+                status,
+                criado_em,
+                atualizado_em
+            ) VALUES (
                 :om_id,
-                :data_lancamento,
                 :recibo,
+                :data_lancamento,
                 :tipo_linha,
                 :descricao_antiga,
                 :detalhes,
                 :categoria,
                 :aplicacao,
                 :valor,
+                '+',
                 :moeda_codigo,
                 :cambio,
                 :valor_brl,
                 :anexo_recibo,
-                '+',
-                'Ativo'
+                'Ativo',
+                CURRENT_TIMESTAMP,
+                CURRENT_TIMESTAMP
             )
         """), {
             "om_id": om_id,
-            "data_lancamento": data_lancamento,
             "recibo": proximo_recibo,
+            "data_lancamento": data_lancamento,
             "tipo_linha": descricao,
             "descricao_antiga": detalhes,
             "detalhes": detalhes,
@@ -1517,12 +1518,12 @@ def om_linha_nova(om_id: int):
             "moeda_codigo": moeda_codigo,
             "cambio": cambio,
             "valor_brl": valor_brl,
-            "anexo_recibo": nome_arquivo,
+            "anexo_recibo": nome_arquivo
         })
 
-    flash("LINHA ADICIONADA COM SUCESSO.", "success")
+    flash("LINHA DA OM SALVA COM SUCESSO.", "success")
     return redirect(url_for("financeiro_dois.om_editar", om_id=om_id))
-    
+
 @bp.route("/om/<int:om_id>/adiantar", methods=["POST"])
 @login_required
 @permission_required("financeiro", "visualizar")
@@ -1561,7 +1562,7 @@ def om_adiantar(om_id: int):
         moeda = conn.execute(text("""
             SELECT codigo, cambio_padrao
             FROM financeiro2_cad_moedas
-            WHERE codigo = :codigo
+            WHERE UPPER(codigo) = UPPER(:codigo)
             LIMIT 1
         """), {"codigo": moeda_codigo}).mappings().first()
 
@@ -2011,12 +2012,12 @@ def om_exportar_pdf(om_id: int):
 @permission_required("financeiro", "visualizar")
 def om_linha_editar(om_id: int, linha_id: int):
     data_lancamento = _nome_preenchido(request.form.get("data_lancamento"))
-    descricao = _nome_preenchido(request.form.get("descricao"))
-    detalhes = _nome_preenchido(request.form.get("detalhes"))
-    categoria = _nome_preenchido(request.form.get("categoria"))
-    aplicacao = _nome_preenchido(request.form.get("aplicacao"))
+    descricao = _nome_preenchido(request.form.get("descricao")).upper()
+    detalhes = _nome_preenchido(request.form.get("detalhes")).upper()
+    categoria = _nome_preenchido(request.form.get("categoria")).upper()
+    aplicacao = _nome_preenchido(request.form.get("aplicacao")).upper()
     valor_txt = _nome_preenchido(request.form.get("valor")).replace(",", ".")
-    moeda_codigo = _nome_preenchido(request.form.get("moeda_codigo")) or "BRL"
+    moeda_codigo = (_nome_preenchido(request.form.get("moeda_codigo")) or "BRL").upper()
 
     if not data_lancamento or not descricao or not categoria or not aplicacao or not valor_txt:
         flash("Preencha data, descrição, categoria, aplicação e valor.", "warning")
@@ -2296,9 +2297,9 @@ def rd_editar(rd_id: int):
                 id,
                 TO_CHAR(data_lancamento, 'YYYY-MM-DD') AS data_form,
                 TO_CHAR(data_lancamento, 'DD/MM/YYYY') AS data,
-                descricao,
-                COALESCE(categoria, '') AS categoria,
-                COALESCE(aplicacao, '') AS aplicacao,
+                UPPER(COALESCE(descricao, '')) AS descricao,
+                UPPER(COALESCE(categoria, '')) AS categoria,
+                UPPER(COALESCE(aplicacao, '')) AS aplicacao,
                 COALESCE(valor, 0) AS valor,
                 COALESCE(status, 'Ativo') AS status,
                 COALESCE(anexo_recibo, '') AS anexo_recibo
@@ -2308,28 +2309,28 @@ def rd_editar(rd_id: int):
         """), {"id": rd_id}).mappings().all()
 
         descricoes = conn.execute(text("""
-            SELECT nome
+            SELECT UPPER(nome) AS nome
             FROM financeiro2_cad_descricoes
             WHERE status = 'Ativo'
             ORDER BY nome
         """)).mappings().all()
 
         categorias = conn.execute(text("""
-            SELECT nome
+            SELECT UPPER(nome) AS nome
             FROM financeiro2_cad_categorias
             WHERE status = 'Ativo'
             ORDER BY nome
         """)).mappings().all()
 
         aplicacoes = conn.execute(text("""
-            SELECT nome
+            SELECT UPPER(nome) AS nome
             FROM financeiro2_cad_aplicacoes
             WHERE status = 'Ativo'
             ORDER BY nome
         """)).mappings().all()
 
         centros_custo_lista = conn.execute(text("""
-            SELECT nome
+            SELECT UPPER(nome) AS nome
             FROM financeiro2_cad_centros_custo
             WHERE status = 'Ativo'
             ORDER BY nome
@@ -2461,22 +2462,46 @@ def rd_linha_nova(rd_id: int):
 
         if not forcar_salvamento:
             duplicadas = conn.execute(text("""
-                SELECT
-                    id,
-                    TO_CHAR(data_lancamento, 'DD/MM/YYYY') AS data,
-                    descricao,
-                    categoria,
-                    aplicacao,
-                    valor,
-                    COALESCE(anexo_recibo, '') AS anexo_recibo
-                FROM financeiro2_rd_linhas
-                WHERE rd_id = :rd_id
-                  AND data_lancamento = :data_lancamento
-                  AND valor = :valor
-                  AND COALESCE(status, 'Ativo') = 'Ativo'
-                ORDER BY id
+                SELECT *
+                FROM (
+                    SELECT
+                        'RD' AS origem,
+                        id,
+                        TO_CHAR(data_lancamento, 'DD/MM/YYYY') AS data,
+                        NULL AS recibo,
+                        UPPER(COALESCE(descricao, '')) AS descricao,
+                        '' AS detalhes,
+                        UPPER(COALESCE(categoria, '')) AS categoria,
+                        UPPER(COALESCE(aplicacao, '')) AS aplicacao,
+                        COALESCE(valor, 0) AS valor,
+                        COALESCE(anexo_recibo, '') AS anexo_recibo,
+                        'rd_recibos' AS pasta_recibo
+                    FROM financeiro2_rd_linhas
+                    WHERE data_lancamento = :data_lancamento
+                      AND valor = :valor
+                      AND COALESCE(status, 'Ativo') = 'Ativo'
+
+                    UNION ALL
+
+                    SELECT
+                        'OM' AS origem,
+                        id,
+                        TO_CHAR(data_lancamento, 'DD/MM/YYYY') AS data,
+                        COALESCE(recibo, id) AS recibo,
+                        UPPER(COALESCE(tipo_linha, '')) AS descricao,
+                        UPPER(COALESCE(detalhes, '')) AS detalhes,
+                        UPPER(COALESCE(categoria, '')) AS categoria,
+                        UPPER(COALESCE(aplicacao, '')) AS aplicacao,
+                        COALESCE(valor, 0) AS valor,
+                        COALESCE(anexo_recibo, '') AS anexo_recibo,
+                        'om_recibos' AS pasta_recibo
+                    FROM financeiro2_om_linhas
+                    WHERE data_lancamento = :data_lancamento
+                      AND valor = :valor
+                      AND COALESCE(status, 'Ativo') = 'Ativo'
+                ) x
+                ORDER BY origem, id
             """), {
-                "rd_id": rd_id,
                 "data_lancamento": data_lancamento,
                 "valor": valor
             }).mappings().all()
@@ -2521,18 +2546,21 @@ def rd_linha_nova(rd_id: int):
                 categoria,
                 aplicacao,
                 valor,
+                anexo_recibo,
                 status,
-                anexo_recibo
-            )
-            VALUES (
+                criado_em,
+                atualizado_em
+            ) VALUES (
                 :rd_id,
                 :data_lancamento,
                 :descricao,
                 :categoria,
                 :aplicacao,
                 :valor,
+                :anexo_recibo,
                 'Ativo',
-                :anexo_recibo
+                CURRENT_TIMESTAMP,
+                CURRENT_TIMESTAMP
             )
         """), {
             "rd_id": rd_id,
@@ -2544,7 +2572,7 @@ def rd_linha_nova(rd_id: int):
             "anexo_recibo": nome_arquivo
         })
 
-    flash("LINHA ADICIONADA COM SUCESSO.", "success")
+    flash("LINHA DA RD SALVA COM SUCESSO.", "success")
     return redirect(url_for("financeiro_dois.rd_editar", rd_id=rd_id))
 
 @bp.route("/rd/<int:rd_id>/linhas/<int:linha_id>/editar", methods=["POST"])
@@ -2686,22 +2714,46 @@ def om_linha_confirmar_duplicidade(om_id: int):
     engine = get_engine()
     with engine.connect() as conn:
         duplicadas = conn.execute(text("""
-            SELECT
-                id,
-                TO_CHAR(data_lancamento, 'DD/MM/YYYY') AS data,
-                COALESCE(recibo, id) AS recibo,
-                COALESCE(tipo_linha, '') AS descricao,
-                COALESCE(detalhes, '') AS detalhes,
-                COALESCE(valor, 0) AS valor,
-                COALESCE(anexo_recibo, '') AS anexo_recibo
-            FROM financeiro2_om_linhas
-            WHERE om_id = :om_id
-              AND data_lancamento = :data_lancamento
-              AND valor = :valor
-              AND COALESCE(status, 'Ativo') = 'Ativo'
-            ORDER BY id
+            SELECT *
+            FROM (
+                SELECT
+                    'OM' AS origem,
+                    id,
+                    TO_CHAR(data_lancamento, 'DD/MM/YYYY') AS data,
+                    COALESCE(recibo, id) AS recibo,
+                    UPPER(COALESCE(tipo_linha, '')) AS descricao,
+                    UPPER(COALESCE(detalhes, '')) AS detalhes,
+                    UPPER(COALESCE(categoria, '')) AS categoria,
+                    UPPER(COALESCE(aplicacao, '')) AS aplicacao,
+                    COALESCE(valor, 0) AS valor,
+                    COALESCE(anexo_recibo, '') AS anexo_recibo,
+                    'om_recibos' AS pasta_recibo
+                FROM financeiro2_om_linhas
+                WHERE data_lancamento = :data_lancamento
+                  AND valor = :valor
+                  AND COALESCE(status, 'Ativo') = 'Ativo'
+
+                UNION ALL
+
+                SELECT
+                    'RD' AS origem,
+                    id,
+                    TO_CHAR(data_lancamento, 'DD/MM/YYYY') AS data,
+                    NULL AS recibo,
+                    UPPER(COALESCE(descricao, '')) AS descricao,
+                    '' AS detalhes,
+                    UPPER(COALESCE(categoria, '')) AS categoria,
+                    UPPER(COALESCE(aplicacao, '')) AS aplicacao,
+                    COALESCE(valor, 0) AS valor,
+                    COALESCE(anexo_recibo, '') AS anexo_recibo,
+                    'rd_recibos' AS pasta_recibo
+                FROM financeiro2_rd_linhas
+                WHERE data_lancamento = :data_lancamento
+                  AND valor = :valor
+                  AND COALESCE(status, 'Ativo') = 'Ativo'
+            ) x
+            ORDER BY origem, id
         """), {
-            "om_id": om_id,
             "data_lancamento": data_lancamento,
             "valor": valor
         }).mappings().all()
@@ -2724,7 +2776,7 @@ def om_linha_confirmar_duplicidade(om_id: int):
             "moeda_codigo": moeda_codigo,
         }
     )
-    
+
 @bp.route("/rd/<int:rd_id>/linhas/confirmar-duplicidade", methods=["POST"])
 @login_required
 @permission_required("financeiro", "visualizar")
@@ -2744,22 +2796,46 @@ def rd_linha_confirmar_duplicidade(rd_id: int):
     engine = get_engine()
     with engine.connect() as conn:
         duplicadas = conn.execute(text("""
-            SELECT
-                id,
-                TO_CHAR(data_lancamento, 'DD/MM/YYYY') AS data,
-                descricao,
-                categoria,
-                aplicacao,
-                valor,
-                COALESCE(anexo_recibo, '') AS anexo_recibo
-            FROM financeiro2_rd_linhas
-            WHERE rd_id = :rd_id
-              AND data_lancamento = :data_lancamento
-              AND valor = :valor
-              AND COALESCE(status, 'Ativo') = 'Ativo'
-            ORDER BY id
+            SELECT *
+            FROM (
+                SELECT
+                    'RD' AS origem,
+                    id,
+                    TO_CHAR(data_lancamento, 'DD/MM/YYYY') AS data,
+                    NULL AS recibo,
+                    UPPER(COALESCE(descricao, '')) AS descricao,
+                    '' AS detalhes,
+                    UPPER(COALESCE(categoria, '')) AS categoria,
+                    UPPER(COALESCE(aplicacao, '')) AS aplicacao,
+                    COALESCE(valor, 0) AS valor,
+                    COALESCE(anexo_recibo, '') AS anexo_recibo,
+                    'rd_recibos' AS pasta_recibo
+                FROM financeiro2_rd_linhas
+                WHERE data_lancamento = :data_lancamento
+                  AND valor = :valor
+                  AND COALESCE(status, 'Ativo') = 'Ativo'
+
+                UNION ALL
+
+                SELECT
+                    'OM' AS origem,
+                    id,
+                    TO_CHAR(data_lancamento, 'DD/MM/YYYY') AS data,
+                    COALESCE(recibo, id) AS recibo,
+                    UPPER(COALESCE(tipo_linha, '')) AS descricao,
+                    UPPER(COALESCE(detalhes, '')) AS detalhes,
+                    UPPER(COALESCE(categoria, '')) AS categoria,
+                    UPPER(COALESCE(aplicacao, '')) AS aplicacao,
+                    COALESCE(valor, 0) AS valor,
+                    COALESCE(anexo_recibo, '') AS anexo_recibo,
+                    'om_recibos' AS pasta_recibo
+                FROM financeiro2_om_linhas
+                WHERE data_lancamento = :data_lancamento
+                  AND valor = :valor
+                  AND COALESCE(status, 'Ativo') = 'Ativo'
+            ) x
+            ORDER BY origem, id
         """), {
-            "rd_id": rd_id,
             "data_lancamento": data_lancamento,
             "valor": valor
         }).mappings().all()

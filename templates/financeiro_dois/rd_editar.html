@@ -53,7 +53,7 @@
                 <select class="input-like" name="centro_custo" required>
                   <option value="">Selecione</option>
                   {% for item in centros_custo_lista %}
-                  <option value="{{ item.nome }}" {% if rd.centro_custo == item.nome %}selected{% endif %}>{{ item.nome }}</option>
+                  <option value="{{ item.nome|upper }}" {% if (rd.centro_custo or '')|upper == (item.nome or '')|upper %}selected{% endif %}>{{ item.nome|upper }}</option>
                   {% endfor %}
                 </select>
               </div>
@@ -133,7 +133,7 @@
             <select class="input-like" name="descricao" required>
               <option value="">Selecione</option>
               {% for item in descricoes %}
-              <option value="{{ item.nome }}">{{ item.nome }}</option>
+              <option value="{{ item.nome|upper }}">{{ item.nome|upper }}</option>
               {% endfor %}
             </select>
           </div>
@@ -143,7 +143,7 @@
             <select class="input-like" name="categoria" required>
               <option value="">Selecione</option>
               {% for item in categorias %}
-              <option value="{{ item.nome }}">{{ item.nome }}</option>
+              <option value="{{ item.nome|upper }}">{{ item.nome|upper }}</option>
               {% endfor %}
             </select>
           </div>
@@ -153,7 +153,7 @@
             <select class="input-like" name="aplicacao" required>
               <option value="">Selecione</option>
               {% for item in aplicacoes %}
-              <option value="{{ item.nome }}">{{ item.nome }}</option>
+              <option value="{{ item.nome|upper }}">{{ item.nome|upper }}</option>
               {% endfor %}
             </select>
           </div>
@@ -191,7 +191,7 @@
             <select class="input-like" name="aplicacao" required>
               <option value="">Selecione</option>
               {% for item in aplicacoes %}
-              <option value="{{ item.nome }}">{{ item.nome }}</option>
+              <option value="{{ item.nome|upper }}">{{ item.nome|upper }}</option>
               {% endfor %}
             </select>
           </div>
@@ -224,7 +224,7 @@
             <select class="input-like" name="aplicacao" required>
               <option value="">Selecione</option>
               {% for item in aplicacoes %}
-              <option value="{{ item.nome }}">{{ item.nome }}</option>
+              <option value="{{ item.nome|upper }}">{{ item.nome|upper }}</option>
               {% endfor %}
             </select>
           </div>
@@ -267,21 +267,21 @@
               <td>
                 <select class="input-like input-like-sm" name="descricao" form="linha-rd-{{ linha.id }}" required>
                   {% for item in descricoes %}
-                  <option value="{{ item.nome }}" {% if linha.descricao == item.nome %}selected{% endif %}>{{ item.nome }}</option>
+                  <option value="{{ item.nome|upper }}" {% if (linha.descricao or '')|upper == (item.nome or '')|upper %}selected{% endif %}>{{ item.nome|upper }}</option>
                   {% endfor %}
                 </select>
               </td>
               <td>
                 <select class="input-like input-like-sm" name="categoria" form="linha-rd-{{ linha.id }}" required>
                   {% for item in categorias %}
-                  <option value="{{ item.nome }}" {% if linha.categoria == item.nome %}selected{% endif %}>{{ item.nome }}</option>
+                  <option value="{{ item.nome|upper }}" {% if (linha.categoria or '')|upper == (item.nome or '')|upper %}selected{% endif %}>{{ item.nome|upper }}</option>
                   {% endfor %}
                 </select>
               </td>
               <td>
                 <select class="input-like input-like-sm" name="aplicacao" form="linha-rd-{{ linha.id }}" required>
                   {% for item in aplicacoes %}
-                  <option value="{{ item.nome }}" {% if linha.aplicacao == item.nome %}selected{% endif %}>{{ item.nome }}</option>
+                  <option value="{{ item.nome|upper }}" {% if (linha.aplicacao or '')|upper == (item.nome or '')|upper %}selected{% endif %}>{{ item.nome|upper }}</option>
                   {% endfor %}
                 </select>
               </td>
@@ -306,9 +306,9 @@
               </td>
               {% else %}
               <td>{{ linha.data }}</td>
-              <td>{{ linha.descricao }}</td>
-              <td>{{ linha.categoria }}</td>
-              <td>{{ linha.aplicacao }}</td>
+              <td>{{ linha.descricao|upper }}</td>
+              <td>{{ linha.categoria|upper }}</td>
+              <td>{{ linha.aplicacao|upper }}</td>
               <td style="text-align:right;">R$ {{ '%.2f'|format(linha.valor) }}</td>
               <td>{{ linha.status }}</td>
               <td>
@@ -455,6 +455,15 @@
     gap:10px;
     margin-top:16px;
     flex-wrap:wrap;
+  }
+
+  
+  .input-like,
+  .input-like-sm,
+  .input-like option,
+  .table td,
+  .table th {
+    text-transform: uppercase;
   }
 
   .linha-inativa{

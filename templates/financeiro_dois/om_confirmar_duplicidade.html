@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Confirmar possível duplicidade | OM{% endblock %}
+{% block title %}CONFIRMAR POSSÍVEL DUPLICIDADE | OM{% endblock %}
 
 {% block content %}
 <div class="page-wrap">
@@ -8,48 +8,48 @@
       <div class="zone-left">
         <div class="zone-icon">⚠️</div>
         <div>
-          <div class="zone-title">Possível despesa repetida na OM</div>
-          <div class="muted">Existe uma linha com a mesma data e o mesmo valor.</div>
+          <div class="zone-title">POSSÍVEL DESPESA REPETIDA NA OM</div>
+          <div class="muted">EXISTE UMA LINHA COM A MESMA DATA E O MESMO VALOR, EM OM OU RD.</div>
         </div>
       </div>
     </div>
 
     <div class="om-card" style="margin-bottom:16px;">
-      <div class="card-title">Linhas encontradas</div>
+      <div class="card-title">LINHAS ENCONTRADAS</div>
       <div class="table-wrap">
         <table class="table">
           <thead>
-			<tr>
-			  <th>Origem</th>
-			  <th>Data</th>
-			  <th>Recibo</th>
-			  <th>Descrição</th>
-			  <th>Detalhes</th>
-			  <th>Categoria</th>
-			  <th>Aplicação</th>
-			  <th>Valor</th>
-			  <th>Anexo</th>
-			</tr>
+            <tr>
+              <th>ORIGEM</th>
+              <th>DATA</th>
+              <th>RECIBO</th>
+              <th>DESCRIÇÃO</th>
+              <th>DETALHES</th>
+              <th>CATEGORIA</th>
+              <th>APLICAÇÃO</th>
+              <th>VALOR</th>
+              <th>ANEXO</th>
+            </tr>
           </thead>
           <tbody>
             {% for item in duplicadas %}
-			<tr>
-			  <td>{{ item.origem }}</td>
-			  <td>{{ item.data }}</td>
-			  <td>{{ item.recibo or '—' }}</td>
-			  <td>{{ item.descricao }}</td>
-			  <td>{{ item.detalhes or '—' }}</td>
-			  <td>{{ item.categoria or '—' }}</td>
-			  <td>{{ item.aplicacao or '—' }}</td>
-			  <td>R$ {{ '%.2f'|format(item.valor) }}</td>
-			  <td>
-				{% if item.anexo_recibo %}
-				<a class="btn btn-sm" href="{{ url_for('static', filename='uploads/financeiro2/' ~ item.pasta_recibo ~ '/' ~ item.anexo_recibo) }}" target="_blank">Abrir recibo</a>
-				{% else %}
-				—
-				{% endif %}
-			  </td>
-			</tr>
+            <tr>
+              <td>{{ item.origem }}</td>
+              <td>{{ item.data }}</td>
+              <td>{{ item.recibo or '—' }}</td>
+              <td>{{ item.descricao }}</td>
+              <td>{{ item.detalhes or '—' }}</td>
+              <td>{{ item.categoria or '—' }}</td>
+              <td>{{ item.aplicacao or '—' }}</td>
+              <td>R$ {{ '%.2f'|format(item.valor) }}</td>
+              <td>
+                {% if item.anexo_recibo %}
+                <a class="btn btn-sm" href="{{ url_for('static', filename='uploads/financeiro2/' ~ item.pasta_recibo ~ '/' ~ item.anexo_recibo) }}" target="_blank">ABRIR RECIBO</a>
+                {% else %}
+                —
+                {% endif %}
+              </td>
+            </tr>
             {% endfor %}
           </tbody>
         </table>
@@ -57,17 +57,17 @@
     </div>
 
     <div class="om-card">
-      <div class="card-title">Deseja salvar mesmo assim?</div>
+      <div class="card-title">DESEJA SALVAR MESMO ASSIM?</div>
 
-      <form method="post" action="{{ url_for('financeiro_dois.om_linha_nova', om_id=om_id) }}">
+      <form method="post" action="{{ url_for('financeiro_dois.om_linha_nova', om_id=om_id) }}" enctype="multipart/form-data">
         {% for chave, valor in form_data.items() %}
         <input type="hidden" name="{{ chave }}" value="{{ valor }}">
         {% endfor %}
         <input type="hidden" name="forcar_salvamento" value="1">
 
         <div class="form-actions-top">
-          <button type="submit" class="btn btn-primary">Salvar mesmo assim</button>
-          <a class="btn" href="{{ url_for('financeiro_dois.om_editar', om_id=om_id) }}">Cancelar</a>
+          <button type="submit" class="btn btn-primary">SALVAR MESMO ASSIM</button>
+          <a class="btn" href="{{ url_for('financeiro_dois.om_editar', om_id=om_id) }}">CANCELAR</a>
         </div>
       </form>
     </div>

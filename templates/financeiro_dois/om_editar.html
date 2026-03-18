@@ -118,7 +118,7 @@
             <select class="input-like" name="descricao" required>
               <option value="">Selecione</option>
               {% for item in descricoes %}
-              <option value="{{ item.nome }}">{{ item.nome }}</option>
+              <option value="{{ item.nome|upper }}">{{ item.nome|upper }}</option>
               {% endfor %}
             </select>
           </div>
@@ -128,7 +128,7 @@
             <select class="input-like" name="categoria" required>
               <option value="">Selecione</option>
               {% for item in categorias %}
-              <option value="{{ item.nome }}">{{ item.nome }}</option>
+              <option value="{{ item.nome|upper }}">{{ item.nome|upper }}</option>
               {% endfor %}
             </select>
           </div>
@@ -138,7 +138,7 @@
             <select class="input-like" name="aplicacao" required>
               <option value="">Selecione</option>
               {% for item in aplicacoes %}
-              <option value="{{ item.nome }}">{{ item.nome }}</option>
+              <option value="{{ item.nome|upper }}">{{ item.nome|upper }}</option>
               {% endfor %}
             </select>
           </div>
@@ -152,8 +152,8 @@
             <label>Moeda</label>
             <select class="input-like" name="moeda_codigo" required>
               {% for item in moedas %}
-              <option value="{{ item.codigo }}" {% if item.codigo == 'BRL' %}selected{% endif %}>
-                {{ item.codigo }} - {{ item.nome }}
+              <option value="{{ item.codigo|upper }}" {% if item.codigo|upper == 'BRL' %}selected{% endif %}>
+                {{ item.codigo|upper }} - {{ item.nome|upper }}
               </option>
               {% endfor %}
             </select>
@@ -194,7 +194,7 @@
 			<select class="input-like" name="aplicacao" required>
 			  <option value="">Selecione</option>
 			  {% for item in aplicacoes %}
-			  <option value="{{ item.nome }}">{{ item.nome }}</option>
+			  <option value="{{ item.nome|upper }}">{{ item.nome|upper }}</option>
 			  {% endfor %}
 			</select>
 		  </div>
@@ -208,8 +208,8 @@
 			<label>Moeda</label>
 			<select class="input-like" name="moeda_codigo" required>
 			  {% for item in moedas %}
-			  <option value="{{ item.codigo }}" {% if item.codigo == 'BRL' %}selected{% endif %}>
-				{{ item.codigo }} - {{ item.nome }}
+			  <option value="{{ item.codigo|upper }}" {% if item.codigo|upper == 'BRL' %}selected{% endif %}>
+				{{ item.codigo|upper }} - {{ item.nome|upper }}
 			  </option>
 			  {% endfor %}
 			</select>
@@ -238,7 +238,7 @@
 			<select class="input-like" name="aplicacao" required>
 			  <option value="">Selecione</option>
 			  {% for item in aplicacoes %}
-			  <option value="{{ item.nome }}">{{ item.nome }}</option>
+			  <option value="{{ item.nome|upper }}">{{ item.nome|upper }}</option>
 			  {% endfor %}
 			</select>
 		  </div>
@@ -311,7 +311,7 @@
 			  <td>
 				  <select class="input-like input-like-sm" name="moeda_codigo" required>
 					{% for item in moedas %}
-					<option value="{{ item.codigo }}" {% if linha.moeda_codigo == item.codigo %}selected{% endif %}>{{ item.codigo }}</option>
+					<option value="{{ item.codigo|upper }}" {% if (linha.moeda_codigo or '')|upper == (item.codigo or '')|upper %}selected{% endif %}>{{ item.codigo|upper }}</option>
 					{% endfor %}
 				  </select>
 			  </td>
@@ -335,12 +335,12 @@
 				  {{ linha.data }}
 			  </td>
 			  <td>{{ linha.recibo }}</td>
-			  <td>{{ linha.descricao }}</td>
-			  <td>{{ linha.detalhes }}</td>
-			  <td>{{ linha.categoria }}</td>
-			  <td>{{ linha.aplicacao }}</td>
+			  <td>{{ linha.descricao|upper }}</td>
+			  <td>{{ linha.detalhes|upper }}</td>
+			  <td>{{ linha.categoria|upper }}</td>
+			  <td>{{ linha.aplicacao|upper }}</td>
 			  <td style="text-align:right;">{{ '%.2f'|format(linha.valor) }}</td>
-			  <td>{{ linha.moeda_codigo }}</td>
+			  <td>{{ linha.moeda_codigo|upper }}</td>
 			  <td style="text-align:right;">{{ '%.6f'|format(linha.cambio) }}</td>
 			  <td style="text-align:right;">R$ {{ '%.2f'|format(linha.valor_brl) }}</td>
 			  <td>{{ linha.status }}</td>
@@ -501,7 +501,16 @@
       grid-template-columns:1fr;
     }
   }
-	.linha-inativa{
+	
+  .input-like,
+  .input-like-sm,
+  .input-like option,
+  .table td,
+  .table th {
+    text-transform: uppercase;
+  }
+
+  .linha-inativa{
 	  opacity: 0.6;
 	  background: #fafafa;
 	}
