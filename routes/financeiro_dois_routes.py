@@ -2478,7 +2478,7 @@ def rd_linha_editar(rd_id: int, linha_id: int):
             return redirect(url_for("financeiro_dois.rd_editar", rd_id=rd_id))
 
         linha = conn.execute(text("""
-            SELECT id, status, anexo_recibo
+            SELECT id, status
             FROM financeiro2_rd_linhas
             WHERE id = :linha_id
               AND rd_id = :rd_id
@@ -2492,23 +2492,6 @@ def rd_linha_editar(rd_id: int, linha_id: int):
             flash("A LINHA ESTÁ INATIVA E NÃO PODE SER EDITADA.", "warning")
             return redirect(url_for("financeiro_dois.rd_editar", rd_id=rd_id))
 
-        nome_arquivo = linha["anexo_recibo"]
-
-        arquivo = request.files.get("anexo_recibo")
-        if arquivo and arquivo.filename:
-            import os
-            import uuid
-            from werkzeug.utils import secure_filename
-
-            pasta = os.path.join("static", "uploads", "financeiro2", "rd_recibos")
-            os.makedirs(pasta, exist_ok=True)
-
-            nome_seguro = secure_filename(arquivo.filename)
-            extensao = os.path.splitext(nome_seguro)[1].lower()
-            nome_arquivo = f"{uuid.uuid4().hex}{extensao}"
-            caminho = os.path.join(pasta, nome_arquivo)
-            arquivo.save(caminho)
-
         conn.execute(text("""
             UPDATE financeiro2_rd_linhas
             SET data_lancamento = :data_lancamento,
@@ -2516,7 +2499,6 @@ def rd_linha_editar(rd_id: int, linha_id: int):
                 categoria = :categoria,
                 aplicacao = :aplicacao,
                 valor = :valor,
-                anexo_recibo = :anexo_recibo,
                 atualizado_em = CURRENT_TIMESTAMP
             WHERE id = :linha_id
               AND rd_id = :rd_id
@@ -2526,7 +2508,6 @@ def rd_linha_editar(rd_id: int, linha_id: int):
             "categoria": categoria,
             "aplicacao": aplicacao,
             "valor": valor,
-            "anexo_recibo": nome_arquivo,
             "linha_id": linha_id,
             "rd_id": rd_id
         })

@@ -297,8 +297,7 @@
                 {% endif %}
               </td>
               <td>
-                <form id="linha-rd-{{ linha.id }}" method="post" action="{{ url_for('financeiro_dois.rd_linha_editar', rd_id=rd.id, linha_id=linha.id) }}" enctype="multipart/form-data">
-                  <input type="file" name="anexo_recibo" class="input-like input-like-sm" style="margin-bottom:6px;">
+                <form id="linha-rd-{{ linha.id }}" method="post" action="{{ url_for('financeiro_dois.rd_linha_editar', rd_id=rd.id, linha_id=linha.id) }}">
                   <button type="submit" class="btn btn-sm">Salvar</button>
                 </form>
                 <form method="post" action="{{ url_for('financeiro_dois.rd_linha_toggle_status', rd_id=rd.id, linha_id=linha.id) }}" style="margin-top:6px;">
