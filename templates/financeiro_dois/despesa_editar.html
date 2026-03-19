@@ -51,10 +51,18 @@
               <label>Vencimento</label>
               <input class="input-like" type="date" name="vencimento" value="{{ despesa.vencimento_form }}" />
             </div>
-            <div class="field">
-              <label>Tipo documento</label>
-              <input class="input-like" type="text" name="tipo_documento" value="{{ despesa.tipo_documento }}" {% if despesa.eh_importada %}disabled{% endif %} required />
-            </div>
+			<div class="field">
+			  <label>Tipo documento</label>
+			  <select class="input-like" name="tipo_documento" form="form-despesa" {% if despesa.eh_importada %}disabled{% endif %} required>
+				<option value="">SELECIONE</option>
+				{% for item in tipos_documento %}
+				  <option value="{{ item.nome }}" {% if (despesa.tipo_documento or '')|upper == (item.nome or '')|upper %}selected{% endif %}>{{ item.nome }}</option>
+				{% endfor %}
+			  </select>
+			  {% if despesa.eh_importada %}
+				<input type="hidden" name="tipo_documento" value="{{ despesa.tipo_documento }}" form="form-despesa">
+			  {% endif %}
+			</div>
             <div class="field">
               <label>Número documento</label>
               <input class="input-like" type="text" name="numero_documento" value="{{ despesa.numero_documento }}" {% if despesa.eh_importada %}disabled{% endif %} required />
@@ -67,14 +75,30 @@
               <label>CPF/CNPJ</label>
               <input class="input-like" type="text" name="cpf_cnpj" value="{{ despesa.cpf_cnpj }}" {% if despesa.eh_importada %}disabled{% endif %} />
             </div>
-            <div class="field">
-              <label>Centro de custo</label>
-              <input class="input-like" type="text" name="centro_custo" value="{{ despesa.centro_custo }}" {% if despesa.eh_importada %}disabled{% endif %} />
-            </div>
-            <div class="field">
-              <label>Fonte pagadora</label>
-              <input class="input-like" type="text" name="fonte_pagadora" value="{{ despesa.fonte_pagadora }}" />
-            </div>
+			<div class="field">
+			  <label>Centro de custo</label>
+			  <select class="input-like" name="centro_custo" form="form-despesa" {% if despesa.eh_importada %}disabled{% endif %} required>
+				<option value="">SELECIONE</option>
+				{% for item in centros_custo %}
+				  <option value="{{ item.nome }}" {% if (despesa.centro_custo or '')|upper == (item.nome or '')|upper %}selected{% endif %}>{{ item.nome }}</option>
+				{% endfor %}
+			  </select>
+			  {% if despesa.eh_importada %}
+				<input type="hidden" name="centro_custo" value="{{ despesa.centro_custo }}" form="form-despesa">
+			  {% endif %}
+			</div>
+			<div class="field">
+			  <label>Fonte pagadora</label>
+			  <select class="input-like" name="fonte_pagadora" form="form-despesa" {% if despesa.eh_importada %}disabled{% endif %}>
+				<option value="">SELECIONE</option>
+				{% for item in empresas_nd %}
+				  <option value="{{ item.nome }}" {% if (despesa.fonte_pagadora or '')|upper == (item.nome or '')|upper %}selected{% endif %}>{{ item.nome }}</option>
+				{% endfor %}
+			  </select>
+			  {% if despesa.eh_importada %}
+				<input type="hidden" name="fonte_pagadora" value="{{ despesa.fonte_pagadora }}" form="form-despesa">
+			  {% endif %}
+			</div>
             <div class="field">
               <label>Valor</label>
               <input class="input-like" type="text" name="valor" value="{{ '%.2f'|format(despesa.valor) }}" {% if despesa.eh_importada %}disabled{% endif %} required />

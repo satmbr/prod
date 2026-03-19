@@ -3047,6 +3047,29 @@ def despesas():
 @permission_required("financeiro", "visualizar")
 def despesa_nova():
     hoje = date.today().strftime("%Y-%m-%d")
+    engine = get_engine()
+
+    with engine.connect() as conn:
+        tipos_documento = conn.execute(text("""
+            SELECT UPPER(nome) AS nome
+            FROM financeiro2_cad_tipos_documento
+            WHERE status = 'Ativo'
+            ORDER BY nome
+        """)).mappings().all()
+
+        centros_custo = conn.execute(text("""
+            SELECT UPPER(nome) AS nome
+            FROM financeiro2_cad_centros_custo
+            WHERE status = 'Ativo'
+            ORDER BY nome
+        """)).mappings().all()
+
+        empresas_nd = conn.execute(text("""
+            SELECT UPPER(nome) AS nome
+            FROM financeiro2_cad_empresas_nd
+            WHERE status = 'Ativo'
+            ORDER BY nome
+        """)).mappings().all()
 
     despesa = {
         "id": 0,
@@ -3056,7 +3079,7 @@ def despesa_nova():
         "origem_id": None,
         "data_form": hoje,
         "vencimento_form": "",
-        "tipo_documento": "DESPESA OPERACIONAL",
+        "tipo_documento": "",
         "numero_documento": "",
         "fornecedor": "",
         "cpf_cnpj": "",
@@ -3082,6 +3105,9 @@ def despesa_nova():
         "financeiro_dois/despesa_editar.html",
         subnav_links=build_financeiro_dois_subnav("despesas"),
         despesa=despesa,
+        tipos_documento=tipos_documento,
+        centros_custo=centros_custo,
+        empresas_nd=empresas_nd,
     )
     
 @bp.route("/despesas/criar", methods=["POST"])
@@ -3252,6 +3278,27 @@ def despesa_editar(despesa_id: int):
             ORDER BY id DESC
         """), {"despesa_id": despesa_id}).mappings().all()
 
+        tipos_documento = conn.execute(text("""
+            SELECT UPPER(nome) AS nome
+            FROM financeiro2_cad_tipos_documento
+            WHERE status = 'Ativo'
+            ORDER BY nome
+        """)).mappings().all()
+
+        centros_custo = conn.execute(text("""
+            SELECT UPPER(nome) AS nome
+            FROM financeiro2_cad_centros_custo
+            WHERE status = 'Ativo'
+            ORDER BY nome
+        """)).mappings().all()
+
+        empresas_nd = conn.execute(text("""
+            SELECT UPPER(nome) AS nome
+            FROM financeiro2_cad_empresas_nd
+            WHERE status = 'Ativo'
+            ORDER BY nome
+        """)).mappings().all()
+
     despesa = dict(despesa)
     despesa["origem"] = despesa["origem_tipo"]
     despesa["eh_nova"] = False
@@ -3262,6 +3309,9 @@ def despesa_editar(despesa_id: int):
         "financeiro_dois/despesa_editar.html",
         subnav_links=build_financeiro_dois_subnav("despesas"),
         despesa=despesa,
+        tipos_documento=tipos_documento,
+        centros_custo=centros_custo,
+        empresas_nd=empresas_nd,
     )
     
 @bp.route("/despesas/<int:despesa_id>/salvar", methods=["POST"])
