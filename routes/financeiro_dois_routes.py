@@ -3415,6 +3415,239 @@ def despesa_salvar(despesa_id: int):
 
     flash("DESPESA SALVA COM SUCESSO.", "success")
     return redirect(url_for("financeiro_dois.despesa_editar", despesa_id=despesa_id))
+    
+@bp.route("/despesas/importar")
+@login_required
+@permission_required("financeiro", "visualizar")
+def despesas_importar():
+    engine = get_engine()
+
+    with engine.connect() as conn:
+        oms = conn.execute(text("""
+            SELECT
+                'OM' AS origem_tipo,
+                om.id AS origem_id,
+                UPPER(COALESCE(om.numero_om, '')) AS numero_origem,
+                TO_CHAR(om.criado_em, 'DD/MM/YYYY') AS data_origem,
+                UPPER(COALESCE(om.nome_colaborador, '')) AS favorecido,
+                UPPER(COALESCE(om.status, '')) AS status_origem,
+                COALESCE((
+                    SELECT SUM(COALESCE(l.valor_brl, 0))
+                    FROM financeiro2_om_linhas l
+                    WHERE l.om_id = om.id
+                      AND COALESCE(l.status, 'Ativo') = 'Ativo'
+                ), 0) AS valor_total,
+                CASE
+                    WHEN EXISTS (
+                        SELECT 1
+                        FROM financeiro2_despesas d
+                        WHERE d.origem_tipo = 'OM'
+                          AND d.origem_id = om.id
+                    ) THEN 1 ELSE 0
+                END AS ja_importada
+            FROM financeiro2_om om
+            ORDER BY om.id DESC
+        """)).mappings().all()
+
+        rds = conn.execute(text("""
+            SELECT
+                'RD' AS origem_tipo,
+                rd.id AS origem_id,
+                UPPER(COALESCE(rd.numero_rd, '')) AS numero_origem,
+                TO_CHAR(rd.criado_em, 'DD/MM/YYYY') AS data_origem,
+                UPPER(COALESCE(rd.nome_colaborador, '')) AS favorecido,
+                UPPER(COALESCE(rd.status, '')) AS status_origem,
+                COALESCE((
+                    SELECT SUM(COALESCE(l.valor, 0))
+                    FROM financeiro2_rd_linhas l
+                    WHERE l.rd_id = rd.id
+                      AND COALESCE(l.status, 'Ativo') = 'Ativo'
+                ), 0) AS valor_total,
+                CASE
+                    WHEN EXISTS (
+                        SELECT 1
+                        FROM financeiro2_despesas d
+                        WHERE d.origem_tipo = 'RD'
+                          AND d.origem_id = rd.id
+                    ) THEN 1 ELSE 0
+                END AS ja_importada
+            FROM financeiro2_rd rd
+            ORDER BY rd.id DESC
+        """)).mappings().all()
+
+    itens = []
+    for item in list(oms) + list(rds):
+        item = dict(item)
+        item["pode_importar"] = item["status_origem"] == "PAGA" and not bool(item["ja_importada"])
+        itens.append(item)
+
+    itens.sort(key=lambda x: (x["origem_tipo"], x["numero_origem"]), reverse=True)
+
+    return render_template(
+        "financeiro_dois/despesas_importar.html",
+        subnav_links=build_financeiro_dois_subnav("despesas"),
+        itens=itens,
+    )
+    
+@bp.route("/despesas/importar/<string:origem_tipo>/<int:origem_id>", methods=["POST"])
+@login_required
+@permission_required("financeiro", "visualizar")
+def despesa_importar_origem(origem_tipo: str, origem_id: int):
+    origem_tipo = (origem_tipo or "").upper().strip()
+    if origem_tipo not in ("OM", "RD"):
+        flash("ORIGEM INVÁLIDA PARA IMPORTAÇÃO.", "warning")
+        return redirect(url_for("financeiro_dois.despesas_importar"))
+
+    engine = get_engine()
+    with engine.begin() as conn:
+        existente = conn.execute(text("""
+            SELECT id
+            FROM financeiro2_despesas
+            WHERE origem_tipo = :origem_tipo
+              AND origem_id = :origem_id
+            LIMIT 1
+        """), {
+            "origem_tipo": origem_tipo,
+            "origem_id": origem_id
+        }).mappings().first()
+
+        if existente:
+            flash("ESSA ORIGEM JÁ FOI IMPORTADA COMO DESPESA.", "warning")
+            return redirect(url_for("financeiro_dois.despesas_importar"))
+
+        if origem_tipo == "OM":
+            origem = conn.execute(text("""
+                SELECT
+                    id,
+                    numero_om AS numero_origem,
+                    criado_em::date AS data_documento,
+                    UPPER(COALESCE(nome_colaborador, '')) AS fornecedor,
+                    UPPER(COALESCE(matricula_colaborador, '')) AS cpf_cnpj,
+                    UPPER(COALESCE(status, '')) AS status_origem,
+                    COALESCE((
+                        SELECT SUM(COALESCE(l.valor_brl, 0))
+                        FROM financeiro2_om_linhas l
+                        WHERE l.om_id = financeiro2_om.id
+                          AND COALESCE(l.status, 'Ativo') = 'Ativo'
+                    ), 0) AS valor_total
+                FROM financeiro2_om
+                WHERE id = :id
+            """), {"id": origem_id}).mappings().first()
+
+            tipo_documento = "OM"
+            numero_documento = origem["numero_origem"] if origem else ""
+            descricao = f"IMPORTAÇÃO DA OM {numero_documento}"
+            centro_custo = ""
+            fonte_pagadora = ""
+
+        else:
+            origem = conn.execute(text("""
+                SELECT
+                    id,
+                    numero_rd AS numero_origem,
+                    criado_em::date AS data_documento,
+                    UPPER(COALESCE(nome_colaborador, '')) AS fornecedor,
+                    UPPER(COALESCE(matricula_colaborador, '')) AS cpf_cnpj,
+                    UPPER(COALESCE(status, '')) AS status_origem,
+                    COALESCE((
+                        SELECT SUM(COALESCE(l.valor, 0))
+                        FROM financeiro2_rd_linhas l
+                        WHERE l.rd_id = financeiro2_rd.id
+                          AND COALESCE(l.status, 'Ativo') = 'Ativo'
+                    ), 0) AS valor_total
+                FROM financeiro2_rd
+                WHERE id = :id
+            """), {"id": origem_id}).mappings().first()
+
+            tipo_documento = "RD"
+            numero_documento = origem["numero_origem"] if origem else ""
+            descricao = f"IMPORTAÇÃO DA RD {numero_documento}"
+            centro_custo = ""
+            fonte_pagadora = ""
+
+        if not origem:
+            flash("ORIGEM NÃO ENCONTRADA.", "danger")
+            return redirect(url_for("financeiro_dois.despesas_importar"))
+
+        if origem["status_origem"] != "PAGA":
+            flash("A IMPORTAÇÃO SÓ É PERMITIDA QUANDO A ORIGEM ESTIVER PAGA.", "warning")
+            return redirect(url_for("financeiro_dois.despesas_importar"))
+
+        numero_despesa = _proximo_numero_despesa(conn, origem["data_documento"])
+
+        conn.execute(text("""
+            INSERT INTO financeiro2_despesas (
+                numero_despesa,
+                tipo_registro,
+                origem_tipo,
+                origem_id,
+                data_documento,
+                vencimento,
+                tipo_documento,
+                numero_documento,
+                fornecedor,
+                cpf_cnpj,
+                descricao,
+                centro_custo,
+                fonte_pagadora,
+                valor,
+                status_despesa,
+                status_nd,
+                nd_numero,
+                motivo_status_nd,
+                observacao,
+                data_pagamento,
+                valor_pago,
+                observacao_pagamento,
+                importada_em,
+                criado_em,
+                atualizado_em
+            ) VALUES (
+                :numero_despesa,
+                'IMPORTADA',
+                :origem_tipo,
+                :origem_id,
+                :data_documento,
+                NULL,
+                :tipo_documento,
+                :numero_documento,
+                :fornecedor,
+                :cpf_cnpj,
+                :descricao,
+                :centro_custo,
+                :fonte_pagadora,
+                :valor,
+                'PAGA',
+                'NÃO VINCULADA',
+                '',
+                '',
+                '',
+                :data_pagamento,
+                :valor_pago,
+                'IMPORTADA AUTOMATICAMENTE DA ORIGEM',
+                CURRENT_TIMESTAMP,
+                CURRENT_TIMESTAMP,
+                CURRENT_TIMESTAMP
+            )
+        """), {
+            "numero_despesa": numero_despesa,
+            "origem_tipo": origem_tipo,
+            "origem_id": origem_id,
+            "data_documento": origem["data_documento"],
+            "tipo_documento": tipo_documento,
+            "numero_documento": numero_documento,
+            "fornecedor": origem["fornecedor"],
+            "cpf_cnpj": origem["cpf_cnpj"],
+            "descricao": descricao,
+            "centro_custo": centro_custo,
+            "fonte_pagadora": fonte_pagadora,
+            "valor": float(origem["valor_total"] or 0),
+            "data_pagamento": origem["data_documento"],
+            "valor_pago": float(origem["valor_total"] or 0),
+        })
+
+    flash(f"{origem_tipo} IMPORTADA COMO DESPESA COM SUCESSO.", "success")
+    return redirect(url_for("financeiro_dois.despesas"))
 
 @bp.route("/rd/<int:rd_id>/adiantar", methods=["POST"])
 @login_required

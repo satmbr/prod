@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}Importar Despesa | Financeiro Dois{% endblock %}
+
+{% block content %}
+<div class="page-wrap">
+  <section class="zone">
+    <div class="zone-head">
+      <div class="zone-left">
+        <div class="zone-icon">📥</div>
+        <div>
+          <div class="zone-title">Importar despesa</div>
+          <div class="muted">OMs e RDs ainda não importadas para Despesas.</div>
+        </div>
+      </div>
+      <div class="zone-actions">
+        <a class="btn" href="{{ url_for('financeiro_dois.despesas') }}">Voltar</a>
+      </div>
+    </div>
+
+    <div class="filters-card" style="margin-bottom:16px;">
+      <div class="muted">
+        OMs e RDs em aberto ou parcial aparecem para acompanhamento, mas só podem ser importadas quando estiverem com status <strong>PAGA</strong>.
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>TIPO</th>
+            <th>NÚMERO</th>
+            <th>DATA</th>
+            <th>FAVORECIDO</th>
+            <th>STATUS ORIGEM</th>
+            <th>JÁ IMPORTADA</th>
+            <th style="text-align:right;">VALOR TOTAL</th>
+            <th style="width:180px;">AÇÃO</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in itens %}
+          <tr {% if item.status_origem != 'PAGA' %}style="background:#fff7ed;"{% endif %}>
+            <td>{{ item.origem_tipo }}</td>
+            <td><strong>{{ item.numero_origem }}</strong></td>
+            <td>{{ item.data_origem }}</td>
+            <td>{{ item.favorecido or '—' }}</td>
+            <td>
+              {% if item.status_origem == 'PAGA' %}
+                <span style="color:#166534;font-weight:700;">PAGA</span>
+              {% elif item.status_origem == 'PARCIAL' %}
+                <span style="color:#b45309;font-weight:700;">PARCIAL</span>
+              {% else %}
+                <span style="color:#334155;font-weight:700;">{{ item.status_origem }}</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if item.ja_importada %}
+                <span style="color:#166534;font-weight:700;">SIM</span>
+              {% else %}
+                <span style="color:#334155;font-weight:700;">NÃO</span>
+              {% endif %}
+            </td>
+            <td style="text-align:right;">R$ {{ '%.2f'|format(item.valor_total) }}</td>
+            <td>
+              {% if item.ja_importada %}
+                <span class="btn btn-sm" style="opacity:.65;cursor:not-allowed;">Já importada</span>
+              {% elif item.pode_importar %}
+                <form method="post" action="{{ url_for('financeiro_dois.despesa_importar_origem', origem_tipo=item.origem_tipo, origem_id=item.origem_id) }}" style="display:inline;">
+                  <button type="submit" class="btn btn-sm btn-primary">Importar</button>
+                </form>
+              {% else %}
+                <span class="btn btn-sm" style="opacity:.65;cursor:not-allowed;">Bloqueada</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="8">Nenhuma OM ou RD disponível para importação.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+{% endblock %}

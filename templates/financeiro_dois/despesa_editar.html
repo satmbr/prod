@@ -30,6 +30,11 @@
         <button type="submit" form="form-despesa" class="btn btn-primary">
           {% if despesa.eh_nova %}Criar despesa{% else %}Salvar alterações{% endif %}
         </button>
+		{% if despesa.eh_importada and despesa.origem_tipo == 'OM' %}
+		  <a class="btn" href="{{ url_for('financeiro_dois.om_editar', om_id=despesa.origem_id) }}">Abrir origem OM</a>
+		{% elif despesa.eh_importada and despesa.origem_tipo == 'RD' %}
+		  <a class="btn" href="{{ url_for('financeiro_dois.rd_editar', rd_id=despesa.origem_id) }}">Abrir origem RD</a>
+		{% endif %}		
       </div>
     </div>
 
