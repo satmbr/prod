@@ -214,7 +214,9 @@ def cadastros():
     )
     
 def _valor_decimal(txt: str) -> float:
-    bruto = (txt or "").strip().replace("R$", "").replace(".", "").replace(",", ".")
+    bruto = (txt or "").strip().replace("R$", "").replace(" ", "")
+    if "," in bruto:
+        bruto = bruto.replace(".", "").replace(",", ".")
     return float(bruto)
 
 def _proximo_numero_despesa(conn, dt_ref: date | None = None) -> str:
