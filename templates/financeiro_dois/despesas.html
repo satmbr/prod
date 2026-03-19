@@ -13,12 +13,8 @@
         </div>
       </div>
       <div class="zone-actions">
-        {% if 'financeiro_dois.despesas_importar' in current_app.view_functions %}
-          <a class="btn" href="{{ url_for('financeiro_dois.despesas_importar') }}">Importar despesa</a>
-        {% else %}
-          <a class="btn" href="#" onclick="return false;" title="Rota ainda não implementada">Importar despesa</a>
-        {% endif %}
-        <a class="btn btn-primary" href="{{ url_for('financeiro_dois.despesa_nova') }}">Nova despesa</a>
+		<a class="btn" href="{{ url_for('financeiro_dois.despesas_importar') }}">Importar despesa</a>
+		<a class="btn btn-primary" href="{{ url_for('financeiro_dois.despesa_nova') }}">Nova despesa</a>
       </div>
     </div>
 
