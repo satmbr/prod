@@ -10,6 +10,9 @@ from pypdf import PdfReader, PdfWriter
 from PIL import Image
 import os
 from reportlab.lib.utils import ImageReader
+from datetime import date, datetime
+import uuid
+from werkzeug.utils import secure_filename
 
 bp = Blueprint("financeiro_dois", __name__, url_prefix="/financeiro-dois")
 
@@ -209,7 +212,45 @@ def cadastros():
         parametros=parametros,
         empresas_nd=empresas_nd,
     )
+    
+def _valor_decimal(txt: str) -> float:
+    bruto = (txt or "").strip().replace("R$", "").replace(".", "").replace(",", ".")
+    return float(bruto)
 
+def _proximo_numero_despesa(conn, dt_ref: date | None = None) -> str:
+    dt_ref = dt_ref or date.today()
+    prefixo = f"DESP-{dt_ref.strftime('%Y%m')}-"
+
+    linha = conn.execute(text("""
+        SELECT numero_despesa
+        FROM financeiro2_despesas
+        WHERE numero_despesa LIKE :prefixo
+        ORDER BY numero_despesa DESC
+        LIMIT 1
+    """), {"prefixo": f"{prefixo}%"}).mappings().first()
+
+    seq = 1
+    if linha and linha["numero_despesa"]:
+        try:
+            seq = int(str(linha["numero_despesa"]).split("-")[-1]) + 1
+        except Exception:
+            seq = 1
+
+    return f"{prefixo}{seq:04d}"
+
+def _salvar_anexo_despesa(arquivo):
+    if not arquivo or not arquivo.filename:
+        return None, None
+
+    pasta = os.path.join("static", "uploads", "financeiro2", "despesas")
+    os.makedirs(pasta, exist_ok=True)
+
+    nome_original = secure_filename(arquivo.filename)
+    extensao = os.path.splitext(nome_original)[1].lower()
+    nome_salvo = f"{uuid.uuid4().hex}{extensao}"
+
+    arquivo.save(os.path.join(pasta, nome_salvo))
+    return nome_salvo, nome_original
 
 # =========================
 # CADASTROS
@@ -2888,50 +2929,440 @@ def rd_linha_confirmar_duplicidade(rd_id: int):
 @login_required
 @permission_required("financeiro", "visualizar")
 def despesas():
-    despesas_lista = [
-        {"id": 1, "data": "15/03/2026", "vencimento": "20/03/2026", "tipo_documento": "NF", "numero_documento": "NF-4587", "fornecedor": "Hotel Exemplo", "descricao": "Hospedagem equipe", "centro_custo": "ADM", "valor": 950.00, "status_despesa": "Pendente", "status_nd": "Não vinculada", "origem": "Avulsa"},
-        {"id": 2, "data": "14/03/2026", "vencimento": "18/03/2026", "tipo_documento": "Fatura", "numero_documento": "FAT-9001", "fornecedor": "Posto Modelo", "descricao": "Combustível", "centro_custo": "OPERACAO", "valor": 420.50, "status_despesa": "Paga", "status_nd": "Em espera", "origem": "OM"},
-        {"id": 3, "data": "13/03/2026", "vencimento": "25/03/2026", "tipo_documento": "NFS", "numero_documento": "NFS-1102", "fornecedor": "Serviço X", "descricao": "Serviço de apoio", "centro_custo": "MANUTENCAO", "valor": 780.30, "status_despesa": "Pendente", "status_nd": "Rejeitada", "origem": "RD"},
-    ]
-    return render_template("financeiro_dois/despesas.html", subnav_links=build_financeiro_dois_subnav("despesas"), despesas=despesas_lista)
+    busca = _nome_preenchido(request.args.get("busca")).upper()
+    status_despesa = _nome_preenchido(request.args.get("status_despesa")).upper()
+    status_nd = _nome_preenchido(request.args.get("status_nd")).upper()
+    origem = _nome_preenchido(request.args.get("origem")).upper()
+    data_inicial = _nome_preenchido(request.args.get("data_inicial"))
+    data_final = _nome_preenchido(request.args.get("data_final"))
+    venc_inicial = _nome_preenchido(request.args.get("venc_inicial"))
+    venc_final = _nome_preenchido(request.args.get("venc_final"))
+    nd_numero = _nome_preenchido(request.args.get("nd_numero")).upper()
+    somente_vencidas = request.args.get("somente_vencidas") == "1"
 
+    filtros = ["1=1"]
+    params = {}
 
-@bp.route("/despesas/<int:despesa_id>")
+    if busca:
+        filtros.append("""
+            (
+                UPPER(COALESCE(numero_despesa, '')) LIKE :busca
+                OR UPPER(COALESCE(numero_documento, '')) LIKE :busca
+                OR UPPER(COALESCE(fornecedor, '')) LIKE :busca
+                OR UPPER(COALESCE(descricao, '')) LIKE :busca
+            )
+        """)
+        params["busca"] = f"%{busca}%"
+
+    if status_despesa and status_despesa != "TODOS":
+        filtros.append("UPPER(COALESCE(status_despesa, '')) = :status_despesa")
+        params["status_despesa"] = status_despesa
+
+    if status_nd and status_nd != "TODOS":
+        filtros.append("UPPER(COALESCE(status_nd, '')) = :status_nd")
+        params["status_nd"] = status_nd
+
+    if origem and origem not in ("TODAS", "TODOS"):
+        filtros.append("UPPER(COALESCE(origem_tipo, '')) = :origem")
+        params["origem"] = origem
+
+    if data_inicial:
+        filtros.append("data_documento >= :data_inicial")
+        params["data_inicial"] = data_inicial
+
+    if data_final:
+        filtros.append("data_documento <= :data_final")
+        params["data_final"] = data_final
+
+    if venc_inicial:
+        filtros.append("vencimento >= :venc_inicial")
+        params["venc_inicial"] = venc_inicial
+
+    if venc_final:
+        filtros.append("vencimento <= :venc_final")
+        params["venc_final"] = venc_final
+
+    if nd_numero:
+        filtros.append("UPPER(COALESCE(nd_numero, '')) LIKE :nd_numero")
+        params["nd_numero"] = f"%{nd_numero}%"
+
+    if somente_vencidas:
+        filtros.append("""
+            COALESCE(status_despesa, 'PENDENTE') <> 'PAGA'
+            AND vencimento IS NOT NULL
+            AND vencimento < CURRENT_DATE
+        """)
+
+    engine = get_engine()
+    with engine.connect() as conn:
+        despesas = conn.execute(text(f"""
+            SELECT
+                id,
+                TO_CHAR(data_documento, 'DD/MM/YYYY') AS data,
+                TO_CHAR(vencimento, 'DD/MM/YYYY') AS vencimento,
+                UPPER(COALESCE(tipo_documento, '')) AS tipo_documento,
+                UPPER(COALESCE(numero_despesa, '')) AS numero_despesa,
+                UPPER(COALESCE(numero_documento, '')) AS numero_documento,
+                UPPER(COALESCE(fornecedor, '')) AS fornecedor,
+                UPPER(COALESCE(descricao, '')) AS descricao,
+                UPPER(COALESCE(centro_custo, '')) AS centro_custo,
+                UPPER(COALESCE(status_despesa, '')) AS status_despesa,
+                UPPER(COALESCE(status_nd, '')) AS status_nd,
+                UPPER(COALESCE(origem_tipo, '')) AS origem,
+                UPPER(COALESCE(nd_numero, '')) AS nd_numero,
+                COALESCE(valor, 0) AS valor,
+                CASE
+                    WHEN UPPER(COALESCE(status_despesa, '')) = 'PAGA' THEN 'PAGA'
+                    WHEN vencimento IS NOT NULL AND vencimento < CURRENT_DATE THEN 'VENCIDA'
+                    WHEN vencimento IS NOT NULL AND vencimento <= CURRENT_DATE + INTERVAL '7 day' THEN 'A VENCER'
+                    ELSE 'NO PRAZO'
+                END AS situacao_vencimento
+            FROM financeiro2_despesas
+            WHERE {' AND '.join(filtros)}
+            ORDER BY data_documento DESC, id DESC
+        """), params).mappings().all()
+
+    return render_template(
+        "financeiro_dois/despesas.html",
+        subnav_links=build_financeiro_dois_subnav("despesas"),
+        despesas=despesas,
+        filtros={
+            "busca": request.args.get("busca", ""),
+            "status_despesa": request.args.get("status_despesa", "TODOS"),
+            "status_nd": request.args.get("status_nd", "TODOS"),
+            "origem": request.args.get("origem", "TODAS"),
+            "data_inicial": request.args.get("data_inicial", ""),
+            "data_final": request.args.get("data_final", ""),
+            "venc_inicial": request.args.get("venc_inicial", ""),
+            "venc_final": request.args.get("venc_final", ""),
+            "nd_numero": request.args.get("nd_numero", ""),
+            "somente_vencidas": somente_vencidas,
+        }
+    )
+    
+@bp.route("/despesas/nova")
 @login_required
 @permission_required("financeiro", "visualizar")
-def despesa_editar(despesa_id: int):
-    despesas_map = {
-        1: {
-            "id": 1, "data": "15/03/2026", "vencimento": "20/03/2026", "tipo_documento": "NF", "numero_documento": "NF-4587",
-            "fornecedor": "Hotel Exemplo", "cnpj": "12.345.678/0001-90", "descricao": "Hospedagem equipe", "previsao_valor": 1000.00,
-            "valor": 950.00, "centro_custo": "ADM", "status_despesa": "Pendente", "status_nd": "Não vinculada",
-            "motivo_status_nd": "", "origem": "Avulsa", "fonte_pagadora": "", "observacao": "Despesa inicial de hospedagem.",
-        },
-        2: {
-            "id": 2, "data": "14/03/2026", "vencimento": "18/03/2026", "tipo_documento": "Fatura", "numero_documento": "FAT-9001",
-            "fornecedor": "Posto Modelo", "cnpj": "22.333.444/0001-55", "descricao": "Combustível", "previsao_valor": 450.00,
-            "valor": 420.50, "centro_custo": "OPERACAO", "status_despesa": "Paga", "status_nd": "Em espera",
-            "motivo_status_nd": "Aguardando definição da ND", "origem": "OM", "fonte_pagadora": "OM-2026-0002",
-            "observacao": "Importada da OM e com vínculo limitado.",
-        },
-        3: {
-            "id": 3, "data": "13/03/2026", "vencimento": "25/03/2026", "tipo_documento": "NFS", "numero_documento": "NFS-1102",
-            "fornecedor": "Serviço X", "cnpj": "98.765.432/0001-10", "descricao": "Serviço de apoio", "previsao_valor": 800.00,
-            "valor": 780.30, "centro_custo": "MANUTENCAO", "status_despesa": "Pendente", "status_nd": "Rejeitada",
-            "motivo_status_nd": "Fora do escopo da ND atual", "origem": "RD", "fonte_pagadora": "RD-2026-03-ABC",
-            "observacao": "Despesa importada da RD.",
-        },
-    }
+def despesa_nova():
+    hoje = date.today().strftime("%Y-%m-%d")
 
-    despesa = despesas_map.get(despesa_id)
-    if not despesa:
-        abort(404)
+    despesa = {
+        "id": 0,
+        "numero_despesa": "NOVA",
+        "origem": "OPERACIONAL",
+        "origem_tipo": "OPERACIONAL",
+        "origem_id": None,
+        "data_form": hoje,
+        "vencimento_form": "",
+        "tipo_documento": "DESPESA OPERACIONAL",
+        "numero_documento": "",
+        "fornecedor": "",
+        "cpf_cnpj": "",
+        "descricao": "",
+        "centro_custo": "",
+        "fonte_pagadora": "",
+        "valor": 0,
+        "status_despesa": "PENDENTE",
+        "status_nd": "NÃO VINCULADA",
+        "nd_numero": "",
+        "motivo_status_nd": "",
+        "observacao": "",
+        "data_pagamento_form": "",
+        "valor_pago": 0,
+        "observacao_pagamento": "",
+        "tipo_registro": "OPERACIONAL",
+        "eh_nova": True,
+        "eh_importada": False,
+        "anexos": [],
+    }
 
     return render_template(
         "financeiro_dois/despesa_editar.html",
         subnav_links=build_financeiro_dois_subnav("despesas"),
         despesa=despesa,
     )
+    
+@bp.route("/despesas/criar", methods=["POST"])
+@login_required
+@permission_required("financeiro", "visualizar")
+def despesa_criar():
+    data_documento = _nome_preenchido(request.form.get("data_documento"))
+    vencimento = _nome_preenchido(request.form.get("vencimento"))
+    tipo_documento = _nome_preenchido(request.form.get("tipo_documento")).upper() or "DESPESA OPERACIONAL"
+    numero_documento = _nome_preenchido(request.form.get("numero_documento")).upper()
+    fornecedor = _nome_preenchido(request.form.get("fornecedor")).upper()
+    cpf_cnpj = _nome_preenchido(request.form.get("cpf_cnpj")).upper()
+    descricao = _nome_preenchido(request.form.get("descricao")).upper()
+    centro_custo = _nome_preenchido(request.form.get("centro_custo")).upper()
+    fonte_pagadora = _nome_preenchido(request.form.get("fonte_pagadora")).upper()
+    valor_txt = _nome_preenchido(request.form.get("valor"))
+    observacao = _nome_preenchido(request.form.get("observacao")).upper()
+
+    if not data_documento or not numero_documento or not descricao or not valor_txt:
+        flash("PREENCHA DATA, NÚMERO DO DOCUMENTO, DESCRIÇÃO E VALOR.", "warning")
+        return redirect(url_for("financeiro_dois.despesa_nova"))
+
+    try:
+        valor = _valor_decimal(valor_txt)
+    except ValueError:
+        flash("VALOR INVÁLIDO.", "warning")
+        return redirect(url_for("financeiro_dois.despesa_nova"))
+
+    if valor <= 0:
+        flash("O VALOR DA DESPESA DEVE SER MAIOR QUE ZERO.", "warning")
+        return redirect(url_for("financeiro_dois.despesa_nova"))
+
+    engine = get_engine()
+    with engine.begin() as conn:
+        numero_despesa = _proximo_numero_despesa(conn)
+
+        novo_id = conn.execute(text("""
+            INSERT INTO financeiro2_despesas (
+                numero_despesa,
+                tipo_registro,
+                origem_tipo,
+                origem_id,
+                data_documento,
+                vencimento,
+                tipo_documento,
+                numero_documento,
+                fornecedor,
+                cpf_cnpj,
+                descricao,
+                centro_custo,
+                fonte_pagadora,
+                valor,
+                status_despesa,
+                status_nd,
+                nd_numero,
+                motivo_status_nd,
+                observacao,
+                valor_pago,
+                observacao_pagamento,
+                criado_em,
+                atualizado_em
+            ) VALUES (
+                :numero_despesa,
+                'OPERACIONAL',
+                'OPERACIONAL',
+                NULL,
+                :data_documento,
+                :vencimento,
+                :tipo_documento,
+                :numero_documento,
+                :fornecedor,
+                :cpf_cnpj,
+                :descricao,
+                :centro_custo,
+                :fonte_pagadora,
+                :valor,
+                'PENDENTE',
+                'NÃO VINCULADA',
+                '',
+                '',
+                :observacao,
+                0,
+                '',
+                CURRENT_TIMESTAMP,
+                CURRENT_TIMESTAMP
+            )
+            RETURNING id
+        """), {
+            "numero_despesa": numero_despesa,
+            "data_documento": data_documento,
+            "vencimento": vencimento or None,
+            "tipo_documento": tipo_documento,
+            "numero_documento": numero_documento,
+            "fornecedor": fornecedor,
+            "cpf_cnpj": cpf_cnpj,
+            "descricao": descricao,
+            "centro_custo": centro_custo,
+            "fonte_pagadora": fonte_pagadora,
+            "valor": valor,
+            "observacao": observacao,
+        }).scalar()
+
+        arquivo = request.files.get("anexo")
+        nome_salvo, nome_original = _salvar_anexo_despesa(arquivo)
+        if nome_salvo:
+            conn.execute(text("""
+                INSERT INTO financeiro2_despesas_anexos (
+                    despesa_id, arquivo, nome_original, criado_em
+                ) VALUES (
+                    :despesa_id, :arquivo, :nome_original, CURRENT_TIMESTAMP
+                )
+            """), {
+                "despesa_id": novo_id,
+                "arquivo": nome_salvo,
+                "nome_original": nome_original,
+            })
+
+    flash("DESPESA OPERACIONAL CRIADA COM SUCESSO.", "success")
+    return redirect(url_for("financeiro_dois.despesa_editar", despesa_id=novo_id))
+
+@bp.route("/despesas/<int:despesa_id>")
+@login_required
+@permission_required("financeiro", "visualizar")
+def despesa_editar(despesa_id: int):
+    engine = get_engine()
+    with engine.connect() as conn:
+        despesa = conn.execute(text("""
+            SELECT
+                id,
+                UPPER(COALESCE(numero_despesa, '')) AS numero_despesa,
+                UPPER(COALESCE(tipo_registro, '')) AS tipo_registro,
+                UPPER(COALESCE(origem_tipo, '')) AS origem_tipo,
+                origem_id,
+                TO_CHAR(data_documento, 'YYYY-MM-DD') AS data_form,
+                TO_CHAR(vencimento, 'YYYY-MM-DD') AS vencimento_form,
+                TO_CHAR(data_pagamento, 'YYYY-MM-DD') AS data_pagamento_form,
+                TO_CHAR(data_documento, 'DD/MM/YYYY') AS data,
+                TO_CHAR(vencimento, 'DD/MM/YYYY') AS vencimento,
+                UPPER(COALESCE(tipo_documento, '')) AS tipo_documento,
+                UPPER(COALESCE(numero_documento, '')) AS numero_documento,
+                UPPER(COALESCE(fornecedor, '')) AS fornecedor,
+                UPPER(COALESCE(cpf_cnpj, '')) AS cpf_cnpj,
+                UPPER(COALESCE(descricao, '')) AS descricao,
+                UPPER(COALESCE(centro_custo, '')) AS centro_custo,
+                UPPER(COALESCE(fonte_pagadora, '')) AS fonte_pagadora,
+                COALESCE(valor, 0) AS valor,
+                UPPER(COALESCE(status_despesa, '')) AS status_despesa,
+                UPPER(COALESCE(status_nd, '')) AS status_nd,
+                UPPER(COALESCE(nd_numero, '')) AS nd_numero,
+                UPPER(COALESCE(motivo_status_nd, '')) AS motivo_status_nd,
+                UPPER(COALESCE(observacao, '')) AS observacao,
+                COALESCE(valor_pago, 0) AS valor_pago,
+                UPPER(COALESCE(observacao_pagamento, '')) AS observacao_pagamento
+            FROM financeiro2_despesas
+            WHERE id = :id
+        """), {"id": despesa_id}).mappings().first()
+
+        if not despesa:
+            abort(404)
+
+        anexos = conn.execute(text("""
+            SELECT
+                id,
+                arquivo,
+                nome_original
+            FROM financeiro2_despesas_anexos
+            WHERE despesa_id = :despesa_id
+            ORDER BY id DESC
+        """), {"despesa_id": despesa_id}).mappings().all()
+
+    despesa = dict(despesa)
+    despesa["origem"] = despesa["origem_tipo"]
+    despesa["eh_nova"] = False
+    despesa["eh_importada"] = despesa["origem_tipo"] in ("OM", "RD")
+    despesa["anexos"] = anexos
+
+    return render_template(
+        "financeiro_dois/despesa_editar.html",
+        subnav_links=build_financeiro_dois_subnav("despesas"),
+        despesa=despesa,
+    )
+    
+@bp.route("/despesas/<int:despesa_id>/salvar", methods=["POST"])
+@login_required
+@permission_required("financeiro", "visualizar")
+def despesa_salvar(despesa_id: int):
+    data_documento = _nome_preenchido(request.form.get("data_documento"))
+    vencimento = _nome_preenchido(request.form.get("vencimento"))
+    tipo_documento = _nome_preenchido(request.form.get("tipo_documento")).upper()
+    numero_documento = _nome_preenchido(request.form.get("numero_documento")).upper()
+    fornecedor = _nome_preenchido(request.form.get("fornecedor")).upper()
+    cpf_cnpj = _nome_preenchido(request.form.get("cpf_cnpj")).upper()
+    descricao = _nome_preenchido(request.form.get("descricao")).upper()
+    centro_custo = _nome_preenchido(request.form.get("centro_custo")).upper()
+    fonte_pagadora = _nome_preenchido(request.form.get("fonte_pagadora")).upper()
+    status_despesa = _nome_preenchido(request.form.get("status_despesa")).upper() or "PENDENTE"
+    status_nd = _nome_preenchido(request.form.get("status_nd")).upper() or "NÃO VINCULADA"
+    nd_numero = _nome_preenchido(request.form.get("nd_numero")).upper()
+    motivo_status_nd = _nome_preenchido(request.form.get("motivo_status_nd")).upper()
+    observacao = _nome_preenchido(request.form.get("observacao")).upper()
+    valor_txt = _nome_preenchido(request.form.get("valor"))
+
+    if not data_documento or not numero_documento or not descricao or not valor_txt:
+        flash("PREENCHA DATA, NÚMERO DO DOCUMENTO, DESCRIÇÃO E VALOR.", "warning")
+        return redirect(url_for("financeiro_dois.despesa_editar", despesa_id=despesa_id))
+
+    try:
+        valor = _valor_decimal(valor_txt)
+    except ValueError:
+        flash("VALOR INVÁLIDO.", "warning")
+        return redirect(url_for("financeiro_dois.despesa_editar", despesa_id=despesa_id))
+
+    engine = get_engine()
+    with engine.begin() as conn:
+        atual = conn.execute(text("""
+            SELECT origem_tipo
+            FROM financeiro2_despesas
+            WHERE id = :id
+        """), {"id": despesa_id}).mappings().first()
+
+        if not atual:
+            abort(404)
+
+        if str(atual["origem_tipo"]).upper() in ("OM", "RD"):
+            flash("DESPESA IMPORTADA DEVE SER ALTERADA PELA ORIGEM.", "warning")
+            return redirect(url_for("financeiro_dois.despesa_editar", despesa_id=despesa_id))
+
+        conn.execute(text("""
+            UPDATE financeiro2_despesas
+            SET
+                data_documento = :data_documento,
+                vencimento = :vencimento,
+                tipo_documento = :tipo_documento,
+                numero_documento = :numero_documento,
+                fornecedor = :fornecedor,
+                cpf_cnpj = :cpf_cnpj,
+                descricao = :descricao,
+                centro_custo = :centro_custo,
+                fonte_pagadora = :fonte_pagadora,
+                valor = :valor,
+                status_despesa = :status_despesa,
+                status_nd = :status_nd,
+                nd_numero = :nd_numero,
+                motivo_status_nd = :motivo_status_nd,
+                observacao = :observacao,
+                atualizado_em = CURRENT_TIMESTAMP
+            WHERE id = :id
+        """), {
+            "id": despesa_id,
+            "data_documento": data_documento,
+            "vencimento": vencimento or None,
+            "tipo_documento": tipo_documento,
+            "numero_documento": numero_documento,
+            "fornecedor": fornecedor,
+            "cpf_cnpj": cpf_cnpj,
+            "descricao": descricao,
+            "centro_custo": centro_custo,
+            "fonte_pagadora": fonte_pagadora,
+            "valor": valor,
+            "status_despesa": status_despesa,
+            "status_nd": status_nd,
+            "nd_numero": nd_numero,
+            "motivo_status_nd": motivo_status_nd,
+            "observacao": observacao,
+        })
+
+        arquivo = request.files.get("anexo")
+        nome_salvo, nome_original = _salvar_anexo_despesa(arquivo)
+        if nome_salvo:
+            conn.execute(text("""
+                INSERT INTO financeiro2_despesas_anexos (
+                    despesa_id, arquivo, nome_original, criado_em
+                ) VALUES (
+                    :despesa_id, :arquivo, :nome_original, CURRENT_TIMESTAMP
+                )
+            """), {
+                "despesa_id": despesa_id,
+                "arquivo": nome_salvo,
+                "nome_original": nome_original,
+            })
+
+    flash("DESPESA SALVA COM SUCESSO.", "success")
+    return redirect(url_for("financeiro_dois.despesa_editar", despesa_id=despesa_id))
 
 @bp.route("/rd/<int:rd_id>/adiantar", methods=["POST"])
 @login_required

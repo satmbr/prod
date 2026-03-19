@@ -9,85 +9,145 @@
         <div class="zone-icon">💸</div>
         <div>
           <div class="zone-title">Despesas</div>
-          <div class="muted">Despesas avulsas ou importadas, com controle de pagamento e vínculo.</div>
+          <div class="muted">Despesas operacionais e importadas, com controle de pagamento, vencimento e vínculo com ND.</div>
         </div>
       </div>
       <div class="zone-actions">
-        <a class="btn btn-primary" href="#">Nova despesa</a>
+        {% if 'financeiro_dois.despesas_importar' in current_app.view_functions %}
+          <a class="btn" href="{{ url_for('financeiro_dois.despesas_importar') }}">Importar despesa</a>
+        {% else %}
+          <a class="btn" href="#" onclick="return false;" title="Rota ainda não implementada">Importar despesa</a>
+        {% endif %}
+        <a class="btn btn-primary" href="{{ url_for('financeiro_dois.despesa_nova') }}">Nova despesa</a>
       </div>
     </div>
 
-    <div class="filters-card">
+    <form method="get" action="{{ url_for('financeiro_dois.despesas') }}" class="filters-card">
       <div class="filters-grid">
         <div class="field">
           <label>Busca</label>
-          <input type="text" class="input-like" placeholder="Fornecedor, número ou descrição" />
+          <input type="text" name="busca" class="input-like" placeholder="Fornecedor, número ou descrição" value="{{ filtros.busca }}" />
         </div>
         <div class="field">
           <label>Status despesa</label>
-          <select class="input-like">
-            <option>Todos</option>
-            <option>Pendente</option>
-            <option>Paga</option>
+          <select class="input-like" name="status_despesa">
+            <option value="TODOS" {% if filtros.status_despesa == 'TODOS' %}selected{% endif %}>TODOS</option>
+            <option value="PENDENTE" {% if filtros.status_despesa == 'PENDENTE' %}selected{% endif %}>PENDENTE</option>
+            <option value="PARCIAL" {% if filtros.status_despesa == 'PARCIAL' %}selected{% endif %}>PARCIAL</option>
+            <option value="PAGA" {% if filtros.status_despesa == 'PAGA' %}selected{% endif %}>PAGA</option>
+            <option value="CANCELADA" {% if filtros.status_despesa == 'CANCELADA' %}selected{% endif %}>CANCELADA</option>
           </select>
         </div>
         <div class="field">
           <label>Status ND</label>
-          <select class="input-like">
-            <option>Todos</option>
-            <option>Não vinculada</option>
-            <option>Em espera</option>
-            <option>Rejeitada</option>
-            <option>Vinculada</option>
+          <select class="input-like" name="status_nd">
+            <option value="TODOS" {% if filtros.status_nd == 'TODOS' %}selected{% endif %}>TODOS</option>
+            <option value="NÃO VINCULADA" {% if filtros.status_nd == 'NÃO VINCULADA' %}selected{% endif %}>NÃO VINCULADA</option>
+            <option value="EM ANÁLISE" {% if filtros.status_nd == 'EM ANÁLISE' %}selected{% endif %}>EM ANÁLISE</option>
+            <option value="REJEITADA" {% if filtros.status_nd == 'REJEITADA' %}selected{% endif %}>REJEITADA</option>
+            <option value="VINCULADA" {% if filtros.status_nd == 'VINCULADA' %}selected{% endif %}>VINCULADA</option>
           </select>
         </div>
         <div class="field">
           <label>Origem</label>
-          <select class="input-like">
-            <option>Todas</option>
-            <option>Avulsa</option>
-            <option>OM</option>
-            <option>RD</option>
+          <select class="input-like" name="origem">
+            <option value="TODAS" {% if filtros.origem == 'TODAS' %}selected{% endif %}>TODAS</option>
+            <option value="OPERACIONAL" {% if filtros.origem == 'OPERACIONAL' %}selected{% endif %}>OPERACIONAL</option>
+            <option value="OM" {% if filtros.origem == 'OM' %}selected{% endif %}>OM</option>
+            <option value="RD" {% if filtros.origem == 'RD' %}selected{% endif %}>RD</option>
           </select>
         </div>
+        <div class="field">
+          <label>Data inicial</label>
+          <input type="date" name="data_inicial" class="input-like" value="{{ filtros.data_inicial }}">
+        </div>
+        <div class="field">
+          <label>Data final</label>
+          <input type="date" name="data_final" class="input-like" value="{{ filtros.data_final }}">
+        </div>
+        <div class="field">
+          <label>Venc. inicial</label>
+          <input type="date" name="venc_inicial" class="input-like" value="{{ filtros.venc_inicial }}">
+        </div>
+        <div class="field">
+          <label>Venc. final</label>
+          <input type="date" name="venc_final" class="input-like" value="{{ filtros.venc_final }}">
+        </div>
+        <div class="field">
+          <label>ND</label>
+          <input type="text" name="nd_numero" class="input-like" value="{{ filtros.nd_numero }}">
+        </div>
+        <div class="field checkbox-field">
+          <label class="checkbox-label">
+            <input type="checkbox" name="somente_vencidas" value="1" {% if filtros.somente_vencidas %}checked{% endif %}>
+            SOMENTE VENCIDAS
+          </label>
+        </div>
       </div>
-    </div>
+
+      <div class="form-actions-top" style="margin-top:14px;">
+        <button type="submit" class="btn btn-primary">Filtrar</button>
+        <a class="btn" href="{{ url_for('financeiro_dois.despesas') }}">Limpar</a>
+      </div>
+    </form>
 
     <div class="table-wrap">
       <table class="table">
         <thead>
           <tr>
-            <th>Data</th>
-            <th>Tipo</th>
-            <th>Número</th>
-            <th>Fornecedor</th>
-            <th>Descrição</th>
+            <th>DATA</th>
+            <th>VENCIMENTO</th>
+            <th>TIPO</th>
+            <th>Nº DESPESA</th>
+            <th>Nº DOC.</th>
+            <th>FORNECEDOR</th>
+            <th>DESCRIÇÃO</th>
             <th>CC</th>
-            <th>Status despesa</th>
-            <th>Status ND</th>
-            <th>Origem</th>
-            <th style="text-align:right;">Valor</th>
-            <th style="width:160px;">Ações</th>
+            <th>ND</th>
+            <th>STATUS DESPESA</th>
+            <th>STATUS ND</th>
+            <th>ORIGEM</th>
+            <th>SITUAÇÃO</th>
+            <th style="text-align:right;">VALOR</th>
+            <th style="width:160px;">AÇÕES</th>
           </tr>
         </thead>
         <tbody>
           {% for item in despesas %}
           <tr>
             <td>{{ item.data }}</td>
+            <td>{{ item.vencimento or '—' }}</td>
             <td>{{ item.tipo_documento }}</td>
-            <td><strong>{{ item.numero_documento }}</strong></td>
+            <td><strong>{{ item.numero_despesa }}</strong></td>
+            <td>{{ item.numero_documento }}</td>
             <td>{{ item.fornecedor }}</td>
             <td>{{ item.descricao }}</td>
             <td>{{ item.centro_custo }}</td>
+            <td>{{ item.nd_numero or '—' }}</td>
             <td>{{ item.status_despesa }}</td>
             <td>{{ item.status_nd }}</td>
             <td>{{ item.origem }}</td>
+            <td>
+              {% if item.situacao_vencimento == 'VENCIDA' %}
+                <span class="tag tag-danger">VENCIDA</span>
+              {% elif item.situacao_vencimento == 'A VENCER' %}
+                <span class="tag tag-warning">A VENCER</span>
+              {% elif item.situacao_vencimento == 'PAGA' %}
+                <span class="tag tag-success">PAGA</span>
+              {% else %}
+                <span class="tag tag-neutral">NO PRAZO</span>
+              {% endif %}
+            </td>
             <td style="text-align:right;">R$ {{ '%.2f'|format(item.valor) }}</td>
             <td>
               <div class="table-actions">
                 <a class="btn btn-sm" href="{{ url_for('financeiro_dois.despesa_editar', despesa_id=item.id) }}">Editar</a>
               </div>
             </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="15">Nenhuma despesa encontrada.</td>
           </tr>
           {% endfor %}
         </tbody>
@@ -100,10 +160,18 @@
   .filters-card{background:#fff;border:1px solid #d8e1ec;border-radius:18px;padding:18px;margin-bottom:16px;box-shadow:0 6px 18px rgba(15,23,42,.05);}
   .filters-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;}
   .field label{display:block;margin-bottom:6px;font-size:13px;font-weight:600;color:#334155;}
-  .input-like{width:100%;height:42px;border:1px solid #d8e1ec;border-radius:12px;padding:0 12px;font-size:14px;background:#fff;}
+  .input-like{width:100%;height:42px;border:1px solid #d8e1ec;border-radius:12px;padding:0 12px;font-size:14px;background:#fff;text-transform:uppercase;}
   .input-like:focus{outline:none;border-color:#9db6cf;box-shadow:0 0 0 3px rgba(22,50,79,.08);}
+  .checkbox-field{display:flex;align-items:end;}
+  .checkbox-label{display:flex !important;gap:8px;align-items:center;margin:0;font-size:13px;font-weight:700;color:#334155;}
   .table-wrap{overflow:auto;}
   .table-actions{display:flex;gap:8px;flex-wrap:wrap;}
   .btn-sm{padding:7px 10px;font-size:12px;line-height:1;}
+  .tag{display:inline-flex;align-items:center;justify-content:center;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:800;letter-spacing:.02em;}
+  .tag-danger{background:#fee2e2;color:#b91c1c;}
+  .tag-warning{background:#fef3c7;color:#b45309;}
+  .tag-success{background:#dcfce7;color:#166534;}
+  .tag-neutral{background:#e2e8f0;color:#334155;}
+  .table td,.table th{text-transform:uppercase;}
 </style>
 {% endblock %}
