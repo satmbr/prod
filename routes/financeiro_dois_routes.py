@@ -3236,33 +3236,46 @@ def despesa_editar(despesa_id: int):
     with engine.connect() as conn:
         despesa = conn.execute(text("""
             SELECT
-                id,
-                UPPER(COALESCE(numero_despesa, '')) AS numero_despesa,
-                UPPER(COALESCE(tipo_registro, '')) AS tipo_registro,
-                UPPER(COALESCE(origem_tipo, '')) AS origem_tipo,
-                origem_id,
-                TO_CHAR(data_documento, 'YYYY-MM-DD') AS data_form,
-                TO_CHAR(vencimento, 'YYYY-MM-DD') AS vencimento_form,
-                TO_CHAR(data_pagamento, 'YYYY-MM-DD') AS data_pagamento_form,
-                TO_CHAR(data_documento, 'DD/MM/YYYY') AS data,
-                TO_CHAR(vencimento, 'DD/MM/YYYY') AS vencimento,
-                UPPER(COALESCE(tipo_documento, '')) AS tipo_documento,
-                UPPER(COALESCE(numero_documento, '')) AS numero_documento,
-                UPPER(COALESCE(fornecedor, '')) AS fornecedor,
-                UPPER(COALESCE(cpf_cnpj, '')) AS cpf_cnpj,
-                UPPER(COALESCE(descricao, '')) AS descricao,
-                UPPER(COALESCE(centro_custo, '')) AS centro_custo,
-                UPPER(COALESCE(fonte_pagadora, '')) AS fonte_pagadora,
-                COALESCE(valor, 0) AS valor,
-                UPPER(COALESCE(status_despesa, '')) AS status_despesa,
-                UPPER(COALESCE(status_nd, '')) AS status_nd,
-                UPPER(COALESCE(nd_numero, '')) AS nd_numero,
-                UPPER(COALESCE(motivo_status_nd, '')) AS motivo_status_nd,
-                UPPER(COALESCE(observacao, '')) AS observacao,
-                COALESCE(valor_pago, 0) AS valor_pago,
-                UPPER(COALESCE(observacao_pagamento, '')) AS observacao_pagamento
-            FROM financeiro2_despesas
-            WHERE id = :id
+                d.id,
+                UPPER(COALESCE(d.numero_despesa, '')) AS numero_despesa,
+                UPPER(COALESCE(d.tipo_registro, '')) AS tipo_registro,
+                UPPER(COALESCE(d.origem_tipo, '')) AS origem_tipo,
+                d.origem_id,
+                CASE
+                    WHEN d.origem_tipo = 'OM' THEN (
+                        SELECT UPPER(COALESCE(om.numero_om, ''))
+                        FROM financeiro2_om om
+                        WHERE om.id = d.origem_id
+                    )
+                    WHEN d.origem_tipo = 'RD' THEN (
+                        SELECT UPPER(COALESCE(rd.numero_rd, ''))
+                        FROM financeiro2_rd rd
+                        WHERE rd.id = d.origem_id
+                    )
+                    ELSE ''
+                END AS origem_numero,
+                TO_CHAR(d.data_documento, 'YYYY-MM-DD') AS data_form,
+                TO_CHAR(d.vencimento, 'YYYY-MM-DD') AS vencimento_form,
+                TO_CHAR(d.data_pagamento, 'YYYY-MM-DD') AS data_pagamento_form,
+                TO_CHAR(d.data_documento, 'DD/MM/YYYY') AS data,
+                TO_CHAR(d.vencimento, 'DD/MM/YYYY') AS vencimento,
+                UPPER(COALESCE(d.tipo_documento, '')) AS tipo_documento,
+                UPPER(COALESCE(d.numero_documento, '')) AS numero_documento,
+                UPPER(COALESCE(d.fornecedor, '')) AS fornecedor,
+                UPPER(COALESCE(d.cpf_cnpj, '')) AS cpf_cnpj,
+                UPPER(COALESCE(d.descricao, '')) AS descricao,
+                UPPER(COALESCE(d.centro_custo, '')) AS centro_custo,
+                UPPER(COALESCE(d.fonte_pagadora, '')) AS fonte_pagadora,
+                COALESCE(d.valor, 0) AS valor,
+                UPPER(COALESCE(d.status_despesa, '')) AS status_despesa,
+                UPPER(COALESCE(d.status_nd, '')) AS status_nd,
+                UPPER(COALESCE(d.nd_numero, '')) AS nd_numero,
+                UPPER(COALESCE(d.motivo_status_nd, '')) AS motivo_status_nd,
+                UPPER(COALESCE(d.observacao, '')) AS observacao,
+                COALESCE(d.valor_pago, 0) AS valor_pago,
+                UPPER(COALESCE(d.observacao_pagamento, '')) AS observacao_pagamento
+            FROM financeiro2_despesas d
+            WHERE d.id = :id
         """), {"id": despesa_id}).mappings().first()
 
         if not despesa:
@@ -3277,6 +3290,31 @@ def despesa_editar(despesa_id: int):
             WHERE despesa_id = :despesa_id
             ORDER BY id DESC
         """), {"despesa_id": despesa_id}).mappings().all()
+
+        if str(despesa["origem_tipo"]).upper() == "OM":
+            anexos_origem = conn.execute(text("""
+                SELECT
+                    ROW_NUMBER() OVER (ORDER BY l.id) AS id,
+                    l.anexo_recibo AS arquivo,
+                    COALESCE(l.anexo_recibo, '') AS nome_original
+                FROM financeiro2_om_linhas l
+                WHERE l.om_id = :origem_id
+                  AND COALESCE(l.anexo_recibo, '') <> ''
+                ORDER BY l.id
+            """), {"origem_id": despesa["origem_id"]}).mappings().all()
+        elif str(despesa["origem_tipo"]).upper() == "RD":
+            anexos_origem = conn.execute(text("""
+                SELECT
+                    ROW_NUMBER() OVER (ORDER BY l.id) AS id,
+                    l.anexo_recibo AS arquivo,
+                    COALESCE(l.anexo_recibo, '') AS nome_original
+                FROM financeiro2_rd_linhas l
+                WHERE l.rd_id = :origem_id
+                  AND COALESCE(l.anexo_recibo, '') <> ''
+                ORDER BY l.id
+            """), {"origem_id": despesa["origem_id"]}).mappings().all()
+        else:
+            anexos_origem = anexos
 
         tipos_documento = conn.execute(text("""
             SELECT UPPER(nome) AS nome
@@ -3303,7 +3341,7 @@ def despesa_editar(despesa_id: int):
     despesa["origem"] = despesa["origem_tipo"]
     despesa["eh_nova"] = False
     despesa["eh_importada"] = despesa["origem_tipo"] in ("OM", "RD")
-    despesa["anexos"] = anexos
+    despesa["anexos"] = anexos_origem if despesa["eh_importada"] else anexos
 
     return render_template(
         "financeiro_dois/despesa_editar.html",
@@ -3525,11 +3563,27 @@ def despesa_importar_origem(origem_tipo: str, origem_id: int):
                     UPPER(COALESCE(matricula_colaborador, '')) AS cpf_cnpj,
                     UPPER(COALESCE(status, '')) AS status_origem,
                     COALESCE((
-                        SELECT SUM(COALESCE(l.valor_brl, 0))
+                        SELECT SUM(
+                            CASE
+                                WHEN COALESCE(l.valor_brl, 0) > 0 THEN COALESCE(l.valor_brl, 0)
+                                ELSE 0
+                            END
+                        )
                         FROM financeiro2_om_linhas l
                         WHERE l.om_id = financeiro2_om.id
                           AND COALESCE(l.status, 'Ativo') = 'Ativo'
-                    ), 0) AS valor_total
+                    ), 0) AS valor_total,
+                    COALESCE((
+                        SELECT SUM(
+                            CASE
+                                WHEN COALESCE(l.valor_brl, 0) < 0 THEN ABS(COALESCE(l.valor_brl, 0))
+                                ELSE 0
+                            END
+                        )
+                        FROM financeiro2_om_linhas l
+                        WHERE l.om_id = financeiro2_om.id
+                          AND COALESCE(l.status, 'Ativo') = 'Ativo'
+                    ), 0) AS valor_pago_total
                 FROM financeiro2_om
                 WHERE id = :id
             """), {"id": origem_id}).mappings().first()
@@ -3643,7 +3697,7 @@ def despesa_importar_origem(origem_tipo: str, origem_id: int):
             "fonte_pagadora": fonte_pagadora,
             "valor": float(origem["valor_total"] or 0),
             "data_pagamento": origem["data_documento"],
-            "valor_pago": float(origem["valor_total"] or 0),
+            "valor_pago": float(origem["valor_pago_total"] or origem["valor_total"] or 0),
         })
 
     flash(f"{origem_tipo} IMPORTADA COMO DESPESA COM SUCESSO.", "success")

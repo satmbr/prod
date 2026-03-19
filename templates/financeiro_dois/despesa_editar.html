@@ -23,18 +23,13 @@
       <div class="zone-actions">
         <a class="btn" href="{{ url_for('financeiro_dois.despesas') }}">Voltar</a>
         {% if despesa.eh_importada and despesa.origem_tipo == 'OM' and despesa.origem_id %}
-          <a class="btn" href="{{ url_for('financeiro_dois.om_editar', om_id=despesa.origem_id) }}">Abrir origem</a>
+          <a class="btn" href="{{ url_for('financeiro_dois.om_editar', om_id=despesa.origem_id) }}">Abrir origem OM</a>
         {% elif despesa.eh_importada and despesa.origem_tipo == 'RD' and despesa.origem_id %}
-          <a class="btn" href="{{ url_for('financeiro_dois.rd_editar', rd_id=despesa.origem_id) }}">Abrir origem</a>
+          <a class="btn" href="{{ url_for('financeiro_dois.rd_editar', rd_id=despesa.origem_id) }}">Abrir origem RD</a>
         {% endif %}
         <button type="submit" form="form-despesa" class="btn btn-primary">
           {% if despesa.eh_nova %}Criar despesa{% else %}Salvar alterações{% endif %}
         </button>
-		{% if despesa.eh_importada and despesa.origem_tipo == 'OM' %}
-		  <a class="btn" href="{{ url_for('financeiro_dois.om_editar', om_id=despesa.origem_id) }}">Abrir origem OM</a>
-		{% elif despesa.eh_importada and despesa.origem_tipo == 'RD' %}
-		  <a class="btn" href="{{ url_for('financeiro_dois.rd_editar', rd_id=despesa.origem_id) }}">Abrir origem RD</a>
-		{% endif %}		
       </div>
     </div>
 
@@ -51,63 +46,81 @@
             <div class="field">
               <label>Data</label>
               <input class="input-like" type="date" name="data_documento" value="{{ despesa.data_form }}" {% if despesa.eh_importada %}disabled{% endif %} required />
+              {% if despesa.eh_importada %}
+                <input type="hidden" name="data_documento" value="{{ despesa.data_form }}">
+              {% endif %}
             </div>
+
             <div class="field">
               <label>Vencimento</label>
-              <input class="input-like" type="date" name="vencimento" value="{{ despesa.vencimento_form }}" />
+              <input class="input-like" type="date" name="vencimento" value="{{ despesa.vencimento_form }}" {% if despesa.eh_importada %}disabled{% endif %} />
+              {% if despesa.eh_importada %}
+                <input type="hidden" name="vencimento" value="{{ despesa.vencimento_form }}">
+              {% endif %}
             </div>
-			<div class="field">
-			  <label>Tipo documento</label>
-			  <select class="input-like" name="tipo_documento" form="form-despesa" {% if despesa.eh_importada %}disabled{% endif %} required>
-				<option value="">SELECIONE</option>
-				{% for item in tipos_documento %}
-				  <option value="{{ item.nome }}" {% if (despesa.tipo_documento or '')|upper == (item.nome or '')|upper %}selected{% endif %}>{{ item.nome }}</option>
-				{% endfor %}
-			  </select>
-			  {% if despesa.eh_importada %}
-				<input type="hidden" name="tipo_documento" value="{{ despesa.tipo_documento }}" form="form-despesa">
-			  {% endif %}
-			</div>
+
+            <div class="field">
+              <label>Tipo documento</label>
+              <select class="input-like" name="tipo_documento" required>
+                <option value="">SELECIONE</option>
+                {% for item in tipos_documento %}
+                  <option value="{{ item.nome }}" {% if (despesa.tipo_documento or '')|upper == (item.nome or '')|upper %}selected{% endif %}>{{ item.nome }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
             <div class="field">
               <label>Número documento</label>
               <input class="input-like" type="text" name="numero_documento" value="{{ despesa.numero_documento }}" {% if despesa.eh_importada %}disabled{% endif %} required />
+              {% if despesa.eh_importada %}
+                <input type="hidden" name="numero_documento" value="{{ despesa.numero_documento }}">
+              {% endif %}
             </div>
+
             <div class="field">
               <label>Fornecedor</label>
               <input class="input-like" type="text" name="fornecedor" value="{{ despesa.fornecedor }}" {% if despesa.eh_importada %}disabled{% endif %} />
+              {% if despesa.eh_importada %}
+                <input type="hidden" name="fornecedor" value="{{ despesa.fornecedor }}">
+              {% endif %}
             </div>
+
             <div class="field">
               <label>CPF/CNPJ</label>
               <input class="input-like" type="text" name="cpf_cnpj" value="{{ despesa.cpf_cnpj }}" {% if despesa.eh_importada %}disabled{% endif %} />
+              {% if despesa.eh_importada %}
+                <input type="hidden" name="cpf_cnpj" value="{{ despesa.cpf_cnpj }}">
+              {% endif %}
             </div>
-			<div class="field">
-			  <label>Centro de custo</label>
-			  <select class="input-like" name="centro_custo" form="form-despesa" {% if despesa.eh_importada %}disabled{% endif %} required>
-				<option value="">SELECIONE</option>
-				{% for item in centros_custo %}
-				  <option value="{{ item.nome }}" {% if (despesa.centro_custo or '')|upper == (item.nome or '')|upper %}selected{% endif %}>{{ item.nome }}</option>
-				{% endfor %}
-			  </select>
-			  {% if despesa.eh_importada %}
-				<input type="hidden" name="centro_custo" value="{{ despesa.centro_custo }}" form="form-despesa">
-			  {% endif %}
-			</div>
-			<div class="field">
-			  <label>Fonte pagadora</label>
-			  <select class="input-like" name="fonte_pagadora" form="form-despesa" {% if despesa.eh_importada %}disabled{% endif %}>
-				<option value="">SELECIONE</option>
-				{% for item in empresas_nd %}
-				  <option value="{{ item.nome }}" {% if (despesa.fonte_pagadora or '')|upper == (item.nome or '')|upper %}selected{% endif %}>{{ item.nome }}</option>
-				{% endfor %}
-			  </select>
-			  {% if despesa.eh_importada %}
-				<input type="hidden" name="fonte_pagadora" value="{{ despesa.fonte_pagadora }}" form="form-despesa">
-			  {% endif %}
-			</div>
+
+            <div class="field">
+              <label>Centro de custo</label>
+              <select class="input-like" name="centro_custo" required>
+                <option value="">SELECIONE</option>
+                {% for item in centros_custo %}
+                  <option value="{{ item.nome }}" {% if (despesa.centro_custo or '')|upper == (item.nome or '')|upper %}selected{% endif %}>{{ item.nome }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="field">
+              <label>Fonte pagadora</label>
+              <select class="input-like" name="fonte_pagadora">
+                <option value="">SELECIONE</option>
+                {% for item in empresas_nd %}
+                  <option value="{{ item.nome }}" {% if (despesa.fonte_pagadora or '')|upper == (item.nome or '')|upper %}selected{% endif %}>{{ item.nome }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
             <div class="field">
               <label>Valor</label>
               <input class="input-like" type="text" name="valor" value="{{ '%.2f'|format(despesa.valor) }}" {% if despesa.eh_importada %}disabled{% endif %} required />
+              {% if despesa.eh_importada %}
+                <input type="hidden" name="valor" value="{{ '%.2f'|format(despesa.valor) }}">
+              {% endif %}
             </div>
+
             <div class="field">
               <label>Status despesa</label>
               <select class="input-like" name="status_despesa" {% if despesa.eh_importada %}disabled{% endif %}>
@@ -116,7 +129,11 @@
                 <option value="PAGA" {% if despesa.status_despesa == 'PAGA' %}selected{% endif %}>PAGA</option>
                 <option value="CANCELADA" {% if despesa.status_despesa == 'CANCELADA' %}selected{% endif %}>CANCELADA</option>
               </select>
+              {% if despesa.eh_importada %}
+                <input type="hidden" name="status_despesa" value="{{ despesa.status_despesa }}">
+              {% endif %}
             </div>
+
             <div class="field">
               <label>Status ND</label>
               <select class="input-like" name="status_nd">
@@ -126,18 +143,25 @@
                 <option value="VINCULADA" {% if despesa.status_nd == 'VINCULADA' %}selected{% endif %}>VINCULADA</option>
               </select>
             </div>
+
             <div class="field">
               <label>ND vinculada</label>
               <input class="input-like" type="text" name="nd_numero" value="{{ despesa.nd_numero }}" />
             </div>
+
             <div class="field field-full">
               <label>Descrição</label>
               <input class="input-like" type="text" name="descricao" value="{{ despesa.descricao }}" {% if despesa.eh_importada %}disabled{% endif %} required />
+              {% if despesa.eh_importada %}
+                <input type="hidden" name="descricao" value="{{ despesa.descricao }}">
+              {% endif %}
             </div>
+
             <div class="field field-full">
               <label>Motivo status ND</label>
               <input class="input-like" type="text" name="motivo_status_nd" value="{{ despesa.motivo_status_nd }}" />
             </div>
+
             <div class="field field-full">
               <label>Observação</label>
               <textarea class="input-like textarea-like" name="observacao">{{ despesa.observacao }}</textarea>
@@ -159,7 +183,7 @@
           <div class="resume-row"><span>Nº despesa</span><strong>{{ despesa.numero_despesa }}</strong></div>
           <div class="resume-row"><span>Origem</span><strong>{{ despesa.origem_tipo }}</strong></div>
           {% if despesa.eh_importada %}
-          <div class="resume-row"><span>ID origem</span><strong>{{ despesa.origem_id or '—' }}</strong></div>
+          <div class="resume-row"><span>Número origem</span><strong>{{ despesa.origem_numero or '—' }}</strong></div>
           {% endif %}
           <div class="resume-row"><span>Status despesa</span><strong>{{ despesa.status_despesa }}</strong></div>
           <div class="resume-row"><span>Status ND</span><strong>{{ despesa.status_nd }}</strong></div>
@@ -172,9 +196,11 @@
           <div class="resume-row"><span>Data pagamento</span><strong>{{ despesa.data_pagamento_form or '—' }}</strong></div>
           <div class="resume-row"><span>Valor pago</span><strong>R$ {{ '%.2f'|format(despesa.valor_pago) }}</strong></div>
           <div class="resume-row"><span>Observação</span><strong>{{ despesa.observacao_pagamento or '—' }}</strong></div>
+          {% if not despesa.eh_importada %}
           <div class="action-list" style="margin-top:12px;">
             <a href="#" class="btn btn-primary btn-block" onclick="return false;" title="Será implementado na próxima etapa">Registrar pagamento</a>
           </div>
+          {% endif %}
         </div>
 
         <div class="resume-card">
@@ -182,10 +208,22 @@
           {% if despesa.anexos %}
             <div class="anexo-list">
               {% for anexo in despesa.anexos %}
-                <a class="anexo-item" href="{{ url_for('static', filename='uploads/financeiro2/despesas/' ~ anexo.arquivo) }}" target="_blank">
-                  <span>{{ anexo.nome_original or anexo.arquivo }}</span>
-                  <strong>Abrir</strong>
-                </a>
+                {% if despesa.eh_importada and despesa.origem_tipo == 'OM' %}
+                  <a class="anexo-item" href="{{ url_for('static', filename='uploads/financeiro2/om_recibos/' ~ anexo.arquivo) }}" target="_blank">
+                    <span>{{ anexo.nome_original or anexo.arquivo }}</span>
+                    <strong>Abrir</strong>
+                  </a>
+                {% elif despesa.eh_importada and despesa.origem_tipo == 'RD' %}
+                  <a class="anexo-item" href="{{ url_for('static', filename='uploads/financeiro2/rd_recibos/' ~ anexo.arquivo) }}" target="_blank">
+                    <span>{{ anexo.nome_original or anexo.arquivo }}</span>
+                    <strong>Abrir</strong>
+                  </a>
+                {% else %}
+                  <a class="anexo-item" href="{{ url_for('static', filename='uploads/financeiro2/despesas/' ~ anexo.arquivo) }}" target="_blank">
+                    <span>{{ anexo.nome_original or anexo.arquivo }}</span>
+                    <strong>Abrir</strong>
+                  </a>
+                {% endif %}
               {% endfor %}
             </div>
           {% else %}
@@ -202,7 +240,7 @@
   .om-card,.resume-card{background:#fff;border:1px solid #d8e1ec;border-radius:18px;padding:18px;box-shadow:0 6px 18px rgba(15,23,42,.05);}
   .card-title,.resume-title{font-size:18px;font-weight:700;color:#16324F;margin-bottom:14px;}
   .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;}
-  .field label{display:block;margin-bottom:6px;font-size:13px;font-weight:600;color:#334155;}
+  .field label{display:block;margin-bottom:6px;font-size:13px;font-weight:600;color:#334155; text-transform:uppercase;}
   .field-full{grid-column:1 / -1;}
   .input-like{width:100%;height:42px;border:1px solid #d8e1ec;border-radius:12px;padding:0 12px;font-size:14px;background:#fff;text-transform:uppercase;}
   .input-like:focus{outline:none;border-color:#9db6cf;box-shadow:0 0 0 3px rgba(22,50,79,.08);}
