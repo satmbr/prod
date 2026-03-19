@@ -1,194 +1,192 @@
 {% extends "base.html" %}
-{% block title %}{{ despesa.numero_despesa }} | Financeiro Dois{% endblock %}
+{% block title %}{{ despesa.numero_despesa }} | Despesas{% endblock %}
 
 {% block content %}
 <div class="page-wrap">
-  <section class="zone">
-    <div class="zone-head">
-      <div class="zone-left">
-        <div class="zone-icon">💸</div>
-        <div>
-          <div class="zone-title">{{ despesa.numero_despesa }}</div>
-          <div class="muted">
-            {% if despesa.eh_importada %}
-              Despesa importada da origem {{ despesa.origem_tipo }}.
-            {% elif despesa.eh_nova %}
-              Cadastro de nova despesa operacional.
-            {% else %}
-              Edição da despesa operacional com status, vencimento e vínculo informativo.
-            {% endif %}
-          </div>
+  <div class="page-head">
+    <div class="page-head-left">
+      <div class="page-icon">💸</div>
+      <div>
+        <h1 class="page-title">{{ despesa.numero_despesa }}</h1>
+        <div class="page-subtitle">
+          {% if despesa.eh_nova %}
+            Nova despesa operacional.
+          {% elif despesa.eh_importada %}
+            Despesa importada da origem {{ despesa.origem_tipo }}.
+          {% else %}
+            Edição de despesa operacional.
+          {% endif %}
         </div>
-      </div>
-      <div class="zone-actions">
-        <a class="btn" href="{{ url_for('financeiro_dois.despesas') }}">Voltar</a>
-        {% if despesa.eh_importada and despesa.origem_tipo == 'OM' and despesa.origem_id %}
-          <a class="btn" href="{{ url_for('financeiro_dois.om_editar', om_id=despesa.origem_id) }}">Abrir origem OM</a>
-        {% elif despesa.eh_importada and despesa.origem_tipo == 'RD' and despesa.origem_id %}
-          <a class="btn" href="{{ url_for('financeiro_dois.rd_editar', rd_id=despesa.origem_id) }}">Abrir origem RD</a>
-        {% endif %}
-        <button type="submit" form="form-despesa" class="btn btn-primary">
-          {% if despesa.eh_nova %}Criar despesa{% else %}Salvar alterações{% endif %}
-        </button>
       </div>
     </div>
 
-    <div class="om-grid">
-      <div class="om-card">
+    <div class="page-actions">
+      <a class="btn" href="{{ url_for('financeiro_dois.despesas') }}">Voltar</a>
+
+      {% if despesa.eh_importada and despesa.origem_tipo == 'OM' %}
+        <a class="btn" href="{{ url_for('financeiro_dois.om_editar', om_id=despesa.origem_id) }}">Abrir origem OM</a>
+      {% elif despesa.eh_importada and despesa.origem_tipo == 'RD' %}
+        <a class="btn" href="{{ url_for('financeiro_dois.rd_editar', rd_id=despesa.origem_id) }}">Abrir origem RD</a>
+      {% endif %}
+
+      <button type="submit" form="form-despesa" class="btn btn-primary">Salvar alterações</button>
+    </div>
+  </div>
+
+  <form
+    id="form-despesa"
+    method="post"
+    action="{% if despesa.eh_nova %}{{ url_for('financeiro_dois.despesa_criar') }}{% else %}{{ url_for('financeiro_dois.despesa_salvar', despesa_id=despesa.id) }}{% endif %}"
+    enctype="multipart/form-data"
+  >
+    <div class="content-grid">
+      <section class="main-card">
         <div class="card-title">Dados da despesa</div>
 
-        <form id="form-despesa"
-              method="post"
-              enctype="multipart/form-data"
-              action="{% if despesa.eh_nova %}{{ url_for('financeiro_dois.despesa_criar') }}{% else %}{{ url_for('financeiro_dois.despesa_salvar', despesa_id=despesa.id) }}{% endif %}">
-
-          <div class="form-grid">
-            <div class="field">
-              <label>Data</label>
-              <input class="input-like" type="date" name="data_documento" value="{{ despesa.data_form }}" {% if despesa.eh_importada %}disabled{% endif %} required />
-              {% if despesa.eh_importada %}
-                <input type="hidden" name="data_documento" value="{{ despesa.data_form }}">
-              {% endif %}
-            </div>
-
-            <div class="field">
-              <label>Vencimento</label>
-              <input class="input-like" type="date" name="vencimento" value="{{ despesa.vencimento_form }}" {% if despesa.eh_importada %}disabled{% endif %} />
-              {% if despesa.eh_importada %}
-                <input type="hidden" name="vencimento" value="{{ despesa.vencimento_form }}">
-              {% endif %}
-            </div>
-
-            <div class="field">
-              <label>Tipo documento</label>
-              <select class="input-like" name="tipo_documento" required>
-                <option value="">SELECIONE</option>
-                {% for item in tipos_documento %}
-                  <option value="{{ item.nome }}" {% if (despesa.tipo_documento or '')|upper == (item.nome or '')|upper %}selected{% endif %}>{{ item.nome }}</option>
-                {% endfor %}
-              </select>
-            </div>
-
-            <div class="field">
-              <label>Número documento</label>
-              <input class="input-like" type="text" name="numero_documento" value="{{ despesa.numero_documento }}" {% if despesa.eh_importada %}disabled{% endif %} required />
-              {% if despesa.eh_importada %}
-                <input type="hidden" name="numero_documento" value="{{ despesa.numero_documento }}">
-              {% endif %}
-            </div>
-
-            <div class="field">
-              <label>Fornecedor</label>
-              <input class="input-like" type="text" name="fornecedor" value="{{ despesa.fornecedor }}" {% if despesa.eh_importada %}disabled{% endif %} />
-              {% if despesa.eh_importada %}
-                <input type="hidden" name="fornecedor" value="{{ despesa.fornecedor }}">
-              {% endif %}
-            </div>
-
-            <div class="field">
-              <label>CPF/CNPJ</label>
-              <input class="input-like" type="text" name="cpf_cnpj" value="{{ despesa.cpf_cnpj }}" {% if despesa.eh_importada %}disabled{% endif %} />
-              {% if despesa.eh_importada %}
-                <input type="hidden" name="cpf_cnpj" value="{{ despesa.cpf_cnpj }}">
-              {% endif %}
-            </div>
-
-            <div class="field">
-              <label>Centro de custo</label>
-              <select class="input-like" name="centro_custo" required>
-                <option value="">SELECIONE</option>
-                {% for item in centros_custo %}
-                  <option value="{{ item.nome }}" {% if (despesa.centro_custo or '')|upper == (item.nome or '')|upper %}selected{% endif %}>{{ item.nome }}</option>
-                {% endfor %}
-              </select>
-            </div>
-
-            <div class="field">
-              <label>Fonte pagadora</label>
-              <select class="input-like" name="fonte_pagadora">
-                <option value="">SELECIONE</option>
-                {% for item in empresas_nd %}
-                  <option value="{{ item.nome }}" {% if (despesa.fonte_pagadora or '')|upper == (item.nome or '')|upper %}selected{% endif %}>{{ item.nome }}</option>
-                {% endfor %}
-              </select>
-            </div>
-
-            <div class="field">
-              <label>Valor</label>
-              <input class="input-like" type="text" name="valor" value="{{ '%.2f'|format(despesa.valor) }}" {% if despesa.eh_importada %}disabled{% endif %} required />
-              {% if despesa.eh_importada %}
-                <input type="hidden" name="valor" value="{{ '%.2f'|format(despesa.valor) }}">
-              {% endif %}
-            </div>
-
-            <div class="field">
-              <label>Status despesa</label>
-              <select class="input-like" name="status_despesa" {% if despesa.eh_importada %}disabled{% endif %}>
-                <option value="PENDENTE" {% if despesa.status_despesa == 'PENDENTE' %}selected{% endif %}>PENDENTE</option>
-                <option value="PARCIAL" {% if despesa.status_despesa == 'PARCIAL' %}selected{% endif %}>PARCIAL</option>
-                <option value="PAGA" {% if despesa.status_despesa == 'PAGA' %}selected{% endif %}>PAGA</option>
-                <option value="CANCELADA" {% if despesa.status_despesa == 'CANCELADA' %}selected{% endif %}>CANCELADA</option>
-              </select>
-              {% if despesa.eh_importada %}
-                <input type="hidden" name="status_despesa" value="{{ despesa.status_despesa }}">
-              {% endif %}
-            </div>
-
-            <div class="field">
-              <label>Status ND</label>
-              <select class="input-like" name="status_nd">
-                <option value="NÃO VINCULADA" {% if despesa.status_nd == 'NÃO VINCULADA' %}selected{% endif %}>NÃO VINCULADA</option>
-                <option value="EM ANÁLISE" {% if despesa.status_nd == 'EM ANÁLISE' %}selected{% endif %}>EM ANÁLISE</option>
-                <option value="REJEITADA" {% if despesa.status_nd == 'REJEITADA' %}selected{% endif %}>REJEITADA</option>
-                <option value="VINCULADA" {% if despesa.status_nd == 'VINCULADA' %}selected{% endif %}>VINCULADA</option>
-              </select>
-            </div>
-
-            <div class="field">
-              <label>ND vinculada</label>
-              <input class="input-like" type="text" name="nd_numero" value="{{ despesa.nd_numero }}" />
-            </div>
-
-            <div class="field field-full">
-              <label>Descrição</label>
-              <input class="input-like" type="text" name="descricao" value="{{ despesa.descricao }}" {% if despesa.eh_importada %}disabled{% endif %} required />
-              {% if despesa.eh_importada %}
-                <input type="hidden" name="descricao" value="{{ despesa.descricao }}">
-              {% endif %}
-            </div>
-
-            <div class="field field-full">
-              <label>Motivo status ND</label>
-              <input class="input-like" type="text" name="motivo_status_nd" value="{{ despesa.motivo_status_nd }}" />
-            </div>
-
-            <div class="field field-full">
-              <label>Observação</label>
-              <textarea class="input-like textarea-like" name="observacao">{{ despesa.observacao }}</textarea>
-            </div>
-
-            {% if not despesa.eh_importada %}
-            <div class="field field-full">
-              <label>Anexo</label>
-              <input class="input-like file-like" type="file" name="anexo" />
-            </div>
+        <div class="form-grid four">
+          <div class="field">
+            <label>Data</label>
+            <input class="input-like" type="date" name="data_documento" value="{{ despesa.data_form }}" {% if despesa.eh_importada %}disabled{% endif %} required>
+            {% if despesa.eh_importada %}
+              <input type="hidden" name="data_documento" value="{{ despesa.data_form }}">
             {% endif %}
           </div>
-        </form>
-      </div>
 
-      <div class="om-side">
+          <div class="field">
+            <label>Vencimento</label>
+            <input class="input-like" type="date" name="vencimento" value="{{ despesa.vencimento_form }}" {% if despesa.eh_importada %}disabled{% endif %}>
+            {% if despesa.eh_importada %}
+              <input type="hidden" name="vencimento" value="{{ despesa.vencimento_form }}">
+            {% endif %}
+          </div>
+
+          <div class="field">
+            <label>Tipo documento</label>
+            <select class="input-like" name="tipo_documento" required>
+              <option value="">SELECIONE</option>
+              {% for item in tipos_documento %}
+                <option value="{{ item.nome }}" {% if (despesa.tipo_documento or '')|upper == (item.nome or '')|upper %}selected{% endif %}>{{ item.nome }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="field">
+            <label>Número documento</label>
+            <input class="input-like" type="text" name="numero_documento" value="{{ despesa.numero_documento }}" {% if despesa.eh_importada %}disabled{% endif %} required>
+            {% if despesa.eh_importada %}
+              <input type="hidden" name="numero_documento" value="{{ despesa.numero_documento }}">
+            {% endif %}
+          </div>
+
+          <div class="field">
+            <label>Fornecedor</label>
+            <input class="input-like" type="text" name="fornecedor" value="{{ despesa.fornecedor }}" {% if despesa.eh_importada %}disabled{% endif %}>
+            {% if despesa.eh_importada %}
+              <input type="hidden" name="fornecedor" value="{{ despesa.fornecedor }}">
+            {% endif %}
+          </div>
+
+          <div class="field">
+            <label>CPF/CNPJ</label>
+            <input class="input-like" type="text" name="cpf_cnpj" value="{{ despesa.cpf_cnpj }}" {% if despesa.eh_importada %}disabled{% endif %}>
+            {% if despesa.eh_importada %}
+              <input type="hidden" name="cpf_cnpj" value="{{ despesa.cpf_cnpj }}">
+            {% endif %}
+          </div>
+
+          <div class="field">
+            <label>Centro de custo</label>
+            <select class="input-like" name="centro_custo">
+              <option value="">SELECIONE</option>
+              {% for item in centros_custo %}
+                <option value="{{ item.nome }}" {% if (despesa.centro_custo or '')|upper == (item.nome or '')|upper %}selected{% endif %}>{{ item.nome }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="field">
+            <label>Fonte pagadora</label>
+            <select class="input-like" name="fonte_pagadora">
+              <option value="">SELECIONE</option>
+              {% for item in empresas_nd %}
+                <option value="{{ item.nome }}" {% if (despesa.fonte_pagadora or '')|upper == (item.nome or '')|upper %}selected{% endif %}>{{ item.nome }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="field">
+            <label>Valor</label>
+            <input class="input-like" type="text" name="valor" value="{{ '%.2f'|format(despesa.valor) }}" {% if despesa.eh_importada %}disabled{% endif %} required>
+            {% if despesa.eh_importada %}
+              <input type="hidden" name="valor" value="{{ '%.2f'|format(despesa.valor) }}">
+            {% endif %}
+          </div>
+
+          <div class="field">
+            <label>Status despesa</label>
+            <select class="input-like" name="status_despesa" {% if despesa.eh_importada %}disabled{% endif %}>
+              <option value="PENDENTE" {% if despesa.status_despesa == 'PENDENTE' %}selected{% endif %}>PENDENTE</option>
+              <option value="PARCIAL" {% if despesa.status_despesa == 'PARCIAL' %}selected{% endif %}>PARCIAL</option>
+              <option value="PAGA" {% if despesa.status_despesa == 'PAGA' %}selected{% endif %}>PAGA</option>
+              <option value="CANCELADA" {% if despesa.status_despesa == 'CANCELADA' %}selected{% endif %}>CANCELADA</option>
+            </select>
+            {% if despesa.eh_importada %}
+              <input type="hidden" name="status_despesa" value="{{ despesa.status_despesa }}">
+            {% endif %}
+          </div>
+
+          <div class="field">
+            <label>Status ND</label>
+            <select class="input-like" name="status_nd">
+              <option value="NÃO VINCULADA" {% if despesa.status_nd == 'NÃO VINCULADA' %}selected{% endif %}>NÃO VINCULADA</option>
+              <option value="EM ANÁLISE" {% if despesa.status_nd == 'EM ANÁLISE' %}selected{% endif %}>EM ANÁLISE</option>
+              <option value="REJEITADA" {% if despesa.status_nd == 'REJEITADA' %}selected{% endif %}>REJEITADA</option>
+              <option value="VINCULADA" {% if despesa.status_nd == 'VINCULADA' %}selected{% endif %}>VINCULADA</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label>ND vinculada</label>
+            <input class="input-like" type="text" name="nd_numero" value="{{ despesa.nd_numero }}">
+          </div>
+        </div>
+
+        <div class="field" style="margin-top:14px;">
+          <label>Descrição</label>
+          <textarea class="input-like textarea-like" name="descricao" {% if despesa.eh_importada %}disabled{% endif %}>{{ despesa.descricao }}</textarea>
+          {% if despesa.eh_importada %}
+            <input type="hidden" name="descricao" value="{{ despesa.descricao }}">
+          {% endif %}
+        </div>
+
+        <div class="field" style="margin-top:14px;">
+          <label>Motivo status ND</label>
+          <textarea class="input-like textarea-like small" name="motivo_status_nd">{{ despesa.motivo_status_nd }}</textarea>
+        </div>
+
+        <div class="field" style="margin-top:14px;">
+          <label>Observação</label>
+          <textarea class="input-like textarea-like medium" name="observacao">{{ despesa.observacao }}</textarea>
+        </div>
+
+        {% if not despesa.eh_importada %}
+        <div class="field" style="margin-top:14px;">
+          <label>Anexo</label>
+          <input class="input-like file-like" type="file" name="anexo">
+        </div>
+        {% endif %}
+      </section>
+
+      <aside class="side-column">
         <div class="resume-card">
           <div class="resume-title">Resumo</div>
           <div class="resume-row"><span>Nº despesa</span><strong>{{ despesa.numero_despesa }}</strong></div>
-          <div class="resume-row"><span>Origem</span><strong>{{ despesa.origem_tipo }}</strong></div>
-          {% if despesa.eh_importada %}
+          <div class="resume-row"><span>Origem</span><strong>{{ despesa.origem or '—' }}</strong></div>
           <div class="resume-row"><span>Número origem</span><strong>{{ despesa.origem_numero or '—' }}</strong></div>
-          {% endif %}
           <div class="resume-row"><span>Status despesa</span><strong>{{ despesa.status_despesa }}</strong></div>
           <div class="resume-row"><span>Status ND</span><strong>{{ despesa.status_nd }}</strong></div>
           <div class="resume-row"><span>Vencimento</span><strong>{{ despesa.vencimento or '—' }}</strong></div>
-          <div class="resume-row resume-total"><span>Valor</span><strong>R$ {{ '%.2f'|format(despesa.valor) }}</strong></div>
+          <div class="resume-row total"><span>Valor</span><strong>R$ {{ '%.2f'|format(despesa.valor) }}</strong></div>
         </div>
 
         <div class="resume-card">
@@ -196,65 +194,200 @@
           <div class="resume-row"><span>Data pagamento</span><strong>{{ despesa.data_pagamento_form or '—' }}</strong></div>
           <div class="resume-row"><span>Valor pago</span><strong>R$ {{ '%.2f'|format(despesa.valor_pago) }}</strong></div>
           <div class="resume-row"><span>Observação</span><strong>{{ despesa.observacao_pagamento or '—' }}</strong></div>
+
           {% if not despesa.eh_importada %}
-          <div class="action-list" style="margin-top:12px;">
-            <a href="#" class="btn btn-primary btn-block" onclick="return false;" title="Será implementado na próxima etapa">Registrar pagamento</a>
+          <div style="margin-top:14px;">
+            <button type="button" class="btn btn-primary btn-block">Registrar pagamento</button>
           </div>
           {% endif %}
         </div>
 
         <div class="resume-card">
           <div class="resume-title">Anexos</div>
-          {% if despesa.anexos %}
+
+          {% if despesa.eh_importada %}
+            <div class="muted">Esta despesa importada não possui anexo próprio. Use <strong>Abrir origem</strong> para consultar os recibos.</div>
+          {% elif despesa.anexos %}
             <div class="anexo-list">
               {% for anexo in despesa.anexos %}
-                {% if despesa.eh_importada and despesa.origem_tipo == 'OM' %}
-                  <a class="anexo-item" href="{{ url_for('static', filename='uploads/financeiro2/om_recibos/' ~ anexo.arquivo) }}" target="_blank">
-                    <span>{{ anexo.nome_original or anexo.arquivo }}</span>
-                    <strong>Abrir</strong>
-                  </a>
-                {% elif despesa.eh_importada and despesa.origem_tipo == 'RD' %}
-                  <a class="anexo-item" href="{{ url_for('static', filename='uploads/financeiro2/rd_recibos/' ~ anexo.arquivo) }}" target="_blank">
-                    <span>{{ anexo.nome_original or anexo.arquivo }}</span>
-                    <strong>Abrir</strong>
-                  </a>
-                {% else %}
-                  <a class="anexo-item" href="{{ url_for('static', filename='uploads/financeiro2/despesas/' ~ anexo.arquivo) }}" target="_blank">
-                    <span>{{ anexo.nome_original or anexo.arquivo }}</span>
-                    <strong>Abrir</strong>
-                  </a>
-                {% endif %}
+                <a class="anexo-item" href="{{ url_for('static', filename='uploads/financeiro2/despesas/' ~ anexo.arquivo) }}" target="_blank">
+                  <span>{{ anexo.nome_original or anexo.arquivo }}</span>
+                </a>
               {% endfor %}
             </div>
           {% else %}
             <div class="muted">Nenhum anexo registrado.</div>
           {% endif %}
         </div>
-      </div>
+      </aside>
     </div>
-  </section>
+  </form>
 </div>
 
 <style>
-  .om-grid{display:grid;grid-template-columns:minmax(0,2fr) minmax(280px,1fr);gap:16px;margin-bottom:16px;}
-  .om-card,.resume-card{background:#fff;border:1px solid #d8e1ec;border-radius:18px;padding:18px;box-shadow:0 6px 18px rgba(15,23,42,.05);}
-  .card-title,.resume-title{font-size:18px;font-weight:700;color:#16324F;margin-bottom:14px;}
-  .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;}
-  .field label{display:block;margin-bottom:6px;font-size:13px;font-weight:600;color:#334155; text-transform:uppercase;}
-  .field-full{grid-column:1 / -1;}
-  .input-like{width:100%;height:42px;border:1px solid #d8e1ec;border-radius:12px;padding:0 12px;font-size:14px;background:#fff;text-transform:uppercase;}
-  .input-like:focus{outline:none;border-color:#9db6cf;box-shadow:0 0 0 3px rgba(22,50,79,.08);}
-  .textarea-like{min-height:96px;padding:12px;resize:vertical;}
-  .file-like{padding:8px 12px;height:auto;text-transform:none;}
-  .input-like[disabled], select[disabled], textarea[disabled]{background:#f8fafc;color:#64748b;cursor:not-allowed;}
-  .resume-row{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid #edf2f7;font-size:14px;text-transform:uppercase;}
-  .resume-row:last-child{border-bottom:none;}
-  .resume-total{font-size:15px;font-weight:700;}
-  .action-list{display:flex;flex-direction:column;gap:10px;}
-  .btn-block{width:100%;text-align:center;}
-  .anexo-list{display:flex;flex-direction:column;gap:8px;}
-  .anexo-item{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border:1px solid #d8e1ec;border-radius:12px;text-decoration:none;color:#16324F;background:#f8fafc;}
-  .anexo-item strong{font-size:12px;text-transform:uppercase;}
-  @media (max-width:980px){.om-grid{grid-template-columns:1fr;}}
+.page-wrap{
+  display:flex;
+  flex-direction:column;
+  gap:16px;
+}
+.page-head{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:16px;
+  flex-wrap:wrap;
+}
+.page-head-left{
+  display:flex;
+  gap:14px;
+  align-items:center;
+}
+.page-icon{
+  width:46px;
+  height:46px;
+  border-radius:14px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:#e2e8f0;
+  font-size:22px;
+}
+.page-title{
+  margin:0;
+  font-size:18px;
+  font-weight:800;
+}
+.page-subtitle{
+  color:#334155;
+  font-size:13px;
+  margin-top:2px;
+}
+.page-actions{
+  display:flex;
+  gap:8px;
+  align-items:center;
+  flex-wrap:wrap;
+}
+.content-grid{
+  display:grid;
+  grid-template-columns:minmax(0, 2fr) minmax(320px, 1fr);
+  gap:16px;
+}
+.main-card,
+.resume-card{
+  background:#fff;
+  border:1px solid #d9e2ec;
+  border-radius:20px;
+  padding:18px;
+}
+.card-title,
+.resume-title{
+  font-size:18px;
+  font-weight:800;
+  margin-bottom:14px;
+  color:#0f2f4f;
+}
+.form-grid{
+  display:grid;
+  gap:14px;
+}
+.form-grid.four{
+  grid-template-columns:repeat(4, minmax(0, 1fr));
+}
+.field{
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+}
+.field label{
+  font-weight:700;
+  font-size:13px;
+  color:#0f2f4f;
+  text-transform:uppercase;
+}
+.input-like{
+  width:100%;
+  min-height:42px;
+  padding:10px 14px;
+  border:1px solid #c7d2e0;
+  border-radius:14px;
+  background:#fff;
+  font-size:13px;
+  color:#243b53;
+  text-transform:uppercase;
+}
+.textarea-like{
+  min-height:88px;
+  resize:vertical;
+}
+.textarea-like.small{
+  min-height:74px;
+}
+.textarea-like.medium{
+  min-height:96px;
+}
+.file-like{
+  padding:8px 12px;
+}
+.side-column{
+  display:flex;
+  flex-direction:column;
+  gap:16px;
+}
+.resume-row{
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+  padding:10px 0;
+  border-bottom:1px solid #e5edf5;
+  text-transform:uppercase;
+}
+.resume-row:last-child{
+  border-bottom:none;
+}
+.resume-row.total{
+  font-weight:800;
+  font-size:18px;
+}
+.anexo-list{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+.anexo-item{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:10px 12px;
+  border:1px solid #d9e2ec;
+  border-radius:12px;
+  text-decoration:none;
+  color:#0f2f4f;
+  background:#f8fbff;
+}
+.muted{
+  color:#52667a;
+  font-size:13px;
+}
+.btn-block{
+  width:100%;
+  justify-content:center;
+}
+
+@media (max-width: 1100px){
+  .content-grid{
+    grid-template-columns:1fr;
+  }
+}
+@media (max-width: 900px){
+  .form-grid.four{
+    grid-template-columns:repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 640px){
+  .form-grid.four{
+    grid-template-columns:1fr;
+  }
+}
 </style>
 {% endblock %}
