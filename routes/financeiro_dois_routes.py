@@ -3615,7 +3615,10 @@ def despesa_importar_origem(origem_tipo: str, origem_id: int):
                     criado_em::date AS data_documento,
                     UPPER(COALESCE(nome_colaborador, '')) AS fornecedor,
                     UPPER(COALESCE(matricula_colaborador, '')) AS cpf_cnpj,
-                    UPPER(COALESCE(status, '')) AS status_origem,
+                    CASE
+                        WHEN UPPER(COALESCE(status, '')) = 'QUITADA' THEN 'PAGA'
+                        ELSE UPPER(COALESCE(status, ''))
+                    END AS status_origem,
 
                     COALESCE((
                         SELECT SUM(COALESCE(l.valor, 0))
