@@ -3354,6 +3354,17 @@ def despesa_editar(despesa_id: int):
             ORDER BY id DESC
         """), {"despesa_id": despesa_id}).mappings().all()
 
+        pagamentos = conn.execute(text("""
+            SELECT
+                id,
+                TO_CHAR(data_pagamento, 'DD/MM/YYYY') AS data_pagamento,
+                COALESCE(valor_pago, 0) AS valor_pago,
+                UPPER(COALESCE(observacao, '')) AS observacao
+            FROM financeiro2_despesas_pagamentos
+            WHERE despesa_id = :despesa_id
+            ORDER BY data_pagamento DESC, id DESC
+        """), {"despesa_id": despesa_id}).mappings().all()
+
         tipos_documento = conn.execute(text("""
             SELECT UPPER(nome) AS nome
             FROM financeiro2_cad_tipos_documento
@@ -3380,9 +3391,9 @@ def despesa_editar(despesa_id: int):
         despesa["eh_nova"] = False
         despesa["eh_importada"] = despesa["origem_tipo"] in ("OM", "RD")
         despesa["anexos"] = anexos
+        despesa["pagamentos"] = pagamentos
 
-        # Recalcula dinamicamente valores de despesas importadas,
-        # para corrigir registros antigos zerados.
+        # Recalcula dinamicamente valores de despesas importadas
         if despesa["eh_importada"] and despesa["origem_tipo"] == "OM":
             totais = conn.execute(text("""
                 SELECT
@@ -4408,3 +4419,102 @@ def nota_debito_editar(nd_id: int):
         nd=nd,
         total_nd=total_nd,
     )
+    
+@bp.route("/despesas/<int:despesa_id>/registrar-pagamento", methods=["POST"])
+@login_required
+@permission_required("financeiro", "visualizar")
+def despesa_registrar_pagamento(despesa_id: int):
+    data_pagamento = _nome_preenchido(request.form.get("data_pagamento"))
+    valor_pago_txt = _nome_preenchido(request.form.get("valor_pago"))
+    observacao_pagamento = _nome_preenchido(request.form.get("observacao_pagamento")).upper()
+
+    if not data_pagamento or not valor_pago_txt:
+        flash("PREENCHA DATA E VALOR DO PAGAMENTO.", "warning")
+        return redirect(url_for("financeiro_dois.despesa_editar", despesa_id=despesa_id))
+
+    try:
+        valor_pago = _valor_decimal(valor_pago_txt)
+    except ValueError:
+        flash("VALOR DE PAGAMENTO INVÁLIDO.", "warning")
+        return redirect(url_for("financeiro_dois.despesa_editar", despesa_id=despesa_id))
+
+    if valor_pago <= 0:
+        flash("O VALOR DO PAGAMENTO DEVE SER MAIOR QUE ZERO.", "warning")
+        return redirect(url_for("financeiro_dois.despesa_editar", despesa_id=despesa_id))
+
+    engine = get_engine()
+    with engine.begin() as conn:
+        despesa = conn.execute(text("""
+            SELECT
+                id,
+                UPPER(COALESCE(origem_tipo, '')) AS origem_tipo,
+                COALESCE(valor, 0) AS valor
+            FROM financeiro2_despesas
+            WHERE id = :id
+        """), {"id": despesa_id}).mappings().first()
+
+        if not despesa:
+            abort(404)
+
+        if despesa["origem_tipo"] in ("OM", "RD"):
+            flash("PAGAMENTO DE DESPESA IMPORTADA DEVE SER CONTROLADO PELA ORIGEM.", "warning")
+            return redirect(url_for("financeiro_dois.despesa_editar", despesa_id=despesa_id))
+
+        conn.execute(text("""
+            INSERT INTO financeiro2_despesas_pagamentos (
+                despesa_id,
+                data_pagamento,
+                valor_pago,
+                observacao,
+                criado_em
+            ) VALUES (
+                :despesa_id,
+                :data_pagamento,
+                :valor_pago,
+                :observacao,
+                CURRENT_TIMESTAMP
+            )
+        """), {
+            "despesa_id": despesa_id,
+            "data_pagamento": data_pagamento,
+            "valor_pago": valor_pago,
+            "observacao": observacao_pagamento,
+        })
+
+        totais = conn.execute(text("""
+            SELECT
+                COALESCE(SUM(COALESCE(valor_pago, 0)), 0) AS total_pago,
+                MAX(data_pagamento) AS ultima_data
+            FROM financeiro2_despesas_pagamentos
+            WHERE despesa_id = :despesa_id
+        """), {"despesa_id": despesa_id}).mappings().first()
+
+        total_pago = float(totais["total_pago"] or 0)
+        valor_total = float(despesa["valor"] or 0)
+
+        if total_pago <= 0:
+            status_despesa = "PENDENTE"
+        elif total_pago < valor_total:
+            status_despesa = "PARCIAL"
+        else:
+            status_despesa = "PAGA"
+
+        conn.execute(text("""
+            UPDATE financeiro2_despesas
+            SET
+                data_pagamento = :data_pagamento,
+                valor_pago = :valor_pago,
+                observacao_pagamento = :observacao_pagamento,
+                status_despesa = :status_despesa,
+                atualizado_em = CURRENT_TIMESTAMP
+            WHERE id = :id
+        """), {
+            "id": despesa_id,
+            "data_pagamento": totais["ultima_data"],
+            "valor_pago": total_pago,
+            "observacao_pagamento": observacao_pagamento,
+            "status_despesa": status_despesa,
+        })
+
+    flash("PAGAMENTO REGISTRADO COM SUCESSO.", "success")
+    return redirect(url_for("financeiro_dois.despesa_editar", despesa_id=despesa_id))

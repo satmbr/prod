@@ -197,8 +197,41 @@
 
           {% if not despesa.eh_importada %}
           <div style="margin-top:14px;">
-            <button type="button" class="btn btn-primary btn-block">Registrar pagamento</button>
+            <form method="post" action="{{ url_for('financeiro_dois.despesa_registrar_pagamento', despesa_id=despesa.id) }}" class="payment-form">
+              <div class="field">
+                <label>Data pagamento</label>
+                <input class="input-like" type="date" name="data_pagamento" required>
+              </div>
+
+              <div class="field" style="margin-top:10px;">
+                <label>Valor pago</label>
+                <input class="input-like" type="text" name="valor_pago" placeholder="0,00" required>
+              </div>
+
+              <div class="field" style="margin-top:10px;">
+                <label>Observação</label>
+                <textarea class="input-like textarea-like small" name="observacao_pagamento"></textarea>
+              </div>
+
+              <div style="margin-top:12px;">
+                <button type="submit" class="btn btn-primary btn-block">Registrar pagamento</button>
+              </div>
+            </form>
           </div>
+
+          {% if despesa.pagamentos %}
+          <div style="margin-top:16px;">
+            <div class="resume-title" style="font-size:15px; margin-bottom:10px;">Histórico</div>
+            <div class="anexo-list">
+              {% for pg in despesa.pagamentos %}
+              <div class="anexo-item" style="display:block;">
+                <div><strong>{{ pg.data_pagamento }}</strong> — R$ {{ '%.2f'|format(pg.valor_pago) }}</div>
+                <div class="muted" style="margin-top:4px;">{{ pg.observacao or '—' }}</div>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+          {% endif %}
           {% endif %}
         </div>
 
