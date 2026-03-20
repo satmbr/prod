@@ -320,7 +320,7 @@
 			  <td>{{ linha.status }}</td>
 			  <td>
 				  {% if linha.anexo_recibo %}
-					<a class="btn btn-sm" href="{{ url_for('static', filename='uploads/financeiro2/om_recibos/' ~ linha.anexo_recibo) }}" target="_blank">Abrir</a>
+					<a class="btn btn-sm" href="{{ url_for('financeiro_dois.om_abrir_anexo', arquivo=linha.anexo_recibo) }}" target="_blank">Abrir</a>
 				  {% else %}
 					—
 				  {% endif %}
@@ -346,7 +346,7 @@
 			  <td>{{ linha.status }}</td>
 			  <td>
 				  {% if linha.anexo_recibo %}
-					<a class="btn btn-sm" href="{{ url_for('static', filename='uploads/financeiro2/om_recibos/' ~ linha.anexo_recibo) }}" target="_blank">Abrir</a>
+					<a class="btn btn-sm" href="{{ url_for('financeiro_dois.om_abrir_anexo', arquivo=linha.anexo_recibo) }}" target="_blank">Abrir</a>
 				  {% else %}
 					—
 				  {% endif %}
