@@ -98,7 +98,7 @@ def _resolver_caminho_anexo_om(nome_arquivo: str) -> str | None:
     if not nome_arquivo:
         return None
 
-    nome_arquivo = str(nome_arquivo).strip().replace("\", "/")
+    nome_arquivo = str(nome_arquivo).strip().replace("\\", "/")
     if not nome_arquivo:
         return None
 
