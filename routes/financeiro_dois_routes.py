@@ -94,6 +94,47 @@ def _calcular_saldo_rd(conn, rd_id: int) -> float:
 
     return float(saldo["saldo"] or 0)
 
+def _resolver_caminho_anexo_om(nome_arquivo: str) -> str | None:
+    if not nome_arquivo:
+        return None
+
+    nome_arquivo = str(nome_arquivo).strip().replace("\\", "/")
+    if not nome_arquivo:
+        return None
+
+    candidatos = []
+
+    # Se já vier um caminho relativo completo
+    candidatos.append(os.path.join(current_app.root_path, nome_arquivo))
+
+    # Se vier começando por static/
+    candidatos.append(os.path.join(current_app.root_path, nome_arquivo.lstrip("/")))
+
+    # Caminho atual
+    candidatos.append(os.path.join(
+        current_app.root_path, "static", "uploads", "financeiro2", "om_recibos", os.path.basename(nome_arquivo)
+    ))
+
+    # Legados possíveis
+    candidatos.append(os.path.join(
+        current_app.root_path, "static", "uploads", "financeiro2", os.path.basename(nome_arquivo)
+    ))
+    candidatos.append(os.path.join(
+        current_app.root_path, "static", "uploads", "financeiro2", "recibos", os.path.basename(nome_arquivo)
+    ))
+    candidatos.append(os.path.join(
+        current_app.root_path, "static", "uploads", "om_recibos", os.path.basename(nome_arquivo)
+    ))
+    candidatos.append(os.path.join(
+        current_app.root_path, "static", "uploads", "recibos", os.path.basename(nome_arquivo)
+    ))
+
+    for caminho in candidatos:
+        if caminho and os.path.exists(caminho):
+            return caminho
+
+    return None
+
 @bp.route("/")
 @login_required
 @permission_required("financeiro", "visualizar")
@@ -1909,9 +1950,9 @@ def om_exportar_pdf(om_id: int):
             ORDER BY recibo, id
         """), {"id": om_id}).mappings().all()
 
-    total_brl = sum(float(l["valor_brl"]) for l in linhas if l["status"] == "Ativo")
+    total_brl = sum(float(l["valor_brl"]) for l in linhas if str(l["status"]) == "Ativo")
 
-    # 1) Gera o PDF base da OM
+    # PDF base da OM
     buffer_base = BytesIO()
     pdf = canvas.Canvas(buffer_base, pagesize=A4)
     largura, altura = A4
@@ -1969,88 +2010,70 @@ def om_exportar_pdf(om_id: int):
     pdf.save()
     buffer_base.seek(0)
 
-    # 2) Monta o PDF final
     writer = PdfWriter()
 
-    # adiciona páginas do PDF base
+    # Páginas do PDF base
     base_reader = PdfReader(buffer_base)
     for page in base_reader.pages:
         writer.add_page(page)
 
-    # 3) Anexa os recibos na ordem das linhas
+    # Anexos/recibos das linhas
     for linha in linhas:
         nome_anexo = (linha["anexo_recibo"] or "").strip()
         if not nome_anexo:
             continue
 
-        caminho = os.path.join(
-            current_app.root_path,
-            "static",
-            "uploads",
-            "financeiro2",
-            "om_recibos",
-            nome_anexo
-        )
-
-        if not os.path.exists(caminho):
+        caminho = _resolver_caminho_anexo_om(nome_anexo)
+        if not caminho:
             continue
 
         extensao = os.path.splitext(caminho)[1].lower()
 
         try:
-            # PDF: adiciona todas as páginas
             if extensao == ".pdf":
-                anexo_reader = PdfReader(caminho)
-                for page in anexo_reader.pages:
-                    writer.add_page(page)
+                with open(caminho, "rb") as f:
+                    anexo_reader = PdfReader(f)
+                    for page in anexo_reader.pages:
+                        writer.add_page(page)
 
-            # Imagem: cria 1 página PDF com a imagem
-            elif extensao in [".jpg", ".jpeg", ".png", ".bmp", ".webp"]:
-                img = Image.open(caminho)
-                if img.mode in ("RGBA", "P"):
-                    img = img.convert("RGB")
+            elif extensao in (".jpg", ".jpeg", ".png", ".bmp", ".webp"):
+                imagem = Image.open(caminho)
+                if imagem.mode != "RGB":
+                    imagem = imagem.convert("RGB")
 
-                img_buffer = BytesIO()
-                c = canvas.Canvas(img_buffer, pagesize=A4)
-                largura_pg, altura_pg = A4
+                largura_img, altura_img = imagem.size
+                proporcao = min((A4[0] - 60) / largura_img, (A4[1] - 60) / altura_img)
+                nova_largura = largura_img * proporcao
+                nova_altura = altura_img * proporcao
 
-                iw, ih = img.size
-                margem = 30
-                area_w = largura_pg - 2 * margem
-                area_h = altura_pg - 2 * margem
-
-                escala = min(area_w / iw, area_h / ih)
-                novo_w = iw * escala
-                novo_h = ih * escala
-
-                x = (largura_pg - novo_w) / 2
-                y_img = (altura_pg - novo_h) / 2
-
-                img_temp = BytesIO()
-                img.save(img_temp, format="JPEG")
-                img_temp.seek(0)
-
-                c.setFont("Helvetica-Bold", 11)
-                c.drawString(30, altura_pg - 20, f"RECIBO {linha['recibo']} - OM {om['numero_om']}")
-                c.drawImage(ImageReader(img_temp), x, y_img, width=novo_w, height=novo_h)
-                c.showPage()
+                buffer_img = BytesIO()
+                c = canvas.Canvas(buffer_img, pagesize=A4)
+                c.drawImage(
+                    ImageReader(imagem),
+                    30,
+                    (A4[1] - nova_altura) / 2,
+                    width=nova_largura,
+                    height=nova_altura,
+                    preserveAspectRatio=True,
+                    anchor='c'
+                )
                 c.save()
+                buffer_img.seek(0)
 
-                img_buffer.seek(0)
-                img_reader = PdfReader(img_buffer)
+                img_reader = PdfReader(buffer_img)
                 for page in img_reader.pages:
                     writer.add_page(page)
 
         except Exception:
-            # se algum anexo der erro, ele é ignorado sem quebrar a exportação inteira
+            # Ignora anexos corrompidos ou formatos problemáticos sem quebrar o PDF principal
             continue
 
-    saida = BytesIO()
-    writer.write(saida)
-    saida.seek(0)
+    arquivo_final = BytesIO()
+    writer.write(arquivo_final)
+    arquivo_final.seek(0)
 
     return send_file(
-        saida,
+        arquivo_final,
         as_attachment=True,
         download_name=f"{om['numero_om']}.pdf",
         mimetype="application/pdf",
@@ -3312,11 +3335,48 @@ def despesa_editar(despesa_id: int):
             ORDER BY nome
         """)).mappings().all()
 
-    despesa = dict(despesa)
-    despesa["origem"] = despesa["origem_tipo"]
-    despesa["eh_nova"] = False
-    despesa["eh_importada"] = despesa["origem_tipo"] in ("OM", "RD")
-    despesa["anexos"] = anexos
+        despesa = dict(despesa)
+        despesa["origem"] = despesa["origem_tipo"]
+        despesa["eh_nova"] = False
+        despesa["eh_importada"] = despesa["origem_tipo"] in ("OM", "RD")
+        despesa["anexos"] = anexos
+
+        # Recalcula dinamicamente valores de despesas importadas,
+        # para corrigir registros antigos zerados.
+        if despesa["eh_importada"] and despesa["origem_tipo"] == "OM":
+            totais = conn.execute(text("""
+                SELECT
+                    COALESCE(SUM(
+                        CASE
+                            WHEN COALESCE(l.valor_brl, 0) > 0 THEN COALESCE(l.valor_brl, 0)
+                            ELSE 0
+                        END
+                    ), 0) AS valor_total,
+                    COALESCE(SUM(
+                        CASE
+                            WHEN COALESCE(l.valor_brl, 0) < 0 THEN ABS(COALESCE(l.valor_brl, 0))
+                            ELSE 0
+                        END
+                    ), 0) AS valor_pago_total
+                FROM financeiro2_om_linhas l
+                WHERE l.om_id = :origem_id
+                  AND COALESCE(l.status, 'Ativo') = 'Ativo'
+            """), {"origem_id": despesa["origem_id"]}).mappings().first()
+
+            despesa["valor"] = float(totais["valor_total"] or 0)
+            despesa["valor_pago"] = float(totais["valor_pago_total"] or totais["valor_total"] or 0)
+
+        elif despesa["eh_importada"] and despesa["origem_tipo"] == "RD":
+            totais = conn.execute(text("""
+                SELECT
+                    COALESCE(SUM(COALESCE(l.valor, 0)), 0) AS valor_total
+                FROM financeiro2_rd_linhas l
+                WHERE l.rd_id = :origem_id
+                  AND COALESCE(l.status, 'Ativo') = 'Ativo'
+            """), {"origem_id": despesa["origem_id"]}).mappings().first()
+
+            despesa["valor"] = float(totais["valor_total"] or 0)
+            despesa["valor_pago"] = float(totais["valor_total"] or 0)
 
     return render_template(
         "financeiro_dois/despesa_editar.html",
