@@ -2982,80 +2982,109 @@ def despesas():
     if busca:
         filtros.append("""
             (
-                UPPER(COALESCE(numero_despesa, '')) LIKE :busca
-                OR UPPER(COALESCE(numero_documento, '')) LIKE :busca
-                OR UPPER(COALESCE(fornecedor, '')) LIKE :busca
-                OR UPPER(COALESCE(descricao, '')) LIKE :busca
+                UPPER(COALESCE(d.numero_despesa, '')) LIKE :busca
+                OR UPPER(COALESCE(d.numero_documento, '')) LIKE :busca
+                OR UPPER(COALESCE(d.fornecedor, '')) LIKE :busca
+                OR UPPER(COALESCE(d.descricao, '')) LIKE :busca
             )
         """)
         params["busca"] = f"%{busca}%"
 
     if status_despesa and status_despesa != "TODOS":
-        filtros.append("UPPER(COALESCE(status_despesa, '')) = :status_despesa")
+        filtros.append("UPPER(COALESCE(d.status_despesa, '')) = :status_despesa")
         params["status_despesa"] = status_despesa
 
     if status_nd and status_nd != "TODOS":
-        filtros.append("UPPER(COALESCE(status_nd, '')) = :status_nd")
+        filtros.append("UPPER(COALESCE(d.status_nd, '')) = :status_nd")
         params["status_nd"] = status_nd
 
     if origem and origem not in ("TODAS", "TODOS"):
-        filtros.append("UPPER(COALESCE(origem_tipo, '')) = :origem")
+        filtros.append("UPPER(COALESCE(d.origem_tipo, '')) = :origem")
         params["origem"] = origem
 
     if data_inicial:
-        filtros.append("data_documento >= :data_inicial")
+        filtros.append("d.data_documento >= :data_inicial")
         params["data_inicial"] = data_inicial
 
     if data_final:
-        filtros.append("data_documento <= :data_final")
+        filtros.append("d.data_documento <= :data_final")
         params["data_final"] = data_final
 
     if venc_inicial:
-        filtros.append("vencimento >= :venc_inicial")
+        filtros.append("d.vencimento >= :venc_inicial")
         params["venc_inicial"] = venc_inicial
 
     if venc_final:
-        filtros.append("vencimento <= :venc_final")
+        filtros.append("d.vencimento <= :venc_final")
         params["venc_final"] = venc_final
 
     if nd_numero:
-        filtros.append("UPPER(COALESCE(nd_numero, '')) LIKE :nd_numero")
+        filtros.append("UPPER(COALESCE(d.nd_numero, '')) LIKE :nd_numero")
         params["nd_numero"] = f"%{nd_numero}%"
 
     if somente_vencidas:
         filtros.append("""
-            COALESCE(status_despesa, 'PENDENTE') <> 'PAGA'
-            AND vencimento IS NOT NULL
-            AND vencimento < CURRENT_DATE
+            UPPER(COALESCE(d.status_despesa, 'PENDENTE')) <> 'PAGA'
+            AND d.vencimento IS NOT NULL
+            AND d.vencimento < CURRENT_DATE
         """)
 
     engine = get_engine()
     with engine.connect() as conn:
         despesas = conn.execute(text(f"""
             SELECT
-                id,
-                TO_CHAR(data_documento, 'DD/MM/YYYY') AS data,
-                TO_CHAR(vencimento, 'DD/MM/YYYY') AS vencimento,
-                UPPER(COALESCE(tipo_documento, '')) AS tipo_documento,
-                UPPER(COALESCE(numero_despesa, '')) AS numero_despesa,
-                UPPER(COALESCE(numero_documento, '')) AS numero_documento,
-                UPPER(COALESCE(fornecedor, '')) AS fornecedor,
-                UPPER(COALESCE(descricao, '')) AS descricao,
-                UPPER(COALESCE(centro_custo, '')) AS centro_custo,
-                UPPER(COALESCE(status_despesa, '')) AS status_despesa,
-                UPPER(COALESCE(status_nd, '')) AS status_nd,
-                UPPER(COALESCE(origem_tipo, '')) AS origem,
-                UPPER(COALESCE(nd_numero, '')) AS nd_numero,
-                COALESCE(valor, 0) AS valor,
+                d.id,
+                TO_CHAR(d.data_documento, 'DD/MM/YYYY') AS data,
+                TO_CHAR(d.vencimento, 'DD/MM/YYYY') AS vencimento,
+                UPPER(COALESCE(d.tipo_documento, '')) AS tipo_documento,
+                UPPER(COALESCE(d.numero_despesa, '')) AS numero_despesa,
+                UPPER(COALESCE(d.numero_documento, '')) AS numero_documento,
+                UPPER(COALESCE(d.fornecedor, '')) AS fornecedor,
+                UPPER(COALESCE(d.descricao, '')) AS descricao,
+                UPPER(COALESCE(d.centro_custo, '')) AS centro_custo,
+                UPPER(COALESCE(d.status_despesa, '')) AS status_despesa,
+                UPPER(COALESCE(d.status_nd, '')) AS status_nd,
+                UPPER(COALESCE(d.origem_tipo, '')) AS origem,
+                UPPER(COALESCE(d.nd_numero, '')) AS nd_numero,
+
                 CASE
-                    WHEN UPPER(COALESCE(status_despesa, '')) = 'PAGA' THEN 'PAGA'
-                    WHEN vencimento IS NOT NULL AND vencimento < CURRENT_DATE THEN 'VENCIDA'
-                    WHEN vencimento IS NOT NULL AND vencimento <= CURRENT_DATE + INTERVAL '7 day' THEN 'A VENCER'
+                    WHEN UPPER(COALESCE(d.origem_tipo, '')) = 'OM' THEN COALESCE((
+                        SELECT SUM(
+                            CASE
+                                WHEN COALESCE(l.valor_brl, 0) > 0 THEN COALESCE(l.valor_brl, 0)
+                                ELSE 0
+                            END
+                        )
+                        FROM financeiro2_om_linhas l
+                        WHERE l.om_id = d.origem_id
+                          AND COALESCE(l.status, 'Ativo') = 'Ativo'
+                    ), 0)
+
+                    WHEN UPPER(COALESCE(d.origem_tipo, '')) = 'RD' THEN COALESCE((
+                        SELECT SUM(
+                            CASE
+                                WHEN COALESCE(l.valor, 0) > 0 THEN COALESCE(l.valor, 0)
+                                ELSE 0
+                            END
+                        )
+                        FROM financeiro2_rd_linhas l
+                        WHERE l.rd_id = d.origem_id
+                          AND COALESCE(l.status, 'Ativo') = 'Ativo'
+                    ), 0)
+
+                    ELSE COALESCE(d.valor, 0)
+                END AS valor,
+
+                CASE
+                    WHEN UPPER(COALESCE(d.status_despesa, '')) = 'PAGA' THEN 'PAGA'
+                    WHEN d.vencimento IS NOT NULL AND d.vencimento < CURRENT_DATE THEN 'VENCIDA'
+                    WHEN d.vencimento IS NOT NULL AND d.vencimento <= CURRENT_DATE + INTERVAL '7 day' THEN 'A VENCER'
                     ELSE 'NO PRAZO'
                 END AS situacao_vencimento
-            FROM financeiro2_despesas
+
+            FROM financeiro2_despesas d
             WHERE {' AND '.join(filtros)}
-            ORDER BY data_documento DESC, id DESC
+            ORDER BY d.data_documento DESC, d.id DESC
         """), params).mappings().all()
 
     return render_template(
