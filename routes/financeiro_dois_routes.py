@@ -98,30 +98,40 @@ def _resolver_caminho_anexo_om(nome_arquivo: str) -> str | None:
     if not nome_arquivo:
         return None
 
-    nome_arquivo = str(nome_arquivo).strip().replace("\", "/")
+    nome_arquivo = str(nome_arquivo).strip().replace("\\", "/")
     if not nome_arquivo:
         return None
 
-    base = os.path.basename(nome_arquivo)
-    candidatos = [
-        os.path.join(current_app.root_path, nome_arquivo),
-        os.path.join(current_app.root_path, nome_arquivo.lstrip("/")),
-        os.path.join(current_app.root_path, "static", "uploads", "financeiro2", "om_recibos", base),
-        os.path.join(current_app.root_path, "static", "uploads", "financeiro2", base),
-        os.path.join(current_app.root_path, "static", "uploads", "financeiro2", "recibos", base),
-        os.path.join(current_app.root_path, "static", "uploads", "om_recibos", base),
-        os.path.join(current_app.root_path, "static", "uploads", "recibos", base),
-    ]
+    candidatos = []
+
+    # Se já vier um caminho relativo completo
+    candidatos.append(os.path.join(current_app.root_path, nome_arquivo))
+
+    # Se vier começando por static/
+    candidatos.append(os.path.join(current_app.root_path, nome_arquivo.lstrip("/")))
+
+    # Caminho atual
+    candidatos.append(os.path.join(
+        current_app.root_path, "static", "uploads", "financeiro2", "om_recibos", os.path.basename(nome_arquivo)
+    ))
+
+    # Legados possíveis
+    candidatos.append(os.path.join(
+        current_app.root_path, "static", "uploads", "financeiro2", os.path.basename(nome_arquivo)
+    ))
+    candidatos.append(os.path.join(
+        current_app.root_path, "static", "uploads", "financeiro2", "recibos", os.path.basename(nome_arquivo)
+    ))
+    candidatos.append(os.path.join(
+        current_app.root_path, "static", "uploads", "om_recibos", os.path.basename(nome_arquivo)
+    ))
+    candidatos.append(os.path.join(
+        current_app.root_path, "static", "uploads", "recibos", os.path.basename(nome_arquivo)
+    ))
 
     for caminho in candidatos:
         if caminho and os.path.exists(caminho):
             return caminho
-
-    raiz_busca = os.path.join(current_app.root_path, "static", "uploads")
-    if os.path.isdir(raiz_busca):
-        for raiz, _, arquivos in os.walk(raiz_busca):
-            if base in arquivos:
-                return os.path.join(raiz, base)
 
     return None
 
@@ -1900,16 +1910,6 @@ def om_exportar_excel(om_id: int):
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
     
-@bp.route("/om/anexo")
-@login_required
-@permission_required("financeiro", "visualizar")
-def om_abrir_anexo():
-    nome = _nome_preenchido(request.args.get("arquivo"))
-    caminho = _resolver_caminho_anexo_om(nome)
-    if not caminho:
-        abort(404)
-    return send_file(caminho)
-
 @bp.route("/om/<int:om_id>/exportar/pdf")
 @login_required
 @permission_required("financeiro", "visualizar")
@@ -3254,9 +3254,6 @@ def despesa_criar():
 @bp.route("/despesas/<int:despesa_id>")
 @login_required
 @permission_required("financeiro", "visualizar")
-@bp.route("/despesas/<int:despesa_id>")
-@login_required
-@permission_required("financeiro", "visualizar")
 def despesa_editar(despesa_id: int):
     engine = get_engine()
     with engine.connect() as conn:
@@ -3268,9 +3265,18 @@ def despesa_editar(despesa_id: int):
                 UPPER(COALESCE(d.origem_tipo, '')) AS origem_tipo,
                 d.origem_id,
                 CASE
-                    WHEN d.origem_tipo = 'OM' THEN (SELECT UPPER(COALESCE(om.numero_om, '')) FROM financeiro2_om om WHERE om.id = d.origem_id)
-                    WHEN d.origem_tipo = 'RD' THEN (SELECT UPPER(COALESCE(rd.numero_rd, '')) FROM financeiro2_rd rd WHERE rd.id = d.origem_id)
-                    ELSE '' END AS origem_numero,
+                    WHEN d.origem_tipo = 'OM' THEN (
+                        SELECT UPPER(COALESCE(om.numero_om, ''))
+                        FROM financeiro2_om om
+                        WHERE om.id = d.origem_id
+                    )
+                    WHEN d.origem_tipo = 'RD' THEN (
+                        SELECT UPPER(COALESCE(rd.numero_rd, ''))
+                        FROM financeiro2_rd rd
+                        WHERE rd.id = d.origem_id
+                    )
+                    ELSE ''
+                END AS origem_numero,
                 TO_CHAR(d.data_documento, 'YYYY-MM-DD') AS data_form,
                 TO_CHAR(d.vencimento, 'YYYY-MM-DD') AS vencimento_form,
                 TO_CHAR(d.data_pagamento, 'YYYY-MM-DD') AS data_pagamento_form,
@@ -3294,13 +3300,40 @@ def despesa_editar(despesa_id: int):
             FROM financeiro2_despesas d
             WHERE d.id = :id
         """), {"id": despesa_id}).mappings().first()
+
         if not despesa:
             abort(404)
 
-        anexos = conn.execute(text("SELECT id, arquivo, nome_original FROM financeiro2_despesas_anexos WHERE despesa_id = :despesa_id ORDER BY id DESC"), {"despesa_id": despesa_id}).mappings().all()
-        tipos_documento = conn.execute(text("SELECT UPPER(nome) AS nome FROM financeiro2_cad_tipos_documento WHERE status = 'Ativo' ORDER BY nome")).mappings().all()
-        centros_custo = conn.execute(text("SELECT UPPER(nome) AS nome FROM financeiro2_cad_centros_custo WHERE status = 'Ativo' ORDER BY nome")).mappings().all()
-        empresas_nd = conn.execute(text("SELECT UPPER(nome) AS nome FROM financeiro2_cad_empresas_nd WHERE status = 'Ativo' ORDER BY nome")).mappings().all()
+        anexos = conn.execute(text("""
+            SELECT
+                id,
+                arquivo,
+                nome_original
+            FROM financeiro2_despesas_anexos
+            WHERE despesa_id = :despesa_id
+            ORDER BY id DESC
+        """), {"despesa_id": despesa_id}).mappings().all()
+
+        tipos_documento = conn.execute(text("""
+            SELECT UPPER(nome) AS nome
+            FROM financeiro2_cad_tipos_documento
+            WHERE status = 'Ativo'
+            ORDER BY nome
+        """)).mappings().all()
+
+        centros_custo = conn.execute(text("""
+            SELECT UPPER(nome) AS nome
+            FROM financeiro2_cad_centros_custo
+            WHERE status = 'Ativo'
+            ORDER BY nome
+        """)).mappings().all()
+
+        empresas_nd = conn.execute(text("""
+            SELECT UPPER(nome) AS nome
+            FROM financeiro2_cad_empresas_nd
+            WHERE status = 'Ativo'
+            ORDER BY nome
+        """)).mappings().all()
 
         despesa = dict(despesa)
         despesa["origem"] = despesa["origem_tipo"]
@@ -3308,24 +3341,42 @@ def despesa_editar(despesa_id: int):
         despesa["eh_importada"] = despesa["origem_tipo"] in ("OM", "RD")
         despesa["anexos"] = anexos
 
+        # Recalcula dinamicamente valores de despesas importadas,
+        # para corrigir registros antigos zerados.
         if despesa["eh_importada"] and despesa["origem_tipo"] == "OM":
             totais = conn.execute(text("""
-                SELECT COALESCE(SUM(CASE WHEN COALESCE(l.valor_brl,0) > 0 THEN COALESCE(l.valor_brl,0) ELSE 0 END),0) AS valor_total,
-                       COALESCE(SUM(CASE WHEN COALESCE(l.valor_brl,0) < 0 THEN ABS(COALESCE(l.valor_brl,0)) ELSE 0 END),0) AS valor_pago_total
+                SELECT
+                    COALESCE(SUM(
+                        CASE
+                            WHEN COALESCE(l.valor_brl, 0) > 0 THEN COALESCE(l.valor_brl, 0)
+                            ELSE 0
+                        END
+                    ), 0) AS valor_total,
+                    COALESCE(SUM(
+                        CASE
+                            WHEN COALESCE(l.valor_brl, 0) < 0 THEN ABS(COALESCE(l.valor_brl, 0))
+                            ELSE 0
+                        END
+                    ), 0) AS valor_pago_total
                 FROM financeiro2_om_linhas l
-                WHERE l.om_id = :origem_id AND COALESCE(l.status,'Ativo')='Ativo'
+                WHERE l.om_id = :origem_id
+                  AND COALESCE(l.status, 'Ativo') = 'Ativo'
             """), {"origem_id": despesa["origem_id"]}).mappings().first()
+
             despesa["valor"] = float(totais["valor_total"] or 0)
             despesa["valor_pago"] = float(totais["valor_pago_total"] or totais["valor_total"] or 0)
+
         elif despesa["eh_importada"] and despesa["origem_tipo"] == "RD":
             totais = conn.execute(text("""
-                SELECT COALESCE(SUM(CASE WHEN COALESCE(l.valor,0) > 0 THEN COALESCE(l.valor,0) ELSE 0 END),0) AS valor_total,
-                       COALESCE(SUM(CASE WHEN COALESCE(l.valor,0) < 0 THEN ABS(COALESCE(l.valor,0)) ELSE 0 END),0) AS valor_pago_total
+                SELECT
+                    COALESCE(SUM(COALESCE(l.valor, 0)), 0) AS valor_total
                 FROM financeiro2_rd_linhas l
-                WHERE l.rd_id = :origem_id AND COALESCE(l.status,'Ativo')='Ativo'
+                WHERE l.rd_id = :origem_id
+                  AND COALESCE(l.status, 'Ativo') = 'Ativo'
             """), {"origem_id": despesa["origem_id"]}).mappings().first()
+
             despesa["valor"] = float(totais["valor_total"] or 0)
-            despesa["valor_pago"] = float(totais["valor_pago_total"] or totais["valor_total"] or 0)
+            despesa["valor_pago"] = float(totais["valor_total"] or 0)
 
     return render_template(
         "financeiro_dois/despesa_editar.html",
@@ -3335,7 +3386,7 @@ def despesa_editar(despesa_id: int):
         centros_custo=centros_custo,
         empresas_nd=empresas_nd,
     )
-
+    
 @bp.route("/despesas/<int:despesa_id>/salvar", methods=["POST"])
 @login_required
 @permission_required("financeiro", "visualizar")
@@ -3464,9 +3515,6 @@ def despesa_salvar(despesa_id: int):
 @bp.route("/despesas/importar")
 @login_required
 @permission_required("financeiro", "visualizar")
-@bp.route("/despesas/importar")
-@login_required
-@permission_required("financeiro", "visualizar")
 def despesas_importar():
     engine = get_engine()
 
@@ -3479,16 +3527,27 @@ def despesas_importar():
                 TO_CHAR(om.criado_em, 'DD/MM/YYYY') AS data_origem,
                 UPPER(COALESCE(om.nome_colaborador, '')) AS favorecido,
                 UPPER(COALESCE(om.status, '')) AS status_origem,
+
                 COALESCE((
-                    SELECT SUM(CASE WHEN COALESCE(l.valor_brl, 0) > 0 THEN COALESCE(l.valor_brl, 0) ELSE 0 END)
+                    SELECT SUM(
+                        CASE
+                            WHEN COALESCE(l.valor_brl, 0) > 0 THEN COALESCE(l.valor_brl, 0)
+                            ELSE 0
+                        END
+                    )
                     FROM financeiro2_om_linhas l
                     WHERE l.om_id = om.id
                       AND COALESCE(l.status, 'Ativo') = 'Ativo'
                 ), 0) AS valor_total,
-                CASE WHEN EXISTS (
-                    SELECT 1 FROM financeiro2_despesas d
-                    WHERE d.origem_tipo = 'OM' AND d.origem_id = om.id
-                ) THEN 1 ELSE 0 END AS ja_importada
+
+                CASE
+                    WHEN EXISTS (
+                        SELECT 1
+                        FROM financeiro2_despesas d
+                        WHERE d.origem_tipo = 'OM'
+                          AND d.origem_id = om.id
+                    ) THEN 1 ELSE 0
+                END AS ja_importada
             FROM financeiro2_om om
             ORDER BY om.id DESC
         """)).mappings().all()
@@ -3500,17 +3559,26 @@ def despesas_importar():
                 UPPER(COALESCE(rd.numero_rd, '')) AS numero_origem,
                 TO_CHAR(rd.criado_em, 'DD/MM/YYYY') AS data_origem,
                 UPPER(COALESCE(rd.nome_colaborador, '')) AS favorecido,
-                CASE WHEN UPPER(COALESCE(rd.status, '')) = 'QUITADA' THEN 'PAGA' ELSE UPPER(COALESCE(rd.status, '')) END AS status_origem,
+                CASE
+                    WHEN UPPER(COALESCE(rd.status, '')) = 'QUITADA' THEN 'PAGA'
+                    ELSE UPPER(COALESCE(rd.status, ''))
+                END AS status_origem,
+
                 COALESCE((
-                    SELECT SUM(CASE WHEN COALESCE(l.valor, 0) > 0 THEN COALESCE(l.valor, 0) ELSE 0 END)
+                    SELECT SUM(COALESCE(l.valor, 0))
                     FROM financeiro2_rd_linhas l
                     WHERE l.rd_id = rd.id
                       AND COALESCE(l.status, 'Ativo') = 'Ativo'
                 ), 0) AS valor_total,
-                CASE WHEN EXISTS (
-                    SELECT 1 FROM financeiro2_despesas d
-                    WHERE d.origem_tipo = 'RD' AND d.origem_id = rd.id
-                ) THEN 1 ELSE 0 END AS ja_importada
+
+                CASE
+                    WHEN EXISTS (
+                        SELECT 1
+                        FROM financeiro2_despesas d
+                        WHERE d.origem_tipo = 'RD'
+                          AND d.origem_id = rd.id
+                    ) THEN 1 ELSE 0
+                END AS ja_importada
             FROM financeiro2_rd rd
             ORDER BY rd.id DESC
         """)).mappings().all()
@@ -3528,10 +3596,7 @@ def despesas_importar():
         subnav_links=build_financeiro_dois_subnav("despesas"),
         itens=itens,
     )
-
-@bp.route("/despesas/importar/<string:origem_tipo>/<int:origem_id>", methods=["POST"])
-@login_required
-@permission_required("financeiro", "visualizar")
+    
 @bp.route("/despesas/importar/<string:origem_tipo>/<int:origem_id>", methods=["POST"])
 @login_required
 @permission_required("financeiro", "visualizar")
@@ -3544,47 +3609,94 @@ def despesa_importar_origem(origem_tipo: str, origem_id: int):
     engine = get_engine()
     with engine.begin() as conn:
         existente = conn.execute(text("""
-            SELECT id FROM financeiro2_despesas
-            WHERE origem_tipo = :origem_tipo AND origem_id = :origem_id
+            SELECT id
+            FROM financeiro2_despesas
+            WHERE origem_tipo = :origem_tipo
+              AND origem_id = :origem_id
             LIMIT 1
-        """), {"origem_tipo": origem_tipo, "origem_id": origem_id}).mappings().first()
+        """), {
+            "origem_tipo": origem_tipo,
+            "origem_id": origem_id
+        }).mappings().first()
+
         if existente:
             flash("ESSA ORIGEM JÁ FOI IMPORTADA COMO DESPESA.", "warning")
             return redirect(url_for("financeiro_dois.despesas_importar"))
 
         if origem_tipo == "OM":
             origem = conn.execute(text("""
-                SELECT id, numero_om AS numero_origem, criado_em::date AS data_documento,
-                       UPPER(COALESCE(nome_colaborador, '')) AS fornecedor,
-                       UPPER(COALESCE(matricula_colaborador, '')) AS cpf_cnpj,
-                       UPPER(COALESCE(status, '')) AS status_origem,
-                       COALESCE((SELECT SUM(CASE WHEN COALESCE(l.valor_brl,0) > 0 THEN COALESCE(l.valor_brl,0) ELSE 0 END)
-                                 FROM financeiro2_om_linhas l
-                                 WHERE l.om_id = financeiro2_om.id AND COALESCE(l.status,'Ativo')='Ativo'),0) AS valor_total,
-                       COALESCE((SELECT SUM(CASE WHEN COALESCE(l.valor_brl,0) < 0 THEN ABS(COALESCE(l.valor_brl,0)) ELSE 0 END)
-                                 FROM financeiro2_om_linhas l
-                                 WHERE l.om_id = financeiro2_om.id AND COALESCE(l.status,'Ativo')='Ativo'),0) AS valor_pago_total
+                SELECT
+                    id,
+                    numero_om AS numero_origem,
+                    criado_em::date AS data_documento,
+                    UPPER(COALESCE(nome_colaborador, '')) AS fornecedor,
+                    UPPER(COALESCE(matricula_colaborador, '')) AS cpf_cnpj,
+                    CASE
+                        WHEN UPPER(COALESCE(status, '')) = 'QUITADA' THEN 'PAGA'
+                        ELSE UPPER(COALESCE(status, ''))
+                    END AS status_origem,
+
+                    COALESCE((
+                        SELECT SUM(
+                            CASE
+                                WHEN COALESCE(l.valor_brl, 0) > 0 THEN COALESCE(l.valor_brl, 0)
+                                ELSE 0
+                            END
+                        )
+                        FROM financeiro2_om_linhas l
+                        WHERE l.om_id = financeiro2_om.id
+                          AND COALESCE(l.status, 'Ativo') = 'Ativo'
+                    ), 0) AS valor_total,
+
+                    COALESCE((
+                        SELECT SUM(
+                            CASE
+                                WHEN COALESCE(l.valor_brl, 0) < 0 THEN ABS(COALESCE(l.valor_brl, 0))
+                                ELSE 0
+                            END
+                        )
+                        FROM financeiro2_om_linhas l
+                        WHERE l.om_id = financeiro2_om.id
+                          AND COALESCE(l.status, 'Ativo') = 'Ativo'
+                    ), 0) AS valor_pago_total
                 FROM financeiro2_om
                 WHERE id = :id
             """), {"id": origem_id}).mappings().first()
+
             tipo_documento = "OM"
             numero_documento = origem["numero_origem"] if origem else ""
             descricao = f"IMPORTAÇÃO DA OM {numero_documento}"
+
         else:
             origem = conn.execute(text("""
-                SELECT id, numero_rd AS numero_origem, criado_em::date AS data_documento,
-                       UPPER(COALESCE(nome_colaborador, '')) AS fornecedor,
-                       UPPER(COALESCE(matricula_colaborador, '')) AS cpf_cnpj,
-                       CASE WHEN UPPER(COALESCE(status,''))='QUITADA' THEN 'PAGA' ELSE UPPER(COALESCE(status,'')) END AS status_origem,
-                       COALESCE((SELECT SUM(CASE WHEN COALESCE(l.valor,0) > 0 THEN COALESCE(l.valor,0) ELSE 0 END)
-                                 FROM financeiro2_rd_linhas l
-                                 WHERE l.rd_id = financeiro2_rd.id AND COALESCE(l.status,'Ativo')='Ativo'),0) AS valor_total,
-                       COALESCE((SELECT SUM(CASE WHEN COALESCE(l.valor,0) < 0 THEN ABS(COALESCE(l.valor,0)) ELSE 0 END)
-                                 FROM financeiro2_rd_linhas l
-                                 WHERE l.rd_id = financeiro2_rd.id AND COALESCE(l.status,'Ativo')='Ativo'),0) AS valor_pago_total
+                SELECT
+                    id,
+                    numero_rd AS numero_origem,
+                    criado_em::date AS data_documento,
+                    UPPER(COALESCE(nome_colaborador, '')) AS fornecedor,
+                    UPPER(COALESCE(matricula_colaborador, '')) AS cpf_cnpj,
+                    CASE
+                        WHEN UPPER(COALESCE(status, '')) = 'QUITADA' THEN 'PAGA'
+                        ELSE UPPER(COALESCE(status, ''))
+                    END AS status_origem,
+
+                    COALESCE((
+                        SELECT SUM(COALESCE(l.valor, 0))
+                        FROM financeiro2_rd_linhas l
+                        WHERE l.rd_id = financeiro2_rd.id
+                          AND COALESCE(l.status, 'Ativo') = 'Ativo'
+                    ), 0) AS valor_total,
+
+                    COALESCE((
+                        SELECT SUM(COALESCE(l.valor, 0))
+                        FROM financeiro2_rd_linhas l
+                        WHERE l.rd_id = financeiro2_rd.id
+                          AND COALESCE(l.status, 'Ativo') = 'Ativo'
+                    ), 0) AS valor_pago_total
                 FROM financeiro2_rd
                 WHERE id = :id
             """), {"id": origem_id}).mappings().first()
+
             tipo_documento = "RD"
             numero_documento = origem["numero_origem"] if origem else ""
             descricao = f"IMPORTAÇÃO DA RD {numero_documento}"
@@ -3592,26 +3704,66 @@ def despesa_importar_origem(origem_tipo: str, origem_id: int):
         if not origem:
             flash("ORIGEM NÃO ENCONTRADA.", "danger")
             return redirect(url_for("financeiro_dois.despesas_importar"))
+
         if origem["status_origem"] != "PAGA":
             flash("A IMPORTAÇÃO SÓ É PERMITIDA QUANDO A ORIGEM ESTIVER PAGA.", "warning")
             return redirect(url_for("financeiro_dois.despesas_importar"))
 
         numero_despesa = _proximo_numero_despesa(conn, origem["data_documento"])
+
         conn.execute(text("""
             INSERT INTO financeiro2_despesas (
-                numero_despesa, tipo_registro, origem_tipo, origem_id,
-                data_documento, vencimento, tipo_documento, numero_documento,
-                fornecedor, cpf_cnpj, descricao, centro_custo, fonte_pagadora,
-                valor, status_despesa, status_nd, nd_numero, motivo_status_nd,
-                observacao, data_pagamento, valor_pago, observacao_pagamento,
-                importada_em, criado_em, atualizado_em
+                numero_despesa,
+                tipo_registro,
+                origem_tipo,
+                origem_id,
+                data_documento,
+                vencimento,
+                tipo_documento,
+                numero_documento,
+                fornecedor,
+                cpf_cnpj,
+                descricao,
+                centro_custo,
+                fonte_pagadora,
+                valor,
+                status_despesa,
+                status_nd,
+                nd_numero,
+                motivo_status_nd,
+                observacao,
+                data_pagamento,
+                valor_pago,
+                observacao_pagamento,
+                importada_em,
+                criado_em,
+                atualizado_em
             ) VALUES (
-                :numero_despesa, 'IMPORTADA', :origem_tipo, :origem_id,
-                :data_documento, NULL, :tipo_documento, :numero_documento,
-                :fornecedor, :cpf_cnpj, :descricao, '', '',
-                :valor, 'PAGA', 'NÃO VINCULADA', '', '',
-                '', :data_pagamento, :valor_pago, 'IMPORTADA AUTOMATICAMENTE DA ORIGEM',
-                CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                :numero_despesa,
+                'IMPORTADA',
+                :origem_tipo,
+                :origem_id,
+                :data_documento,
+                NULL,
+                :tipo_documento,
+                :numero_documento,
+                :fornecedor,
+                :cpf_cnpj,
+                :descricao,
+                '',
+                '',
+                :valor,
+                'PAGA',
+                'NÃO VINCULADA',
+                '',
+                '',
+                '',
+                :data_pagamento,
+                :valor_pago,
+                'IMPORTADA AUTOMATICAMENTE DA ORIGEM',
+                CURRENT_TIMESTAMP,
+                CURRENT_TIMESTAMP,
+                CURRENT_TIMESTAMP
             )
         """), {
             "numero_despesa": numero_despesa,
