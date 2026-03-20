@@ -189,6 +189,7 @@
           <div class="resume-row total"><span>Valor</span><strong>R$ {{ '%.2f'|format(despesa.valor) }}</strong></div>
         </div>
 
+        {% if not despesa.eh_nova %}
         <div class="resume-card">
           <div class="resume-title">Pagamento</div>
           <div class="resume-row"><span>Data pagamento</span><strong>{{ despesa.data_pagamento_form or '—' }}</strong></div>
@@ -197,34 +198,28 @@
 
           {% if not despesa.eh_importada %}
           <div style="margin-top:14px;">
-			<div class="payment-form">
-			  <div class="field">
-				<label>Data pagamento</label>
-				<input class="input-like" type="date" name="data_pagamento" form="form-pagamento-{{ despesa.id }}">
-			  </div>
+            <div class="payment-form">
+              <div class="field">
+                <label>Data pagamento</label>
+                <input class="input-like" type="date" name="data_pagamento" form="form-pagamento-{{ despesa.id }}">
+              </div>
 
-			  <div class="field" style="margin-top:10px;">
-				<label>Valor pago</label>
-				<input class="input-like" type="text" name="valor_pago" placeholder="0,00" form="form-pagamento-{{ despesa.id }}">
-			  </div>
+              <div class="field" style="margin-top:10px;">
+                <label>Valor pago</label>
+                <input class="input-like" type="text" name="valor_pago" placeholder="0,00" form="form-pagamento-{{ despesa.id }}">
+              </div>
 
-			  <div class="field" style="margin-top:10px;">
-				<label>Observação</label>
-				<textarea class="input-like textarea-like small" name="observacao_pagamento" form="form-pagamento-{{ despesa.id }}"></textarea>
-			  </div>
+              <div class="field" style="margin-top:10px;">
+                <label>Observação</label>
+                <textarea class="input-like textarea-like small" name="observacao_pagamento" form="form-pagamento-{{ despesa.id }}"></textarea>
+              </div>
 
-			  <div style="margin-top:12px;">
-				<button type="submit" class="btn btn-primary btn-block" form="form-pagamento-{{ despesa.id }}">
-				  Registrar pagamento
-				</button>
-			  </div>
-			</div>
-
-			<form
-			  id="form-pagamento-{{ despesa.id }}"
-			  method="post"
-			  action="{{ url_for('financeiro_dois.despesa_registrar_pagamento', despesa_id=despesa.id) }}"
-			></form>
+              <div style="margin-top:12px;">
+                <button type="submit" class="btn btn-primary btn-block" form="form-pagamento-{{ despesa.id }}">
+                  Registrar pagamento
+                </button>
+              </div>
+            </div>
           </div>
 
           {% if despesa.pagamentos %}
@@ -242,6 +237,7 @@
           {% endif %}
           {% endif %}
         </div>
+        {% endif %}
 
         <div class="resume-card">
           <div class="resume-title">Anexos</div>
@@ -263,6 +259,14 @@
       </aside>
     </div>
   </form>
+
+  {% if not despesa.eh_nova and not despesa.eh_importada %}
+  <form
+    id="form-pagamento-{{ despesa.id }}"
+    method="post"
+    action="{{ url_for('financeiro_dois.despesa_registrar_pagamento', despesa_id=despesa.id) }}"
+  ></form>
+  {% endif %}
 </div>
 
 <style>
