@@ -197,26 +197,34 @@
 
           {% if not despesa.eh_importada %}
           <div style="margin-top:14px;">
-            <form method="post" action="{{ url_for('financeiro_dois.despesa_registrar_pagamento', despesa_id=despesa.id) }}" class="payment-form">
-              <div class="field">
-                <label>Data pagamento</label>
-                <input class="input-like" type="date" name="data_pagamento" required>
-              </div>
+			<div class="payment-form">
+			  <div class="field">
+				<label>Data pagamento</label>
+				<input class="input-like" type="date" name="data_pagamento" form="form-pagamento-{{ despesa.id }}">
+			  </div>
 
-              <div class="field" style="margin-top:10px;">
-                <label>Valor pago</label>
-                <input class="input-like" type="text" name="valor_pago" placeholder="0,00" required>
-              </div>
+			  <div class="field" style="margin-top:10px;">
+				<label>Valor pago</label>
+				<input class="input-like" type="text" name="valor_pago" placeholder="0,00" form="form-pagamento-{{ despesa.id }}">
+			  </div>
 
-              <div class="field" style="margin-top:10px;">
-                <label>Observação</label>
-                <textarea class="input-like textarea-like small" name="observacao_pagamento"></textarea>
-              </div>
+			  <div class="field" style="margin-top:10px;">
+				<label>Observação</label>
+				<textarea class="input-like textarea-like small" name="observacao_pagamento" form="form-pagamento-{{ despesa.id }}"></textarea>
+			  </div>
 
-              <div style="margin-top:12px;">
-                <button type="submit" class="btn btn-primary btn-block">Registrar pagamento</button>
-              </div>
-            </form>
+			  <div style="margin-top:12px;">
+				<button type="submit" class="btn btn-primary btn-block" form="form-pagamento-{{ despesa.id }}">
+				  Registrar pagamento
+				</button>
+			  </div>
+			</div>
+
+			<form
+			  id="form-pagamento-{{ despesa.id }}"
+			  method="post"
+			  action="{{ url_for('financeiro_dois.despesa_registrar_pagamento', despesa_id=despesa.id) }}"
+			></form>
           </div>
 
           {% if despesa.pagamentos %}
