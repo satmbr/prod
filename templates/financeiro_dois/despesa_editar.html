@@ -114,13 +114,13 @@
             </select>
           </div>
 
-          <div class="field">
-            <label>Valor</label>
-            <input class="input-like" type="text" name="valor" value="{{ '%.2f'|format(despesa.valor) }}" {% if despesa.eh_importada %}disabled{% endif %} required>
-            {% if despesa.eh_importada %}
-              <input type="hidden" name="valor" value="{{ '%.2f'|format(despesa.valor) }}">
-            {% endif %}
-          </div>
+			<div class="field" style="margin-top:14px;">
+			  <label>Descrição</label>
+			  <textarea class="input-like textarea-like" name="descricao" {% if despesa.eh_importada %}disabled{% endif %} required>{{ despesa.descricao }}</textarea>
+			  {% if despesa.eh_importada %}
+				<input type="hidden" name="descricao" value="{{ despesa.descricao }}">
+			  {% endif %}
+			</div>
 
           <div class="field">
             <label>Status despesa</label>

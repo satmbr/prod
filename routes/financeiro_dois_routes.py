@@ -3149,14 +3149,14 @@ def despesa_nova():
         "descricao": "",
         "centro_custo": "",
         "fonte_pagadora": "",
-        "valor": 0,
+        "valor": "",
         "status_despesa": "PENDENTE",
         "status_nd": "NÃO VINCULADA",
         "nd_numero": "",
         "motivo_status_nd": "",
         "observacao": "",
         "data_pagamento_form": "",
-        "valor_pago": 0,
+        "valor_pago": "",
         "observacao_pagamento": "",
         "tipo_registro": "OPERACIONAL",
         "eh_nova": True,
@@ -3179,7 +3179,7 @@ def despesa_nova():
 def despesa_criar():
     data_documento = _nome_preenchido(request.form.get("data_documento"))
     vencimento = _nome_preenchido(request.form.get("vencimento"))
-    tipo_documento = _nome_preenchido(request.form.get("tipo_documento")).upper() or "DESPESA OPERACIONAL"
+    tipo_documento = _nome_preenchido(request.form.get("tipo_documento")).upper()
     numero_documento = _nome_preenchido(request.form.get("numero_documento")).upper()
     fornecedor = _nome_preenchido(request.form.get("fornecedor")).upper()
     cpf_cnpj = _nome_preenchido(request.form.get("cpf_cnpj")).upper()
@@ -3188,22 +3188,99 @@ def despesa_criar():
     fonte_pagadora = _nome_preenchido(request.form.get("fonte_pagadora")).upper()
     valor_txt = _nome_preenchido(request.form.get("valor"))
     observacao = _nome_preenchido(request.form.get("observacao")).upper()
+    status_nd = _nome_preenchido(request.form.get("status_nd")).upper() or "NÃO VINCULADA"
+    nd_numero = _nome_preenchido(request.form.get("nd_numero")).upper()
+    motivo_status_nd = _nome_preenchido(request.form.get("motivo_status_nd")).upper()
+
+    engine = get_engine()
+    with engine.connect() as conn:
+        tipos_documento = conn.execute(text("""
+            SELECT UPPER(nome) AS nome
+            FROM financeiro2_cad_tipos_documento
+            WHERE status = 'Ativo'
+            ORDER BY nome
+        """)).mappings().all()
+
+        centros_custo = conn.execute(text("""
+            SELECT UPPER(nome) AS nome
+            FROM financeiro2_cad_centros_custo
+            WHERE status = 'Ativo'
+            ORDER BY nome
+        """)).mappings().all()
+
+        empresas_nd = conn.execute(text("""
+            SELECT UPPER(nome) AS nome
+            FROM financeiro2_cad_empresas_nd
+            WHERE status = 'Ativo'
+            ORDER BY nome
+        """)).mappings().all()
+
+    despesa_form = {
+        "id": 0,
+        "numero_despesa": "NOVA",
+        "origem": "OPERACIONAL",
+        "origem_tipo": "OPERACIONAL",
+        "origem_id": None,
+        "data_form": data_documento,
+        "vencimento_form": vencimento,
+        "tipo_documento": tipo_documento,
+        "numero_documento": numero_documento,
+        "fornecedor": fornecedor,
+        "cpf_cnpj": cpf_cnpj,
+        "descricao": descricao,
+        "centro_custo": centro_custo,
+        "fonte_pagadora": fonte_pagadora,
+        "valor": valor_txt,
+        "status_despesa": "PENDENTE",
+        "status_nd": status_nd,
+        "nd_numero": nd_numero,
+        "motivo_status_nd": motivo_status_nd,
+        "observacao": observacao,
+        "data_pagamento_form": "",
+        "valor_pago": 0,
+        "observacao_pagamento": "",
+        "tipo_registro": "OPERACIONAL",
+        "eh_nova": True,
+        "eh_importada": False,
+        "anexos": [],
+        "pagamentos": [],
+    }
 
     if not data_documento or not numero_documento or not descricao or not valor_txt:
         flash("PREENCHA DATA, NÚMERO DO DOCUMENTO, DESCRIÇÃO E VALOR.", "warning")
-        return redirect(url_for("financeiro_dois.despesa_nova"))
+        return render_template(
+            "financeiro_dois/despesa_editar.html",
+            subnav_links=build_financeiro_dois_subnav("despesas"),
+            despesa=despesa_form,
+            tipos_documento=tipos_documento,
+            centros_custo=centros_custo,
+            empresas_nd=empresas_nd,
+        )
 
     try:
         valor = _valor_decimal(valor_txt)
     except ValueError:
         flash("VALOR INVÁLIDO.", "warning")
-        return redirect(url_for("financeiro_dois.despesa_nova"))
+        return render_template(
+            "financeiro_dois/despesa_editar.html",
+            subnav_links=build_financeiro_dois_subnav("despesas"),
+            despesa=despesa_form,
+            tipos_documento=tipos_documento,
+            centros_custo=centros_custo,
+            empresas_nd=empresas_nd,
+        )
 
     if valor <= 0:
         flash("O VALOR DA DESPESA DEVE SER MAIOR QUE ZERO.", "warning")
-        return redirect(url_for("financeiro_dois.despesa_nova"))
+        return render_template(
+            "financeiro_dois/despesa_editar.html",
+            subnav_links=build_financeiro_dois_subnav("despesas"),
+            despesa=despesa_form,
+            tipos_documento=tipos_documento,
+            centros_custo=centros_custo,
+            empresas_nd=empresas_nd,
+        )
 
-    engine = get_engine()
     with engine.begin() as conn:
         numero_despesa = _proximo_numero_despesa(conn)
 
@@ -3248,9 +3325,9 @@ def despesa_criar():
                 :fonte_pagadora,
                 :valor,
                 'PENDENTE',
-                'NÃO VINCULADA',
-                '',
-                '',
+                :status_nd,
+                :nd_numero,
+                :motivo_status_nd,
                 :observacao,
                 0,
                 '',
@@ -3270,6 +3347,9 @@ def despesa_criar():
             "centro_custo": centro_custo,
             "fonte_pagadora": fonte_pagadora,
             "valor": valor,
+            "status_nd": status_nd,
+            "nd_numero": nd_numero,
+            "motivo_status_nd": motivo_status_nd,
             "observacao": observacao,
         }).scalar()
 
