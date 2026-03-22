@@ -116,8 +116,31 @@
 
       {% if mostrar_resultados %}
       <div class="zone-actions">
-        <span class="btn" style="opacity:.65; cursor:not-allowed;">Exportar Excel</span>
-        <span class="btn" style="opacity:.65; cursor:not-allowed;">Exportar PDF</span>
+		<a class="btn" href="{{ url_for('financeiro_dois.despesas_exportar_excel',
+			busca=filtros.busca,
+			status_despesa=filtros.status_despesa,
+			status_nd=filtros.status_nd,
+			origem=filtros.origem,
+			data_inicial=filtros.data_inicial,
+			data_final=filtros.data_final,
+			venc_inicial=filtros.venc_inicial,
+			venc_final=filtros.venc_final,
+			nd_numero=filtros.nd_numero,
+			somente_vencidas='1' if filtros.somente_vencidas else '0'
+		) }}">Exportar Excel</a>
+
+		<a class="btn" href="{{ url_for('financeiro_dois.despesas_exportar_pdf',
+			busca=filtros.busca,
+			status_despesa=filtros.status_despesa,
+			status_nd=filtros.status_nd,
+			origem=filtros.origem,
+			data_inicial=filtros.data_inicial,
+			data_final=filtros.data_final,
+			venc_inicial=filtros.venc_inicial,
+			venc_final=filtros.venc_final,
+			nd_numero=filtros.nd_numero,
+			somente_vencidas='1' if filtros.somente_vencidas else '0'
+		) }}">Exportar PDF</a>
       </div>
       {% endif %}
     </div>

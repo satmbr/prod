@@ -4622,3 +4622,373 @@ def despesa_registrar_pagamento(despesa_id: int):
 
     flash("PAGAMENTO REGISTRADO COM SUCESSO.", "success")
     return redirect(url_for("financeiro_dois.despesa_editar", despesa_id=despesa_id))
+    
+#====================================================================================
+#      EXPORTAR DESPESAS
+#====================================================================================
+
+@bp.route("/despesas/exportar/excel")
+@login_required
+@permission_required("financeiro", "visualizar")
+def despesas_exportar_excel():
+    from io import BytesIO
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment
+
+    busca = _nome_preenchido(request.args.get("busca")).upper()
+    status_despesa = _nome_preenchido(request.args.get("status_despesa")).upper()
+    status_nd = _nome_preenchido(request.args.get("status_nd")).upper()
+    origem = _nome_preenchido(request.args.get("origem")).upper()
+    data_inicial = _nome_preenchido(request.args.get("data_inicial"))
+    data_final = _nome_preenchido(request.args.get("data_final"))
+    venc_inicial = _nome_preenchido(request.args.get("venc_inicial"))
+    venc_final = _nome_preenchido(request.args.get("venc_final"))
+    nd_numero = _nome_preenchido(request.args.get("nd_numero")).upper()
+    somente_vencidas = request.args.get("somente_vencidas") == "1"
+
+    filtros = ["1=1"]
+    params = {}
+
+    tem_filtro = any([
+        busca,
+        status_despesa and status_despesa != "TODOS",
+        status_nd and status_nd != "TODOS",
+        origem and origem not in ("TODAS", "TODOS"),
+        data_inicial,
+        data_final,
+        venc_inicial,
+        venc_final,
+        nd_numero,
+        somente_vencidas,
+    ])
+
+    if not tem_filtro:
+        flash("APLIQUE AO MENOS UM FILTRO PARA EXPORTAR.", "warning")
+        return redirect(url_for("financeiro_dois.despesas"))
+
+    if busca:
+        filtros.append("""
+            (
+                UPPER(COALESCE(d.numero_despesa, '')) LIKE :busca
+                OR UPPER(COALESCE(d.numero_documento, '')) LIKE :busca
+                OR UPPER(COALESCE(d.fornecedor, '')) LIKE :busca
+                OR UPPER(COALESCE(d.descricao, '')) LIKE :busca
+            )
+        """)
+        params["busca"] = f"%{busca}%"
+
+    if status_despesa and status_despesa != "TODOS":
+        filtros.append("UPPER(COALESCE(d.status_despesa, '')) = :status_despesa")
+        params["status_despesa"] = status_despesa
+
+    if status_nd and status_nd != "TODOS":
+        filtros.append("UPPER(COALESCE(d.status_nd, '')) = :status_nd")
+        params["status_nd"] = status_nd
+
+    if origem and origem not in ("TODAS", "TODOS"):
+        filtros.append("UPPER(COALESCE(d.origem_tipo, '')) = :origem")
+        params["origem"] = origem
+
+    if data_inicial:
+        filtros.append("d.data_documento >= :data_inicial")
+        params["data_inicial"] = data_inicial
+
+    if data_final:
+        filtros.append("d.data_documento <= :data_final")
+        params["data_final"] = data_final
+
+    if venc_inicial:
+        filtros.append("d.vencimento >= :venc_inicial")
+        params["venc_inicial"] = venc_inicial
+
+    if venc_final:
+        filtros.append("d.vencimento <= :venc_final")
+        params["venc_final"] = venc_final
+
+    if nd_numero:
+        filtros.append("UPPER(COALESCE(d.nd_numero, '')) LIKE :nd_numero")
+        params["nd_numero"] = f"%{nd_numero}%"
+
+    if somente_vencidas:
+        filtros.append("""
+            UPPER(COALESCE(d.status_despesa, 'PENDENTE')) <> 'PAGA'
+            AND d.vencimento IS NOT NULL
+            AND d.vencimento < CURRENT_DATE
+        """)
+
+    engine = get_engine()
+    with engine.connect() as conn:
+        registros = conn.execute(text(f"""
+            SELECT
+                TO_CHAR(d.data_documento, 'DD/MM/YYYY') AS data,
+                TO_CHAR(d.vencimento, 'DD/MM/YYYY') AS vencimento,
+                UPPER(COALESCE(d.tipo_documento, '')) AS tipo_documento,
+                UPPER(COALESCE(d.numero_despesa, '')) AS numero_despesa,
+                UPPER(COALESCE(d.numero_documento, '')) AS numero_documento,
+                UPPER(COALESCE(d.fornecedor, '')) AS fornecedor,
+                UPPER(COALESCE(d.descricao, '')) AS descricao,
+                UPPER(COALESCE(d.centro_custo, '')) AS centro_custo,
+                UPPER(COALESCE(d.nd_numero, '')) AS nd_numero,
+                UPPER(COALESCE(d.status_despesa, '')) AS status_despesa,
+                UPPER(COALESCE(d.status_nd, '')) AS status_nd,
+                UPPER(COALESCE(d.origem_tipo, '')) AS origem,
+                CASE
+                    WHEN UPPER(COALESCE(d.origem_tipo, '')) = 'OM' THEN COALESCE((
+                        SELECT SUM(CASE WHEN COALESCE(l.valor_brl, 0) > 0 THEN COALESCE(l.valor_brl, 0) ELSE 0 END)
+                        FROM financeiro2_om_linhas l
+                        WHERE l.om_id = d.origem_id
+                          AND COALESCE(l.status, 'Ativo') = 'Ativo'
+                    ), 0)
+                    WHEN UPPER(COALESCE(d.origem_tipo, '')) = 'RD' THEN COALESCE((
+                        SELECT SUM(CASE WHEN COALESCE(l.valor, 0) > 0 THEN COALESCE(l.valor, 0) ELSE 0 END)
+                        FROM financeiro2_rd_linhas l
+                        WHERE l.rd_id = d.origem_id
+                          AND COALESCE(l.status, 'Ativo') = 'Ativo'
+                    ), 0)
+                    ELSE COALESCE(d.valor, 0)
+                END AS valor
+            FROM financeiro2_despesas d
+            WHERE {' AND '.join(filtros)}
+            ORDER BY d.data_documento DESC, d.id DESC
+        """), params).mappings().all()
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "DESPESAS"
+
+    headers = [
+        "DATA", "VENCIMENTO", "TIPO", "Nº DESPESA", "Nº DOC.",
+        "FORNECEDOR", "DESCRIÇÃO", "CC", "ND", "STATUS DESPESA",
+        "STATUS ND", "ORIGEM", "VALOR"
+    ]
+    ws.append(headers)
+
+    fill = PatternFill("solid", fgColor="16324F")
+    font = Font(color="FFFFFF", bold=True)
+
+    for cell in ws[1]:
+        cell.fill = fill
+        cell.font = font
+        cell.alignment = Alignment(horizontal="center")
+
+    total_valor = 0.0
+    for r in registros:
+        valor = float(r["valor"] or 0)
+        total_valor += valor
+        ws.append([
+            r["data"], r["vencimento"], r["tipo_documento"], r["numero_despesa"],
+            r["numero_documento"], r["fornecedor"], r["descricao"], r["centro_custo"],
+            r["nd_numero"], r["status_despesa"], r["status_nd"], r["origem"], valor
+        ])
+
+    ws.append([])
+    ws.append(["", "", "", "", "", "", "", "", "", "", "", "TOTAL", total_valor])
+
+    for col in ws.columns:
+        max_len = 0
+        col_letter = col[0].column_letter
+        for cell in col:
+            val = "" if cell.value is None else str(cell.value)
+            if len(val) > max_len:
+                max_len = len(val)
+        ws.column_dimensions[col_letter].width = min(max_len + 2, 35)
+
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+
+    return send_file(
+        output,
+        as_attachment=True,
+        download_name="despesas_filtradas.xlsx",
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    
+@bp.route("/despesas/exportar/pdf")
+@login_required
+@permission_required("financeiro", "visualizar")
+def despesas_exportar_pdf():
+    from io import BytesIO
+    from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.pdfgen import canvas
+
+    busca = _nome_preenchido(request.args.get("busca")).upper()
+    status_despesa = _nome_preenchido(request.args.get("status_despesa")).upper()
+    status_nd = _nome_preenchido(request.args.get("status_nd")).upper()
+    origem = _nome_preenchido(request.args.get("origem")).upper()
+    data_inicial = _nome_preenchido(request.args.get("data_inicial"))
+    data_final = _nome_preenchido(request.args.get("data_final"))
+    venc_inicial = _nome_preenchido(request.args.get("venc_inicial"))
+    venc_final = _nome_preenchido(request.args.get("venc_final"))
+    nd_numero = _nome_preenchido(request.args.get("nd_numero")).upper()
+    somente_vencidas = request.args.get("somente_vencidas") == "1"
+
+    filtros = ["1=1"]
+    params = {}
+
+    tem_filtro = any([
+        busca,
+        status_despesa and status_despesa != "TODOS",
+        status_nd and status_nd != "TODOS",
+        origem and origem not in ("TODAS", "TODOS"),
+        data_inicial,
+        data_final,
+        venc_inicial,
+        venc_final,
+        nd_numero,
+        somente_vencidas,
+    ])
+
+    if not tem_filtro:
+        flash("APLIQUE AO MENOS UM FILTRO PARA EXPORTAR.", "warning")
+        return redirect(url_for("financeiro_dois.despesas"))
+
+    if busca:
+        filtros.append("""
+            (
+                UPPER(COALESCE(d.numero_despesa, '')) LIKE :busca
+                OR UPPER(COALESCE(d.numero_documento, '')) LIKE :busca
+                OR UPPER(COALESCE(d.fornecedor, '')) LIKE :busca
+                OR UPPER(COALESCE(d.descricao, '')) LIKE :busca
+            )
+        """)
+        params["busca"] = f"%{busca}%"
+
+    if status_despesa and status_despesa != "TODOS":
+        filtros.append("UPPER(COALESCE(d.status_despesa, '')) = :status_despesa")
+        params["status_despesa"] = status_despesa
+
+    if status_nd and status_nd != "TODOS":
+        filtros.append("UPPER(COALESCE(d.status_nd, '')) = :status_nd")
+        params["status_nd"] = status_nd
+
+    if origem and origem not in ("TODAS", "TODOS"):
+        filtros.append("UPPER(COALESCE(d.origem_tipo, '')) = :origem")
+        params["origem"] = origem
+
+    if data_inicial:
+        filtros.append("d.data_documento >= :data_inicial")
+        params["data_inicial"] = data_inicial
+
+    if data_final:
+        filtros.append("d.data_documento <= :data_final")
+        params["data_final"] = data_final
+
+    if venc_inicial:
+        filtros.append("d.vencimento >= :venc_inicial")
+        params["venc_inicial"] = venc_inicial
+
+    if venc_final:
+        filtros.append("d.vencimento <= :venc_final")
+        params["venc_final"] = venc_final
+
+    if nd_numero:
+        filtros.append("UPPER(COALESCE(d.nd_numero, '')) LIKE :nd_numero")
+        params["nd_numero"] = f"%{nd_numero}%"
+
+    if somente_vencidas:
+        filtros.append("""
+            UPPER(COALESCE(d.status_despesa, 'PENDENTE')) <> 'PAGA'
+            AND d.vencimento IS NOT NULL
+            AND d.vencimento < CURRENT_DATE
+        """)
+
+    engine = get_engine()
+    with engine.connect() as conn:
+        registros = conn.execute(text(f"""
+            SELECT
+                TO_CHAR(d.data_documento, 'DD/MM/YYYY') AS data,
+                TO_CHAR(d.vencimento, 'DD/MM/YYYY') AS vencimento,
+                UPPER(COALESCE(d.numero_despesa, '')) AS numero_despesa,
+                UPPER(COALESCE(d.fornecedor, '')) AS fornecedor,
+                UPPER(COALESCE(d.descricao, '')) AS descricao,
+                UPPER(COALESCE(d.status_despesa, '')) AS status_despesa,
+                UPPER(COALESCE(d.status_nd, '')) AS status_nd,
+                UPPER(COALESCE(d.origem_tipo, '')) AS origem,
+                CASE
+                    WHEN UPPER(COALESCE(d.origem_tipo, '')) = 'OM' THEN COALESCE((
+                        SELECT SUM(CASE WHEN COALESCE(l.valor_brl, 0) > 0 THEN COALESCE(l.valor_brl, 0) ELSE 0 END)
+                        FROM financeiro2_om_linhas l
+                        WHERE l.om_id = d.origem_id
+                          AND COALESCE(l.status, 'Ativo') = 'Ativo'
+                    ), 0)
+                    WHEN UPPER(COALESCE(d.origem_tipo, '')) = 'RD' THEN COALESCE((
+                        SELECT SUM(CASE WHEN COALESCE(l.valor, 0) > 0 THEN COALESCE(l.valor, 0) ELSE 0 END)
+                        FROM financeiro2_rd_linhas l
+                        WHERE l.rd_id = d.origem_id
+                          AND COALESCE(l.status, 'Ativo') = 'Ativo'
+                    ), 0)
+                    ELSE COALESCE(d.valor, 0)
+                END AS valor
+            FROM financeiro2_despesas d
+            WHERE {' AND '.join(filtros)}
+            ORDER BY d.data_documento DESC, d.id DESC
+        """), params).mappings().all()
+
+    buffer = BytesIO()
+    pdf = canvas.Canvas(buffer, pagesize=landscape(A4))
+    largura, altura = landscape(A4)
+
+    y = altura - 30
+    pdf.setFont("Helvetica-Bold", 14)
+    pdf.drawString(30, y, "DESPESAS FILTRADAS")
+    y -= 25
+
+    pdf.setFont("Helvetica-Bold", 8)
+    pdf.drawString(30, y, "DATA")
+    pdf.drawString(80, y, "VENC.")
+    pdf.drawString(130, y, "Nº DESPESA")
+    pdf.drawString(230, y, "FORNECEDOR")
+    pdf.drawString(410, y, "DESCRIÇÃO")
+    pdf.drawString(610, y, "STATUS")
+    pdf.drawString(680, y, "ND")
+    pdf.drawString(750, y, "ORIGEM")
+    pdf.drawRightString(820, y, "VALOR")
+    y -= 15
+
+    pdf.setFont("Helvetica", 8)
+    total_valor = 0.0
+
+    for r in registros:
+        if y < 30:
+            pdf.showPage()
+            y = altura - 30
+            pdf.setFont("Helvetica-Bold", 8)
+            pdf.drawString(30, y, "DATA")
+            pdf.drawString(80, y, "VENC.")
+            pdf.drawString(130, y, "Nº DESPESA")
+            pdf.drawString(230, y, "FORNECEDOR")
+            pdf.drawString(410, y, "DESCRIÇÃO")
+            pdf.drawString(610, y, "STATUS")
+            pdf.drawString(680, y, "ND")
+            pdf.drawString(750, y, "ORIGEM")
+            pdf.drawRightString(820, y, "VALOR")
+            y -= 15
+            pdf.setFont("Helvetica", 8)
+
+        valor = float(r["valor"] or 0)
+        total_valor += valor
+
+        pdf.drawString(30, y, str(r["data"]))
+        pdf.drawString(80, y, str(r["vencimento"] or "—"))
+        pdf.drawString(130, y, str(r["numero_despesa"])[:16])
+        pdf.drawString(230, y, str(r["fornecedor"])[:30])
+        pdf.drawString(410, y, str(r["descricao"])[:34])
+        pdf.drawString(610, y, str(r["status_despesa"])[:10])
+        pdf.drawString(680, y, str(r["status_nd"])[:10])
+        pdf.drawString(750, y, str(r["origem"])[:8])
+        pdf.drawRightString(820, y, f"{valor:.2f}")
+        y -= 13
+
+    y -= 10
+    pdf.setFont("Helvetica-Bold", 10)
+    pdf.drawRightString(820, y, f"TOTAL: {total_valor:.2f}")
+    pdf.save()
+
+    buffer.seek(0)
+    return send_file(
+        buffer,
+        as_attachment=True,
+        download_name="despesas_filtradas.pdf",
+        mimetype="application/pdf",
+    )
