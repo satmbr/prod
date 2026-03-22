@@ -2979,6 +2979,19 @@ def despesas():
     filtros = ["1=1"]
     params = {}
 
+    tem_filtro = any([
+        busca,
+        status_despesa and status_despesa != "TODOS",
+        status_nd and status_nd != "TODOS",
+        origem and origem not in ("TODAS", "TODOS"),
+        data_inicial,
+        data_final,
+        venc_inicial,
+        venc_final,
+        nd_numero,
+        somente_vencidas,
+    ])
+
     if busca:
         filtros.append("""
             (
@@ -3029,68 +3042,79 @@ def despesas():
             AND d.vencimento < CURRENT_DATE
         """)
 
-    engine = get_engine()
-    with engine.connect() as conn:
-        despesas = conn.execute(text(f"""
-            SELECT
-                d.id,
-                TO_CHAR(d.data_documento, 'DD/MM/YYYY') AS data,
-                TO_CHAR(d.vencimento, 'DD/MM/YYYY') AS vencimento,
-                UPPER(COALESCE(d.tipo_documento, '')) AS tipo_documento,
-                UPPER(COALESCE(d.numero_despesa, '')) AS numero_despesa,
-                UPPER(COALESCE(d.numero_documento, '')) AS numero_documento,
-                UPPER(COALESCE(d.fornecedor, '')) AS fornecedor,
-                UPPER(COALESCE(d.descricao, '')) AS descricao,
-                UPPER(COALESCE(d.centro_custo, '')) AS centro_custo,
-                UPPER(COALESCE(d.status_despesa, '')) AS status_despesa,
-                UPPER(COALESCE(d.status_nd, '')) AS status_nd,
-                UPPER(COALESCE(d.origem_tipo, '')) AS origem,
-                UPPER(COALESCE(d.nd_numero, '')) AS nd_numero,
+    despesas = []
+    total_registros = 0
+    total_valor = 0.0
 
-                CASE
-                    WHEN UPPER(COALESCE(d.origem_tipo, '')) = 'OM' THEN COALESCE((
-                        SELECT SUM(
-                            CASE
-                                WHEN COALESCE(l.valor_brl, 0) > 0 THEN COALESCE(l.valor_brl, 0)
-                                ELSE 0
-                            END
-                        )
-                        FROM financeiro2_om_linhas l
-                        WHERE l.om_id = d.origem_id
-                          AND COALESCE(l.status, 'Ativo') = 'Ativo'
-                    ), 0)
+    if tem_filtro:
+        engine = get_engine()
+        with engine.connect() as conn:
+            despesas = conn.execute(text(f"""
+                SELECT
+                    d.id,
+                    TO_CHAR(d.data_documento, 'DD/MM/YYYY') AS data,
+                    TO_CHAR(d.vencimento, 'DD/MM/YYYY') AS vencimento,
+                    UPPER(COALESCE(d.tipo_documento, '')) AS tipo_documento,
+                    UPPER(COALESCE(d.numero_despesa, '')) AS numero_despesa,
+                    UPPER(COALESCE(d.numero_documento, '')) AS numero_documento,
+                    UPPER(COALESCE(d.fornecedor, '')) AS fornecedor,
+                    UPPER(COALESCE(d.descricao, '')) AS descricao,
+                    UPPER(COALESCE(d.centro_custo, '')) AS centro_custo,
+                    UPPER(COALESCE(d.status_despesa, '')) AS status_despesa,
+                    UPPER(COALESCE(d.status_nd, '')) AS status_nd,
+                    UPPER(COALESCE(d.origem_tipo, '')) AS origem,
+                    UPPER(COALESCE(d.nd_numero, '')) AS nd_numero,
 
-                    WHEN UPPER(COALESCE(d.origem_tipo, '')) = 'RD' THEN COALESCE((
-                        SELECT SUM(
-                            CASE
-                                WHEN COALESCE(l.valor, 0) > 0 THEN COALESCE(l.valor, 0)
-                                ELSE 0
-                            END
-                        )
-                        FROM financeiro2_rd_linhas l
-                        WHERE l.rd_id = d.origem_id
-                          AND COALESCE(l.status, 'Ativo') = 'Ativo'
-                    ), 0)
+                    CASE
+                        WHEN UPPER(COALESCE(d.origem_tipo, '')) = 'OM' THEN COALESCE((
+                            SELECT SUM(
+                                CASE
+                                    WHEN COALESCE(l.valor_brl, 0) > 0 THEN COALESCE(l.valor_brl, 0)
+                                    ELSE 0
+                                END
+                            )
+                            FROM financeiro2_om_linhas l
+                            WHERE l.om_id = d.origem_id
+                              AND COALESCE(l.status, 'Ativo') = 'Ativo'
+                        ), 0)
 
-                    ELSE COALESCE(d.valor, 0)
-                END AS valor,
+                        WHEN UPPER(COALESCE(d.origem_tipo, '')) = 'RD' THEN COALESCE((
+                            SELECT SUM(
+                                CASE
+                                    WHEN COALESCE(l.valor, 0) > 0 THEN COALESCE(l.valor, 0)
+                                    ELSE 0
+                                END
+                            )
+                            FROM financeiro2_rd_linhas l
+                            WHERE l.rd_id = d.origem_id
+                              AND COALESCE(l.status, 'Ativo') = 'Ativo'
+                        ), 0)
 
-                CASE
-                    WHEN UPPER(COALESCE(d.status_despesa, '')) = 'PAGA' THEN 'PAGA'
-                    WHEN d.vencimento IS NOT NULL AND d.vencimento < CURRENT_DATE THEN 'VENCIDA'
-                    WHEN d.vencimento IS NOT NULL AND d.vencimento <= CURRENT_DATE + INTERVAL '7 day' THEN 'A VENCER'
-                    ELSE 'NO PRAZO'
-                END AS situacao_vencimento
+                        ELSE COALESCE(d.valor, 0)
+                    END AS valor,
 
-            FROM financeiro2_despesas d
-            WHERE {' AND '.join(filtros)}
-            ORDER BY d.data_documento DESC, d.id DESC
-        """), params).mappings().all()
+                    CASE
+                        WHEN UPPER(COALESCE(d.status_despesa, '')) = 'PAGA' THEN 'PAGA'
+                        WHEN d.vencimento IS NOT NULL AND d.vencimento < CURRENT_DATE THEN 'VENCIDA'
+                        WHEN d.vencimento IS NOT NULL AND d.vencimento <= CURRENT_DATE + INTERVAL '7 day' THEN 'A VENCER'
+                        ELSE 'NO PRAZO'
+                    END AS situacao_vencimento
+
+                FROM financeiro2_despesas d
+                WHERE {' AND '.join(filtros)}
+                ORDER BY d.data_documento DESC, d.id DESC
+            """), params).mappings().all()
+
+        total_registros = len(despesas)
+        total_valor = sum(float(item["valor"] or 0) for item in despesas)
 
     return render_template(
         "financeiro_dois/despesas.html",
         subnav_links=build_financeiro_dois_subnav("despesas"),
         despesas=despesas,
+        mostrar_resultados=tem_filtro,
+        total_registros=total_registros,
+        total_valor=total_valor,
         filtros={
             "busca": request.args.get("busca", ""),
             "status_despesa": request.args.get("status_despesa", "TODOS"),

@@ -92,99 +92,143 @@
       </div>
 
       <div class="form-actions-top">
-        <button type="submit" class="btn btn-primary">Filtrar</button>
+        <button type="submit" class="btn btn-primary">Aplicar filtros</button>
         <a class="btn" href="{{ url_for('financeiro_dois.despesas') }}">Limpar</a>
       </div>
     </form>
+  </section>
 
-    <div class="table-wrap">
-      <table class="table">
-        <thead>
-          <tr>
-            <th>DATA</th>
-            <th>VENCIMENTO</th>
-            <th>TIPO</th>
-            <th>Nº DESPESA</th>
-            <th>Nº DOC.</th>
-            <th>FORNECEDOR</th>
-            <th>DESCRIÇÃO</th>
-            <th>CC</th>
-            <th>ND</th>
-            <th>STATUS DESPESA</th>
-            <th>STATUS ND</th>
-            <th>ORIGEM</th>
-            <th>SITUAÇÃO</th>
-            <th style="text-align:right;">VALOR</th>
-            <th style="width:170px;">AÇÕES</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for item in despesas %}
-          <tr>
-            <td>{{ item.data }}</td>
-            <td>{{ item.vencimento or '—' }}</td>
-            <td>{{ item.tipo_documento }}</td>
-            <td><strong>{{ item.numero_despesa }}</strong></td>
-            <td>{{ item.numero_documento }}</td>
-            <td>{{ item.fornecedor }}</td>
-            <td>{{ item.descricao }}</td>
-            <td>{{ item.centro_custo or '—' }}</td>
-            <td>{{ item.nd_numero or '—' }}</td>
-            <td>
-              {% if item.status_despesa == 'PAGA' %}
-                <span class="badge badge-green">PAGA</span>
-              {% elif item.status_despesa == 'PARCIAL' %}
-                <span class="badge badge-yellow">PARCIAL</span>
-              {% elif item.status_despesa == 'CANCELADA' %}
-                <span class="badge badge-gray">CANCELADA</span>
-              {% else %}
-                <span class="badge badge-blue">PENDENTE</span>
-              {% endif %}
-            </td>
-            <td>
-              {% if item.status_nd == 'VINCULADA' %}
-                <span class="badge badge-green">VINCULADA</span>
-              {% elif item.status_nd == 'REJEITADA' %}
-                <span class="badge badge-red">REJEITADA</span>
-              {% elif item.status_nd == 'EM ANÁLISE' %}
-                <span class="badge badge-yellow">EM ANÁLISE</span>
-              {% else %}
-                <span class="badge badge-blue">NÃO VINCULADA</span>
-              {% endif %}
-            </td>
-            <td>{{ item.origem }}</td>
-            <td>
-              {% if item.situacao_vencimento == 'VENCIDA' %}
-                <span class="badge badge-red">VENCIDA</span>
-              {% elif item.situacao_vencimento == 'A VENCER' %}
-                <span class="badge badge-yellow">A VENCER</span>
-              {% elif item.situacao_vencimento == 'PAGA' %}
-                <span class="badge badge-green">PAGA</span>
-              {% else %}
-                <span class="badge badge-gray">NO PRAZO</span>
-              {% endif %}
-            </td>
-            <td style="text-align:right;">R$ {{ '%.2f'|format(item.valor) }}</td>
-            <td>
-              <div class="table-actions">
-                <a class="btn btn-sm" href="{{ url_for('financeiro_dois.despesa_editar', despesa_id=item.id) }}">Editar</a>
-              </div>
-            </td>
-          </tr>
-          {% else %}
-          <tr>
-            <td colspan="15">Nenhuma despesa encontrada.</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+  <section class="zone">
+    <div class="zone-head">
+      <div class="zone-left">
+        <div class="zone-icon">📋</div>
+        <div>
+          <div class="zone-title">Resultados</div>
+          <div class="muted">
+            {% if mostrar_resultados %}
+              {{ total_registros }} registro(s) encontrado(s).
+            {% else %}
+              Aplique ao menos um filtro para exibir os registros.
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      {% if mostrar_resultados %}
+      <div class="zone-actions">
+        <span class="btn" style="opacity:.65; cursor:not-allowed;">Exportar Excel</span>
+        <span class="btn" style="opacity:.65; cursor:not-allowed;">Exportar PDF</span>
+      </div>
+      {% endif %}
     </div>
+
+    {% if mostrar_resultados %}
+      <div class="summary-bar">
+        <div class="summary-card">
+          <div class="summary-label">Registros</div>
+          <div class="summary-value">{{ total_registros }}</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">Valor total</div>
+          <div class="summary-value">R$ {{ '%.2f'|format(total_valor) }}</div>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>DATA</th>
+              <th>VENCIMENTO</th>
+              <th>TIPO</th>
+              <th>Nº DESPESA</th>
+              <th>Nº DOC.</th>
+              <th>FORNECEDOR</th>
+              <th>DESCRIÇÃO</th>
+              <th>CC</th>
+              <th>ND</th>
+              <th>STATUS DESPESA</th>
+              <th>STATUS ND</th>
+              <th>ORIGEM</th>
+              <th>SITUAÇÃO</th>
+              <th style="text-align:right;">VALOR</th>
+              <th style="width:170px;">AÇÕES</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in despesas %}
+            <tr>
+              <td>{{ item.data }}</td>
+              <td>{{ item.vencimento or '—' }}</td>
+              <td>{{ item.tipo_documento }}</td>
+              <td><strong>{{ item.numero_despesa }}</strong></td>
+              <td>{{ item.numero_documento }}</td>
+              <td>{{ item.fornecedor }}</td>
+              <td>{{ item.descricao }}</td>
+              <td>{{ item.centro_custo or '—' }}</td>
+              <td>{{ item.nd_numero or '—' }}</td>
+              <td>
+                {% if item.status_despesa == 'PAGA' %}
+                  <span class="badge badge-green">PAGA</span>
+                {% elif item.status_despesa == 'PARCIAL' %}
+                  <span class="badge badge-yellow">PARCIAL</span>
+                {% elif item.status_despesa == 'CANCELADA' %}
+                  <span class="badge badge-gray">CANCELADA</span>
+                {% else %}
+                  <span class="badge badge-blue">PENDENTE</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if item.status_nd == 'VINCULADA' %}
+                  <span class="badge badge-green">VINCULADA</span>
+                {% elif item.status_nd == 'REJEITADA' %}
+                  <span class="badge badge-red">REJEITADA</span>
+                {% elif item.status_nd == 'EM ANÁLISE' %}
+                  <span class="badge badge-yellow">EM ANÁLISE</span>
+                {% else %}
+                  <span class="badge badge-blue">NÃO VINCULADA</span>
+                {% endif %}
+              </td>
+              <td>{{ item.origem }}</td>
+              <td>
+                {% if item.situacao_vencimento == 'VENCIDA' %}
+                  <span class="badge badge-red">VENCIDA</span>
+                {% elif item.situacao_vencimento == 'A VENCER' %}
+                  <span class="badge badge-yellow">A VENCER</span>
+                {% elif item.situacao_vencimento == 'PAGA' %}
+                  <span class="badge badge-green">PAGA</span>
+                {% else %}
+                  <span class="badge badge-gray">NO PRAZO</span>
+                {% endif %}
+              </td>
+              <td style="text-align:right;">R$ {{ '%.2f'|format(item.valor) }}</td>
+              <td>
+                <div class="table-actions">
+                  <a class="btn btn-sm" href="{{ url_for('financeiro_dois.despesa_editar', despesa_id=item.id) }}">Editar</a>
+                </div>
+              </td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="15">Nenhum registro encontrado para os filtros informados.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="empty-state">
+        <div class="empty-icon">🔎</div>
+        <div class="empty-title">Nenhum resultado exibido</div>
+        <div class="empty-text">Use os filtros acima para consultar despesas específicas.</div>
+      </div>
+    {% endif %}
   </section>
 </div>
 
 <style>
 .filters-card{
-  margin-bottom:16px;
+  margin-top:4px;
   padding:16px;
   border:1px solid #d9e2ec;
   border-radius:18px;
@@ -237,6 +281,30 @@
   flex-wrap:wrap;
   margin-top:14px;
 }
+.summary-bar{
+  display:grid;
+  grid-template-columns:repeat(2, minmax(0, 1fr));
+  gap:12px;
+  margin-bottom:14px;
+}
+.summary-card{
+  background:#fff;
+  border:1px solid #d9e2ec;
+  border-radius:16px;
+  padding:14px 16px;
+}
+.summary-label{
+  font-size:12px;
+  font-weight:700;
+  color:#52667a;
+  text-transform:uppercase;
+}
+.summary-value{
+  margin-top:6px;
+  font-size:22px;
+  font-weight:800;
+  color:#0f2f4f;
+}
 .badge{
   display:inline-flex;
   align-items:center;
@@ -256,6 +324,28 @@
 .badge-blue{ background:#dbeafe; color:#1d4ed8; }
 .badge-gray{ background:#e5e7eb; color:#334155; }
 
+.empty-state{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  padding:36px 18px;
+  text-align:center;
+  color:#52667a;
+}
+.empty-icon{
+  font-size:28px;
+}
+.empty-title{
+  font-size:18px;
+  font-weight:800;
+  color:#0f2f4f;
+}
+.empty-text{
+  font-size:13px;
+}
+
 @media (max-width: 1200px){
   .filters-grid{
     grid-template-columns:repeat(3, minmax(0, 1fr));
@@ -265,6 +355,9 @@
   .filters-grid{
     grid-template-columns:repeat(2, minmax(0, 1fr));
   }
+  .summary-bar{
+    grid-template-columns:1fr;
+  }
 }
 @media (max-width: 560px){
   .filters-grid{
@@ -273,3 +366,8 @@
 }
 </style>
 {% endblock %}
+"""
+path = Path("/mnt/data/despesas_filtros_resultados.html")
+path.write_text(content, encoding="utf-8")
+print(path)
+【อ่านข้อความเต็มanalysis to=python_user_visible.exec code
