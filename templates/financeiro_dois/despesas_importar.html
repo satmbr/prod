@@ -9,7 +9,7 @@
         <div class="zone-icon">📥</div>
         <div>
           <div class="zone-title">Importar despesa</div>
-          <div class="muted">OMs e RDs ainda não importadas para Despesas.</div>
+          <div class="muted">OMs e RDs ainda não importadas ou aguardando liberação para importação.</div>
         </div>
       </div>
       <div class="zone-actions">
@@ -17,9 +17,70 @@
       </div>
     </div>
 
-    <div class="filters-card" style="margin-bottom:16px;">
-      <div class="muted">
-        OMs e RDs em aberto ou parcial aparecem para acompanhamento, mas só podem ser importadas quando estiverem com status <strong>PAGA</strong>.
+    <form method="get" action="{{ url_for('financeiro_dois.despesas_importar') }}" class="filters-card">
+      <div class="filters-grid">
+        <div class="field">
+          <label>Busca</label>
+          <input type="text" name="busca" class="input-like" placeholder="Número ou favorecido" value="{{ filtros.busca }}">
+        </div>
+
+        <div class="field">
+          <label>Tipo origem</label>
+          <select class="input-like" name="tipo_origem">
+            <option value="TODAS" {% if filtros.tipo_origem == 'TODAS' %}selected{% endif %}>TODAS</option>
+            <option value="OM" {% if filtros.tipo_origem == 'OM' %}selected{% endif %}>OM</option>
+            <option value="RD" {% if filtros.tipo_origem == 'RD' %}selected{% endif %}>RD</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label>Status origem</label>
+          <select class="input-like" name="status_origem">
+            <option value="TODOS" {% if filtros.status_origem == 'TODOS' %}selected{% endif %}>TODOS</option>
+            <option value="PAGA" {% if filtros.status_origem == 'PAGA' %}selected{% endif %}>PAGA</option>
+            <option value="PARCIAL" {% if filtros.status_origem == 'PARCIAL' %}selected{% endif %}>PARCIAL</option>
+            <option value="EM ABERTO" {% if filtros.status_origem == 'EM ABERTO' %}selected{% endif %}>EM ABERTO</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label>Situação importação</label>
+          <select class="input-like" name="situacao_importacao">
+            <option value="TODAS" {% if filtros.situacao_importacao == 'TODAS' %}selected{% endif %}>TODAS</option>
+            <option value="LIBERADAS" {% if filtros.situacao_importacao == 'LIBERADAS' %}selected{% endif %}>LIBERADAS</option>
+            <option value="BLOQUEADAS" {% if filtros.situacao_importacao == 'BLOQUEADAS' %}selected{% endif %}>BLOQUEADAS</option>
+            <option value="JA IMPORTADAS" {% if filtros.situacao_importacao == 'JA IMPORTADAS' %}selected{% endif %}>JÁ IMPORTADAS</option>
+            <option value="NAO IMPORTADAS" {% if filtros.situacao_importacao == 'NAO IMPORTADAS' %}selected{% endif %}>NÃO IMPORTADAS</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-actions-top">
+        <button type="submit" class="btn btn-primary">Aplicar filtros</button>
+        <a class="btn" href="{{ url_for('financeiro_dois.despesas_importar') }}">Limpar</a>
+      </div>
+    </form>
+
+    <div class="summary-bar">
+      <div class="summary-card">
+        <div class="summary-label">Registros</div>
+        <div class="summary-value">{{ total_registros }}</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-label">Liberadas</div>
+        <div class="summary-value">{{ total_liberadas }}</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-label">Bloqueadas</div>
+        <div class="summary-value">{{ total_bloqueadas }}</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-label">Já importadas</div>
+        <div class="summary-value">{{ total_importadas }}</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-label">Valor total</div>
+        <div class="summary-value">R$ {{ '%.2f'|format(total_valor) }}</div>
       </div>
     </div>
 
@@ -32,6 +93,7 @@
             <th>DATA</th>
             <th>FAVORECIDO</th>
             <th>STATUS ORIGEM</th>
+            <th>SITUAÇÃO</th>
             <th>JÁ IMPORTADA</th>
             <th style="text-align:right;">VALOR TOTAL</th>
             <th style="width:180px;">AÇÃO</th>
@@ -39,25 +101,34 @@
         </thead>
         <tbody>
           {% for item in itens %}
-          <tr {% if item.status_origem != 'PAGA' %}style="background:#fff7ed;"{% endif %}>
+          <tr>
             <td>{{ item.origem_tipo }}</td>
             <td><strong>{{ item.numero_origem }}</strong></td>
             <td>{{ item.data_origem }}</td>
             <td>{{ item.favorecido or '—' }}</td>
             <td>
               {% if item.status_origem == 'PAGA' %}
-                <span style="color:#166534;font-weight:700;">PAGA</span>
+                <span class="badge badge-green">PAGA</span>
               {% elif item.status_origem == 'PARCIAL' %}
-                <span style="color:#b45309;font-weight:700;">PARCIAL</span>
+                <span class="badge badge-yellow">PARCIAL</span>
               {% else %}
-                <span style="color:#334155;font-weight:700;">{{ item.status_origem }}</span>
+                <span class="badge badge-blue">{{ item.status_origem }}</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if item.pode_importar %}
+                <span class="badge badge-green">LIBERADA</span>
+              {% elif item.ja_importada %}
+                <span class="badge badge-gray">FINALIZADA</span>
+              {% else %}
+                <span class="badge badge-red">BLOQUEADA</span>
               {% endif %}
             </td>
             <td>
               {% if item.ja_importada %}
-                <span style="color:#166534;font-weight:700;">SIM</span>
+                <span class="badge badge-green">SIM</span>
               {% else %}
-                <span style="color:#334155;font-weight:700;">NÃO</span>
+                <span class="badge badge-gray">NÃO</span>
               {% endif %}
             </td>
             <td style="text-align:right;">R$ {{ '%.2f'|format(item.valor_total) }}</td>
@@ -75,7 +146,7 @@
           </tr>
           {% else %}
           <tr>
-            <td colspan="8">Nenhuma OM ou RD disponível para importação.</td>
+            <td colspan="9">Nenhuma OM ou RD encontrada com os filtros informados.</td>
           </tr>
           {% endfor %}
         </tbody>
@@ -83,4 +154,105 @@
     </div>
   </section>
 </div>
+
+<style>
+.filters-card{
+  margin-bottom:16px;
+  padding:16px;
+  border:1px solid #d9e2ec;
+  border-radius:18px;
+  background:#fff;
+}
+.filters-grid{
+  display:grid;
+  grid-template-columns:repeat(4, minmax(0, 1fr));
+  gap:14px;
+}
+.field{
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+}
+.field label{
+  font-weight:700;
+  font-size:13px;
+  color:#0f2f4f;
+  text-transform:uppercase;
+}
+.input-like{
+  width:100%;
+  min-height:42px;
+  padding:10px 14px;
+  border:1px solid #c7d2e0;
+  border-radius:14px;
+  background:#fff;
+  font-size:13px;
+  color:#243b53;
+  text-transform:uppercase;
+}
+.form-actions-top{
+  display:flex;
+  gap:8px;
+  align-items:center;
+  flex-wrap:wrap;
+  margin-top:14px;
+}
+.summary-bar{
+  display:grid;
+  grid-template-columns:repeat(5, minmax(0, 1fr));
+  gap:12px;
+  margin-bottom:14px;
+}
+.summary-card{
+  background:#fff;
+  border:1px solid #d9e2ec;
+  border-radius:16px;
+  padding:14px 16px;
+}
+.summary-label{
+  font-size:12px;
+  font-weight:700;
+  color:#52667a;
+  text-transform:uppercase;
+}
+.summary-value{
+  margin-top:6px;
+  font-size:22px;
+  font-weight:800;
+  color:#0f2f4f;
+}
+.badge{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-height:28px;
+  padding:4px 10px;
+  border-radius:999px;
+  font-size:12px;
+  font-weight:800;
+  letter-spacing:.02em;
+  text-transform:uppercase;
+  white-space:nowrap;
+}
+.badge-green{ background:#dcfce7; color:#166534; }
+.badge-yellow{ background:#fef3c7; color:#b45309; }
+.badge-red{ background:#fee2e2; color:#b91c1c; }
+.badge-blue{ background:#dbeafe; color:#1d4ed8; }
+.badge-gray{ background:#e5e7eb; color:#334155; }
+
+@media (max-width: 1200px){
+  .filters-grid{
+    grid-template-columns:repeat(2, minmax(0, 1fr));
+  }
+  .summary-bar{
+    grid-template-columns:repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 640px){
+  .filters-grid,
+  .summary-bar{
+    grid-template-columns:1fr;
+  }
+}
+</style>
 {% endblock %}

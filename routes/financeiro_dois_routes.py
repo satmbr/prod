@@ -3682,6 +3682,11 @@ def despesa_salvar(despesa_id: int):
 @login_required
 @permission_required("financeiro", "visualizar")
 def despesas_importar():
+    busca = _nome_preenchido(request.args.get("busca")).upper()
+    tipo_origem = _nome_preenchido(request.args.get("tipo_origem")).upper() or "TODAS"
+    status_origem = _nome_preenchido(request.args.get("status_origem")).upper() or "TODOS"
+    situacao_importacao = _nome_preenchido(request.args.get("situacao_importacao")).upper() or "TODAS"
+
     engine = get_engine()
 
     with engine.connect() as conn:
@@ -3692,8 +3697,10 @@ def despesas_importar():
                 UPPER(COALESCE(om.numero_om, '')) AS numero_origem,
                 TO_CHAR(om.criado_em, 'DD/MM/YYYY') AS data_origem,
                 UPPER(COALESCE(om.nome_colaborador, '')) AS favorecido,
-                UPPER(COALESCE(om.status, '')) AS status_origem,
-
+                CASE
+                    WHEN UPPER(COALESCE(om.status, '')) = 'QUITADA' THEN 'PAGA'
+                    ELSE UPPER(COALESCE(om.status, ''))
+                END AS status_origem,
                 COALESCE((
                     SELECT SUM(
                         CASE
@@ -3705,7 +3712,6 @@ def despesas_importar():
                     WHERE l.om_id = om.id
                       AND COALESCE(l.status, 'Ativo') = 'Ativo'
                 ), 0) AS valor_total,
-
                 CASE
                     WHEN EXISTS (
                         SELECT 1
@@ -3729,7 +3735,6 @@ def despesas_importar():
                     WHEN UPPER(COALESCE(rd.status, '')) = 'QUITADA' THEN 'PAGA'
                     ELSE UPPER(COALESCE(rd.status, ''))
                 END AS status_origem,
-
                 COALESCE((
                     SELECT SUM(
                         CASE
@@ -3741,7 +3746,6 @@ def despesas_importar():
                     WHERE l.rd_id = rd.id
                       AND COALESCE(l.status, 'Ativo') = 'Ativo'
                 ), 0) AS valor_total,
-
                 CASE
                     WHEN EXISTS (
                         SELECT 1
@@ -3757,15 +3761,63 @@ def despesas_importar():
     itens = []
     for item in list(oms) + list(rds):
         item = dict(item)
+
+        status = item["status_origem"] or ""
+        if status in ("ABERTA", "ABERTO"):
+            status = "EM ABERTO"
+        item["status_origem"] = status
+
         item["pode_importar"] = item["status_origem"] == "PAGA" and not bool(item["ja_importada"])
+
+        if busca:
+            alvo = " ".join([
+                str(item["numero_origem"] or ""),
+                str(item["favorecido"] or ""),
+                str(item["origem_tipo"] or "")
+            ]).upper()
+            if busca not in alvo:
+                continue
+
+        if tipo_origem != "TODAS" and item["origem_tipo"] != tipo_origem:
+            continue
+
+        if status_origem != "TODOS" and item["status_origem"] != status_origem:
+            continue
+
+        if situacao_importacao == "LIBERADAS" and not item["pode_importar"]:
+            continue
+        if situacao_importacao == "BLOQUEADAS" and item["pode_importar"]:
+            continue
+        if situacao_importacao == "JA IMPORTADAS" and not bool(item["ja_importada"]):
+            continue
+        if situacao_importacao == "NAO IMPORTADAS" and bool(item["ja_importada"]):
+            continue
+
         itens.append(item)
 
     itens.sort(key=lambda x: (x["origem_tipo"], x["numero_origem"]), reverse=True)
+
+    total_registros = len(itens)
+    total_liberadas = sum(1 for i in itens if i["pode_importar"])
+    total_bloqueadas = sum(1 for i in itens if not i["pode_importar"] and not i["ja_importada"])
+    total_importadas = sum(1 for i in itens if i["ja_importada"])
+    total_valor = sum(float(i["valor_total"] or 0) for i in itens)
 
     return render_template(
         "financeiro_dois/despesas_importar.html",
         subnav_links=build_financeiro_dois_subnav("despesas"),
         itens=itens,
+        total_registros=total_registros,
+        total_liberadas=total_liberadas,
+        total_bloqueadas=total_bloqueadas,
+        total_importadas=total_importadas,
+        total_valor=total_valor,
+        filtros={
+            "busca": request.args.get("busca", ""),
+            "tipo_origem": tipo_origem,
+            "status_origem": status_origem,
+            "situacao_importacao": situacao_importacao,
+        }
     )
     
 @bp.route("/despesas/importar/<string:origem_tipo>/<int:origem_id>", methods=["POST"])
