@@ -114,13 +114,13 @@
             </select>
           </div>
 
-			<div class="field" style="margin-top:14px;">
-			  <label>Descrição</label>
-			  <textarea class="input-like textarea-like" name="descricao" {% if despesa.eh_importada %}disabled{% endif %} required>{{ despesa.descricao }}</textarea>
-			  {% if despesa.eh_importada %}
-				<input type="hidden" name="descricao" value="{{ despesa.descricao }}">
-			  {% endif %}
-			</div>
+          <div class="field">
+            <label>Valor</label>
+            <input class="input-like" type="text" name="valor" value="{{ despesa.valor or '' }}" {% if despesa.eh_importada %}disabled{% endif %} required>
+            {% if despesa.eh_importada %}
+              <input type="hidden" name="valor" value="{{ despesa.valor }}">
+            {% endif %}
+          </div>
 
           <div class="field">
             <label>Status despesa</label>
@@ -153,7 +153,7 @@
 
         <div class="field" style="margin-top:14px;">
           <label>Descrição</label>
-          <textarea class="input-like textarea-like" name="descricao" {% if despesa.eh_importada %}disabled{% endif %}>{{ despesa.descricao }}</textarea>
+          <textarea class="input-like textarea-like" name="descricao" {% if despesa.eh_importada %}disabled{% endif %} required>{{ despesa.descricao }}</textarea>
           {% if despesa.eh_importada %}
             <input type="hidden" name="descricao" value="{{ despesa.descricao }}">
           {% endif %}
@@ -186,14 +186,14 @@
           <div class="resume-row"><span>Status despesa</span><strong>{{ despesa.status_despesa }}</strong></div>
           <div class="resume-row"><span>Status ND</span><strong>{{ despesa.status_nd }}</strong></div>
           <div class="resume-row"><span>Vencimento</span><strong>{{ despesa.vencimento or '—' }}</strong></div>
-          <div class="resume-row total"><span>Valor</span><strong>R$ {{ '%.2f'|format(despesa.valor) }}</strong></div>
+          <div class="resume-row total"><span>Valor</span><strong>R$ {{ '%.2f'|format(despesa.valor|float if despesa.valor else 0) }}</strong></div>
         </div>
 
         {% if not despesa.eh_nova %}
         <div class="resume-card">
           <div class="resume-title">Pagamento</div>
           <div class="resume-row"><span>Data pagamento</span><strong>{{ despesa.data_pagamento_form or '—' }}</strong></div>
-          <div class="resume-row"><span>Valor pago</span><strong>R$ {{ '%.2f'|format(despesa.valor_pago) }}</strong></div>
+          <div class="resume-row"><span>Valor pago</span><strong>R$ {{ '%.2f'|format(despesa.valor_pago|float if despesa.valor_pago else 0) }}</strong></div>
           <div class="resume-row"><span>Observação</span><strong>{{ despesa.observacao_pagamento or '—' }}</strong></div>
 
           {% if not despesa.eh_importada %}
@@ -270,169 +270,35 @@
 </div>
 
 <style>
-.page-wrap{
-  display:flex;
-  flex-direction:column;
-  gap:16px;
-}
-.page-head{
-  display:flex;
-  justify-content:space-between;
-  align-items:flex-start;
-  gap:16px;
-  flex-wrap:wrap;
-}
-.page-head-left{
-  display:flex;
-  gap:14px;
-  align-items:center;
-}
-.page-icon{
-  width:46px;
-  height:46px;
-  border-radius:14px;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  background:#e2e8f0;
-  font-size:22px;
-}
-.page-title{
-  margin:0;
-  font-size:18px;
-  font-weight:800;
-}
-.page-subtitle{
-  color:#334155;
-  font-size:13px;
-  margin-top:2px;
-}
-.page-actions{
-  display:flex;
-  gap:8px;
-  align-items:center;
-  flex-wrap:wrap;
-}
-.content-grid{
-  display:grid;
-  grid-template-columns:minmax(0, 2fr) minmax(320px, 1fr);
-  gap:16px;
-}
-.main-card,
-.resume-card{
-  background:#fff;
-  border:1px solid #d9e2ec;
-  border-radius:20px;
-  padding:18px;
-}
-.card-title,
-.resume-title{
-  font-size:18px;
-  font-weight:800;
-  margin-bottom:14px;
-  color:#0f2f4f;
-}
-.form-grid{
-  display:grid;
-  gap:14px;
-}
-.form-grid.four{
-  grid-template-columns:repeat(4, minmax(0, 1fr));
-}
-.field{
-  display:flex;
-  flex-direction:column;
-  gap:6px;
-}
-.field label{
-  font-weight:700;
-  font-size:13px;
-  color:#0f2f4f;
-  text-transform:uppercase;
-}
-.input-like{
-  width:100%;
-  min-height:42px;
-  padding:10px 14px;
-  border:1px solid #c7d2e0;
-  border-radius:14px;
-  background:#fff;
-  font-size:13px;
-  color:#243b53;
-  text-transform:uppercase;
-}
-.textarea-like{
-  min-height:88px;
-  resize:vertical;
-}
-.textarea-like.small{
-  min-height:74px;
-}
-.textarea-like.medium{
-  min-height:96px;
-}
-.file-like{
-  padding:8px 12px;
-}
-.side-column{
-  display:flex;
-  flex-direction:column;
-  gap:16px;
-}
-.resume-row{
-  display:flex;
-  justify-content:space-between;
-  gap:12px;
-  padding:10px 0;
-  border-bottom:1px solid #e5edf5;
-  text-transform:uppercase;
-}
-.resume-row:last-child{
-  border-bottom:none;
-}
-.resume-row.total{
-  font-weight:800;
-  font-size:18px;
-}
-.anexo-list{
-  display:flex;
-  flex-direction:column;
-  gap:8px;
-}
-.anexo-item{
-  display:flex;
-  align-items:center;
-  gap:8px;
-  padding:10px 12px;
-  border:1px solid #d9e2ec;
-  border-radius:12px;
-  text-decoration:none;
-  color:#0f2f4f;
-  background:#f8fbff;
-}
-.muted{
-  color:#52667a;
-  font-size:13px;
-}
-.btn-block{
-  width:100%;
-  justify-content:center;
-}
-
-@media (max-width: 1100px){
-  .content-grid{
-    grid-template-columns:1fr;
-  }
-}
-@media (max-width: 900px){
-  .form-grid.four{
-    grid-template-columns:repeat(2, minmax(0, 1fr));
-  }
-}
-@media (max-width: 640px){
-  .form-grid.four{
-    grid-template-columns:1fr;
-  }
-}
+.page-wrap{display:flex;flex-direction:column;gap:16px;}
+.page-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;}
+.page-head-left{display:flex;gap:14px;align-items:center;}
+.page-icon{width:46px;height:46px;border-radius:14px;display:flex;align-items:center;justify-content:center;background:#e2e8f0;font-size:22px;}
+.page-title{margin:0;font-size:18px;font-weight:800;}
+.page-subtitle{color:#334155;font-size:13px;margin-top:2px;}
+.page-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.content-grid{display:grid;grid-template-columns:minmax(0, 2fr) minmax(320px, 1fr);gap:16px;}
+.main-card,.resume-card{background:#fff;border:1px solid #d9e2ec;border-radius:20px;padding:18px;}
+.card-title,.resume-title{font-size:18px;font-weight:800;margin-bottom:14px;color:#0f2f4f;}
+.form-grid{display:grid;gap:14px;}
+.form-grid.four{grid-template-columns:repeat(4, minmax(0, 1fr));}
+.field{display:flex;flex-direction:column;gap:6px;}
+.field label{font-weight:700;font-size:13px;color:#0f2f4f;text-transform:uppercase;}
+.input-like{width:100%;min-height:42px;padding:10px 14px;border:1px solid #c7d2e0;border-radius:14px;background:#fff;font-size:13px;color:#243b53;text-transform:uppercase;}
+.textarea-like{min-height:88px;resize:vertical;}
+.textarea-like.small{min-height:74px;}
+.textarea-like.medium{min-height:96px;}
+.file-like{padding:8px 12px;}
+.side-column{display:flex;flex-direction:column;gap:16px;}
+.resume-row{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid #e5edf5;text-transform:uppercase;}
+.resume-row:last-child{border-bottom:none;}
+.resume-row.total{font-weight:800;font-size:18px;}
+.anexo-list{display:flex;flex-direction:column;gap:8px;}
+.anexo-item{display:flex;align-items:center;gap:8px;padding:10px 12px;border:1px solid #d9e2ec;border-radius:12px;text-decoration:none;color:#0f2f4f;background:#f8fbff;}
+.muted{color:#52667a;font-size:13px;}
+.btn-block{width:100%;justify-content:center;}
+@media (max-width: 1100px){.content-grid{grid-template-columns:1fr;}}
+@media (max-width: 900px){.form-grid.four{grid-template-columns:repeat(2, minmax(0, 1fr));}}
+@media (max-width: 640px){.form-grid.four{grid-template-columns:1fr;}}
 </style>
 {% endblock %}
