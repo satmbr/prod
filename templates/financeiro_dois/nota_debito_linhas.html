@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Linhas da origem | {{ nd.numero_nd }}{% endblock %}
+
+{% block content %}
+<div class="page-wrap">
+  <section class="zone">
+    <div class="zone-head">
+      <div class="zone-left">
+        <div class="zone-icon">🧩</div>
+        <div>
+          <div class="zone-title">Linhas da origem — {{ despesa.numero_despesa }}</div>
+          <div class="muted">Selecione as linhas que entram na ND ou que serão desconsideradas.</div>
+        </div>
+      </div>
+      <div class="zone-actions">
+        <a class="btn" href="{{ url_for('financeiro_dois.nota_debito_despesas', nd_id=nd.id) }}">Voltar</a>
+      </div>
+    </div>
+
+    <form method="post" action="{{ url_for('financeiro_dois.nota_debito_salvar_linhas', nd_id=nd.id, despesa_id=despesa.id) }}">
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>DATA</th>
+              <th>REF.</th>
+              <th>DESCRIÇÃO</th>
+              <th>CATEGORIA</th>
+              <th>APLICAÇÃO</th>
+              <th style="text-align:right;">VALOR</th>
+              <th>Nº ND ATUAL</th>
+              <th>DESCONSIDERADA</th>
+              <th>VINCULAR</th>
+              <th>DESCONSIDERAR</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for linha in linhas %}
+            <tr>
+              <td>{{ linha.data }}</td>
+              <td>{{ linha.referencia }}</td>
+              <td>{{ linha.descricao }}</td>
+              <td>{{ linha.categoria }}</td>
+              <td>{{ linha.aplicacao }}</td>
+              <td style="text-align:right;">R$ {{ '%.2f'|format(linha.valor) }}</td>
+              <td>{{ linha.numero_nd or '—' }}</td>
+              <td>{{ 'SIM' if linha.desconsiderada_nd else 'NÃO' }}</td>
+
+              {% if linha.numero_nd or linha.desconsiderada_nd %}
+                <td><span class="btn btn-sm" style="opacity:.65;cursor:not-allowed;">Bloqueada</span></td>
+                <td><span class="btn btn-sm" style="opacity:.65;cursor:not-allowed;">Bloqueada</span></td>
+              {% else %}
+                <td style="text-align:center;">
+                  <input type="checkbox" name="vincular_ids" value="{{ linha.id }}">
+                </td>
+                <td style="text-align:center;">
+                  <input type="checkbox" name="desconsiderar_ids" value="{{ linha.id }}">
+                </td>
+              {% endif %}
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="10">Nenhuma linha elegível encontrada.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="form-actions-top" style="margin-top:14px;">
+        <button type="submit" class="btn btn-primary">Salvar seleção</button>
+      </div>
+    </form>
+  </section>
+</div>
+{% endblock %}

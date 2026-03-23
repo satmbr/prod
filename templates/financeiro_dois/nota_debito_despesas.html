@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Despesas elegíveis | {{ nd.numero_nd }}{% endblock %}
+
+{% block content %}
+<div class="page-wrap">
+  <section class="zone">
+    <div class="zone-head">
+      <div class="zone-left">
+        <div class="zone-icon">📂</div>
+        <div>
+          <div class="zone-title">Despesas elegíveis para a ND {{ nd.numero_nd }}</div>
+          <div class="muted">Selecione uma despesa importada para trabalhar as linhas da origem.</div>
+        </div>
+      </div>
+      <div class="zone-actions">
+        <a class="btn" href="{{ url_for('financeiro_dois.nota_debito_editar', nd_id=nd.id) }}">Voltar</a>
+      </div>
+    </div>
+
+    <form method="get" action="{{ url_for('financeiro_dois.nota_debito_despesas', nd_id=nd.id) }}" class="filters-card">
+      <div class="filters-grid">
+        <div class="field">
+          <label>Busca</label>
+          <input type="text" name="busca" class="input-like" value="{{ filtros.busca }}">
+        </div>
+        <div class="field">
+          <label>Origem</label>
+          <select class="input-like" name="origem">
+            <option value="TODAS" {% if filtros.origem == 'TODAS' %}selected{% endif %}>TODAS</option>
+            <option value="OM" {% if filtros.origem == 'OM' %}selected{% endif %}>OM</option>
+            <option value="RD" {% if filtros.origem == 'RD' %}selected{% endif %}>RD</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Status ND</label>
+          <select class="input-like" name="status_nd">
+            <option value="TODOS" {% if filtros.status_nd == 'TODOS' %}selected{% endif %}>TODOS</option>
+            <option value="NÃO VINCULADA" {% if filtros.status_nd == 'NÃO VINCULADA' %}selected{% endif %}>NÃO VINCULADA</option>
+            <option value="PARCIAL" {% if filtros.status_nd == 'PARCIAL' %}selected{% endif %}>PARCIAL</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-actions-top">
+        <button type="submit" class="btn btn-primary">Filtrar</button>
+        <a class="btn" href="{{ url_for('financeiro_dois.nota_debito_despesas', nd_id=nd.id) }}">Limpar</a>
+      </div>
+    </form>
+
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Nº DESPESA</th>
+            <th>ORIGEM</th>
+            <th>Nº ORIGEM</th>
+            <th>FORNECEDOR</th>
+            <th>DESCRIÇÃO</th>
+            <th>STATUS ND</th>
+            <th style="text-align:right;">VALOR</th>
+            <th style="width:180px;">AÇÃO</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in despesas %}
+          <tr>
+            <td><strong>{{ item.numero_despesa }}</strong></td>
+            <td>{{ item.origem }}</td>
+            <td>{{ item.numero_origem }}</td>
+            <td>{{ item.fornecedor }}</td>
+            <td>{{ item.descricao }}</td>
+            <td>{{ item.status_nd }}</td>
+            <td style="text-align:right;">R$ {{ '%.2f'|format(item.valor) }}</td>
+            <td>
+              <a class="btn btn-sm btn-primary" href="{{ url_for('financeiro_dois.nota_debito_origem_linhas', nd_id=nd.id, despesa_id=item.id) }}">
+                Selecionar linhas
+              </a>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="8">Nenhuma despesa elegível encontrada.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+{% endblock %}

@@ -21,6 +21,9 @@
     <div class="page-actions">
       <a class="btn" href="{{ url_for('financeiro_dois.notas_debito') }}">Voltar</a>
       <button type="submit" form="form-nd" class="btn btn-primary">Salvar alterações</button>
+	  {% if not nd.eh_nova %}
+	    <a class="btn" href="{{ url_for('financeiro_dois.nota_debito_despesas', nd_id=nd.id) }}">Selecionar despesas</a>
+	  {% endif %}
     </div>
   </div>
 

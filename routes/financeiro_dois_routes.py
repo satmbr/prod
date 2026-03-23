@@ -5342,3 +5342,316 @@ def nota_debito_salvar(nd_id: int):
 
     flash("ND SALVA COM SUCESSO.", "success")
     return redirect(url_for("financeiro_dois.nota_debito_editar", nd_id=nd_id))
+    
+@bp.route("/notas-debito/<int:nd_id>/despesas")
+@login_required
+@permission_required("financeiro", "visualizar")
+def nota_debito_despesas(nd_id: int):
+    busca = _nome_preenchido(request.args.get("busca")).upper()
+    origem = _nome_preenchido(request.args.get("origem")).upper() or "TODAS"
+    status_nd = _nome_preenchido(request.args.get("status_nd")).upper() or "TODOS"
+
+    engine = get_engine()
+    with engine.connect() as conn:
+        nd = conn.execute(text("""
+            SELECT
+                id,
+                UPPER(COALESCE(numero_nd, '')) AS numero_nd,
+                TO_CHAR(data_nd, 'DD/MM/YYYY') AS data_nd,
+                UPPER(COALESCE(empresa_nd, '')) AS empresa_nd,
+                UPPER(COALESCE(status, '')) AS status
+            FROM financeiro2_notas_debito
+            WHERE id = :id
+        """), {"id": nd_id}).mappings().first()
+
+        if not nd:
+            abort(404)
+
+        filtros = [
+            "UPPER(COALESCE(d.origem_tipo, '')) IN ('OM', 'RD')",
+            "UPPER(COALESCE(d.status_nd, '')) IN ('NÃO VINCULADA', 'PARCIAL')"
+        ]
+        params = {}
+
+        if busca:
+            filtros.append("""
+                (
+                    UPPER(COALESCE(d.numero_despesa, '')) LIKE :busca
+                    OR UPPER(COALESCE(d.numero_documento, '')) LIKE :busca
+                    OR UPPER(COALESCE(d.fornecedor, '')) LIKE :busca
+                    OR UPPER(COALESCE(d.descricao, '')) LIKE :busca
+                )
+            """)
+            params["busca"] = f"%{busca}%"
+
+        if origem != "TODAS":
+            filtros.append("UPPER(COALESCE(d.origem_tipo, '')) = :origem")
+            params["origem"] = origem
+
+        if status_nd != "TODOS":
+            filtros.append("UPPER(COALESCE(d.status_nd, '')) = :status_nd")
+            params["status_nd"] = status_nd
+
+        despesas = conn.execute(text(f"""
+            SELECT
+                d.id,
+                UPPER(COALESCE(d.numero_despesa, '')) AS numero_despesa,
+                UPPER(COALESCE(d.origem_tipo, '')) AS origem,
+                d.origem_id,
+                CASE
+                    WHEN d.origem_tipo = 'OM' THEN (
+                        SELECT UPPER(COALESCE(om.numero_om, ''))
+                        FROM financeiro2_om om
+                        WHERE om.id = d.origem_id
+                    )
+                    WHEN d.origem_tipo = 'RD' THEN (
+                        SELECT UPPER(COALESCE(rd.numero_rd, ''))
+                        FROM financeiro2_rd rd
+                        WHERE rd.id = d.origem_id
+                    )
+                    ELSE ''
+                END AS numero_origem,
+                UPPER(COALESCE(d.fornecedor, '')) AS fornecedor,
+                UPPER(COALESCE(d.descricao, '')) AS descricao,
+                UPPER(COALESCE(d.status_nd, '')) AS status_nd,
+                CASE
+                    WHEN UPPER(COALESCE(d.origem_tipo, '')) = 'OM' THEN COALESCE((
+                        SELECT SUM(CASE WHEN COALESCE(l.valor_brl, 0) > 0 THEN COALESCE(l.valor_brl, 0) ELSE 0 END)
+                        FROM financeiro2_om_linhas l
+                        WHERE l.om_id = d.origem_id
+                          AND COALESCE(l.status, 'Ativo') = 'Ativo'
+                    ), 0)
+                    WHEN UPPER(COALESCE(d.origem_tipo, '')) = 'RD' THEN COALESCE((
+                        SELECT SUM(CASE WHEN COALESCE(l.valor, 0) > 0 THEN COALESCE(l.valor, 0) ELSE 0 END)
+                        FROM financeiro2_rd_linhas l
+                        WHERE l.rd_id = d.origem_id
+                          AND COALESCE(l.status, 'Ativo') = 'Ativo'
+                    ), 0)
+                    ELSE COALESCE(d.valor, 0)
+                END AS valor
+            FROM financeiro2_despesas d
+            WHERE {' AND '.join(filtros)}
+            ORDER BY d.id DESC
+        """), params).mappings().all()
+
+    return render_template(
+        "financeiro_dois/nota_debito_despesas.html",
+        subnav_links=build_financeiro_dois_subnav("notas_debito"),
+        nd=nd,
+        despesas=despesas,
+        filtros={
+            "busca": request.args.get("busca", ""),
+            "origem": origem,
+            "status_nd": status_nd,
+        }
+    )
+    
+@bp.route("/notas-debito/<int:nd_id>/despesas/<int:despesa_id>/linhas")
+@login_required
+@permission_required("financeiro", "visualizar")
+def nota_debito_origem_linhas(nd_id: int, despesa_id: int):
+    engine = get_engine()
+
+    with engine.connect() as conn:
+        nd = conn.execute(text("""
+            SELECT
+                id,
+                UPPER(COALESCE(numero_nd, '')) AS numero_nd,
+                TO_CHAR(data_nd, 'DD/MM/YYYY') AS data_nd,
+                UPPER(COALESCE(empresa_nd, '')) AS empresa_nd,
+                UPPER(COALESCE(status, '')) AS status
+            FROM financeiro2_notas_debito
+            WHERE id = :id
+        """), {"id": nd_id}).mappings().first()
+
+        if not nd:
+            abort(404)
+
+        despesa = conn.execute(text("""
+            SELECT
+                id,
+                UPPER(COALESCE(numero_despesa, '')) AS numero_despesa,
+                UPPER(COALESCE(origem_tipo, '')) AS origem,
+                origem_id,
+                UPPER(COALESCE(status_nd, '')) AS status_nd
+            FROM financeiro2_despesas
+            WHERE id = :id
+        """), {"id": despesa_id}).mappings().first()
+
+        if not despesa:
+            abort(404)
+
+        if despesa["origem"] == "OM":
+            linhas = conn.execute(text("""
+                SELECT
+                    id,
+                    TO_CHAR(data_lancamento, 'DD/MM/YYYY') AS data,
+                    COALESCE(recibo, id) AS referencia,
+                    UPPER(COALESCE(tipo_linha, '')) AS descricao,
+                    UPPER(COALESCE(categoria, '')) AS categoria,
+                    UPPER(COALESCE(aplicacao, '')) AS aplicacao,
+                    COALESCE(valor_brl, 0) AS valor,
+                    UPPER(COALESCE(numero_nd, '')) AS numero_nd,
+                    COALESCE(desconsiderada_nd, FALSE) AS desconsiderada_nd
+                FROM financeiro2_om_linhas
+                WHERE om_id = :origem_id
+                  AND COALESCE(status, 'Ativo') = 'Ativo'
+                  AND COALESCE(valor_brl, 0) > 0
+                ORDER BY id
+            """), {"origem_id": despesa["origem_id"]}).mappings().all()
+        else:
+            linhas = conn.execute(text("""
+                SELECT
+                    id,
+                    TO_CHAR(data_lancamento, 'DD/MM/YYYY') AS data,
+                    id AS referencia,
+                    UPPER(COALESCE(descricao, '')) AS descricao,
+                    UPPER(COALESCE(categoria, '')) AS categoria,
+                    UPPER(COALESCE(aplicacao, '')) AS aplicacao,
+                    COALESCE(valor, 0) AS valor,
+                    UPPER(COALESCE(numero_nd, '')) AS numero_nd,
+                    COALESCE(desconsiderada_nd, FALSE) AS desconsiderada_nd
+                FROM financeiro2_rd_linhas
+                WHERE rd_id = :origem_id
+                  AND COALESCE(status, 'Ativo') = 'Ativo'
+                  AND COALESCE(valor, 0) > 0
+                ORDER BY id
+            """), {"origem_id": despesa["origem_id"]}).mappings().all()
+
+    return render_template(
+        "financeiro_dois/nota_debito_linhas.html",
+        subnav_links=build_financeiro_dois_subnav("notas_debito"),
+        nd=nd,
+        despesa=despesa,
+        linhas=linhas,
+    )
+    
+@bp.route("/notas-debito/<int:nd_id>/despesas/<int:despesa_id>/linhas/salvar", methods=["POST"])
+@login_required
+@permission_required("financeiro", "visualizar")
+def nota_debito_salvar_linhas(nd_id: int, despesa_id: int):
+    vincular_ids = set(request.form.getlist("vincular_ids"))
+    desconsiderar_ids = set(request.form.getlist("desconsiderar_ids"))
+
+    conflito = vincular_ids.intersection(desconsiderar_ids)
+    if conflito:
+        flash("UMA MESMA LINHA NÃO PODE SER VINCULADA E DESCONSIDERADA AO MESMO TEMPO.", "warning")
+        return redirect(url_for("financeiro_dois.nota_debito_origem_linhas", nd_id=nd_id, despesa_id=despesa_id))
+
+    engine = get_engine()
+    with engine.begin() as conn:
+        nd = conn.execute(text("""
+            SELECT id, UPPER(COALESCE(numero_nd, '')) AS numero_nd
+            FROM financeiro2_notas_debito
+            WHERE id = :id
+        """), {"id": nd_id}).mappings().first()
+
+        despesa = conn.execute(text("""
+            SELECT
+                id,
+                UPPER(COALESCE(origem_tipo, '')) AS origem,
+                origem_id,
+                UPPER(COALESCE(nd_numero, '')) AS nd_numero_atual
+            FROM financeiro2_despesas
+            WHERE id = :id
+        """), {"id": despesa_id}).mappings().first()
+
+        if not nd or not despesa:
+            abort(404)
+
+        tabela = "financeiro2_om_linhas" if despesa["origem"] == "OM" else "financeiro2_rd_linhas"
+        fk = "om_id" if despesa["origem"] == "OM" else "rd_id"
+
+        # Vincular linhas
+        for linha_id in vincular_ids:
+            conn.execute(text(f"""
+                UPDATE {tabela}
+                SET
+                    numero_nd = :numero_nd,
+                    desconsiderada_nd = FALSE
+                WHERE id = :linha_id
+                  AND {fk} = :origem_id
+                  AND COALESCE(status, 'Ativo') = 'Ativo'
+                  AND COALESCE(numero_nd, '') = ''
+            """), {
+                "numero_nd": nd["numero_nd"],
+                "linha_id": int(linha_id),
+                "origem_id": despesa["origem_id"],
+            })
+
+        # Desconsiderar linhas
+        for linha_id in desconsiderar_ids:
+            conn.execute(text(f"""
+                UPDATE {tabela}
+                SET
+                    desconsiderada_nd = TRUE
+                WHERE id = :linha_id
+                  AND {fk} = :origem_id
+                  AND COALESCE(status, 'Ativo') = 'Ativo'
+                  AND COALESCE(numero_nd, '') = ''
+            """), {
+                "linha_id": int(linha_id),
+                "origem_id": despesa["origem_id"],
+            })
+
+        # Registrar relação ND x despesa
+        rel = conn.execute(text("""
+            SELECT id
+            FROM financeiro2_notas_debito_despesas
+            WHERE nd_id = :nd_id
+              AND despesa_id = :despesa_id
+            LIMIT 1
+        """), {"nd_id": nd_id, "despesa_id": despesa_id}).mappings().first()
+
+        if not rel:
+            conn.execute(text("""
+                INSERT INTO financeiro2_notas_debito_despesas (
+                    nd_id, despesa_id, criado_em
+                ) VALUES (
+                    :nd_id, :despesa_id, CURRENT_TIMESTAMP
+                )
+            """), {"nd_id": nd_id, "despesa_id": despesa_id})
+
+        # Recalcular status da despesa
+        totais = conn.execute(text(f"""
+            SELECT
+                COUNT(*) AS total_linhas,
+                SUM(
+                    CASE
+                        WHEN COALESCE(numero_nd, '') <> '' OR COALESCE(desconsiderada_nd, FALSE) = TRUE
+                        THEN 1 ELSE 0
+                    END
+                ) AS total_resolvidas
+            FROM {tabela}
+            WHERE {fk} = :origem_id
+              AND COALESCE(status, 'Ativo') = 'Ativo'
+              AND COALESCE({"valor_brl" if despesa["origem"] == "OM" else "valor"}, 0) > 0
+        """), {"origem_id": despesa["origem_id"]}).mappings().first()
+
+        total_linhas = int(totais["total_linhas"] or 0)
+        total_resolvidas = int(totais["total_resolvidas"] or 0)
+
+        if total_resolvidas <= 0:
+            novo_status = "NÃO VINCULADA"
+        elif total_resolvidas < total_linhas:
+            novo_status = "PARCIAL"
+        else:
+            novo_status = "VINCULADA"
+
+        nd_numero_principal = despesa["nd_numero_atual"] or nd["numero_nd"]
+
+        conn.execute(text("""
+            UPDATE financeiro2_despesas
+            SET
+                status_nd = :status_nd,
+                nd_numero = :nd_numero,
+                atualizado_em = CURRENT_TIMESTAMP
+            WHERE id = :id
+        """), {
+            "id": despesa_id,
+            "status_nd": novo_status,
+            "nd_numero": nd_numero_principal,
+        })
+
+    flash("LINHAS DA ORIGEM PROCESSADAS COM SUCESSO.", "success")
+    return redirect(url_for("financeiro_dois.nota_debito_editar", nd_id=nd_id))
