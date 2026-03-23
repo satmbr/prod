@@ -5044,3 +5044,301 @@ def despesas_exportar_pdf():
         download_name="despesas_filtradas.pdf",
         mimetype="application/pdf",
     )
+    
+@bp.route("/notas-debito")
+@login_required
+@permission_required("financeiro", "visualizar")
+def notas_debito():
+    numero_nd = _nome_preenchido(request.args.get("numero_nd")).upper()
+    empresa_nd = _nome_preenchido(request.args.get("empresa_nd")).upper()
+    status = _nome_preenchido(request.args.get("status")).upper()
+    data_inicial = _nome_preenchido(request.args.get("data_inicial"))
+    data_final = _nome_preenchido(request.args.get("data_final"))
+
+    filtros = ["1=1"]
+    params = {}
+
+    if numero_nd:
+        filtros.append("UPPER(COALESCE(nd.numero_nd, '')) LIKE :numero_nd")
+        params["numero_nd"] = f"%{numero_nd}%"
+
+    if empresa_nd:
+        filtros.append("UPPER(COALESCE(nd.empresa_nd, '')) LIKE :empresa_nd")
+        params["empresa_nd"] = f"%{empresa_nd}%"
+
+    if status and status != "TODOS":
+        filtros.append("UPPER(COALESCE(nd.status, '')) = :status")
+        params["status"] = status
+
+    if data_inicial:
+        filtros.append("nd.data_nd >= :data_inicial")
+        params["data_inicial"] = data_inicial
+
+    if data_final:
+        filtros.append("nd.data_nd <= :data_final")
+        params["data_final"] = data_final
+
+    engine = get_engine()
+    with engine.connect() as conn:
+        registros = conn.execute(text(f"""
+            SELECT
+                nd.id,
+                UPPER(COALESCE(nd.numero_nd, '')) AS numero_nd,
+                TO_CHAR(nd.data_nd, 'DD/MM/YYYY') AS data_nd,
+                UPPER(COALESCE(nd.empresa_nd, '')) AS empresa_nd,
+                UPPER(COALESCE(nd.status, '')) AS status,
+                UPPER(COALESCE(nd.observacao, '')) AS observacao,
+                COALESCE((
+                    SELECT COUNT(*)
+                    FROM financeiro2_notas_debito_despesas rel
+                    WHERE rel.nd_id = nd.id
+                ), 0) AS qtd_despesas
+            FROM financeiro2_notas_debito nd
+            WHERE {' AND '.join(filtros)}
+            ORDER BY nd.data_nd DESC, nd.id DESC
+        """), params).mappings().all()
+
+    return render_template(
+        "financeiro_dois/notas_debito.html",
+        subnav_links=build_financeiro_dois_subnav("notas_debito"),
+        registros=registros,
+        filtros={
+            "numero_nd": request.args.get("numero_nd", ""),
+            "empresa_nd": request.args.get("empresa_nd", ""),
+            "status": request.args.get("status", "TODOS"),
+            "data_inicial": request.args.get("data_inicial", ""),
+            "data_final": request.args.get("data_final", ""),
+        }
+    )
+
+
+@bp.route("/notas-debito/nova")
+@login_required
+@permission_required("financeiro", "visualizar")
+def nota_debito_nova():
+    hoje = date.today().strftime("%Y-%m-%d")
+    engine = get_engine()
+
+    with engine.connect() as conn:
+        empresas_nd = conn.execute(text("""
+            SELECT UPPER(nome) AS nome
+            FROM financeiro2_cad_empresas_nd
+            WHERE status = 'Ativo'
+            ORDER BY nome
+        """)).mappings().all()
+
+    nd = {
+        "id": 0,
+        "numero_nd": "",
+        "data_form": hoje,
+        "empresa_nd": "",
+        "status": "ABERTA",
+        "observacao": "",
+        "eh_nova": True,
+        "qtd_despesas": 0,
+    }
+
+    return render_template(
+        "financeiro_dois/nota_debito_editar.html",
+        subnav_links=build_financeiro_dois_subnav("notas_debito"),
+        nd=nd,
+        empresas_nd=empresas_nd,
+    )
+
+
+@bp.route("/notas-debito/criar", methods=["POST"])
+@login_required
+@permission_required("financeiro", "visualizar")
+def nota_debito_criar():
+    numero_nd = _nome_preenchido(request.form.get("numero_nd")).upper()
+    data_nd = _nome_preenchido(request.form.get("data_nd"))
+    empresa_nd = _nome_preenchido(request.form.get("empresa_nd")).upper()
+    status = _nome_preenchido(request.form.get("status")).upper() or "ABERTA"
+    observacao = _nome_preenchido(request.form.get("observacao")).upper()
+
+    engine = get_engine()
+    with engine.connect() as conn:
+        empresas_nd = conn.execute(text("""
+            SELECT UPPER(nome) AS nome
+            FROM financeiro2_cad_empresas_nd
+            WHERE status = 'Ativo'
+            ORDER BY nome
+        """)).mappings().all()
+
+    nd_form = {
+        "id": 0,
+        "numero_nd": numero_nd,
+        "data_form": data_nd,
+        "empresa_nd": empresa_nd,
+        "status": status,
+        "observacao": observacao,
+        "eh_nova": True,
+        "qtd_despesas": 0,
+    }
+
+    if not numero_nd or not data_nd or not empresa_nd:
+        flash("PREENCHA NÚMERO ND, DATA E EMPRESA ND.", "warning")
+        return render_template(
+            "financeiro_dois/nota_debito_editar.html",
+            subnav_links=build_financeiro_dois_subnav("notas_debito"),
+            nd=nd_form,
+            empresas_nd=empresas_nd,
+        )
+
+    with engine.begin() as conn:
+        existe = conn.execute(text("""
+            SELECT id
+            FROM financeiro2_notas_debito
+            WHERE UPPER(numero_nd) = :numero_nd
+            LIMIT 1
+        """), {"numero_nd": numero_nd}).mappings().first()
+
+        if existe:
+            flash("JÁ EXISTE UMA ND COM ESSE NÚMERO.", "warning")
+            return render_template(
+                "financeiro_dois/nota_debito_editar.html",
+                subnav_links=build_financeiro_dois_subnav("notas_debito"),
+                nd=nd_form,
+                empresas_nd=empresas_nd,
+            )
+
+        novo_id = conn.execute(text("""
+            INSERT INTO financeiro2_notas_debito (
+                numero_nd,
+                data_nd,
+                empresa_nd,
+                status,
+                observacao,
+                criado_em,
+                atualizado_em
+            ) VALUES (
+                :numero_nd,
+                :data_nd,
+                :empresa_nd,
+                :status,
+                :observacao,
+                CURRENT_TIMESTAMP,
+                CURRENT_TIMESTAMP
+            )
+            RETURNING id
+        """), {
+            "numero_nd": numero_nd,
+            "data_nd": data_nd,
+            "empresa_nd": empresa_nd,
+            "status": status,
+            "observacao": observacao,
+        }).scalar()
+
+    flash("ND CRIADA COM SUCESSO.", "success")
+    return redirect(url_for("financeiro_dois.nota_debito_editar", nd_id=novo_id))
+
+
+@bp.route("/notas-debito/<int:nd_id>")
+@login_required
+@permission_required("financeiro", "visualizar")
+def nota_debito_editar(nd_id: int):
+    engine = get_engine()
+
+    with engine.connect() as conn:
+        nd = conn.execute(text("""
+            SELECT
+                id,
+                UPPER(COALESCE(numero_nd, '')) AS numero_nd,
+                TO_CHAR(data_nd, 'YYYY-MM-DD') AS data_form,
+                TO_CHAR(data_nd, 'DD/MM/YYYY') AS data_nd,
+                UPPER(COALESCE(empresa_nd, '')) AS empresa_nd,
+                UPPER(COALESCE(status, '')) AS status,
+                UPPER(COALESCE(observacao, '')) AS observacao
+            FROM financeiro2_notas_debito
+            WHERE id = :id
+        """), {"id": nd_id}).mappings().first()
+
+        if not nd:
+            abort(404)
+
+        empresas_nd = conn.execute(text("""
+            SELECT UPPER(nome) AS nome
+            FROM financeiro2_cad_empresas_nd
+            WHERE status = 'Ativo'
+            ORDER BY nome
+        """)).mappings().all()
+
+        despesas_rel = conn.execute(text("""
+            SELECT
+                d.id,
+                UPPER(COALESCE(d.numero_despesa, '')) AS numero_despesa,
+                UPPER(COALESCE(d.origem_tipo, '')) AS origem,
+                UPPER(COALESCE(d.fornecedor, '')) AS fornecedor,
+                UPPER(COALESCE(d.descricao, '')) AS descricao,
+                UPPER(COALESCE(d.status_nd, '')) AS status_nd
+            FROM financeiro2_notas_debito_despesas rel
+            JOIN financeiro2_despesas d ON d.id = rel.despesa_id
+            WHERE rel.nd_id = :nd_id
+            ORDER BY d.id DESC
+        """), {"nd_id": nd_id}).mappings().all()
+
+    nd = dict(nd)
+    nd["eh_nova"] = False
+    nd["qtd_despesas"] = len(despesas_rel)
+
+    return render_template(
+        "financeiro_dois/nota_debito_editar.html",
+        subnav_links=build_financeiro_dois_subnav("notas_debito"),
+        nd=nd,
+        empresas_nd=empresas_nd,
+        despesas_rel=despesas_rel,
+    )
+
+
+@bp.route("/notas-debito/<int:nd_id>/salvar", methods=["POST"])
+@login_required
+@permission_required("financeiro", "visualizar")
+def nota_debito_salvar(nd_id: int):
+    numero_nd = _nome_preenchido(request.form.get("numero_nd")).upper()
+    data_nd = _nome_preenchido(request.form.get("data_nd"))
+    empresa_nd = _nome_preenchido(request.form.get("empresa_nd")).upper()
+    status = _nome_preenchido(request.form.get("status")).upper() or "ABERTA"
+    observacao = _nome_preenchido(request.form.get("observacao")).upper()
+
+    if not numero_nd or not data_nd or not empresa_nd:
+        flash("PREENCHA NÚMERO ND, DATA E EMPRESA ND.", "warning")
+        return redirect(url_for("financeiro_dois.nota_debito_editar", nd_id=nd_id))
+
+    engine = get_engine()
+    with engine.begin() as conn:
+        existe = conn.execute(text("""
+            SELECT id
+            FROM financeiro2_notas_debito
+            WHERE UPPER(numero_nd) = :numero_nd
+              AND id <> :id
+            LIMIT 1
+        """), {
+            "numero_nd": numero_nd,
+            "id": nd_id
+        }).mappings().first()
+
+        if existe:
+            flash("JÁ EXISTE OUTRA ND COM ESSE NÚMERO.", "warning")
+            return redirect(url_for("financeiro_dois.nota_debito_editar", nd_id=nd_id))
+
+        conn.execute(text("""
+            UPDATE financeiro2_notas_debito
+            SET
+                numero_nd = :numero_nd,
+                data_nd = :data_nd,
+                empresa_nd = :empresa_nd,
+                status = :status,
+                observacao = :observacao,
+                atualizado_em = CURRENT_TIMESTAMP
+            WHERE id = :id
+        """), {
+            "id": nd_id,
+            "numero_nd": numero_nd,
+            "data_nd": data_nd,
+            "empresa_nd": empresa_nd,
+            "status": status,
+            "observacao": observacao,
+        })
+
+    flash("ND SALVA COM SUCESSO.", "success")
+    return redirect(url_for("financeiro_dois.nota_debito_editar", nd_id=nd_id))
