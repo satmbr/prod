@@ -4504,77 +4504,77 @@ def aprovacoes():
 # NOTAS DE DEBITO
 # =========================
 
-@bp.route("/notas-debito")
-@login_required
-@permission_required("financeiro", "visualizar")
-def notas_debito():
-    notas = [
-        {"id": 1, "numero_nd": "ND-2026-0001", "empresa_origem": "MATISA", "data_criacao": "15/03/2026", "status": "Aberta", "total": 1730.30},
-        {"id": 2, "numero_nd": "ND-2026-0002", "empresa_origem": "PRUMAT", "data_criacao": "14/03/2026", "status": "Fechada", "total": 950.00},
-        {"id": 3, "numero_nd": "ND-2026-0003", "empresa_origem": "MATISA", "data_criacao": "13/03/2026", "status": "Exportada", "total": 420.50},
-    ]
+#@bp.route("/notas-debito")
+#@login_required
+#@permission_required("financeiro", "visualizar")
+#def notas_debito():
+#    notas = [
+#        {"id": 1, "numero_nd": "ND-2026-0001", "empresa_origem": "MATISA", "data_criacao": "15/03/2026", "status": "Aberta", "total": 1730.30},
+#        {"id": 2, "numero_nd": "ND-2026-0002", "empresa_origem": "PRUMAT", "data_criacao": "14/03/2026", "status": "Fechada", "total": 950.00},
+#        {"id": 3, "numero_nd": "ND-2026-0003", "empresa_origem": "MATISA", "data_criacao": "13/03/2026", "status": "Exportada", "total": 420.50},
+#    ]
+#
+#    return render_template(
+#        "financeiro_dois/notas_debito.html",
+#        subnav_links=build_financeiro_dois_subnav("nd"),
+#        notas=notas,
+#    )
 
-    return render_template(
-        "financeiro_dois/notas_debito.html",
-        subnav_links=build_financeiro_dois_subnav("nd"),
-        notas=notas,
-    )
 
-
-@bp.route("/notas-debito/<int:nd_id>")
-@login_required
-@permission_required("financeiro", "visualizar")
-def nota_debito_editar(nd_id: int):
-    notas_map = {
-        1: {
-            "id": 1,
-            "numero_nd": "ND-2026-0001",
-            "empresa_origem": "MATISA",
-            "data_criacao": "15/03/2026",
-            "status": "Aberta",
-            "observacao": "ND em montagem com despesas ainda em análise.",
-            "linhas": [
-                {"data": "15/03/2026", "descricao": "Hospedagem equipe", "tipo": "NF", "numero_documento": "NF-4587", "valor": 950.00},
-                {"data": "14/03/2026", "descricao": "Combustível", "tipo": "Fatura", "numero_documento": "FAT-9001", "valor": 420.50},
-                {"data": "13/03/2026", "descricao": "Serviço de apoio", "tipo": "NFS", "numero_documento": "NFS-1102", "valor": 359.80},
-            ],
-        },
-        2: {
-            "id": 2,
-            "numero_nd": "ND-2026-0002",
-            "empresa_origem": "PRUMAT",
-            "data_criacao": "14/03/2026",
-            "status": "Fechada",
-            "observacao": "ND já conferida e fechada.",
-            "linhas": [
-                {"data": "14/03/2026", "descricao": "Hospedagem equipe", "tipo": "NF", "numero_documento": "NF-4587", "valor": 950.00},
-            ],
-        },
-        3: {
-            "id": 3,
-            "numero_nd": "ND-2026-0003",
-            "empresa_origem": "MATISA",
-            "data_criacao": "13/03/2026",
-            "status": "Exportada",
-            "observacao": "ND exportada em PDF e travada para edição direta.",
-            "linhas": [
-                {"data": "14/03/2026", "descricao": "Combustível", "tipo": "Fatura", "numero_documento": "FAT-9001", "valor": 420.50},
-            ],
-        },
-    }
-
-    nd = notas_map.get(nd_id)
-    if not nd:
-        abort(404)
-
-    total_nd = sum(item["valor"] for item in nd["linhas"])
-
-    return render_template(
-        "financeiro_dois/nota_debito_editar.html",
-        subnav_links=build_financeiro_dois_subnav("nd"),
-        nd=nd,
-        total_nd=total_nd,
-    )
+#@bp.route("/notas-debito/<int:nd_id>")
+#@login_required
+#@permission_required("financeiro", "visualizar")
+#def nota_debito_editar(nd_id: int):
+#    notas_map = {
+#        1: {
+#            "id": 1,
+#            "numero_nd": "ND-2026-0001",
+#            "empresa_origem": "MATISA",
+#            "data_criacao": "15/03/2026",
+#            "status": "Aberta",
+#            "observacao": "ND em montagem com despesas ainda em análise.",
+#            "linhas": [
+#                {"data": "15/03/2026", "descricao": "Hospedagem equipe", "tipo": "NF", "numero_documento": "NF-4587", "valor": 950.00},
+#                {"data": "14/03/2026", "descricao": "Combustível", "tipo": "Fatura", "numero_documento": "FAT-9001", "valor": 420.50},
+#                {"data": "13/03/2026", "descricao": "Serviço de apoio", "tipo": "NFS", "numero_documento": "NFS-1102", "valor": 359.80},
+#            ],
+#        },
+#        2: {
+#            "id": 2,
+#            "numero_nd": "ND-2026-0002",
+#            "empresa_origem": "PRUMAT",
+#            "data_criacao": "14/03/2026",
+#            "status": "Fechada",
+#            "observacao": "ND já conferida e fechada.",
+#            "linhas": [
+#                {"data": "14/03/2026", "descricao": "Hospedagem equipe", "tipo": "NF", "numero_documento": "NF-4587", "valor": 950.00},
+#            ],
+#        },
+#        3: {
+#            "id": 3,
+#            "numero_nd": "ND-2026-0003",
+#            "empresa_origem": "MATISA",
+#            "data_criacao": "13/03/2026",
+#            "status": "Exportada",
+#            "observacao": "ND exportada em PDF e travada para edição direta.",
+#            "linhas": [
+#                {"data": "14/03/2026", "descricao": "Combustível", "tipo": "Fatura", "numero_documento": "FAT-9001", "valor": 420.50},
+#            ],
+#        },
+#    }
+#
+#    nd = notas_map.get(nd_id)
+#    if not nd:
+#        abort(404)
+#
+#    total_nd = sum(item["valor"] for item in nd["linhas"])
+#
+#    return render_template(
+#        "financeiro_dois/nota_debito_editar.html",
+#        subnav_links=build_financeiro_dois_subnav("nd"),
+#        nd=nd,
+#        total_nd=total_nd,
+#    )
     
 @bp.route("/despesas/<int:despesa_id>/registrar-pagamento", methods=["POST"])
 @login_required
