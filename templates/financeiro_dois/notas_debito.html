@@ -76,7 +76,19 @@
             <td><strong>{{ item.numero_nd }}</strong></td>
             <td>{{ item.data_nd }}</td>
             <td>{{ item.empresa_nd }}</td>
-            <td>{{ item.status }}</td>
+            <td>
+              {% if item.status == 'VINCULADA' %}
+                <span class="badge badge-green">VINCULADA</span>
+              {% elif item.status == 'PARCIAL' %}
+                <span class="badge badge-yellow">PARCIAL</span>
+              {% elif item.status == 'REJEITADA' %}
+                <span class="badge badge-red">REJEITADA</span>
+              {% elif item.status == 'CANCELADA' %}
+                <span class="badge badge-gray">CANCELADA</span>
+              {% else %}
+                <span class="badge badge-blue">ABERTA</span>
+              {% endif %}
+            </td>
             <td>{{ item.qtd_despesas }}</td>
             <td>
               <div class="table-actions">
@@ -94,4 +106,82 @@
     </div>
   </section>
 </div>
+
+<style>
+.filters-card{
+  margin-top:4px;
+  padding:16px;
+  border:1px solid #d9e2ec;
+  border-radius:18px;
+  background:#fff;
+}
+.filters-grid{
+  display:grid;
+  grid-template-columns:repeat(5, minmax(0, 1fr));
+  gap:14px;
+}
+.field{
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+}
+.field label{
+  font-weight:700;
+  font-size:13px;
+  color:#0f2f4f;
+  text-transform:uppercase;
+}
+.input-like{
+  width:100%;
+  min-height:42px;
+  padding:10px 14px;
+  border:1px solid #c7d2e0;
+  border-radius:14px;
+  background:#fff;
+  font-size:13px;
+  color:#243b53;
+  text-transform:uppercase;
+}
+.form-actions-top{
+  display:flex;
+  gap:8px;
+  align-items:center;
+  flex-wrap:wrap;
+  margin-top:14px;
+}
+.badge{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-height:28px;
+  padding:4px 10px;
+  border-radius:999px;
+  font-size:12px;
+  font-weight:800;
+  letter-spacing:.02em;
+  text-transform:uppercase;
+  white-space:nowrap;
+}
+.badge-green{ background:#dcfce7; color:#166534; }
+.badge-yellow{ background:#fef3c7; color:#b45309; }
+.badge-red{ background:#fee2e2; color:#b91c1c; }
+.badge-blue{ background:#dbeafe; color:#1d4ed8; }
+.badge-gray{ background:#e5e7eb; color:#334155; }
+
+@media (max-width: 1200px){
+  .filters-grid{
+    grid-template-columns:repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 800px){
+  .filters-grid{
+    grid-template-columns:repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 560px){
+  .filters-grid{
+    grid-template-columns:1fr;
+  }
+}
+</style>
 {% endblock %}

@@ -85,25 +85,33 @@
           <div class="resume-row"><span>Qtd despesas</span><strong>{{ nd.qtd_despesas }}</strong></div>
         </div>
 
-        {% if not nd.eh_nova %}
-        <div class="resume-card">
-          <div class="resume-title">Despesas vinculadas</div>
+		{% if not nd.eh_nova %}
+		<div class="resume-card">
+		  <div class="resume-title">Despesas relacionadas</div>
 
-          {% if despesas_rel %}
-            <div class="anexo-list">
-              {% for item in despesas_rel %}
-              <div class="anexo-item" style="display:block;">
-                <div><strong>{{ item.numero_despesa }}</strong> — {{ item.origem }}</div>
-                <div class="muted" style="margin-top:4px;">{{ item.fornecedor }}</div>
-                <div class="muted" style="margin-top:2px;">{{ item.descricao }}</div>
-              </div>
-              {% endfor %}
-            </div>
-          {% else %}
-            <div class="muted">Nenhuma despesa vinculada ainda.</div>
-          {% endif %}
-        </div>
-        {% endif %}
+		  {% if despesas_rel %}
+			<div class="anexo-list">
+			  {% for item in despesas_rel %}
+			  <div class="anexo-item" style="display:block;">
+				<div>
+				  <strong>{{ item.numero_despesa }}</strong> — {{ item.origem }}
+				</div>
+				<div class="muted" style="margin-top:4px;">{{ item.fornecedor }}</div>
+				<div class="muted" style="margin-top:2px;">{{ item.descricao }}</div>
+				<div class="muted" style="margin-top:6px;"><strong>Status ND:</strong> {{ item.status_nd }}</div>
+				<div style="margin-top:10px;">
+				  <a class="btn btn-sm" href="{{ url_for('financeiro_dois.nota_debito_origem_linhas', nd_id=nd.id, despesa_id=item.id) }}">
+					Ver linhas
+				  </a>
+				</div>
+			  </div>
+			  {% endfor %}
+			</div>
+		  {% else %}
+			<div class="muted">Nenhuma despesa vinculada ainda.</div>
+		  {% endif %}
+		</div>
+		{% endif %}
       </aside>
     </div>
   </form>

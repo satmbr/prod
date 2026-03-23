@@ -134,6 +134,53 @@ def _resolver_caminho_anexo_om(nome_arquivo: str) -> str | None:
             return caminho
 
     return None
+    
+def _recalcular_status_nd(conn, nd_id: int):
+    nd = conn.execute(text("""
+        SELECT
+            id,
+            UPPER(COALESCE(status, '')) AS status
+        FROM financeiro2_notas_debito
+        WHERE id = :id
+    """), {"id": nd_id}).mappings().first()
+
+    if not nd:
+        return
+
+    if nd["status"] in ("REJEITADA", "CANCELADA"):
+        return
+
+    rel = conn.execute(text("""
+        SELECT
+            COUNT(*) AS total_despesas,
+            SUM(CASE WHEN UPPER(COALESCE(d.status_nd, '')) = 'VINCULADA' THEN 1 ELSE 0 END) AS total_vinculadas,
+            SUM(CASE WHEN UPPER(COALESCE(d.status_nd, '')) = 'PARCIAL' THEN 1 ELSE 0 END) AS total_parciais
+        FROM financeiro2_notas_debito_despesas rel
+        JOIN financeiro2_despesas d ON d.id = rel.despesa_id
+        WHERE rel.nd_id = :nd_id
+    """), {"nd_id": nd_id}).mappings().first()
+
+    total_despesas = int(rel["total_despesas"] or 0)
+    total_vinculadas = int(rel["total_vinculadas"] or 0)
+    total_parciais = int(rel["total_parciais"] or 0)
+
+    if total_despesas <= 0:
+        novo_status = "ABERTA"
+    elif total_vinculadas == total_despesas:
+        novo_status = "VINCULADA"
+    else:
+        novo_status = "PARCIAL" if total_parciais > 0 or total_despesas > 0 else "ABERTA"
+
+    conn.execute(text("""
+        UPDATE financeiro2_notas_debito
+        SET
+            status = :status,
+            atualizado_em = CURRENT_TIMESTAMP
+        WHERE id = :id
+    """), {
+        "id": nd_id,
+        "status": novo_status,
+    })
 
 @bp.route("/")
 @login_required
@@ -5652,6 +5699,8 @@ def nota_debito_salvar_linhas(nd_id: int, despesa_id: int):
             "status_nd": novo_status,
             "nd_numero": nd_numero_principal,
         })
+        
+        _recalcular_status_nd(conn, nd_id)
 
     flash("LINHAS DA ORIGEM PROCESSADAS COM SUCESSO.", "success")
     return redirect(url_for("financeiro_dois.nota_debito_editar", nd_id=nd_id))
