@@ -181,6 +181,59 @@ def _recalcular_status_nd(conn, nd_id: int):
         "id": nd_id,
         "status": novo_status,
     })
+    
+def _recalcular_status_nd(conn, nd_id: int):
+    nd = conn.execute(text("""
+        SELECT
+            id,
+            UPPER(COALESCE(status, '')) AS status
+        FROM financeiro2_notas_debito
+        WHERE id = :id
+    """), {"id": nd_id}).mappings().first()
+
+    if not nd:
+        return
+
+    # Se foi definida manualmente como rejeitada/cancelada,
+    # não sobrescrever automaticamente.
+    if nd["status"] in ("REJEITADA", "CANCELADA"):
+        return
+
+    rel = conn.execute(text("""
+        SELECT
+            COUNT(*) AS total_despesas,
+            SUM(CASE WHEN UPPER(COALESCE(d.status_nd, '')) = 'VINCULADA' THEN 1 ELSE 0 END) AS total_vinculadas,
+            SUM(CASE WHEN UPPER(COALESCE(d.status_nd, '')) = 'PARCIAL' THEN 1 ELSE 0 END) AS total_parciais,
+            SUM(CASE WHEN UPPER(COALESCE(d.status_nd, '')) = 'NÃO VINCULADA' THEN 1 ELSE 0 END) AS total_nao_vinculadas
+        FROM financeiro2_notas_debito_despesas rel
+        JOIN financeiro2_despesas d ON d.id = rel.despesa_id
+        WHERE rel.nd_id = :nd_id
+    """), {"nd_id": nd_id}).mappings().first()
+
+    total_despesas = int(rel["total_despesas"] or 0)
+    total_vinculadas = int(rel["total_vinculadas"] or 0)
+    total_parciais = int(rel["total_parciais"] or 0)
+    total_nao_vinculadas = int(rel["total_nao_vinculadas"] or 0)
+
+    if total_despesas <= 0:
+        novo_status = "ABERTA"
+    elif total_vinculadas == total_despesas:
+        novo_status = "VINCULADA"
+    elif total_parciais > 0 or total_nao_vinculadas > 0:
+        novo_status = "PARCIAL"
+    else:
+        novo_status = "ABERTA"
+
+    conn.execute(text("""
+        UPDATE financeiro2_notas_debito
+        SET
+            status = :status,
+            atualizado_em = CURRENT_TIMESTAMP
+        WHERE id = :id
+    """), {
+        "id": nd_id,
+        "status": novo_status,
+    })
 
 @bp.route("/")
 @login_required
@@ -5588,7 +5641,9 @@ def nota_debito_salvar_linhas(nd_id: int, despesa_id: int):
     engine = get_engine()
     with engine.begin() as conn:
         nd = conn.execute(text("""
-            SELECT id, UPPER(COALESCE(numero_nd, '')) AS numero_nd
+            SELECT
+                id,
+                UPPER(COALESCE(numero_nd, '')) AS numero_nd
             FROM financeiro2_notas_debito
             WHERE id = :id
         """), {"id": nd_id}).mappings().first()
@@ -5608,8 +5663,9 @@ def nota_debito_salvar_linhas(nd_id: int, despesa_id: int):
 
         tabela = "financeiro2_om_linhas" if despesa["origem"] == "OM" else "financeiro2_rd_linhas"
         fk = "om_id" if despesa["origem"] == "OM" else "rd_id"
+        campo_valor = "valor_brl" if despesa["origem"] == "OM" else "valor"
 
-        # Vincular linhas
+        # Vincular linhas selecionadas
         for linha_id in vincular_ids:
             conn.execute(text(f"""
                 UPDATE {tabela}
@@ -5626,7 +5682,7 @@ def nota_debito_salvar_linhas(nd_id: int, despesa_id: int):
                 "origem_id": despesa["origem_id"],
             })
 
-        # Desconsiderar linhas
+        # Desconsiderar linhas selecionadas
         for linha_id in desconsiderar_ids:
             conn.execute(text(f"""
                 UPDATE {tabela}
@@ -5657,22 +5713,26 @@ def nota_debito_salvar_linhas(nd_id: int, despesa_id: int):
                 ) VALUES (
                     :nd_id, :despesa_id, CURRENT_TIMESTAMP
                 )
-            """), {"nd_id": nd_id, "despesa_id": despesa_id})
+            """), {
+                "nd_id": nd_id,
+                "despesa_id": despesa_id,
+            })
 
-        # Recalcular status da despesa
+        # Recalcular status da despesa com base nas linhas da origem
         totais = conn.execute(text(f"""
             SELECT
                 COUNT(*) AS total_linhas,
                 SUM(
                     CASE
-                        WHEN COALESCE(numero_nd, '') <> '' OR COALESCE(desconsiderada_nd, FALSE) = TRUE
+                        WHEN COALESCE(numero_nd, '') <> ''
+                             OR COALESCE(desconsiderada_nd, FALSE) = TRUE
                         THEN 1 ELSE 0
                     END
                 ) AS total_resolvidas
             FROM {tabela}
             WHERE {fk} = :origem_id
               AND COALESCE(status, 'Ativo') = 'Ativo'
-              AND COALESCE({"valor_brl" if despesa["origem"] == "OM" else "valor"}, 0) > 0
+              AND COALESCE({campo_valor}, 0) > 0
         """), {"origem_id": despesa["origem_id"]}).mappings().first()
 
         total_linhas = int(totais["total_linhas"] or 0)
@@ -5699,7 +5759,8 @@ def nota_debito_salvar_linhas(nd_id: int, despesa_id: int):
             "status_nd": novo_status,
             "nd_numero": nd_numero_principal,
         })
-        
+
+        # Recalcular status da própria ND
         _recalcular_status_nd(conn, nd_id)
 
     flash("LINHAS DA ORIGEM PROCESSADAS COM SUCESSO.", "success")

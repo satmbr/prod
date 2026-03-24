@@ -20,10 +20,12 @@
 
     <div class="page-actions">
       <a class="btn" href="{{ url_for('financeiro_dois.notas_debito') }}">Voltar</a>
+
+      {% if not nd.eh_nova %}
+        <a class="btn" href="{{ url_for('financeiro_dois.nota_debito_despesas', nd_id=nd.id) }}">Selecionar despesas</a>
+      {% endif %}
+
       <button type="submit" form="form-nd" class="btn btn-primary">Salvar alterações</button>
-	  {% if not nd.eh_nova %}
-	    <a class="btn" href="{{ url_for('financeiro_dois.nota_debito_despesas', nd_id=nd.id) }}">Selecionar despesas</a>
-	  {% endif %}
     </div>
   </div>
 
@@ -81,37 +83,50 @@
           <div class="resume-row"><span>Número ND</span><strong>{{ nd.numero_nd or '—' }}</strong></div>
           <div class="resume-row"><span>Data</span><strong>{{ nd.data_nd or '—' }}</strong></div>
           <div class="resume-row"><span>Empresa</span><strong>{{ nd.empresa_nd or '—' }}</strong></div>
-          <div class="resume-row"><span>Status</span><strong>{{ nd.status }}</strong></div>
+          <div class="resume-row">
+            <span>Status</span>
+            <strong>
+              {% if nd.status == 'VINCULADA' %}
+                <span class="badge badge-green">VINCULADA</span>
+              {% elif nd.status == 'PARCIAL' %}
+                <span class="badge badge-yellow">PARCIAL</span>
+              {% elif nd.status == 'REJEITADA' %}
+                <span class="badge badge-red">REJEITADA</span>
+              {% elif nd.status == 'CANCELADA' %}
+                <span class="badge badge-gray">CANCELADA</span>
+              {% else %}
+                <span class="badge badge-blue">ABERTA</span>
+              {% endif %}
+            </strong>
+          </div>
           <div class="resume-row"><span>Qtd despesas</span><strong>{{ nd.qtd_despesas }}</strong></div>
         </div>
 
-		{% if not nd.eh_nova %}
-		<div class="resume-card">
-		  <div class="resume-title">Despesas relacionadas</div>
+        {% if not nd.eh_nova %}
+        <div class="resume-card">
+          <div class="resume-title">Despesas relacionadas</div>
 
-		  {% if despesas_rel %}
-			<div class="anexo-list">
-			  {% for item in despesas_rel %}
-			  <div class="anexo-item" style="display:block;">
-				<div>
-				  <strong>{{ item.numero_despesa }}</strong> — {{ item.origem }}
-				</div>
-				<div class="muted" style="margin-top:4px;">{{ item.fornecedor }}</div>
-				<div class="muted" style="margin-top:2px;">{{ item.descricao }}</div>
-				<div class="muted" style="margin-top:6px;"><strong>Status ND:</strong> {{ item.status_nd }}</div>
-				<div style="margin-top:10px;">
-				  <a class="btn btn-sm" href="{{ url_for('financeiro_dois.nota_debito_origem_linhas', nd_id=nd.id, despesa_id=item.id) }}">
-					Ver linhas
-				  </a>
-				</div>
-			  </div>
-			  {% endfor %}
-			</div>
-		  {% else %}
-			<div class="muted">Nenhuma despesa vinculada ainda.</div>
-		  {% endif %}
-		</div>
-		{% endif %}
+          {% if despesas_rel %}
+            <div class="anexo-list">
+              {% for item in despesas_rel %}
+              <div class="anexo-item" style="display:block;">
+                <div><strong>{{ item.numero_despesa }}</strong> — {{ item.origem }}</div>
+                <div class="muted" style="margin-top:4px;">{{ item.fornecedor }}</div>
+                <div class="muted" style="margin-top:2px;">{{ item.descricao }}</div>
+                <div class="muted" style="margin-top:6px;"><strong>Status ND:</strong> {{ item.status_nd }}</div>
+                <div style="margin-top:10px;">
+                  <a class="btn btn-sm" href="{{ url_for('financeiro_dois.nota_debito_origem_linhas', nd_id=nd.id, despesa_id=item.id) }}">
+                    Ver linhas
+                  </a>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="muted">Nenhuma despesa vinculada ainda.</div>
+          {% endif %}
+        </div>
+        {% endif %}
       </aside>
     </div>
   </form>
@@ -140,6 +155,26 @@
 .anexo-list{display:flex;flex-direction:column;gap:8px;}
 .anexo-item{display:flex;align-items:center;gap:8px;padding:10px 12px;border:1px solid #d9e2ec;border-radius:12px;color:#0f2f4f;background:#f8fbff;}
 .muted{color:#52667a;font-size:13px;}
+
+.badge{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-height:28px;
+  padding:4px 10px;
+  border-radius:999px;
+  font-size:12px;
+  font-weight:800;
+  letter-spacing:.02em;
+  text-transform:uppercase;
+  white-space:nowrap;
+}
+.badge-green{ background:#dcfce7; color:#166534; }
+.badge-yellow{ background:#fef3c7; color:#b45309; }
+.badge-red{ background:#fee2e2; color:#b91c1c; }
+.badge-blue{ background:#dbeafe; color:#1d4ed8; }
+.badge-gray{ background:#e5e7eb; color:#334155; }
+
 @media (max-width: 1100px){.content-grid{grid-template-columns:1fr;}}
 @media (max-width: 900px){.form-grid.four{grid-template-columns:repeat(2, minmax(0, 1fr));}}
 @media (max-width: 640px){.form-grid.four{grid-template-columns:1fr;}}
