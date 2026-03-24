@@ -32,6 +32,9 @@
               <th>DESCONSIDERADA</th>
               <th>VINCULAR</th>
               <th>DESCONSIDERAR</th>
+              {% if pode_reverter %}
+              <th>REVERSÃO</th>
+              {% endif %}
             </tr>
           </thead>
           <tbody>
@@ -44,7 +47,13 @@
               <td>{{ linha.aplicacao }}</td>
               <td style="text-align:right;">R$ {{ '%.2f'|format(linha.valor) }}</td>
               <td>{{ linha.numero_nd or '—' }}</td>
-              <td>{{ 'SIM' if linha.desconsiderada_nd else 'NÃO' }}</td>
+              <td>
+                {% if linha.desconsiderada_nd %}
+                  {{ linha.numero_nd_desconsiderada or 'SIM' }}
+                {% else %}
+                  NÃO
+                {% endif %}
+              </td>
 
               {% if linha.numero_nd or linha.desconsiderada_nd %}
                 <td><span class="btn btn-sm" style="opacity:.65;cursor:not-allowed;">Bloqueada</span></td>
@@ -57,10 +66,22 @@
                   <input type="checkbox" name="desconsiderar_ids" value="{{ linha.id }}">
                 </td>
               {% endif %}
+
+              {% if pode_reverter %}
+              <td>
+                {% if linha.numero_nd == nd.numero_nd or (linha.desconsiderada_nd and linha.numero_nd_desconsiderada == nd.numero_nd) %}
+                <form method="post" action="{{ url_for('financeiro_dois.nota_debito_reverter_linha', nd_id=nd.id, despesa_id=despesa.id, linha_id=linha.id) }}">
+                  <button type="submit" class="btn btn-sm">Reverter</button>
+                </form>
+                {% else %}
+                  <span class="btn btn-sm" style="opacity:.65;cursor:not-allowed;">—</span>
+                {% endif %}
+              </td>
+              {% endif %}
             </tr>
             {% else %}
             <tr>
-              <td colspan="10">Nenhuma linha elegível encontrada.</td>
+              <td colspan="{% if pode_reverter %}11{% else %}10{% endif %}">Nenhuma linha elegível encontrada.</td>
             </tr>
             {% endfor %}
           </tbody>

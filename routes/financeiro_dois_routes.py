@@ -234,7 +234,10 @@ def _recalcular_status_nd(conn, nd_id: int):
         "id": nd_id,
         "status": novo_status,
     })
-@bp.route("/")
+    
+def _usuario_eh_administrador() -> bool:
+    return user_can("auth:administrar")
+    
 @bp.route("/")
 @login_required
 @permission_required("financeiro", "visualizar")
@@ -5650,7 +5653,8 @@ def nota_debito_origem_linhas(nd_id: int, despesa_id: int):
                     UPPER(COALESCE(aplicacao, '')) AS aplicacao,
                     COALESCE(valor_brl, 0) AS valor,
                     UPPER(COALESCE(numero_nd, '')) AS numero_nd,
-                    COALESCE(desconsiderada_nd, FALSE) AS desconsiderada_nd
+                    COALESCE(desconsiderada_nd, FALSE) AS desconsiderada_nd,
+                    UPPER(COALESCE(numero_nd_desconsiderada, '')) AS numero_nd_desconsiderada
                 FROM financeiro2_om_linhas
                 WHERE om_id = :origem_id
                   AND COALESCE(status, 'Ativo') = 'Ativo'
@@ -5668,7 +5672,8 @@ def nota_debito_origem_linhas(nd_id: int, despesa_id: int):
                     UPPER(COALESCE(aplicacao, '')) AS aplicacao,
                     COALESCE(valor, 0) AS valor,
                     UPPER(COALESCE(numero_nd, '')) AS numero_nd,
-                    COALESCE(desconsiderada_nd, FALSE) AS desconsiderada_nd
+                    COALESCE(desconsiderada_nd, FALSE) AS desconsiderada_nd,
+                    UPPER(COALESCE(numero_nd_desconsiderada, '')) AS numero_nd_desconsiderada
                 FROM financeiro2_rd_linhas
                 WHERE rd_id = :origem_id
                   AND COALESCE(status, 'Ativo') = 'Ativo'
@@ -5682,6 +5687,7 @@ def nota_debito_origem_linhas(nd_id: int, despesa_id: int):
         nd=nd,
         despesa=despesa,
         linhas=linhas,
+        pode_reverter=_usuario_eh_administrador(),
     )
     
 @bp.route("/notas-debito/<int:nd_id>/despesas/<int:despesa_id>/linhas/salvar", methods=["POST"])
@@ -5745,12 +5751,14 @@ def nota_debito_salvar_linhas(nd_id: int, despesa_id: int):
             conn.execute(text(f"""
                 UPDATE {tabela}
                 SET
-                    desconsiderada_nd = TRUE
+                    desconsiderada_nd = TRUE,
+                    numero_nd_desconsiderada = :numero_nd
                 WHERE id = :linha_id
                   AND {fk} = :origem_id
                   AND COALESCE(status, 'Ativo') = 'Ativo'
                   AND COALESCE(numero_nd, '') = ''
             """), {
+                "numero_nd": nd["numero_nd"],
                 "linha_id": int(linha_id),
                 "origem_id": despesa["origem_id"],
             })
@@ -5823,3 +5831,148 @@ def nota_debito_salvar_linhas(nd_id: int, despesa_id: int):
 
     flash("LINHAS DA ORIGEM PROCESSADAS COM SUCESSO.", "success")
     return redirect(url_for("financeiro_dois.nota_debito_editar", nd_id=nd_id))
+    
+@bp.route("/notas-debito/<int:nd_id>/despesas/<int:despesa_id>/linhas/<int:linha_id>/reverter", methods=["POST"])
+@login_required
+@permission_required("financeiro", "visualizar")
+def nota_debito_reverter_linha(nd_id: int, despesa_id: int, linha_id: int):
+    if not _usuario_eh_administrador():
+        flash("APENAS O PERFIL ADMINISTRADOR PODE REVERTER LINHAS.", "danger")
+        return redirect(url_for("financeiro_dois.nota_debito_origem_linhas", nd_id=nd_id, despesa_id=despesa_id))
+
+    engine = get_engine()
+    with engine.begin() as conn:
+        nd = conn.execute(text("""
+            SELECT
+                id,
+                UPPER(COALESCE(numero_nd, '')) AS numero_nd
+            FROM financeiro2_notas_debito
+            WHERE id = :id
+        """), {"id": nd_id}).mappings().first()
+
+        despesa = conn.execute(text("""
+            SELECT
+                id,
+                UPPER(COALESCE(origem_tipo, '')) AS origem,
+                origem_id,
+                UPPER(COALESCE(nd_numero, '')) AS nd_numero_atual
+            FROM financeiro2_despesas
+            WHERE id = :id
+        """), {"id": despesa_id}).mappings().first()
+
+        if not nd or not despesa:
+            abort(404)
+
+        tabela = "financeiro2_om_linhas" if despesa["origem"] == "OM" else "financeiro2_rd_linhas"
+        fk = "om_id" if despesa["origem"] == "OM" else "rd_id"
+        campo_valor = "valor_brl" if despesa["origem"] == "OM" else "valor"
+
+        linha = conn.execute(text(f"""
+            SELECT
+                id,
+                UPPER(COALESCE(numero_nd, '')) AS numero_nd,
+                COALESCE(desconsiderada_nd, FALSE) AS desconsiderada_nd,
+                UPPER(COALESCE(numero_nd_desconsiderada, '')) AS numero_nd_desconsiderada
+            FROM {tabela}
+            WHERE id = :linha_id
+              AND {fk} = :origem_id
+              AND COALESCE(status, 'Ativo') = 'Ativo'
+            LIMIT 1
+        """), {
+            "linha_id": linha_id,
+            "origem_id": despesa["origem_id"],
+        }).mappings().first()
+
+        if not linha:
+            flash("LINHA NÃO ENCONTRADA.", "warning")
+            return redirect(url_for("financeiro_dois.nota_debito_origem_linhas", nd_id=nd_id, despesa_id=despesa_id))
+
+        # Reverte vínculo desta ND
+        if linha["numero_nd"] == nd["numero_nd"]:
+            conn.execute(text(f"""
+                UPDATE {tabela}
+                SET numero_nd = NULL
+                WHERE id = :linha_id
+            """), {"linha_id": linha_id})
+
+        # Reverte desconsideração desta ND
+        elif linha["desconsiderada_nd"] and linha["numero_nd_desconsiderada"] == nd["numero_nd"]:
+            conn.execute(text(f"""
+                UPDATE {tabela}
+                SET
+                    desconsiderada_nd = FALSE,
+                    numero_nd_desconsiderada = NULL
+                WHERE id = :linha_id
+            """), {"linha_id": linha_id})
+
+        else:
+            flash("ESSA LINHA NÃO ESTÁ VINCULADA/DESCONSIDERADA POR ESTA ND.", "warning")
+            return redirect(url_for("financeiro_dois.nota_debito_origem_linhas", nd_id=nd_id, despesa_id=despesa_id))
+
+        # Recalcular status da despesa
+        totais = conn.execute(text(f"""
+            SELECT
+                COUNT(*) AS total_linhas,
+                SUM(
+                    CASE
+                        WHEN COALESCE(numero_nd, '') <> ''
+                             OR COALESCE(desconsiderada_nd, FALSE) = TRUE
+                        THEN 1 ELSE 0
+                    END
+                ) AS total_resolvidas
+            FROM {tabela}
+            WHERE {fk} = :origem_id
+              AND COALESCE(status, 'Ativo') = 'Ativo'
+              AND COALESCE({campo_valor}, 0) > 0
+        """), {"origem_id": despesa["origem_id"]}).mappings().first()
+
+        total_linhas = int(totais["total_linhas"] or 0)
+        total_resolvidas = int(totais["total_resolvidas"] or 0)
+
+        if total_resolvidas <= 0:
+            novo_status = "NÃO VINCULADA"
+        elif total_resolvidas < total_linhas:
+            novo_status = "PARCIAL"
+        else:
+            novo_status = "VINCULADA"
+
+        # Mantém nd_numero principal se já existir
+        conn.execute(text("""
+            UPDATE financeiro2_despesas
+            SET
+                status_nd = :status_nd,
+                atualizado_em = CURRENT_TIMESTAMP
+            WHERE id = :id
+        """), {
+            "id": despesa_id,
+            "status_nd": novo_status,
+        })
+
+        # Se essa ND não tiver mais nenhuma linha nem nenhuma desconsideração dela, remove a relação ND x despesa
+        uso_nd = conn.execute(text(f"""
+            SELECT COUNT(*) AS total
+            FROM {tabela}
+            WHERE {fk} = :origem_id
+              AND (
+                    COALESCE(numero_nd, '') = :numero_nd
+                 OR (COALESCE(desconsiderada_nd, FALSE) = TRUE AND COALESCE(numero_nd_desconsiderada, '') = :numero_nd)
+              )
+        """), {
+            "origem_id": despesa["origem_id"],
+            "numero_nd": nd["numero_nd"],
+        }).mappings().first()
+
+        if int(uso_nd["total"] or 0) <= 0:
+            conn.execute(text("""
+                DELETE FROM financeiro2_notas_debito_despesas
+                WHERE nd_id = :nd_id
+                  AND despesa_id = :despesa_id
+            """), {
+                "nd_id": nd_id,
+                "despesa_id": despesa_id,
+            })
+
+        _recalcular_status_nd(conn, nd_id)
+
+    flash("LINHA REVERTIDA COM SUCESSO.", "success")
+    return redirect(url_for("financeiro_dois.nota_debito_origem_linhas", nd_id=nd_id, despesa_id=despesa_id))
