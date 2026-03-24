@@ -234,7 +234,7 @@ def _recalcular_status_nd(conn, nd_id: int):
         "id": nd_id,
         "status": novo_status,
     })
-
+@bp.route("/")
 @bp.route("/")
 @login_required
 @permission_required("financeiro", "visualizar")
