@@ -100,6 +100,11 @@
             </strong>
           </div>
           <div class="resume-row"><span>Qtd despesas</span><strong>{{ nd.qtd_despesas }}</strong></div>
+          <div class="resume-row"><span>Linhas vinculadas</span><strong>{{ nd.total_linhas_vinculadas }}</strong></div>
+          <div class="resume-row"><span>Linhas desconsideradas</span><strong>{{ nd.total_linhas_desconsideradas }}</strong></div>
+          <div class="resume-row"><span>Valor vinculado</span><strong>R$ {{ '%.2f'|format(nd.total_valor_vinculado) }}</strong></div>
+          <div class="resume-row"><span>Valor desconsiderado</span><strong>R$ {{ '%.2f'|format(nd.total_valor_desconsiderado) }}</strong></div>
+          <div class="resume-row total"><span>Valor pendente</span><strong>R$ {{ '%.2f'|format(nd.total_valor_pendente) }}</strong></div>
         </div>
 
         {% if not nd.eh_nova %}
@@ -114,6 +119,11 @@
                 <div class="muted" style="margin-top:4px;">{{ item.fornecedor }}</div>
                 <div class="muted" style="margin-top:2px;">{{ item.descricao }}</div>
                 <div class="muted" style="margin-top:6px;"><strong>Status ND:</strong> {{ item.status_nd }}</div>
+                <div class="muted" style="margin-top:2px;"><strong>Linhas vinculadas:</strong> {{ item.qtd_vinculadas }}</div>
+                <div class="muted" style="margin-top:2px;"><strong>Linhas desconsideradas:</strong> {{ item.qtd_desconsideradas }}</div>
+                <div class="muted" style="margin-top:2px;"><strong>Valor vinculado:</strong> R$ {{ '%.2f'|format(item.valor_vinculado) }}</div>
+                <div class="muted" style="margin-top:2px;"><strong>Valor desconsiderado:</strong> R$ {{ '%.2f'|format(item.valor_desconsiderado) }}</div>
+                <div class="muted" style="margin-top:2px;"><strong>Valor pendente:</strong> R$ {{ '%.2f'|format(item.valor_pendente) }}</div>
                 <div style="margin-top:10px;">
                   <a class="btn btn-sm" href="{{ url_for('financeiro_dois.nota_debito_origem_linhas', nd_id=nd.id, despesa_id=item.id) }}">
                     Ver linhas
@@ -152,6 +162,7 @@
 .side-column{display:flex;flex-direction:column;gap:16px;}
 .resume-row{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid #e5edf5;text-transform:uppercase;}
 .resume-row:last-child{border-bottom:none;}
+.resume-row.total{font-weight:800;font-size:18px;}
 .anexo-list{display:flex;flex-direction:column;gap:8px;}
 .anexo-item{display:flex;align-items:center;gap:8px;padding:10px 12px;border:1px solid #d9e2ec;border-radius:12px;color:#0f2f4f;background:#f8fbff;}
 .muted{color:#52667a;font-size:13px;}

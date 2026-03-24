@@ -5332,7 +5332,6 @@ def nota_debito_criar():
     flash("ND CRIADA COM SUCESSO.", "success")
     return redirect(url_for("financeiro_dois.nota_debito_editar", nd_id=novo_id))
 
-
 @bp.route("/notas-debito/<int:nd_id>")
 @login_required
 @permission_required("financeiro", "visualizar")
@@ -5368,6 +5367,7 @@ def nota_debito_editar(nd_id: int):
                 d.id,
                 UPPER(COALESCE(d.numero_despesa, '')) AS numero_despesa,
                 UPPER(COALESCE(d.origem_tipo, '')) AS origem,
+                d.origem_id,
                 UPPER(COALESCE(d.fornecedor, '')) AS fornecedor,
                 UPPER(COALESCE(d.descricao, '')) AS descricao,
                 UPPER(COALESCE(d.status_nd, '')) AS status_nd
@@ -5377,9 +5377,68 @@ def nota_debito_editar(nd_id: int):
             ORDER BY d.id DESC
         """), {"nd_id": nd_id}).mappings().all()
 
+        despesas_rel = [dict(x) for x in despesas_rel]
+
+        total_linhas_vinculadas = 0
+        total_linhas_desconsideradas = 0
+        total_valor_vinculado = 0.0
+        total_valor_desconsiderado = 0.0
+        total_valor_pendente = 0.0
+
+        for item in despesas_rel:
+            if item["origem"] == "OM":
+                totais = conn.execute(text("""
+                    SELECT
+                        COUNT(*) FILTER (WHERE COALESCE(numero_nd, '') = :numero_nd) AS qtd_vinculadas,
+                        COUNT(*) FILTER (WHERE COALESCE(desconsiderada_nd, FALSE) = TRUE) AS qtd_desconsideradas,
+                        COALESCE(SUM(CASE WHEN COALESCE(numero_nd, '') = :numero_nd THEN COALESCE(valor_brl, 0) ELSE 0 END), 0) AS valor_vinculado,
+                        COALESCE(SUM(CASE WHEN COALESCE(desconsiderada_nd, FALSE) = TRUE THEN COALESCE(valor_brl, 0) ELSE 0 END), 0) AS valor_desconsiderado,
+                        COALESCE(SUM(CASE WHEN COALESCE(numero_nd, '') = '' AND COALESCE(desconsiderada_nd, FALSE) = FALSE THEN COALESCE(valor_brl, 0) ELSE 0 END), 0) AS valor_pendente
+                    FROM financeiro2_om_linhas
+                    WHERE om_id = :origem_id
+                      AND COALESCE(status, 'Ativo') = 'Ativo'
+                      AND COALESCE(valor_brl, 0) > 0
+                """), {
+                    "origem_id": item["origem_id"],
+                    "numero_nd": nd["numero_nd"],
+                }).mappings().first()
+            else:
+                totais = conn.execute(text("""
+                    SELECT
+                        COUNT(*) FILTER (WHERE COALESCE(numero_nd, '') = :numero_nd) AS qtd_vinculadas,
+                        COUNT(*) FILTER (WHERE COALESCE(desconsiderada_nd, FALSE) = TRUE) AS qtd_desconsideradas,
+                        COALESCE(SUM(CASE WHEN COALESCE(numero_nd, '') = :numero_nd THEN COALESCE(valor, 0) ELSE 0 END), 0) AS valor_vinculado,
+                        COALESCE(SUM(CASE WHEN COALESCE(desconsiderada_nd, FALSE) = TRUE THEN COALESCE(valor, 0) ELSE 0 END), 0) AS valor_desconsiderado,
+                        COALESCE(SUM(CASE WHEN COALESCE(numero_nd, '') = '' AND COALESCE(desconsiderada_nd, FALSE) = FALSE THEN COALESCE(valor, 0) ELSE 0 END), 0) AS valor_pendente
+                    FROM financeiro2_rd_linhas
+                    WHERE rd_id = :origem_id
+                      AND COALESCE(status, 'Ativo') = 'Ativo'
+                      AND COALESCE(valor, 0) > 0
+                """), {
+                    "origem_id": item["origem_id"],
+                    "numero_nd": nd["numero_nd"],
+                }).mappings().first()
+
+            item["qtd_vinculadas"] = int(totais["qtd_vinculadas"] or 0)
+            item["qtd_desconsideradas"] = int(totais["qtd_desconsideradas"] or 0)
+            item["valor_vinculado"] = float(totais["valor_vinculado"] or 0)
+            item["valor_desconsiderado"] = float(totais["valor_desconsiderado"] or 0)
+            item["valor_pendente"] = float(totais["valor_pendente"] or 0)
+
+            total_linhas_vinculadas += item["qtd_vinculadas"]
+            total_linhas_desconsideradas += item["qtd_desconsideradas"]
+            total_valor_vinculado += item["valor_vinculado"]
+            total_valor_desconsiderado += item["valor_desconsiderado"]
+            total_valor_pendente += item["valor_pendente"]
+
     nd = dict(nd)
     nd["eh_nova"] = False
     nd["qtd_despesas"] = len(despesas_rel)
+    nd["total_linhas_vinculadas"] = total_linhas_vinculadas
+    nd["total_linhas_desconsideradas"] = total_linhas_desconsideradas
+    nd["total_valor_vinculado"] = total_valor_vinculado
+    nd["total_valor_desconsiderado"] = total_valor_desconsiderado
+    nd["total_valor_pendente"] = total_valor_pendente
 
     return render_template(
         "financeiro_dois/nota_debito_editar.html",
@@ -5388,7 +5447,6 @@ def nota_debito_editar(nd_id: int):
         empresas_nd=empresas_nd,
         despesas_rel=despesas_rel,
     )
-
 
 @bp.route("/notas-debito/<int:nd_id>/salvar", methods=["POST"])
 @login_required
