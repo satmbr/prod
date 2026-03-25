@@ -5234,11 +5234,17 @@ def nota_debito_nova():
         "id": 0,
         "numero_nd": "",
         "data_form": hoje,
+        "data_nd": "",
         "empresa_nd": "",
         "status": "ABERTA",
         "observacao": "",
         "eh_nova": True,
         "qtd_despesas": 0,
+        "total_linhas_vinculadas": 0,
+        "total_linhas_desconsideradas": 0,
+        "total_valor_vinculado": 0.0,
+        "total_valor_desconsiderado": 0.0,
+        "total_valor_pendente": 0.0,
     }
 
     return render_template(
@@ -5272,11 +5278,17 @@ def nota_debito_criar():
         "id": 0,
         "numero_nd": numero_nd,
         "data_form": data_nd,
+        "data_nd": "",
         "empresa_nd": empresa_nd,
         "status": status,
         "observacao": observacao,
         "eh_nova": True,
         "qtd_despesas": 0,
+        "total_linhas_vinculadas": 0,
+        "total_linhas_desconsideradas": 0,
+        "total_valor_vinculado": 0.0,
+        "total_valor_desconsiderado": 0.0,
+        "total_valor_pendente": 0.0,
     }
 
     if not numero_nd or not data_nd or not empresa_nd:
