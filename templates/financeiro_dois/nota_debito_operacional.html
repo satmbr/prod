@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Despesa operacional | {{ nd.numero_nd }}{% endblock %}
+
+{% block content %}
+<div class="page-wrap">
+  <section class="zone">
+    <div class="zone-head">
+      <div class="zone-left">
+        <div class="zone-icon">💸</div>
+        <div>
+          <div class="zone-title">Despesa operacional — {{ despesa.numero_despesa }}</div>
+          <div class="muted">Escolha se a despesa entra nesta ND ou se será desconsiderada.</div>
+        </div>
+      </div>
+      <div class="zone-actions">
+        <a class="btn" href="{{ url_for('financeiro_dois.nota_debito_despesas', nd_id=nd.id) }}">Voltar</a>
+      </div>
+    </div>
+
+    <div class="content-grid">
+      <section class="main-card">
+        <div class="card-title">Dados da despesa</div>
+
+        <div class="resume-row"><span>Nº despesa</span><strong>{{ despesa.numero_despesa }}</strong></div>
+        <div class="resume-row"><span>Nº documento</span><strong>{{ despesa.numero_documento or '—' }}</strong></div>
+        <div class="resume-row"><span>Fornecedor</span><strong>{{ despesa.fornecedor or '—' }}</strong></div>
+        <div class="resume-row"><span>Descrição</span><strong>{{ despesa.descricao or '—' }}</strong></div>
+        <div class="resume-row"><span>Status ND</span><strong>{{ despesa.status_nd }}</strong></div>
+        <div class="resume-row"><span>ND principal</span><strong>{{ despesa.nd_numero or '—' }}</strong></div>
+        <div class="resume-row total"><span>Valor</span><strong>R$ {{ '%.2f'|format(despesa.valor) }}</strong></div>
+
+        <div class="form-actions-top" style="margin-top:18px;">
+          <form method="post" action="{{ url_for('financeiro_dois.nota_debito_operacional', nd_id=nd.id, despesa_id=despesa.id) }}">
+            <input type="hidden" name="acao" value="vincular">
+            <button type="submit" class="btn btn-primary">Vincular despesa à ND</button>
+          </form>
+
+          {% if pode_reverter %}
+          <form method="post" action="{{ url_for('financeiro_dois.nota_debito_operacional', nd_id=nd.id, despesa_id=despesa.id) }}">
+            <input type="hidden" name="acao" value="desconsiderar">
+            <button type="submit" class="btn">Desconsiderar despesa</button>
+          </form>
+          {% endif %}
+        </div>
+
+        {% if pode_reverter and (despesa.nd_numero == nd.numero_nd or despesa.numero_nd_desconsiderada == nd.numero_nd) %}
+        <div class="form-actions-top" style="margin-top:12px;">
+          <form method="post" action="{{ url_for('financeiro_dois.nota_debito_operacional_reverter', nd_id=nd.id, despesa_id=despesa.id) }}">
+            <button type="submit" class="btn">Reverter</button>
+          </form>
+        </div>
+        {% endif %}
+      </section>
+
+      <aside class="side-column">
+        <div class="resume-card">
+          <div class="resume-title">Resumo da ND</div>
+          <div class="resume-row"><span>Número ND</span><strong>{{ nd.numero_nd }}</strong></div>
+          <div class="resume-row"><span>Data</span><strong>{{ nd.data_nd }}</strong></div>
+          <div class="resume-row"><span>Empresa</span><strong>{{ nd.empresa_nd }}</strong></div>
+          <div class="resume-row"><span>Status</span><strong>{{ nd.status }}</strong></div>
+        </div>
+      </aside>
+    </div>
+  </section>
+</div>
+
+<style>
+.content-grid{display:grid;grid-template-columns:minmax(0,2fr) minmax(320px,1fr);gap:16px;}
+.main-card,.resume-card{background:#fff;border:1px solid #d9e2ec;border-radius:20px;padding:18px;}
+.card-title,.resume-title{font-size:18px;font-weight:800;margin-bottom:14px;color:#0f2f4f;}
+.resume-row{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid #e5edf5;text-transform:uppercase;}
+.resume-row:last-child{border-bottom:none;}
+.resume-row.total{font-weight:800;font-size:18px;}
+.side-column{display:flex;flex-direction:column;gap:16px;}
+.form-actions-top{display:flex;gap:8px;flex-wrap:wrap;}
+@media (max-width:1100px){.content-grid{grid-template-columns:1fr;}}
+</style>
+{% endblock %}
