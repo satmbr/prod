@@ -5906,17 +5906,16 @@ def nota_debito_reverter_linha(nd_id: int, despesa_id: int, linha_id: int):
             """), {"linha_id": linha_id})
 
         else:
-            flash("ESSA LINHA NÃO ESTÁ VINCULADA/DESCONSIDERADA POR ESTA ND.", "warning")
+            flash("ESSA LINHA NÃO ESTÁ VINCULADA OU DESCONSIDERADA POR ESTA ND.", "warning")
             return redirect(url_for("financeiro_dois.nota_debito_origem_linhas", nd_id=nd_id, despesa_id=despesa_id))
 
-        # Recalcular status da despesa
         totais = conn.execute(text(f"""
             SELECT
                 COUNT(*) AS total_linhas,
                 SUM(
                     CASE
                         WHEN COALESCE(numero_nd, '') <> ''
-                             OR COALESCE(desconsiderada_nd, FALSE) = TRUE
+                          OR COALESCE(desconsiderada_nd, FALSE) = TRUE
                         THEN 1 ELSE 0
                     END
                 ) AS total_resolvidas
@@ -5936,7 +5935,6 @@ def nota_debito_reverter_linha(nd_id: int, despesa_id: int, linha_id: int):
         else:
             novo_status = "VINCULADA"
 
-        # Mantém nd_numero principal se já existir
         conn.execute(text("""
             UPDATE financeiro2_despesas
             SET
@@ -5948,14 +5946,16 @@ def nota_debito_reverter_linha(nd_id: int, despesa_id: int, linha_id: int):
             "status_nd": novo_status,
         })
 
-        # Se essa ND não tiver mais nenhuma linha nem nenhuma desconsideração dela, remove a relação ND x despesa
         uso_nd = conn.execute(text(f"""
             SELECT COUNT(*) AS total
             FROM {tabela}
             WHERE {fk} = :origem_id
               AND (
                     COALESCE(numero_nd, '') = :numero_nd
-                 OR (COALESCE(desconsiderada_nd, FALSE) = TRUE AND COALESCE(numero_nd_desconsiderada, '') = :numero_nd)
+                 OR (
+                        COALESCE(desconsiderada_nd, FALSE) = TRUE
+                    AND COALESCE(numero_nd_desconsiderada, '') = :numero_nd
+                 )
               )
         """), {
             "origem_id": despesa["origem_id"],
