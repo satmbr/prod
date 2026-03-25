@@ -96,6 +96,10 @@
             <span>Status</span>
             <strong>{{ rd.status|upper }}</strong>
           </div>
+          <div class="resume-row">
+            <span>Status ND</span>
+            <strong>{{ rd.status_nd }}</strong>
+          </div>
           <div class="resume-row resume-total">
             <span>Saldo atual</span>
             <strong>R$ {{ '%.2f'|format(total_valor) }}</strong>
@@ -323,7 +327,6 @@
                 <input class="input-like input-like-sm" type="text" name="valor" value="{{ '%.2f'|format(linha.valor) }}" form="linha-rd-{{ linha.id }}" required>
               </td>
               <td>{{ linha.status|upper }}</td>
-              {% if rd.bloqueada %}<td>{{ linha.numero_nd or "--" }}</td>{% endif %}
               <td>
                 {% if linha.anexo_recibo %}
                 <a class="btn btn-sm" href="{{ url_for('static', filename='uploads/financeiro2/rd_recibos/' ~ linha.anexo_recibo) }}" target="_blank">Abrir recibo</a>
@@ -346,7 +349,6 @@
               <td>{{ linha.aplicacao|upper }}</td>
               <td style="text-align:right;">R$ {{ '%.2f'|format(linha.valor) }}</td>
               <td>{{ linha.status|upper }}</td>
-              {% if rd.bloqueada %}<td>{{ linha.numero_nd or "--" }}</td>{% endif %}
               <td>
                 {% if linha.anexo_recibo %}
                 <a class="btn btn-sm" href="{{ url_for('static', filename='uploads/financeiro2/rd_recibos/' ~ linha.anexo_recibo) }}" target="_blank">Abrir recibo</a>
@@ -369,7 +371,7 @@
             </tr>
             {% else %}
             <tr>
-              <td colspan="{% if rd.bloqueada %}9{% else %}8{% endif %}">Sem linhas lançadas.</td>
+              <td colspan="8">Sem linhas lançadas.</td>
             </tr>
             {% endfor %}
           </tbody>

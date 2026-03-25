@@ -1271,6 +1271,65 @@ def empresa_nd_toggle_status(item_id: int):
 # OM
 # =========================
 
+
+
+def _status_nd_om(conn, om_id: int) -> str:
+    totais = conn.execute(text("""
+        SELECT
+            COUNT(*) FILTER (
+                WHERE COALESCE(status, 'Ativo') = 'Ativo'
+                  AND COALESCE(valor_brl, 0) > 0
+            ) AS total_linhas,
+            COUNT(*) FILTER (
+                WHERE COALESCE(status, 'Ativo') = 'Ativo'
+                  AND COALESCE(valor_brl, 0) > 0
+                  AND (
+                        COALESCE(numero_nd, '') <> ''
+                     OR COALESCE(desconsiderada_nd, FALSE) = TRUE
+                  )
+            ) AS total_resolvidas
+        FROM financeiro2_om_linhas
+        WHERE om_id = :om_id
+    """), {"om_id": om_id}).mappings().first()
+
+    total_linhas = int(totais["total_linhas"] or 0)
+    total_resolvidas = int(totais["total_resolvidas"] or 0)
+
+    if total_resolvidas <= 0:
+        return "NÃO VINCULADA"
+    if total_resolvidas < total_linhas:
+        return "PARCIAL"
+    return "VINCULADA"
+
+
+def _status_nd_rd(conn, rd_id: int) -> str:
+    totais = conn.execute(text("""
+        SELECT
+            COUNT(*) FILTER (
+                WHERE COALESCE(status, 'Ativo') = 'Ativo'
+                  AND COALESCE(valor, 0) > 0
+            ) AS total_linhas,
+            COUNT(*) FILTER (
+                WHERE COALESCE(status, 'Ativo') = 'Ativo'
+                  AND COALESCE(valor, 0) > 0
+                  AND (
+                        COALESCE(numero_nd, '') <> ''
+                     OR COALESCE(desconsiderada_nd, FALSE) = TRUE
+                  )
+            ) AS total_resolvidas
+        FROM financeiro2_rd_linhas
+        WHERE rd_id = :rd_id
+    """), {"rd_id": rd_id}).mappings().first()
+
+    total_linhas = int(totais["total_linhas"] or 0)
+    total_resolvidas = int(totais["total_resolvidas"] or 0)
+
+    if total_resolvidas <= 0:
+        return "NÃO VINCULADA"
+    if total_resolvidas < total_linhas:
+        return "PARCIAL"
+    return "VINCULADA"
+
 @bp.route("/om")
 @login_required
 @permission_required("financeiro", "visualizar")
@@ -1278,7 +1337,7 @@ def om():
     engine = get_engine()
 
     with engine.connect() as conn:
-        oms = conn.execute(text("""
+        oms = [dict(x) for x in conn.execute(text("""
             SELECT
                 o.id,
                 o.numero_om AS numero,
@@ -1296,9 +1355,8 @@ def om():
             LEFT JOIN financeiro2_om_linhas l ON l.om_id = o.id
             GROUP BY o.id, o.numero_om, o.matricula_colaborador, o.nome_colaborador, o.status, o.criado_em
             ORDER BY o.id
-        """)).mappings().all()
+        """)).mappings().all()]
 
-        oms = [dict(x) for x in oms]
         for item in oms:
             item["status_nd"] = _status_nd_om(conn, item["id"])
 
@@ -1307,9 +1365,9 @@ def om():
         subnav_links=build_financeiro_dois_subnav("om"),
         oms=oms,
     )
-
-
+    
 @bp.route("/om/nova", methods=["POST"])
+
 @login_required
 @permission_required("financeiro", "visualizar")
 def om_nova():
@@ -1443,6 +1501,7 @@ def om_editar(om_id: int):
     om["saldo"] = total_brl
     om["linhas"] = linhas
     om["bloqueada"] = str(om["status"]).upper() == "PAGA"
+    om["status_nd"] = _status_nd_om(conn, om_id)
 
     return render_template(
         "financeiro_dois/om_editar.html",
@@ -1454,7 +1513,6 @@ def om_editar(om_id: int):
         aplicacoes=aplicacoes,
         moedas=moedas,
     )
-
 
 @bp.route("/om/<int:om_id>/salvar", methods=["POST"])
 @login_required
@@ -2064,7 +2122,8 @@ def om_exportar_pdf(om_id: int):
                 COALESCE(aplicacao, '') AS aplicacao,
                 COALESCE(valor_brl, 0) AS valor_brl,
                 COALESCE(anexo_recibo, '') AS anexo_recibo,
-                COALESCE(status, 'Ativo') AS status
+                COALESCE(status, 'Ativo') AS status,
+                UPPER(COALESCE(numero_nd, '')) AS numero_nd
             FROM financeiro2_om_linhas
             WHERE om_id = :id
               AND COALESCE(status, 'Ativo') = 'Ativo'
@@ -2366,7 +2425,7 @@ def rd():
     engine = get_engine()
 
     with engine.connect() as conn:
-        rds = conn.execute(text("""
+        rds = [dict(x) for x in conn.execute(text("""
             SELECT
                 r.id,
                 r.numero_rd AS numero,
@@ -2389,9 +2448,8 @@ def rd():
                 r.matricula_colaborador, r.nome_colaborador,
                 r.centro_custo, r.status, r.criado_em
             ORDER BY r.id
-        """)).mappings().all()
+        """)).mappings().all()]
 
-        rds = [dict(x) for x in rds]
         for item in rds:
             item["status_nd"] = _status_nd_rd(conn, item["id"])
 
@@ -2401,8 +2459,8 @@ def rd():
         rds=rds,
     )
 
-
 @bp.route("/rd/nova", methods=["POST"])
+
 @login_required
 @permission_required("financeiro", "visualizar")
 def rd_nova():
@@ -2541,6 +2599,7 @@ def rd_editar(rd_id: int):
         rd["saldo"] = total_valor
         rd["linhas"] = linhas
         rd["bloqueada"] = str(rd["status"]).upper() == "QUITADA"
+        rd["status_nd"] = _status_nd_rd(conn, rd_id)
 
         return render_template(
             "financeiro_dois/rd_editar.html",
@@ -2552,8 +2611,7 @@ def rd_editar(rd_id: int):
             aplicacoes=aplicacoes,
             centros_custo_lista=centros_custo_lista,
         )
-
-
+    
 @bp.route("/rd/<int:rd_id>/salvar", methods=["POST"])
 @login_required
 @permission_required("financeiro", "visualizar")
@@ -4393,7 +4451,8 @@ def rd_exportar_pdf(rd_id: int):
                 COALESCE(aplicacao, '') AS aplicacao,
                 COALESCE(valor, 0) AS valor,
                 COALESCE(status, 'Ativo') AS status,
-                COALESCE(anexo_recibo, '') AS anexo_recibo
+                COALESCE(anexo_recibo, '') AS anexo_recibo,
+                UPPER(COALESCE(numero_nd, '')) AS numero_nd
             FROM financeiro2_rd_linhas
             WHERE rd_id = :id
               AND COALESCE(status, 'Ativo') = 'Ativo'
