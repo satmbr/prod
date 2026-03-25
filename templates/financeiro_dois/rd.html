@@ -96,6 +96,7 @@
             <th>Centro de custo</th>
             <th>Status</th>
             <th>Criada em</th>
+            <th>STATUS ND</th>
             <th style="text-align:right;">Saldo</th>
             <th style="width:160px;">Ações</th>
           </tr>
@@ -118,6 +119,15 @@
               </span>
             </td>
             <td>{{ item.criada_em }}</td>
+            <td>
+              {% if item.status_nd == 'VINCULADA' %}
+                <span class="status-pill status-done">VINCULADA</span>
+              {% elif item.status_nd == 'PARCIAL' %}
+                <span class="status-pill status-warn">PARCIAL</span>
+              {% else %}
+                <span class="status-pill status-open">NÃO VINCULADA</span>
+              {% endif %}
+            </td>
             <td style="text-align:right;">R$ {{ '%.2f'|format(item.saldo) }}</td>
             <td>
               <div class="table-actions">
@@ -127,7 +137,7 @@
           </tr>
           {% else %}
           <tr>
-            <td colspan="9">Sem RDs cadastradas.</td>
+            <td colspan="10">Sem RDs cadastradas.</td>
           </tr>
           {% endfor %}
         </tbody>

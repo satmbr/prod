@@ -253,6 +253,7 @@
               <th>Aplicação</th>
               <th style="text-align:right;">Valor</th>
               <th>Status</th>
+              {% if rd.bloqueada %}<th>Nº ND</th>{% endif %}
               <th>Anexo</th>
               <th>Ações</th>
             </tr>
@@ -322,6 +323,7 @@
                 <input class="input-like input-like-sm" type="text" name="valor" value="{{ '%.2f'|format(linha.valor) }}" form="linha-rd-{{ linha.id }}" required>
               </td>
               <td>{{ linha.status|upper }}</td>
+              {% if rd.bloqueada %}<td>{{ linha.numero_nd or "--" }}</td>{% endif %}
               <td>
                 {% if linha.anexo_recibo %}
                 <a class="btn btn-sm" href="{{ url_for('static', filename='uploads/financeiro2/rd_recibos/' ~ linha.anexo_recibo) }}" target="_blank">Abrir recibo</a>
@@ -344,6 +346,7 @@
               <td>{{ linha.aplicacao|upper }}</td>
               <td style="text-align:right;">R$ {{ '%.2f'|format(linha.valor) }}</td>
               <td>{{ linha.status|upper }}</td>
+              {% if rd.bloqueada %}<td>{{ linha.numero_nd or "--" }}</td>{% endif %}
               <td>
                 {% if linha.anexo_recibo %}
                 <a class="btn btn-sm" href="{{ url_for('static', filename='uploads/financeiro2/rd_recibos/' ~ linha.anexo_recibo) }}" target="_blank">Abrir recibo</a>
@@ -366,7 +369,7 @@
             </tr>
             {% else %}
             <tr>
-              <td colspan="8">Sem linhas lançadas.</td>
+              <td colspan="{% if rd.bloqueada %}9{% else %}8{% endif %}">Sem linhas lançadas.</td>
             </tr>
             {% endfor %}
           </tbody>

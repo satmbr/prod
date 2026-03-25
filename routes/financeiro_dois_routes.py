@@ -1298,12 +1298,17 @@ def om():
             ORDER BY o.id
         """)).mappings().all()
 
+        oms = [dict(x) for x in oms]
+        for item in oms:
+            item["status_nd"] = _status_nd_om(conn, item["id"])
+
     return render_template(
         "financeiro_dois/om.html",
         subnav_links=build_financeiro_dois_subnav("om"),
         oms=oms,
     )
-    
+
+
 @bp.route("/om/nova", methods=["POST"])
 @login_required
 @permission_required("financeiro", "visualizar")
@@ -1397,7 +1402,8 @@ def om_editar(om_id: int):
                 COALESCE(cambio, 1) AS cambio,
                 COALESCE(valor_brl, 0) AS valor_brl,
                 COALESCE(anexo_recibo, '') AS anexo_recibo,
-                COALESCE(status, 'Ativo') AS status
+                COALESCE(status, 'Ativo') AS status,
+                UPPER(COALESCE(numero_nd, '')) AS numero_nd
             FROM financeiro2_om_linhas
             WHERE om_id = :id
             ORDER BY recibo, id
@@ -1448,6 +1454,7 @@ def om_editar(om_id: int):
         aplicacoes=aplicacoes,
         moedas=moedas,
     )
+
 
 @bp.route("/om/<int:om_id>/salvar", methods=["POST"])
 @login_required
@@ -2384,11 +2391,16 @@ def rd():
             ORDER BY r.id
         """)).mappings().all()
 
+        rds = [dict(x) for x in rds]
+        for item in rds:
+            item["status_nd"] = _status_nd_rd(conn, item["id"])
+
     return render_template(
         "financeiro_dois/rd.html",
         subnav_links=build_financeiro_dois_subnav("rd"),
         rds=rds,
     )
+
 
 @bp.route("/rd/nova", methods=["POST"])
 @login_required
@@ -2488,7 +2500,8 @@ def rd_editar(rd_id: int):
                 UPPER(COALESCE(aplicacao, '')) AS aplicacao,
                 COALESCE(valor, 0) AS valor,
                 COALESCE(status, 'Ativo') AS status,
-                COALESCE(anexo_recibo, '') AS anexo_recibo
+                COALESCE(anexo_recibo, '') AS anexo_recibo,
+                UPPER(COALESCE(numero_nd, '')) AS numero_nd
             FROM financeiro2_rd_linhas
             WHERE rd_id = :id
             ORDER BY id
@@ -2539,7 +2552,8 @@ def rd_editar(rd_id: int):
             aplicacoes=aplicacoes,
             centros_custo_lista=centros_custo_lista,
         )
-    
+
+
 @bp.route("/rd/<int:rd_id>/salvar", methods=["POST"])
 @login_required
 @permission_required("financeiro", "visualizar")
