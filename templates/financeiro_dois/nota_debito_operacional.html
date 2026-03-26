@@ -34,13 +34,6 @@
             <input type="hidden" name="acao" value="vincular">
             <button type="submit" class="btn btn-primary">Vincular despesa à ND</button>
           </form>
-
-          {% if pode_reverter %}
-          <form method="post" action="{{ url_for('financeiro_dois.nota_debito_operacional', nd_id=nd.id, despesa_id=despesa.id) }}">
-            <input type="hidden" name="acao" value="desconsiderar">
-            <button type="submit" class="btn">Desconsiderar despesa</button>
-          </form>
-          {% endif %}
         </div>
 
         {% if pode_reverter and (despesa.nd_numero == nd.numero_nd or despesa.numero_nd_desconsiderada == nd.numero_nd) %}
