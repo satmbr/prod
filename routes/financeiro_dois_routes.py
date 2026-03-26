@@ -6262,29 +6262,21 @@ def nota_debito_operacional(nd_id: int, despesa_id: int):
                     LIMIT 1
                 """), {"despesa_id": despesa_id}).mappings().first()
 
-                if rel and int(rel["nd_id"]) != int(nd_id):
-                    flash(
-                        f"DESPESA OPERACIONAL JÁ ESTÁ RELACIONADA À ND {rel['numero_nd']} E SÓ PODE PARTICIPAR DE UMA ÚNICA ND.",
-                        "warning"
-                    )
-                    return redirect(url_for("financeiro_dois.nota_debito_despesas", nd_id=nd_id))
-
-                if not rel:
+                if rel:
+                    if int(rel["nd_id"]) != int(nd_id):
+                        flash(
+                            f"DESPESA OPERACIONAL JÁ ESTÁ RELACIONADA À ND {rel['numero_nd']} E SÓ PODE PARTICIPAR DE UMA ÚNICA ND.",
+                            "warning"
+                        )
+                        return redirect(url_for("financeiro_dois.nota_debito_despesas", nd_id=nd_id))
+                else:
                     conn.execute(text("""
                         INSERT INTO financeiro2_notas_debito_despesas (
                             nd_id, despesa_id, criado_em
                         ) VALUES (
                             :nd_id, :despesa_id, CURRENT_TIMESTAMP
                         )
-                    """), {"nd_id": nd_id, "despesa_id": despesa_id})
-
-                if not rel:
-                    conn.execute(text("""
-                        INSERT INTO financeiro2_notas_debito_despesas (
-                            nd_id, despesa_id, criado_em
-                        ) VALUES (
-                            :nd_id, :despesa_id, CURRENT_TIMESTAMP
-                        )
+                        ON CONFLICT (nd_id, despesa_id) DO NOTHING
                     """), {"nd_id": nd_id, "despesa_id": despesa_id})
 
                 conn.execute(text("""
@@ -6319,29 +6311,21 @@ def nota_debito_operacional(nd_id: int, despesa_id: int):
                     LIMIT 1
                 """), {"despesa_id": despesa_id}).mappings().first()
 
-                if rel and int(rel["nd_id"]) != int(nd_id):
-                    flash(
-                        f"DESPESA OPERACIONAL JÁ ESTÁ RELACIONADA À ND {rel['numero_nd']} E SÓ PODE PARTICIPAR DE UMA ÚNICA ND.",
-                        "warning"
-                    )
-                    return redirect(url_for("financeiro_dois.nota_debito_despesas", nd_id=nd_id))
-
-                if not rel:
+                if rel:
+                    if int(rel["nd_id"]) != int(nd_id):
+                        flash(
+                            f"DESPESA OPERACIONAL JÁ ESTÁ RELACIONADA À ND {rel['numero_nd']} E SÓ PODE PARTICIPAR DE UMA ÚNICA ND.",
+                            "warning"
+                        )
+                        return redirect(url_for("financeiro_dois.nota_debito_despesas", nd_id=nd_id))
+                else:
                     conn.execute(text("""
                         INSERT INTO financeiro2_notas_debito_despesas (
                             nd_id, despesa_id, criado_em
                         ) VALUES (
                             :nd_id, :despesa_id, CURRENT_TIMESTAMP
                         )
-                    """), {"nd_id": nd_id, "despesa_id": despesa_id})
-
-                if not rel:
-                    conn.execute(text("""
-                        INSERT INTO financeiro2_notas_debito_despesas (
-                            nd_id, despesa_id, criado_em
-                        ) VALUES (
-                            :nd_id, :despesa_id, CURRENT_TIMESTAMP
-                        )
+                        ON CONFLICT (nd_id, despesa_id) DO NOTHING
                     """), {"nd_id": nd_id, "despesa_id": despesa_id})
 
                 conn.execute(text("""
