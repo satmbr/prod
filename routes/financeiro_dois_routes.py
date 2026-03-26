@@ -95,64 +95,6 @@ def _calcular_saldo_rd(conn, rd_id: int) -> float:
 
     return float(saldo["saldo"] or 0)
     
-def _status_nd_om(conn, om_id: int) -> str:
-    totais = conn.execute(text("""
-        SELECT
-            COUNT(*) FILTER (
-                WHERE COALESCE(status, 'Ativo') = 'Ativo'
-                  AND COALESCE(valor_brl, 0) > 0
-            ) AS total_linhas,
-            COUNT(*) FILTER (
-                WHERE COALESCE(status, 'Ativo') = 'Ativo'
-                  AND COALESCE(valor_brl, 0) > 0
-                  AND (
-                        COALESCE(numero_nd, '') <> ''
-                     OR COALESCE(desconsiderada_nd, FALSE) = TRUE
-                  )
-            ) AS total_resolvidas
-        FROM financeiro2_om_linhas
-        WHERE om_id = :om_id
-    """), {"om_id": om_id}).mappings().first()
-
-    total = int(totais["total_linhas"] or 0)
-    resolvidas = int(totais["total_resolvidas"] or 0)
-
-    if total <= 0 or resolvidas <= 0:
-        return "NÃO VINCULADA"
-    elif resolvidas < total:
-        return "PARCIAL"
-    else:
-        return "VINCULADA"
-
-
-def _status_nd_rd(conn, rd_id: int) -> str:
-    totais = conn.execute(text("""
-        SELECT
-            COUNT(*) FILTER (
-                WHERE COALESCE(status, 'Ativo') = 'Ativo'
-                  AND COALESCE(valor, 0) > 0
-            ) AS total_linhas,
-            COUNT(*) FILTER (
-                WHERE COALESCE(status, 'Ativo') = 'Ativo'
-                  AND COALESCE(valor, 0) > 0
-                  AND (
-                        COALESCE(numero_nd, '') <> ''
-                     OR COALESCE(desconsiderada_nd, FALSE) = TRUE
-                  )
-            ) AS total_resolvidas
-        FROM financeiro2_rd_linhas
-        WHERE rd_id = :rd_id
-    """), {"rd_id": rd_id}).mappings().first()
-
-    total = int(totais["total_linhas"] or 0)
-    resolvidas = int(totais["total_resolvidas"] or 0)
-
-    if total <= 0 or resolvidas <= 0:
-        return "NÃO VINCULADA"
-    elif resolvidas < total:
-        return "PARCIAL"
-    else:
-        return "VINCULADA"
 
 def _resolver_caminho_anexo_om(nome_arquivo: str) -> str | None:
     if not nome_arquivo:
