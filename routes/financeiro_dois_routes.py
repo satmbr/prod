@@ -6927,9 +6927,9 @@ def despesa_desvincular_salvar(despesa_id: int):
             UPDATE financeiro2_despesas
             SET
                 status_nd = 'NÃO VINCULADA',
-                nd_numero = NULL,
-                numero_nd_desconsiderada = NULL,
-                motivo_status_nd = NULL,
+                nd_numero = '',
+                numero_nd_desconsiderada = '',
+                motivo_status_nd = '',
                 atualizado_em = CURRENT_TIMESTAMP
             WHERE id = :id
         """), {"id": despesa_id})
