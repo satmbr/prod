@@ -1612,6 +1612,7 @@ def om_editar(om_id: int):
     om["saldo"] = total_brl
     om["linhas"] = linhas
     om["bloqueada"] = str(om["status"]).upper() == "PAGA"
+    om["status_nd"] = _status_nd_om(conn, om["id"])
 
     return render_template(
         "financeiro_dois/om_editar.html",
@@ -2710,6 +2711,7 @@ def rd_editar(rd_id: int):
         rd["saldo"] = total_valor
         rd["linhas"] = linhas
         rd["bloqueada"] = str(rd["status"]).upper() == "QUITADA"
+        rd["status_nd"] = _status_nd_rd(conn, rd["id"])
 
         return render_template(
             "financeiro_dois/rd_editar.html",

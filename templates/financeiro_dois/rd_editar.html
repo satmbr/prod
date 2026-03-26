@@ -102,18 +102,21 @@
           </div>
         </div>
 
-        <div class="resume-card">
-          <div class="resume-title">Ações</div>
-          <div class="action-list">
-            {% if not rd.bloqueada %}
-            <button type="button" class="btn btn-primary btn-block" onclick="toggleNovaLinhaRd()">Adicionar linha</button>
-            <button type="button" class="btn btn-block" onclick="toggleAdiantarRd()">Adiantar RD</button>
-            <button type="button" class="btn btn-block" onclick="togglePagarRd()">Pagar RD</button>
-            {% endif %}
-            <a href="{{ url_for('financeiro_dois.rd_exportar_pdf', rd_id=rd.id) }}" class="btn btn-block">Exportar PDF</a>
-            <a href="{{ url_for('financeiro_dois.rd_exportar_excel', rd_id=rd.id) }}" class="btn btn-block">Exportar Excel</a>
-          </div>
-        </div>
+		<div class="resume-card">
+		  <div class="resume-title">Ações</div>
+		  <div class="action-list">
+			{% if not rd.bloqueada %}
+			<button type="button" class="btn btn-primary btn-block" onclick="toggleNovaLinhaRd()">Adicionar linha</button>
+			<button type="button" class="btn btn-block" onclick="toggleAdiantarRd()">Adiantar RD</button>
+			<button type="button" class="btn btn-block" onclick="togglePagarRd()">Pagar RD</button>
+			{% endif %}
+			<a href="{{ url_for('financeiro_dois.rd_exportar_pdf', rd_id=rd.id) }}" class="btn btn-block">Exportar PDF</a>
+			<a href="{{ url_for('financeiro_dois.rd_exportar_excel', rd_id=rd.id) }}" class="btn btn-block">Exportar Excel</a>
+			{% if rd.status|upper == 'QUITADA' and rd.status_nd in ['PARCIAL', 'VINCULADA'] %}
+			<a href="{{ url_for('financeiro_dois.rd_desvincular', rd_id=rd.id) }}" class="btn btn-block">Desvincular</a>
+			{% endif %}
+		  </div>
+		</div>
       </div>
     </div>
 
