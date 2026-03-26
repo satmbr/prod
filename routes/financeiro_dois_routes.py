@@ -6219,6 +6219,28 @@ def nota_debito_operacional(nd_id: int, despesa_id: int):
                 flash("ESSA TELA É APENAS PARA DESPESA OPERACIONAL.", "warning")
                 return redirect(url_for("financeiro_dois.nota_debito_despesas", nd_id=nd_id))
 
+            relacao_outra_nd = conn.execute(text("""
+                SELECT
+                    r.nd_id,
+                    UPPER(COALESCE(n.numero_nd, '')) AS numero_nd
+                FROM financeiro2_notas_debito_despesas r
+                JOIN financeiro2_notas_debito n
+                  ON n.id = r.nd_id
+                WHERE r.despesa_id = :despesa_id
+                  AND r.nd_id <> :nd_id
+                LIMIT 1
+            """), {
+                "despesa_id": despesa_id,
+                "nd_id": nd_id,
+            }).mappings().first()
+
+            if relacao_outra_nd:
+                flash(
+                    f"DESPESA OPERACIONAL JÁ ESTÁ RELACIONADA À ND {relacao_outra_nd['numero_nd']} E SÓ PODE PARTICIPAR DE UMA ÚNICA ND.",
+                    "warning"
+                )
+                return redirect(url_for("financeiro_dois.nota_debito_despesas", nd_id=nd_id))
+
             if despesa["nd_numero"] and despesa["nd_numero"] != nd["numero_nd"]:
                 flash("DESPESA OPERACIONAL JÁ ESTÁ VINCULADA A OUTRA ND E SÓ PODE PARTICIPAR DE UMA ÚNICA ND.", "warning")
                 return redirect(url_for("financeiro_dois.nota_debito_despesas", nd_id=nd_id))
@@ -6229,12 +6251,32 @@ def nota_debito_operacional(nd_id: int, despesa_id: int):
 
             if acao == "vincular":
                 rel = conn.execute(text("""
-                    SELECT id
-                    FROM financeiro2_notas_debito_despesas
-                    WHERE nd_id = :nd_id
-                      AND despesa_id = :despesa_id
+                    SELECT
+                        r.id,
+                        r.nd_id,
+                        UPPER(COALESCE(n.numero_nd, '')) AS numero_nd
+                    FROM financeiro2_notas_debito_despesas r
+                    JOIN financeiro2_notas_debito n
+                      ON n.id = r.nd_id
+                    WHERE r.despesa_id = :despesa_id
                     LIMIT 1
-                """), {"nd_id": nd_id, "despesa_id": despesa_id}).mappings().first()
+                """), {"despesa_id": despesa_id}).mappings().first()
+
+                if rel and int(rel["nd_id"]) != int(nd_id):
+                    flash(
+                        f"DESPESA OPERACIONAL JÁ ESTÁ RELACIONADA À ND {rel['numero_nd']} E SÓ PODE PARTICIPAR DE UMA ÚNICA ND.",
+                        "warning"
+                    )
+                    return redirect(url_for("financeiro_dois.nota_debito_despesas", nd_id=nd_id))
+
+                if not rel:
+                    conn.execute(text("""
+                        INSERT INTO financeiro2_notas_debito_despesas (
+                            nd_id, despesa_id, criado_em
+                        ) VALUES (
+                            :nd_id, :despesa_id, CURRENT_TIMESTAMP
+                        )
+                    """), {"nd_id": nd_id, "despesa_id": despesa_id})
 
                 if not rel:
                     conn.execute(text("""
@@ -6266,12 +6308,32 @@ def nota_debito_operacional(nd_id: int, despesa_id: int):
 
             elif acao == "desconsiderar":
                 rel = conn.execute(text("""
-                    SELECT id
-                    FROM financeiro2_notas_debito_despesas
-                    WHERE nd_id = :nd_id
-                      AND despesa_id = :despesa_id
+                    SELECT
+                        r.id,
+                        r.nd_id,
+                        UPPER(COALESCE(n.numero_nd, '')) AS numero_nd
+                    FROM financeiro2_notas_debito_despesas r
+                    JOIN financeiro2_notas_debito n
+                      ON n.id = r.nd_id
+                    WHERE r.despesa_id = :despesa_id
                     LIMIT 1
-                """), {"nd_id": nd_id, "despesa_id": despesa_id}).mappings().first()
+                """), {"despesa_id": despesa_id}).mappings().first()
+
+                if rel and int(rel["nd_id"]) != int(nd_id):
+                    flash(
+                        f"DESPESA OPERACIONAL JÁ ESTÁ RELACIONADA À ND {rel['numero_nd']} E SÓ PODE PARTICIPAR DE UMA ÚNICA ND.",
+                        "warning"
+                    )
+                    return redirect(url_for("financeiro_dois.nota_debito_despesas", nd_id=nd_id))
+
+                if not rel:
+                    conn.execute(text("""
+                        INSERT INTO financeiro2_notas_debito_despesas (
+                            nd_id, despesa_id, criado_em
+                        ) VALUES (
+                            :nd_id, :despesa_id, CURRENT_TIMESTAMP
+                        )
+                    """), {"nd_id": nd_id, "despesa_id": despesa_id})
 
                 if not rel:
                     conn.execute(text("""
