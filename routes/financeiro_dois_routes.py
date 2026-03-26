@@ -3843,6 +3843,7 @@ def despesa_editar(despesa_id: int):
         tipos_documento=tipos_documento,
         centros_custo=centros_custo,
         empresas_nd=empresas_nd,
+        perfil_administrador=_usuario_eh_administrador(),
     )
     
 @bp.route("/despesas/<int:despesa_id>/desvincular-operacional", methods=["POST"])

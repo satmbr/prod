@@ -202,7 +202,7 @@
 			<strong>{{ despesa.nd_numero or despesa.numero_nd_desconsiderada or '—' }}</strong>
 		  </div>
 
-		  {% if current_user.perfil == 'Administrador' %}
+		  {% if perfil_administrador %}
 		  <form method="post" action="{{ url_for('financeiro_dois.despesa_desvincular_operacional', despesa_id=despesa.id) }}" style="margin-top:14px;">
 			<div class="field">
 			  <label>Senha de confirmação</label>
