@@ -1605,6 +1605,8 @@ def om_editar(om_id: int):
             WHERE status = 'Ativo'
             ORDER BY codigo
         """)).mappings().all()
+        
+        status_nd = _status_nd_om(conn, om["id"])
 
     total_brl = sum(float(item["valor_brl"]) for item in linhas if str(item["status"]) == "Ativo")
 
@@ -1612,7 +1614,7 @@ def om_editar(om_id: int):
     om["saldo"] = total_brl
     om["linhas"] = linhas
     om["bloqueada"] = str(om["status"]).upper() == "PAGA"
-    om["status_nd"] = _status_nd_om(conn, om["id"])
+    om["status_nd"] = status_nd
 
     return render_template(
         "financeiro_dois/om_editar.html",
@@ -2704,14 +2706,15 @@ def rd_editar(rd_id: int):
             WHERE status = 'Ativo'
             ORDER BY nome
         """)).mappings().all()
-
+        
+        status_nd = _status_nd_rd(conn, rd["id"])
         total_valor = sum(float(item["valor"]) for item in linhas if item["status"] == "Ativo")
 
         rd = dict(rd)
         rd["saldo"] = total_valor
         rd["linhas"] = linhas
         rd["bloqueada"] = str(rd["status"]).upper() == "QUITADA"
-        rd["status_nd"] = _status_nd_rd(conn, rd["id"])
+        rd["status_nd"] = status_nd
 
         return render_template(
             "financeiro_dois/rd_editar.html",
