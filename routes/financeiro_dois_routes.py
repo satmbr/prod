@@ -3728,6 +3728,7 @@ def despesa_editar(despesa_id: int):
                 UPPER(COALESCE(d.status_despesa, '')) AS status_despesa,
                 UPPER(COALESCE(d.status_nd, '')) AS status_nd,
                 UPPER(COALESCE(d.nd_numero, '')) AS nd_numero,
+                UPPER(COALESCE(d.numero_nd_desconsiderada, '')) AS numero_nd_desconsiderada,
                 UPPER(COALESCE(d.motivo_status_nd, '')) AS motivo_status_nd,
                 UPPER(COALESCE(d.observacao, '')) AS observacao,
                 COALESCE(d.valor_pago, 0) AS valor_pago,
@@ -3843,6 +3844,78 @@ def despesa_editar(despesa_id: int):
         centros_custo=centros_custo,
         empresas_nd=empresas_nd,
     )
+    
+@bp.route("/despesas/<int:despesa_id>/desvincular-operacional", methods=["POST"])
+@login_required
+@permission_required("financeiro", "visualizar")
+def despesa_desvincular_operacional(despesa_id: int):
+    if not _usuario_eh_administrador():
+        flash("APENAS O PERFIL ADMINISTRADOR PODE DESVINCULAR DESPESA OPERACIONAL DA ND.", "danger")
+        return redirect(url_for("financeiro_dois.despesa_editar", despesa_id=despesa_id))
+
+    senha = _nome_preenchido(request.form.get("senha_confirmacao"))
+
+    if not senha:
+        flash("INFORME A SENHA PARA CONFIRMAR A DESVINCULAÇÃO.", "warning")
+        return redirect(url_for("financeiro_dois.despesa_editar", despesa_id=despesa_id))
+
+    engine = get_engine()
+    with engine.begin() as conn:
+        if not _validar_senha_usuario_atual(conn, senha):
+            flash("SENHA INVÁLIDA.", "danger")
+            return redirect(url_for("financeiro_dois.despesa_editar", despesa_id=despesa_id))
+
+        despesa = conn.execute(text("""
+            SELECT
+                id,
+                UPPER(COALESCE(numero_despesa, '')) AS numero_despesa,
+                UPPER(COALESCE(origem_tipo, '')) AS origem_tipo,
+                UPPER(COALESCE(status_nd, '')) AS status_nd,
+                UPPER(COALESCE(nd_numero, '')) AS nd_numero,
+                UPPER(COALESCE(numero_nd_desconsiderada, '')) AS numero_nd_desconsiderada
+            FROM financeiro2_despesas
+            WHERE id = :id
+        """), {"id": despesa_id}).mappings().first()
+
+        if not despesa:
+            abort(404)
+
+        if despesa["origem_tipo"] != "OPERACIONAL":
+            flash("APENAS DESPESAS OPERACIONAIS PODEM SER DESVINCULADAS POR ESTA TELA.", "warning")
+            return redirect(url_for("financeiro_dois.despesa_editar", despesa_id=despesa_id))
+
+        if not despesa["nd_numero"] and not despesa["numero_nd_desconsiderada"]:
+            flash("ESSA DESPESA OPERACIONAL NÃO ESTÁ VINCULADA A NENHUMA ND.", "warning")
+            return redirect(url_for("financeiro_dois.despesa_editar", despesa_id=despesa_id))
+
+        nds_afetadas = conn.execute(text("""
+            SELECT DISTINCT nd_id
+            FROM financeiro2_notas_debito_despesas
+            WHERE despesa_id = :despesa_id
+        """), {"despesa_id": despesa_id}).mappings().all()
+
+        conn.execute(text("""
+            DELETE FROM financeiro2_notas_debito_despesas
+            WHERE despesa_id = :despesa_id
+        """), {"despesa_id": despesa_id})
+
+        conn.execute(text("""
+            UPDATE financeiro2_despesas
+            SET
+                status_nd = 'NÃO VINCULADA',
+                nd_numero = NULL,
+                numero_nd_desconsiderada = NULL,
+                motivo_status_nd = NULL,
+                atualizado_em = CURRENT_TIMESTAMP
+            WHERE id = :id
+        """), {"id": despesa_id})
+
+        for item in nds_afetadas:
+            if item["nd_id"]:
+                _recalcular_status_nd(conn, int(item["nd_id"]))
+
+    flash("DESPESA OPERACIONAL DESVINCULADA DA ND COM SUCESSO.", "success")
+    return redirect(url_for("financeiro_dois.despesa_editar", despesa_id=despesa_id))
     
 @bp.route("/despesas/<int:despesa_id>/salvar", methods=["POST"])
 @login_required
