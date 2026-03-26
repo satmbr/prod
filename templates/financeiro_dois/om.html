@@ -118,11 +118,14 @@
               {% endif %}
             </td>
             <td style="text-align:right;">R$ {{ '%.2f'|format(item.saldo) }}</td>
-            <td>
-              <div class="table-actions">
-                <a class="btn btn-sm" href="{{ url_for('financeiro_dois.om_editar', om_id=item.id) }}">Editar</a>
-              </div>
-            </td>
+			<td>
+			  <div class="table-actions">
+				<a class="btn btn-sm" href="{{ url_for('financeiro_dois.om_editar', om_id=item.id) }}">Editar</a>
+				{% if item.status == 'Paga' and item.status_nd in ['PARCIAL', 'VINCULADA'] %}
+				  <a class="btn btn-sm" href="{{ url_for('financeiro_dois.om_desvincular', om_id=item.id) }}">Desvincular</a>
+				{% endif %}
+			  </div>
+			</td>
           </tr>
           {% else %}
           <tr>

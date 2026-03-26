@@ -13,6 +13,7 @@ from reportlab.lib.utils import ImageReader
 from datetime import date, datetime
 import uuid
 from werkzeug.utils import secure_filename
+from werkzeug.security import check_password_hash
 
 bp = Blueprint("financeiro_dois", __name__, url_prefix="/financeiro-dois")
 
@@ -190,6 +191,164 @@ def _recalcular_status_nd(conn, nd_id: int):
     
 def _usuario_eh_administrador() -> bool:
     return user_can("auth:administrar")
+
+def _validar_senha_usuario_atual(conn, senha_digitada: str) -> bool:
+    """
+    Ajuste SOMENTE a query abaixo se sua autenticação usar outra tabela/colunas.
+    Estou assumindo:
+      - session['usuario_id']
+      - tabela: usuarios
+      - coluna hash: senha_hash
+    """
+    usuario_id = session.get("usuario_id")
+    if not usuario_id or not senha_digitada:
+        return False
+
+    usuario = conn.execute(text("""
+        SELECT senha_hash
+        FROM usuarios
+        WHERE id = :id
+        LIMIT 1
+    """), {"id": usuario_id}).mappings().first()
+
+    if not usuario or not usuario.get("senha_hash"):
+        return False
+
+    return check_password_hash(usuario["senha_hash"], senha_digitada)
+
+
+def _recalcular_status_despesa_origem(conn, origem_tipo: str, origem_id: int):
+    origem_tipo = (origem_tipo or "").upper()
+
+    if origem_tipo == "OM":
+        totais = conn.execute(text("""
+            SELECT
+                COUNT(*) FILTER (
+                    WHERE COALESCE(status, 'Ativo') = 'Ativo'
+                      AND COALESCE(valor_brl, 0) > 0
+                ) AS total_linhas,
+                COUNT(*) FILTER (
+                    WHERE COALESCE(status, 'Ativo') = 'Ativo'
+                      AND COALESCE(valor_brl, 0) > 0
+                      AND (
+                            COALESCE(numero_nd, '') <> ''
+                         OR COALESCE(desconsiderada_nd, FALSE) = TRUE
+                      )
+                ) AS total_resolvidas
+            FROM financeiro2_om_linhas
+            WHERE om_id = :origem_id
+        """), {"origem_id": origem_id}).mappings().first()
+
+    elif origem_tipo == "RD":
+        totais = conn.execute(text("""
+            SELECT
+                COUNT(*) FILTER (
+                    WHERE COALESCE(status, 'Ativo') = 'Ativo'
+                      AND COALESCE(valor, 0) > 0
+                ) AS total_linhas,
+                COUNT(*) FILTER (
+                    WHERE COALESCE(status, 'Ativo') = 'Ativo'
+                      AND COALESCE(valor, 0) > 0
+                      AND (
+                            COALESCE(numero_nd, '') <> ''
+                         OR COALESCE(desconsiderada_nd, FALSE) = TRUE
+                      )
+                ) AS total_resolvidas
+            FROM financeiro2_rd_linhas
+            WHERE rd_id = :origem_id
+        """), {"origem_id": origem_id}).mappings().first()
+    else:
+        return
+
+    total_linhas = int(totais["total_linhas"] or 0)
+    total_resolvidas = int(totais["total_resolvidas"] or 0)
+
+    if total_resolvidas <= 0:
+        novo_status = "NÃO VINCULADA"
+    elif total_resolvidas < total_linhas:
+        novo_status = "PARCIAL"
+    else:
+        novo_status = "VINCULADA"
+
+    conn.execute(text("""
+        UPDATE financeiro2_despesas
+        SET
+            status_nd = :status_nd,
+            atualizado_em = CURRENT_TIMESTAMP
+        WHERE UPPER(COALESCE(origem_tipo, '')) = :origem_tipo
+          AND origem_id = :origem_id
+    """), {
+        "status_nd": novo_status,
+        "origem_tipo": origem_tipo,
+        "origem_id": origem_id,
+    })
+
+
+def _recalcular_relacao_nd_despesa(conn, nd_numero: str, origem_tipo: str, origem_id: int):
+    origem_tipo = (origem_tipo or "").upper()
+
+    despesa = conn.execute(text("""
+        SELECT id
+        FROM financeiro2_despesas
+        WHERE UPPER(COALESCE(origem_tipo, '')) = :origem_tipo
+          AND origem_id = :origem_id
+        LIMIT 1
+    """), {
+        "origem_tipo": origem_tipo,
+        "origem_id": origem_id,
+    }).mappings().first()
+
+    if not despesa:
+        return
+
+    nd = conn.execute(text("""
+        SELECT id
+        FROM financeiro2_notas_debito
+        WHERE UPPER(COALESCE(numero_nd, '')) = :numero_nd
+        LIMIT 1
+    """), {"numero_nd": (nd_numero or "").upper()}).mappings().first()
+
+    if not nd:
+        return
+
+    if origem_tipo == "OM":
+        uso = conn.execute(text("""
+            SELECT COUNT(*) AS total
+            FROM financeiro2_om_linhas
+            WHERE om_id = :origem_id
+              AND (
+                    UPPER(COALESCE(numero_nd, '')) = :numero_nd
+                 OR UPPER(COALESCE(numero_nd_desconsiderada, '')) = :numero_nd
+              )
+        """), {
+            "origem_id": origem_id,
+            "numero_nd": (nd_numero or "").upper(),
+        }).mappings().first()
+    else:
+        uso = conn.execute(text("""
+            SELECT COUNT(*) AS total
+            FROM financeiro2_rd_linhas
+            WHERE rd_id = :origem_id
+              AND (
+                    UPPER(COALESCE(numero_nd, '')) = :numero_nd
+                 OR UPPER(COALESCE(numero_nd_desconsiderada, '')) = :numero_nd
+              )
+        """), {
+            "origem_id": origem_id,
+            "numero_nd": (nd_numero or "").upper(),
+        }).mappings().first()
+
+    if int(uso["total"] or 0) <= 0:
+        conn.execute(text("""
+            DELETE FROM financeiro2_notas_debito_despesas
+            WHERE nd_id = :nd_id
+              AND despesa_id = :despesa_id
+        """), {
+            "nd_id": nd["id"],
+            "despesa_id": despesa["id"],
+        })
+
+    _recalcular_status_nd(conn, nd["id"])
     
 @bp.route("/")
 @login_required
@@ -6175,3 +6334,303 @@ def nota_debito_operacional_reverter(nd_id: int, despesa_id: int):
 
     flash("DESPESA OPERACIONAL REVERTIDA COM SUCESSO.", "success")
     return redirect(url_for("financeiro_dois.nota_debito_operacional", nd_id=nd_id, despesa_id=despesa_id))
+    
+@bp.route("/om/<int:om_id>/desvincular")
+@login_required
+@permission_required("financeiro", "visualizar")
+def om_desvincular(om_id: int):
+    if not _usuario_eh_administrador():
+        flash("APENAS O PERFIL ADMINISTRADOR PODE DESVINCULAR LINHAS DA OM.", "danger")
+        return redirect(url_for("financeiro_dois.om_editar", om_id=om_id))
+
+    engine = get_engine()
+    with engine.connect() as conn:
+        om = conn.execute(text("""
+            SELECT
+                id,
+                numero_om AS numero,
+                matricula_colaborador AS matricula,
+                nome_colaborador AS colaborador,
+                status
+            FROM financeiro2_om
+            WHERE id = :id
+        """), {"id": om_id}).mappings().first()
+
+        if not om:
+            abort(404)
+
+        if om["status"] != "Paga":
+            flash("SÓ É POSSÍVEL DESVINCULAR QUANDO A OM ESTIVER PAGA.", "warning")
+            return redirect(url_for("financeiro_dois.om_editar", om_id=om_id))
+
+        linhas = conn.execute(text("""
+            SELECT
+                id,
+                TO_CHAR(data_lancamento, 'DD/MM/YYYY') AS data,
+                COALESCE(recibo, id) AS recibo,
+                UPPER(COALESCE(tipo_linha, '')) AS descricao,
+                UPPER(COALESCE(detalhes, '')) AS detalhes,
+                UPPER(COALESCE(categoria, '')) AS categoria,
+                UPPER(COALESCE(aplicacao, '')) AS aplicacao,
+                COALESCE(valor_brl, 0) AS valor_brl,
+                UPPER(COALESCE(numero_nd, '')) AS numero_nd,
+                COALESCE(desconsiderada_nd, FALSE) AS desconsiderada_nd,
+                UPPER(COALESCE(numero_nd_desconsiderada, '')) AS numero_nd_desconsiderada
+            FROM financeiro2_om_linhas
+            WHERE om_id = :om_id
+              AND COALESCE(status, 'Ativo') = 'Ativo'
+              AND COALESCE(valor_brl, 0) > 0
+            ORDER BY id
+        """), {"om_id": om_id}).mappings().all()
+
+    return render_template(
+        "financeiro_dois/om_desvincular.html",
+        subnav_links=build_financeiro_dois_subnav("om"),
+        om=om,
+        linhas=linhas,
+    )
+
+
+@bp.route("/om/<int:om_id>/desvincular/salvar", methods=["POST"])
+@login_required
+@permission_required("financeiro", "visualizar")
+def om_desvincular_salvar(om_id: int):
+    if not _usuario_eh_administrador():
+        flash("APENAS O PERFIL ADMINISTRADOR PODE DESVINCULAR LINHAS DA OM.", "danger")
+        return redirect(url_for("financeiro_dois.om_editar", om_id=om_id))
+
+    senha = _nome_preenchido(request.form.get("senha_confirmacao"))
+    linha_ids = request.form.getlist("linha_ids")
+
+    if not linha_ids:
+        flash("SELECIONE AO MENOS UMA LINHA PARA DESVINCULAR.", "warning")
+        return redirect(url_for("financeiro_dois.om_desvincular", om_id=om_id))
+
+    engine = get_engine()
+    with engine.begin() as conn:
+        if not _validar_senha_usuario_atual(conn, senha):
+            flash("SENHA INVÁLIDA.", "danger")
+            return redirect(url_for("financeiro_dois.om_desvincular", om_id=om_id))
+
+        om = conn.execute(text("""
+            SELECT id, status
+            FROM financeiro2_om
+            WHERE id = :id
+        """), {"id": om_id}).mappings().first()
+
+        if not om:
+            abort(404)
+
+        if om["status"] != "Paga":
+            flash("SÓ É POSSÍVEL DESVINCULAR QUANDO A OM ESTIVER PAGA.", "warning")
+            return redirect(url_for("financeiro_dois.om_editar", om_id=om_id))
+
+        nds_afetadas = set()
+
+        for linha_id in linha_ids:
+            linha = conn.execute(text("""
+                SELECT
+                    id,
+                    UPPER(COALESCE(numero_nd, '')) AS numero_nd,
+                    COALESCE(desconsiderada_nd, FALSE) AS desconsiderada_nd,
+                    UPPER(COALESCE(numero_nd_desconsiderada, '')) AS numero_nd_desconsiderada
+                FROM financeiro2_om_linhas
+                WHERE id = :linha_id
+                  AND om_id = :om_id
+                  AND COALESCE(status, 'Ativo') = 'Ativo'
+                  AND COALESCE(valor_brl, 0) > 0
+            """), {
+                "linha_id": int(linha_id),
+                "om_id": om_id,
+            }).mappings().first()
+
+            if not linha:
+                continue
+
+            if linha["numero_nd"]:
+                nds_afetadas.add(linha["numero_nd"])
+                conn.execute(text("""
+                    UPDATE financeiro2_om_linhas
+                    SET
+                        numero_nd = NULL,
+                        atualizado_em = CURRENT_TIMESTAMP
+                    WHERE id = :linha_id
+                      AND om_id = :om_id
+                """), {
+                    "linha_id": int(linha_id),
+                    "om_id": om_id,
+                })
+
+            if linha["desconsiderada_nd"]:
+                if linha["numero_nd_desconsiderada"]:
+                    nds_afetadas.add(linha["numero_nd_desconsiderada"])
+                conn.execute(text("""
+                    UPDATE financeiro2_om_linhas
+                    SET
+                        desconsiderada_nd = FALSE,
+                        numero_nd_desconsiderada = NULL,
+                        atualizado_em = CURRENT_TIMESTAMP
+                    WHERE id = :linha_id
+                      AND om_id = :om_id
+                """), {
+                    "linha_id": int(linha_id),
+                    "om_id": om_id,
+                })
+
+        _recalcular_status_despesa_origem(conn, "OM", om_id)
+
+        for numero_nd in nds_afetadas:
+            _recalcular_relacao_nd_despesa(conn, numero_nd, "OM", om_id)
+
+    flash("LINHAS DA OM DESVINCULADAS COM SUCESSO.", "success")
+    return redirect(url_for("financeiro_dois.om_editar", om_id=om_id))
+    
+@bp.route("/rd/<int:rd_id>/desvincular")
+@login_required
+@permission_required("financeiro", "visualizar")
+def rd_desvincular(rd_id: int):
+    if not _usuario_eh_administrador():
+        flash("APENAS O PERFIL ADMINISTRADOR PODE DESVINCULAR LINHAS DA RD.", "danger")
+        return redirect(url_for("financeiro_dois.rd_editar", rd_id=rd_id))
+
+    engine = get_engine()
+    with engine.connect() as conn:
+        rd = conn.execute(text("""
+            SELECT
+                id,
+                numero_rd AS numero,
+                periodo,
+                matricula_colaborador AS matricula,
+                nome_colaborador AS colaborador,
+                status
+            FROM financeiro2_rd
+            WHERE id = :id
+        """), {"id": rd_id}).mappings().first()
+
+        if not rd:
+            abort(404)
+
+        if (rd["status"] or "").upper() != "QUITADA":
+            flash("SÓ É POSSÍVEL DESVINCULAR QUANDO A RD ESTIVER QUITADA.", "warning")
+            return redirect(url_for("financeiro_dois.rd_editar", rd_id=rd_id))
+
+        linhas = conn.execute(text("""
+            SELECT
+                id,
+                TO_CHAR(data_lancamento, 'DD/MM/YYYY') AS data,
+                id AS referencia,
+                UPPER(COALESCE(descricao, '')) AS descricao,
+                UPPER(COALESCE(categoria, '')) AS categoria,
+                UPPER(COALESCE(aplicacao, '')) AS aplicacao,
+                COALESCE(valor, 0) AS valor,
+                UPPER(COALESCE(numero_nd, '')) AS numero_nd,
+                COALESCE(desconsiderada_nd, FALSE) AS desconsiderada_nd,
+                UPPER(COALESCE(numero_nd_desconsiderada, '')) AS numero_nd_desconsiderada
+            FROM financeiro2_rd_linhas
+            WHERE rd_id = :rd_id
+              AND COALESCE(status, 'Ativo') = 'Ativo'
+              AND COALESCE(valor, 0) > 0
+            ORDER BY id
+        """), {"rd_id": rd_id}).mappings().all()
+
+    return render_template(
+        "financeiro_dois/rd_desvincular.html",
+        subnav_links=build_financeiro_dois_subnav("rd"),
+        rd=rd,
+        linhas=linhas,
+    )
+
+
+@bp.route("/rd/<int:rd_id>/desvincular/salvar", methods=["POST"])
+@login_required
+@permission_required("financeiro", "visualizar")
+def rd_desvincular_salvar(rd_id: int):
+    if not _usuario_eh_administrador():
+        flash("APENAS O PERFIL ADMINISTRADOR PODE DESVINCULAR LINHAS DA RD.", "danger")
+        return redirect(url_for("financeiro_dois.rd_editar", rd_id=rd_id))
+
+    senha = _nome_preenchido(request.form.get("senha_confirmacao"))
+    linha_ids = request.form.getlist("linha_ids")
+
+    if not linha_ids:
+        flash("SELECIONE AO MENOS UMA LINHA PARA DESVINCULAR.", "warning")
+        return redirect(url_for("financeiro_dois.rd_desvincular", rd_id=rd_id))
+
+    engine = get_engine()
+    with engine.begin() as conn:
+        if not _validar_senha_usuario_atual(conn, senha):
+            flash("SENHA INVÁLIDA.", "danger")
+            return redirect(url_for("financeiro_dois.rd_desvincular", rd_id=rd_id))
+
+        rd = conn.execute(text("""
+            SELECT id, status
+            FROM financeiro2_rd
+            WHERE id = :id
+        """), {"id": rd_id}).mappings().first()
+
+        if not rd:
+            abort(404)
+
+        if (rd["status"] or "").upper() != "QUITADA":
+            flash("SÓ É POSSÍVEL DESVINCULAR QUANDO A RD ESTIVER QUITADA.", "warning")
+            return redirect(url_for("financeiro_dois.rd_editar", rd_id=rd_id))
+
+        nds_afetadas = set()
+
+        for linha_id in linha_ids:
+            linha = conn.execute(text("""
+                SELECT
+                    id,
+                    UPPER(COALESCE(numero_nd, '')) AS numero_nd,
+                    COALESCE(desconsiderada_nd, FALSE) AS desconsiderada_nd,
+                    UPPER(COALESCE(numero_nd_desconsiderada, '')) AS numero_nd_desconsiderada
+                FROM financeiro2_rd_linhas
+                WHERE id = :linha_id
+                  AND rd_id = :rd_id
+                  AND COALESCE(status, 'Ativo') = 'Ativo'
+                  AND COALESCE(valor, 0) > 0
+            """), {
+                "linha_id": int(linha_id),
+                "rd_id": rd_id,
+            }).mappings().first()
+
+            if not linha:
+                continue
+
+            if linha["numero_nd"]:
+                nds_afetadas.add(linha["numero_nd"])
+                conn.execute(text("""
+                    UPDATE financeiro2_rd_linhas
+                    SET
+                        numero_nd = NULL,
+                        atualizado_em = CURRENT_TIMESTAMP
+                    WHERE id = :linha_id
+                      AND rd_id = :rd_id
+                """), {
+                    "linha_id": int(linha_id),
+                    "rd_id": rd_id,
+                })
+
+            if linha["desconsiderada_nd"]:
+                if linha["numero_nd_desconsiderada"]:
+                    nds_afetadas.add(linha["numero_nd_desconsiderada"])
+                conn.execute(text("""
+                    UPDATE financeiro2_rd_linhas
+                    SET
+                        desconsiderada_nd = FALSE,
+                        numero_nd_desconsiderada = NULL,
+                        atualizado_em = CURRENT_TIMESTAMP
+                    WHERE id = :linha_id
+                      AND rd_id = :rd_id
+                """), {
+                    "linha_id": int(linha_id),
+                    "rd_id": rd_id,
+                })
+
+        _recalcular_status_despesa_origem(conn, "RD", rd_id)
+
+        for numero_nd in nds_afetadas:
+            _recalcular_relacao_nd_despesa(conn, numero_nd, "RD", rd_id)
+
+    flash("LINHAS DA RD DESVINCULADAS COM SUCESSO.", "success")
+    return redirect(url_for("financeiro_dois.rd_editar", rd_id=rd_id))

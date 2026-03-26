@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Desvincular RD | {{ rd.numero }}{% endblock %}
+
+{% block content %}
+<div class="page-wrap">
+  <section class="zone">
+    <div class="zone-head">
+      <div class="zone-left">
+        <div class="zone-icon">🔓</div>
+        <div>
+          <div class="zone-title">Desvincular linhas da RD {{ rd.numero }}</div>
+          <div class="muted">Selecione as linhas que deixarão de participar das NDs vinculadas.</div>
+        </div>
+      </div>
+      <div class="zone-actions">
+        <a class="btn" href="{{ url_for('financeiro_dois.rd_editar', rd_id=rd.id) }}">Voltar</a>
+      </div>
+    </div>
+
+    <form method="post" action="{{ url_for('financeiro_dois.rd_desvincular_salvar', rd_id=rd.id) }}">
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th></th>
+              <th>DATA</th>
+              <th>REF.</th>
+              <th>DESCRIÇÃO</th>
+              <th>CATEGORIA</th>
+              <th>APLICAÇÃO</th>
+              <th style="text-align:right;">VALOR</th>
+              <th>Nº ND</th>
+              <th>DESCONSIDERADA</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for linha in linhas %}
+            <tr>
+              <td>
+                {% if linha.numero_nd or linha.desconsiderada_nd %}
+                  <input type="checkbox" name="linha_ids" value="{{ linha.id }}">
+                {% endif %}
+              </td>
+              <td>{{ linha.data }}</td>
+              <td>{{ linha.referencia }}</td>
+              <td>{{ linha.descricao }}</td>
+              <td>{{ linha.categoria }}</td>
+              <td>{{ linha.aplicacao }}</td>
+              <td style="text-align:right;">R$ {{ '%.2f'|format(linha.valor) }}</td>
+              <td>{{ linha.numero_nd or '--' }}</td>
+              <td>{{ linha.numero_nd_desconsiderada if linha.desconsiderada_nd else '--' }}</td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="9">Nenhuma linha vinculada/desconsiderada encontrada.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="filters-card" style="margin-top:16px;">
+        <div class="field">
+          <label>Senha do usuário</label>
+          <input type="password" name="senha_confirmacao" class="input-like" required>
+        </div>
+
+        <div class="form-actions-top" style="margin-top:14px;">
+          <button type="submit" class="btn btn-primary">Confirmar desvinculação</button>
+        </div>
+      </div>
+    </form>
+  </section>
+</div>
+{% endblock %}
