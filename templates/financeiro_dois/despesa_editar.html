@@ -191,35 +191,12 @@
 		
 		{% if despesa.origem_tipo == 'OPERACIONAL' and (despesa.nd_numero or despesa.numero_nd_desconsiderada) %}
 		<div class="resume-card">
-		  <div class="resume-title">Desvinculação ND</div>
-
-		  <div class="muted" style="margin-bottom:12px;">
-			Esta ação remove a despesa operacional da ND vinculada e exige confirmação por senha.
-		  </div>
-
-		  <div class="resume-row">
-			<span>ND atual</span>
-			<strong>{{ despesa.nd_numero or despesa.numero_nd_desconsiderada or '—' }}</strong>
-		  </div>
-
-		  {% if perfil_administrador %}
-		  <form method="post" action="{{ url_for('financeiro_dois.despesa_desvincular_operacional', despesa_id=despesa.id) }}" style="margin-top:14px;">
-			<div class="field">
-			  <label>Senha de confirmação</label>
-			  <input class="input-like" type="password" name="senha_confirmacao" required>
-			</div>
-
-			<div style="margin-top:12px;">
-			  <button type="submit" class="btn btn-block">Desvincular da ND</button>
-			</div>
-		  </form>
-		  {% else %}
-		  <div class="muted" style="margin-top:12px;">
-			Apenas o perfil Administrador pode desvincular despesa operacional da ND.
-		  </div>
-		  {% endif %}
+		  <div class="resume-title">Ações ND</div>
+		  <a href="{{ url_for('financeiro_dois.despesa_desvincular', despesa_id=despesa.id) }}" class="btn btn-block">
+			Desvincular da ND
+		  </a>
 		</div>
-		{% endif %}
+		{% endif %}		
 
         {% if not despesa.eh_nova %}
         <div class="resume-card">

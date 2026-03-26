@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Desvincular Despesa | {{ despesa.numero_despesa }}{% endblock %}
+
+{% block content %}
+<div class="page-wrap">
+  <section class="zone">
+    <div class="zone-head">
+      <div class="zone-left">
+        <div class="zone-icon">🔓</div>
+        <div>
+          <div class="zone-title">Desvincular despesa operacional {{ despesa.numero_despesa }}</div>
+          <div class="muted">Esta ação removerá a despesa da ND vinculada e limpará o vínculo atual.</div>
+        </div>
+      </div>
+      <div class="zone-actions">
+        <a class="btn" href="{{ url_for('financeiro_dois.despesa_editar', despesa_id=despesa.id) }}">Voltar</a>
+      </div>
+    </div>
+
+    <form method="post" action="{{ url_for('financeiro_dois.despesa_desvincular_salvar', despesa_id=despesa.id) }}">
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>DATA</th>
+              <th>Nº DESPESA</th>
+              <th>DOCUMENTO</th>
+              <th>FORNECEDOR</th>
+              <th>DESCRIÇÃO</th>
+              <th>CC</th>
+              <th style="text-align:right;">VALOR</th>
+              <th>Nº ND</th>
+              <th>DESCONSIDERADA</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>{{ despesa.data_documento or '--' }}</td>
+              <td>{{ despesa.numero_despesa }}</td>
+              <td>{{ despesa.numero_documento or '--' }}</td>
+              <td>{{ despesa.fornecedor or '--' }}</td>
+              <td>{{ despesa.descricao or '--' }}</td>
+              <td>{{ despesa.centro_custo or '--' }}</td>
+              <td style="text-align:right;">R$ {{ '%.2f'|format(despesa.valor|float if despesa.valor else 0) }}</td>
+              <td>{{ despesa.nd_numero or '--' }}</td>
+              <td>{{ despesa.numero_nd_desconsiderada or '--' }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="filters-card" style="margin-top:16px;">
+        <div class="field">
+          <label>Senha do usuário</label>
+          <input type="password" name="senha_confirmacao" class="input-like" required>
+        </div>
+
+        <div class="form-actions-top" style="margin-top:14px;">
+          <button type="submit" class="btn btn-primary">Confirmar desvinculação</button>
+        </div>
+      </div>
+    </form>
+  </section>
+</div>
+{% endblock %}
