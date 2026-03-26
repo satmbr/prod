@@ -6144,7 +6144,8 @@ def nota_debito_operacional(nd_id: int, despesa_id: int):
                 SELECT
                     id,
                     UPPER(COALESCE(origem_tipo, '')) AS origem,
-                    UPPER(COALESCE(nd_numero, '')) AS nd_numero
+                    UPPER(COALESCE(nd_numero, '')) AS nd_numero,
+                    UPPER(COALESCE(numero_nd_desconsiderada, '')) AS numero_nd_desconsiderada
                 FROM financeiro2_despesas
                 WHERE id = :id
             """), {"id": despesa_id}).mappings().first()
@@ -6154,6 +6155,14 @@ def nota_debito_operacional(nd_id: int, despesa_id: int):
 
             if despesa["origem"] != "OPERACIONAL":
                 flash("ESSA TELA É APENAS PARA DESPESA OPERACIONAL.", "warning")
+                return redirect(url_for("financeiro_dois.nota_debito_despesas", nd_id=nd_id))
+
+            if despesa["nd_numero"] and despesa["nd_numero"] != nd["numero_nd"]:
+                flash("DESPESA OPERACIONAL JÁ ESTÁ VINCULADA A OUTRA ND E SÓ PODE PARTICIPAR DE UMA ÚNICA ND.", "warning")
+                return redirect(url_for("financeiro_dois.nota_debito_despesas", nd_id=nd_id))
+
+            if despesa["numero_nd_desconsiderada"] and despesa["numero_nd_desconsiderada"] != nd["numero_nd"]:
+                flash("DESPESA OPERACIONAL JÁ FOI DESCONSIDERADA EM OUTRA ND E SÓ PODE PARTICIPAR DE UMA ÚNICA ND.", "warning")
                 return redirect(url_for("financeiro_dois.nota_debito_despesas", nd_id=nd_id))
 
             if acao == "vincular":
@@ -6319,10 +6328,11 @@ def nota_debito_operacional_reverter(nd_id: int, despesa_id: int):
             UPDATE financeiro2_despesas
             SET
                 status_nd = 'NÃO VINCULADA',
-                numero_nd_desconsiderada = NULL,
+                nd_numero = CASE WHEN UPPER(COALESCE(nd_numero, '')) = :numero_nd THEN NULL ELSE nd_numero END,
+                numero_nd_desconsiderada = CASE WHEN UPPER(COALESCE(numero_nd_desconsiderada, '')) = :numero_nd THEN NULL ELSE numero_nd_desconsiderada END,
                 atualizado_em = CURRENT_TIMESTAMP
             WHERE id = :id
-        """), {"id": despesa_id})
+        """), {"id": despesa_id, "numero_nd": nd["numero_nd"]})
 
         conn.execute(text("""
             DELETE FROM financeiro2_notas_debito_despesas
@@ -6359,7 +6369,7 @@ def om_desvincular(om_id: int):
         if not om:
             abort(404)
 
-        if om["status"] != "Paga":
+        if (om["status"] or "").upper() != "PAGA":
             flash("SÓ É POSSÍVEL DESVINCULAR QUANDO A OM ESTIVER PAGA.", "warning")
             return redirect(url_for("financeiro_dois.om_editar", om_id=om_id))
 
@@ -6421,7 +6431,7 @@ def om_desvincular_salvar(om_id: int):
         if not om:
             abort(404)
 
-        if om["status"] != "Paga":
+        if (om["status"] or "").upper() != "PAGA":
             flash("SÓ É POSSÍVEL DESVINCULAR QUANDO A OM ESTIVER PAGA.", "warning")
             return redirect(url_for("financeiro_dois.om_editar", om_id=om_id))
 
