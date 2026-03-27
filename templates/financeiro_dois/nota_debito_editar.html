@@ -104,13 +104,13 @@
 				  <td>{{ linha.controle }}</td>
 				  <td>{{ linha.cc }}</td>
 				  <td>{{ linha.linha }}</td>
-				  <td>
-					{% if linha.recibo %}
-					  <a class="btn btn-sm" href="{{ linha.recibo }}" target="_blank">Abrir recibo</a>
-					{% else %}
-					  --
-					{% endif %}
-				  </td>
+					<td>
+					  {% if linha.recibo %}
+						<a class="btn btn-sm" href="{{ linha.recibo }}" target="_blank">Abrir recibo</a>
+					  {% else %}
+						--
+					  {% endif %}
+					</td>
 				</tr>
 				{% else %}
 				<tr>
