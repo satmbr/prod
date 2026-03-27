@@ -5650,7 +5650,6 @@ def nota_debito_editar(nd_id: int):
                 UPPER(COALESCE(d.centro_custo, '')) AS centro_custo,
                 UPPER(COALESCE(d.descricao, '')) AS despesa_descricao,
                 UPPER(COALESCE(d.fornecedor, '')) AS fornecedor,
-                UPPER(COALESCE(d.anexo, '')) AS anexo_despesa,
                 TO_CHAR(d.data_documento, 'DD/MM/YYYY') AS data_operacional,
                 COALESCE(d.valor, 0) AS valor_operacional,
                 UPPER(COALESCE(d.status_nd, '')) AS status_nd_despesa,
@@ -5777,7 +5776,7 @@ def nota_debito_editar(nd_id: int):
                     "controle": item["numero_documento"] or "--",
                     "cc": item["centro_custo"] or "--",
                     "linha": 1,
-                    "recibo": item["anexo_despesa"] or "",
+                    "recibo": "",
                 })
 
         nd = dict(nd)
