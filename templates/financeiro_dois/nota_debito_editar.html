@@ -166,15 +166,7 @@
 		<div class="resume-card">
 		  <div class="resume-title">Ações</div>
 		  <div class="anexo-list">
-			<a class="btn btn-block" href="{{ url_for('financeiro_dois.nota_debito_exportar_pdf', nd_id=nd.id) }}">
-			  Exportar PDF
-			</a>
-			<a class="btn btn-block" href="{{ url_for('financeiro_dois.nota_debito_exportar_excel', nd_id=nd.id) }}">
-			  Exportar Excel
-			</a>
-			<a class="btn btn-block" href="{{ url_for('financeiro_dois.nota_debito_gerar', nd_id=nd.id) }}">
-			  Gerar ND
-			</a>
+			<div class="muted">Exportações e geração da ND serão ativadas na próxima etapa.</div>
 		  </div>
 		</div>
 		{% endif %}
