@@ -5678,32 +5678,32 @@ def nota_debito_editar(nd_id: int):
             origem_tipo = (item.get("origem_tipo") or "").upper()
 
             if origem_tipo == "OM":
-                om_linhas = conn.execute(text("""
-                    SELECT
-                        TO_CHAR(data_lancamento, 'DD/MM/YYYY') AS data_ref,
-                        UPPER(COALESCE(detalhes, descricao, '')) AS detalhe,
-                        COALESCE(valor_brl, 0) AS valor_ref,
-                        UPPER(COALESCE(:numero_om, '')) AS origem_ref,
-                        UPPER(COALESCE(:controle, '')) AS controle_ref,
-                        UPPER(COALESCE(:cc, '')) AS cc_ref,
-                        linha AS linha_ref,
-                        UPPER(COALESCE(anexo_recibo, '')) AS recibo_ref
-                    FROM financeiro2_om_linhas
-                    WHERE om_id = :origem_id
-                      AND (
-                            UPPER(COALESCE(numero_nd, '')) = :numero_nd
-                         OR UPPER(COALESCE(numero_nd_desconsiderada, '')) = :numero_nd
-                         OR COALESCE(desconsiderada_nd, FALSE) = TRUE
-                      )
-                      AND COALESCE(status, 'Ativo') = 'Ativo'
-                    ORDER BY linha
-                """), {
-                    "origem_id": item["origem_id"],
-                    "numero_nd": nd["numero_nd"],
-                    "numero_om": item.get("numero_om") or "",
-                    "controle": "",
-                    "cc": item.get("centro_custo") or "",
-                }).mappings().all()
+				om_linhas = conn.execute(text("""
+					SELECT
+						TO_CHAR(data_lancamento, 'DD/MM/YYYY') AS data_ref,
+						UPPER(COALESCE(detalhes, descricao, '')) AS detalhe,
+						COALESCE(valor_brl, 0) AS valor_ref,
+						UPPER(COALESCE(:numero_om, '')) AS origem_ref,
+						UPPER(COALESCE(:controle, '')) AS controle_ref,
+						UPPER(COALESCE(:cc, '')) AS cc_ref,
+						1 AS linha_ref,
+						UPPER(COALESCE(anexo_recibo, '')) AS recibo_ref
+					FROM financeiro2_om_linhas
+					WHERE om_id = :origem_id
+					  AND (
+							UPPER(COALESCE(numero_nd, '')) = :numero_nd
+						 OR UPPER(COALESCE(numero_nd_desconsiderada, '')) = :numero_nd
+						 OR COALESCE(desconsiderada_nd, FALSE) = TRUE
+					  )
+					  AND COALESCE(status, 'Ativo') = 'Ativo'
+					ORDER BY id
+				"""), {
+					"origem_id": item["origem_id"],
+					"numero_nd": nd["numero_nd"],
+					"numero_om": item.get("numero_om") or "",
+					"controle": "",
+					"cc": item.get("centro_custo") or "",
+				}).mappings().all()
 
                 for linha in om_linhas:
                     linha = dict(linha)
