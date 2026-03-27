@@ -5652,19 +5652,44 @@ def nota_debito_editar(nd_id: int):
                 UPPER(COALESCE(d.status_nd, '')) AS status_nd,
                 COALESCE(d.valor, 0) AS valor_operacional,
                 TO_CHAR(d.data_documento, 'DD/MM/YYYY') AS data_documento,
-                CASE
-                    WHEN UPPER(COALESCE(d.origem_tipo, '')) = 'OM' THEN (
-                        SELECT UPPER(COALESCE(om.numero_om, ''))
-                        FROM financeiro2_om om
-                        WHERE om.id = d.origem_id
-                    )
-                    WHEN UPPER(COALESCE(d.origem_tipo, '')) = 'RD' THEN (
-                        SELECT UPPER(COALESCE(rd.numero_rd, ''))
-                        FROM financeiro2_rd rd
-                        WHERE rd.id = d.origem_id
-                    )
-                    ELSE UPPER(COALESCE(d.numero_documento, ''))
-                END AS numero_origem
+
+                (
+                    SELECT UPPER(COALESCE(om.numero_om, ''))
+                    FROM financeiro2_om om
+                    WHERE om.id = d.origem_id
+                ) AS numero_om,
+
+                (
+                    SELECT UPPER(COALESCE(om.matricula_colaborador, ''))
+                    FROM financeiro2_om om
+                    WHERE om.id = d.origem_id
+                ) AS matricula_om,
+
+                (
+                    SELECT UPPER(COALESCE(rd.numero_rd, ''))
+                    FROM financeiro2_rd rd
+                    WHERE rd.id = d.origem_id
+                ) AS numero_rd,
+
+                (
+                    SELECT UPPER(COALESCE(rd.matricula_colaborador, ''))
+                    FROM financeiro2_rd rd
+                    WHERE rd.id = d.origem_id
+                ) AS matricula_rd,
+
+                (
+                    SELECT UPPER(COALESCE(rd.centro_custo, ''))
+                    FROM financeiro2_rd rd
+                    WHERE rd.id = d.origem_id
+                ) AS centro_custo_rd,
+
+                (
+                    SELECT COALESCE(a.arquivo, '')
+                    FROM financeiro2_despesas_anexos a
+                    WHERE a.despesa_id = d.id
+                    ORDER BY a.id DESC
+                    LIMIT 1
+                ) AS anexo_operacional
             FROM financeiro2_notas_debito_despesas rel
             JOIN financeiro2_despesas d
               ON d.id = rel.despesa_id
@@ -5684,14 +5709,14 @@ def nota_debito_editar(nd_id: int):
         total_nd = 0.0
 
         for item in despesas_rel:
-            origem_tipo = item["origem"]
+            origem_tipo = (item["origem"] or "").upper()
 
             if origem_tipo == "OM":
                 totais = conn.execute(text("""
                     SELECT
-                        COUNT(*) FILTER (WHERE COALESCE(numero_nd, '') = :numero_nd) AS qtd_vinculadas,
+                        COUNT(*) FILTER (WHERE UPPER(COALESCE(numero_nd, '')) = :numero_nd) AS qtd_vinculadas,
                         COUNT(*) FILTER (WHERE COALESCE(desconsiderada_nd, FALSE) = TRUE) AS qtd_desconsideradas,
-                        COALESCE(SUM(CASE WHEN COALESCE(numero_nd, '') = :numero_nd THEN COALESCE(valor_brl, 0) ELSE 0 END), 0) AS valor_vinculado,
+                        COALESCE(SUM(CASE WHEN UPPER(COALESCE(numero_nd, '')) = :numero_nd THEN COALESCE(valor_brl, 0) ELSE 0 END), 0) AS valor_vinculado,
                         COALESCE(SUM(CASE WHEN COALESCE(desconsiderada_nd, FALSE) = TRUE THEN COALESCE(valor_brl, 0) ELSE 0 END), 0) AS valor_desconsiderado,
                         COALESCE(SUM(CASE WHEN COALESCE(numero_nd, '') = '' AND COALESCE(desconsiderada_nd, FALSE) = FALSE THEN COALESCE(valor_brl, 0) ELSE 0 END), 0) AS valor_pendente
                     FROM financeiro2_om_linhas
@@ -5705,15 +5730,12 @@ def nota_debito_editar(nd_id: int):
 
                 om_linhas = conn.execute(text("""
                     SELECT
-                        id,
                         TO_CHAR(data_lancamento, 'DD/MM/YYYY') AS data_ref,
-                        UPPER(COALESCE(tipo_linha, descricao, detalhes, '')) AS detalhe,
+                        UPPER(COALESCE(detalhes, descricao, '')) AS detalhe,
                         COALESCE(valor_brl, 0) AS valor_ref,
-                        UPPER(COALESCE(:numero_origem, '')) AS origem_ref,
-                        '--' AS controle_ref,
-                        UPPER(COALESCE(:cc, '')) AS cc_ref,
-                        id AS linha_ref,
-                        '' AS recibo_ref
+                        COALESCE(recibo, id) AS linha_ref,
+                        UPPER(COALESCE(aplicacao, '')) AS cc_ref,
+                        COALESCE(anexo_recibo, '') AS recibo_ref
                     FROM financeiro2_om_linhas
                     WHERE om_id = :origem_id
                       AND (
@@ -5723,37 +5745,44 @@ def nota_debito_editar(nd_id: int):
                       )
                       AND COALESCE(status, 'Ativo') = 'Ativo'
                       AND COALESCE(valor_brl, 0) > 0
-                    ORDER BY id
+                    ORDER BY COALESCE(recibo, id), id
                 """), {
                     "origem_id": item["origem_id"],
                     "numero_nd": nd["numero_nd"],
-                    "numero_origem": item.get("numero_origem") or "",
-                    "cc": item.get("centro_custo") or "",
                 }).mappings().all()
 
                 for linha in om_linhas:
                     linha = dict(linha)
                     valor_ref = float(linha["valor_ref"] or 0)
                     total_nd += valor_ref
+
+                    recibo_url = ""
+                    nome_arquivo = (linha["recibo_ref"] or "").strip()
+                    if nome_arquivo:
+                        recibo_url = url_for(
+                            "static",
+                            filename=f"uploads/financeiro2/om_recibos/{os.path.basename(nome_arquivo)}"
+                        )
+
                     linhas_nd.append({
                         "tipo": "OM",
                         "despesa_id": item["id"],
                         "data": linha["data_ref"] or "--",
                         "detalhe": linha["detalhe"] or "--",
                         "valor": valor_ref,
-                        "origem": linha["origem_ref"] or "--",
-                        "controle": linha["controle_ref"] or "--",
+                        "origem": f"OM({item.get('numero_om') or '--'})",
+                        "controle": item.get("matricula_om") or "--",
                         "cc": linha["cc_ref"] or "--",
                         "linha": linha["linha_ref"] or "--",
-                        "recibo": linha["recibo_ref"] or "",
+                        "recibo": recibo_url,
                     })
 
             elif origem_tipo == "RD":
                 totais = conn.execute(text("""
                     SELECT
-                        COUNT(*) FILTER (WHERE COALESCE(numero_nd, '') = :numero_nd) AS qtd_vinculadas,
+                        COUNT(*) FILTER (WHERE UPPER(COALESCE(numero_nd, '')) = :numero_nd) AS qtd_vinculadas,
                         COUNT(*) FILTER (WHERE COALESCE(desconsiderada_nd, FALSE) = TRUE) AS qtd_desconsideradas,
-                        COALESCE(SUM(CASE WHEN COALESCE(numero_nd, '') = :numero_nd THEN COALESCE(valor, 0) ELSE 0 END), 0) AS valor_vinculado,
+                        COALESCE(SUM(CASE WHEN UPPER(COALESCE(numero_nd, '')) = :numero_nd THEN COALESCE(valor, 0) ELSE 0 END), 0) AS valor_vinculado,
                         COALESCE(SUM(CASE WHEN COALESCE(desconsiderada_nd, FALSE) = TRUE THEN COALESCE(valor, 0) ELSE 0 END), 0) AS valor_desconsiderado,
                         COALESCE(SUM(CASE WHEN COALESCE(numero_nd, '') = '' AND COALESCE(desconsiderada_nd, FALSE) = FALSE THEN COALESCE(valor, 0) ELSE 0 END), 0) AS valor_pendente
                     FROM financeiro2_rd_linhas
@@ -5767,15 +5796,10 @@ def nota_debito_editar(nd_id: int):
 
                 rd_linhas = conn.execute(text("""
                     SELECT
-                        id,
                         TO_CHAR(data_lancamento, 'DD/MM/YYYY') AS data_ref,
-                        UPPER(COALESCE(descricao, detalhes, '')) AS detalhe,
+                        UPPER(COALESCE(detalhes, descricao, '')) AS detalhe,
                         COALESCE(valor, 0) AS valor_ref,
-                        UPPER(COALESCE(:numero_origem, '')) AS origem_ref,
-                        '--' AS controle_ref,
-                        UPPER(COALESCE(categoria, aplicacao, :cc)) AS cc_ref,
-                        id AS linha_ref,
-                        '' AS recibo_ref
+                        COALESCE(anexo_recibo, '') AS recibo_ref
                     FROM financeiro2_rd_linhas
                     WHERE rd_id = :origem_id
                       AND (
@@ -5789,25 +5813,32 @@ def nota_debito_editar(nd_id: int):
                 """), {
                     "origem_id": item["origem_id"],
                     "numero_nd": nd["numero_nd"],
-                    "numero_origem": item.get("numero_origem") or "",
-                    "cc": item.get("centro_custo") or "",
                 }).mappings().all()
 
                 for linha in rd_linhas:
                     linha = dict(linha)
                     valor_ref = float(linha["valor_ref"] or 0)
                     total_nd += valor_ref
+
+                    recibo_url = ""
+                    nome_arquivo = (linha["recibo_ref"] or "").strip()
+                    if nome_arquivo:
+                        recibo_url = url_for(
+                            "static",
+                            filename=f"uploads/financeiro2/rd_recibos/{os.path.basename(nome_arquivo)}"
+                        )
+
                     linhas_nd.append({
                         "tipo": "RD",
                         "despesa_id": item["id"],
                         "data": linha["data_ref"] or "--",
                         "detalhe": linha["detalhe"] or "--",
                         "valor": valor_ref,
-                        "origem": linha["origem_ref"] or "--",
-                        "controle": linha["controle_ref"] or "--",
-                        "cc": linha["cc_ref"] or "--",
-                        "linha": linha["linha_ref"] or "--",
-                        "recibo": linha["recibo_ref"] or "",
+                        "origem": f"RD({item.get('numero_rd') or '--'})",
+                        "controle": item.get("matricula_rd") or "--",
+                        "cc": item.get("centro_custo_rd") or "--",
+                        "linha": "--",
+                        "recibo": recibo_url,
                     })
 
             else:
@@ -5821,17 +5852,26 @@ def nota_debito_editar(nd_id: int):
 
                 valor_operacional = float(item["valor_operacional"] or 0)
                 total_nd += valor_operacional
+
+                recibo_url = ""
+                nome_arquivo = (item.get("anexo_operacional") or "").strip()
+                if nome_arquivo:
+                    recibo_url = url_for(
+                        "static",
+                        filename=f"uploads/financeiro2/despesas/{os.path.basename(nome_arquivo)}"
+                    )
+
                 linhas_nd.append({
                     "tipo": "OPERACIONAL",
                     "despesa_id": item["id"],
                     "data": item["data_documento"] or "--",
                     "detalhe": item["descricao"] or "--",
                     "valor": valor_operacional,
-                    "origem": item["numero_documento"] or item["numero_despesa"] or "--",
-                    "controle": item["numero_documento"] or "--",
-                    "cc": item["centro_custo"] or "--",
+                    "origem": f"OP({item.get('numero_despesa') or '--'})",
+                    "controle": item.get("numero_despesa") or "--",
+                    "cc": item.get("centro_custo") or "--",
                     "linha": 1,
-                    "recibo": "",
+                    "recibo": recibo_url,
                 })
 
             item["qtd_vinculadas"] = int(totais["qtd_vinculadas"] or 0)
