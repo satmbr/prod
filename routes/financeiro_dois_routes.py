@@ -5957,6 +5957,202 @@ def nota_debito_editar(nd_id: int):
         despesas_rel=despesas_rel,
     )
 
+@bp.route("/notas-debito/<int:nd_id>/exportar/excel")
+@login_required
+@permission_required("financeiro", "visualizar")
+def nota_debito_exportar_excel(nd_id: int):
+    engine = get_engine()
+
+    with engine.connect() as conn:
+        nd = _carregar_nd_exportacao(conn, nd_id)
+        if not nd:
+            abort(404)
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "ND"
+
+    ws.append(["Número ND", nd["numero_nd"]])
+    ws.append(["Data ND", nd["data_nd"]])
+    ws.append(["Empresa ND", nd["empresa_nd"]])
+    ws.append(["Status", nd["status"]])
+    ws.append(["Referência", nd.get("referencia", "")])
+    ws.append(["Observação", nd.get("observacao", "")])
+    ws.append([])
+    ws.append(["Data", "Detalhe", "Valor", "Origem", "Controle", "CC", "Linha"])
+
+    for linha in nd["linhas_nd"]:
+        ws.append([
+            linha["data"],
+            linha["detalhe"],
+            float(linha["valor"] or 0),
+            linha["origem"],
+            linha["controle"],
+            linha["cc"],
+            linha["linha"],
+        ])
+
+    ws.append([])
+    ws.append(["", "TOTAL", float(nd["total_nd"] or 0), "", "", "", ""])
+
+    arquivo = BytesIO()
+    wb.save(arquivo)
+    arquivo.seek(0)
+
+    return send_file(
+        arquivo,
+        as_attachment=True,
+        download_name=f"{nd['numero_nd']}.xlsx",
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+
+
+@bp.route("/notas-debito/<int:nd_id>/exportar/pdf")
+@login_required
+@permission_required("financeiro", "visualizar")
+def nota_debito_exportar_pdf(nd_id: int):
+    engine = get_engine()
+
+    with engine.connect() as conn:
+        nd = _carregar_nd_exportacao(conn, nd_id)
+        if not nd:
+            abort(404)
+
+    buffer = BytesIO()
+    pdf = canvas.Canvas(buffer, pagesize=A4)
+    largura, altura = A4
+
+    def _cabecalho():
+        pdf.setFillColorRGB(0.95, 0.76, 0.00)
+        pdf.rect(0, altura - 18, largura, 18, fill=1, stroke=0)
+        pdf.setFillColorRGB(0, 0, 0)
+
+        pdf.setFont("Helvetica-Bold", 12)
+        pdf.drawString(40, altura - 45, "MATISA do Brasil")
+        pdf.drawString(40, altura - 60, "Projetos de Via Férrea Ltda")
+
+        pdf.setFont("Helvetica", 9)
+        pdf.drawString(40, altura - 78, "Rua Manoel Bandeira, nº1480")
+        pdf.drawString(40, altura - 90, "Bairro São Diogo I")
+        pdf.drawString(40, altura - 102, "CEP 29163-278 Serra – ES Brasil")
+        pdf.drawString(40, altura - 114, "Central +55 27 3315 9103")
+        pdf.drawString(40, altura - 126, "www.matisadobrasil.com.br")
+
+        pdf.setFont("Helvetica-Bold", 16)
+        pdf.drawCentredString(largura / 2, altura - 165, "NOTA DE DÉBITO")
+
+        pdf.setFont("Helvetica-Bold", 11)
+        pdf.drawRightString(largura - 40, altura - 180, "CONSÓRCIO PRUMAT")
+        pdf.setFont("Helvetica", 10)
+        pdf.drawRightString(largura - 40, altura - 198, "R Doutor Newton Pires, 117 sala 25. Centro")
+        pdf.drawRightString(largura - 40, altura - 212, "CEP: 35570-172 - Formiga/MG")
+        pdf.drawRightString(largura - 40, altura - 226, "CNPJ: 49.292.040/0001.43")
+
+        pdf.setFont("Helvetica-Bold", 11)
+        pdf.drawString(40, altura - 240, f"Referência: {nd.get('referencia', '')}")
+        pdf.drawString(40, altura - 255, f"Nota de débito Nº: {nd['numero_nd']}")
+
+    def _cabecalho_tabela(y):
+        pdf.setFillColorRGB(0.95, 0.92, 0.00)
+        pdf.rect(40, y - 4, largura - 80, 16, fill=1, stroke=0)
+        pdf.setFillColorRGB(0, 0, 0)
+        pdf.setFont("Helvetica-Bold", 10)
+        pdf.drawString(48, y, "Data")
+        pdf.drawString(170, y, "Detalhes")
+        pdf.drawRightString(largura - 48, y, "Valor")
+
+    _cabecalho()
+    y = altura - 280
+    _cabecalho_tabela(y)
+    y -= 18
+
+    pdf.setFont("Helvetica", 9)
+    for linha in nd["linhas_nd"]:
+        if y < 80:
+            pdf.showPage()
+            _cabecalho()
+            y = altura - 70
+            _cabecalho_tabela(y)
+            y -= 18
+            pdf.setFont("Helvetica", 9)
+
+        detalhe = str(linha["detalhe"] or "--")
+        if len(detalhe) > 42:
+            detalhe = detalhe[:42] + "..."
+
+        pdf.drawString(48, y, str(linha["data"] or "--"))
+        pdf.drawString(170, y, detalhe)
+        pdf.drawRightString(largura - 48, y, f"R$ {_fmt_valor_br(linha['valor'])}")
+        y -= 14
+
+    y -= 6
+    pdf.setFont("Helvetica-Bold", 10)
+    pdf.drawString(170, y, "TOTAL")
+    pdf.drawRightString(largura - 48, y, f"R$ {_fmt_valor_br(nd['total_nd'])}")
+
+    y -= 40
+    if y < 120:
+        pdf.showPage()
+        y = altura - 120
+
+    pdf.setFont("Helvetica-Bold", 10)
+    pdf.drawString(60, y, "LOCAL:")
+    pdf.drawString(300, y, "ASSINATURA:")
+    y -= 20
+    pdf.setFont("Helvetica", 10)
+    pdf.drawString(60, y, "SERRA-ES")
+    y -= 24
+    pdf.setFont("Helvetica-Bold", 10)
+    pdf.drawString(60, y, "DATA:")
+    y -= 20
+    pdf.setFont("Helvetica", 10)
+    pdf.drawString(60, y, nd["data_nd"])
+    y -= 34
+    pdf.setFont("Helvetica-Bold", 10)
+    pdf.drawCentredString(largura / 2, y, "MATISA DO BRASIL PROJETOS DE VIA FÉRREA LTDA")
+
+    pdf.setFont("Helvetica", 7)
+    pdf.drawString(40, 26, "MATISA do Brasil Projetos de Via Férrea Ltda., Rua Manoel Bandeira, nº 1480 - São Diogo I, CEP 29163-278 Serra – ES Brasil")
+    pdf.drawString(40, 16, "CNPJ: 15.525.426/0001-36   Tel. +55 27 3315 9103   E-mail: matisa@matisadobrasil.com.br   www.matisadobrasil.com.br")
+
+    pdf.save()
+    buffer.seek(0)
+
+    return send_file(
+        buffer,
+        as_attachment=True,
+        download_name=f"{nd['numero_nd']}.pdf",
+        mimetype="application/pdf",
+    )
+
+
+@bp.route("/notas-debito/<int:nd_id>/gerar")
+@login_required
+@permission_required("financeiro", "visualizar")
+def nota_debito_gerar(nd_id: int):
+    engine = get_engine()
+
+    with engine.begin() as conn:
+        nd = _carregar_nd_exportacao(conn, nd_id)
+        if not nd:
+            abort(404)
+
+        if not nd["linhas_nd"]:
+            flash("ESSA ND NÃO POSSUI LINHAS PARA GERAÇÃO.", "warning")
+            return redirect(url_for("financeiro_dois.nota_debito_editar", nd_id=nd_id))
+
+        conn.execute(text("""
+            UPDATE financeiro2_notas_debito
+            SET
+                status = 'VINCULADA',
+                atualizado_em = CURRENT_TIMESTAMP
+            WHERE id = :id
+              AND UPPER(COALESCE(status, '')) NOT IN ('REJEITADA', 'CANCELADA')
+        """), {"id": nd_id})
+
+    flash("ND GERADA COM SUCESSO.", "success")
+    return redirect(url_for("financeiro_dois.nota_debito_exportar_pdf", nd_id=nd_id))
+
 @bp.route("/notas-debito/<int:nd_id>/salvar", methods=["POST"])
 @login_required
 @permission_required("financeiro", "visualizar")
@@ -6009,6 +6205,239 @@ def nota_debito_salvar(nd_id: int):
 
     flash("ND SALVA COM SUCESSO.", "success")
     return redirect(url_for("financeiro_dois.nota_debito_editar", nd_id=nd_id))
+    
+def _fmt_valor_br(valor: float) -> str:
+    valor = float(valor or 0)
+    texto = f"{valor:,.2f}"
+    return texto.replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+def _referencia_nd(dt_nd: str | None) -> str:
+    try:
+        dt = datetime.strptime(str(dt_nd), "%d/%m/%Y")
+        meses = {
+            1: "janeiro", 2: "fevereiro", 3: "março", 4: "abril",
+            5: "maio", 6: "junho", 7: "julho", 8: "agosto",
+            9: "setembro", 10: "outubro", 11: "novembro", 12: "dezembro",
+        }
+        return f"{meses.get(dt.month, '')} {dt.year}".strip()
+    except Exception:
+        return ""
+
+
+def _carregar_nd_exportacao(conn, nd_id: int):
+    nd = conn.execute(text("""
+        SELECT
+            id,
+            UPPER(COALESCE(numero_nd, '')) AS numero_nd,
+            TO_CHAR(data_nd, 'YYYY-MM-DD') AS data_form,
+            TO_CHAR(data_nd, 'DD/MM/YYYY') AS data_nd,
+            UPPER(COALESCE(empresa_nd, '')) AS empresa_nd,
+            UPPER(COALESCE(status, '')) AS status,
+            UPPER(COALESCE(observacao, '')) AS observacao
+        FROM financeiro2_notas_debito
+        WHERE id = :id
+    """), {"id": nd_id}).mappings().first()
+
+    if not nd:
+        return None
+
+    despesas_rel = conn.execute(text("""
+        SELECT
+            d.id,
+            UPPER(COALESCE(d.numero_despesa, '')) AS numero_despesa,
+            UPPER(COALESCE(d.origem_tipo, '')) AS origem,
+            d.origem_id,
+            UPPER(COALESCE(d.numero_documento, '')) AS numero_documento,
+            UPPER(COALESCE(d.centro_custo, '')) AS centro_custo,
+            UPPER(COALESCE(d.fornecedor, '')) AS fornecedor,
+            UPPER(COALESCE(d.descricao, '')) AS descricao,
+            UPPER(COALESCE(d.status_nd, '')) AS status_nd,
+            COALESCE(d.valor, 0) AS valor_operacional,
+            TO_CHAR(d.data_documento, 'DD/MM/YYYY') AS data_documento,
+
+            (
+                SELECT UPPER(COALESCE(om.numero_om, ''))
+                FROM financeiro2_om om
+                WHERE om.id = d.origem_id
+                LIMIT 1
+            ) AS numero_om,
+
+            (
+                SELECT UPPER(COALESCE(om.matricula_colaborador, ''))
+                FROM financeiro2_om om
+                WHERE om.id = d.origem_id
+                LIMIT 1
+            ) AS matricula_om,
+
+            (
+                SELECT UPPER(COALESCE(rd.numero_rd, ''))
+                FROM financeiro2_rd rd
+                WHERE rd.id = d.origem_id
+                LIMIT 1
+            ) AS numero_rd,
+
+            (
+                SELECT UPPER(COALESCE(rd.matricula_colaborador, ''))
+                FROM financeiro2_rd rd
+                WHERE rd.id = d.origem_id
+                LIMIT 1
+            ) AS matricula_rd,
+
+            (
+                SELECT UPPER(COALESCE(rd.centro_custo, ''))
+                FROM financeiro2_rd rd
+                WHERE rd.id = d.origem_id
+                LIMIT 1
+            ) AS centro_custo_rd,
+
+            (
+                SELECT COALESCE(a.arquivo, '')
+                FROM financeiro2_despesas_anexos a
+                WHERE a.despesa_id = d.id
+                ORDER BY a.id DESC
+                LIMIT 1
+            ) AS anexo_operacional
+        FROM financeiro2_notas_debito_despesas rel
+        JOIN financeiro2_despesas d
+          ON d.id = rel.despesa_id
+        WHERE rel.nd_id = :nd_id
+        ORDER BY d.id DESC
+    """), {"nd_id": nd_id}).mappings().all()
+
+    despesas_rel = [dict(x) for x in despesas_rel]
+
+    linhas_nd = []
+    total_nd = 0.0
+
+    for item in despesas_rel:
+        origem_tipo = (item.get("origem") or "").upper()
+
+        if origem_tipo == "OM":
+            om_linhas = conn.execute(text("""
+                SELECT
+                    TO_CHAR(data_lancamento, 'DD/MM/YYYY') AS data_ref,
+                    UPPER(COALESCE(detalhes, '')) AS detalhe_ref,
+                    COALESCE(valor_brl, 0) AS valor_ref,
+                    COALESCE(recibo, id) AS linha_ref,
+                    UPPER(COALESCE(aplicacao, '')) AS cc_ref,
+                    COALESCE(anexo_recibo, '') AS recibo_ref
+                FROM financeiro2_om_linhas
+                WHERE om_id = :origem_id
+                  AND (
+                        UPPER(COALESCE(numero_nd, '')) = :numero_nd
+                     OR UPPER(COALESCE(numero_nd_desconsiderada, '')) = :numero_nd
+                     OR COALESCE(desconsiderada_nd, FALSE) = TRUE
+                  )
+                  AND COALESCE(status, 'Ativo') = 'Ativo'
+                  AND COALESCE(valor_brl, 0) > 0
+                ORDER BY COALESCE(recibo, id), id
+            """), {
+                "origem_id": item["origem_id"],
+                "numero_nd": nd["numero_nd"],
+            }).mappings().all()
+
+            for linha in om_linhas:
+                linha = dict(linha)
+                valor_ref = float(linha["valor_ref"] or 0)
+                total_nd += valor_ref
+
+                recibo_url = ""
+                nome_arquivo = (linha.get("recibo_ref") or "").strip()
+                if nome_arquivo:
+                    recibo_url = url_for(
+                        "static",
+                        filename=f"uploads/financeiro2/om_recibos/{os.path.basename(nome_arquivo)}"
+                    )
+
+                linhas_nd.append({
+                    "tipo": "OM",
+                    "data": linha.get("data_ref") or "--",
+                    "detalhe": linha.get("detalhe_ref") or "--",
+                    "valor": valor_ref,
+                    "origem": f"OM({item.get('numero_om') or '--'})",
+                    "controle": item.get("matricula_om") or "--",
+                    "cc": linha.get("cc_ref") or "--",
+                    "linha": linha.get("linha_ref") or "--",
+                    "recibo": recibo_url,
+                })
+
+        elif origem_tipo == "RD":
+            rd_linhas = conn.execute(text("""
+                SELECT
+                    TO_CHAR(data_lancamento, 'DD/MM/YYYY') AS data_ref,
+                    UPPER(COALESCE(descricao, '')) AS detalhe_ref,
+                    COALESCE(valor, 0) AS valor_ref,
+                    COALESCE(anexo_recibo, '') AS recibo_ref
+                FROM financeiro2_rd_linhas
+                WHERE rd_id = :origem_id
+                  AND (
+                        UPPER(COALESCE(numero_nd, '')) = :numero_nd
+                     OR UPPER(COALESCE(numero_nd_desconsiderada, '')) = :numero_nd
+                     OR COALESCE(desconsiderada_nd, FALSE) = TRUE
+                  )
+                  AND COALESCE(status, 'Ativo') = 'Ativo'
+                  AND COALESCE(valor, 0) > 0
+                ORDER BY id
+            """), {
+                "origem_id": item["origem_id"],
+                "numero_nd": nd["numero_nd"],
+            }).mappings().all()
+
+            for linha in rd_linhas:
+                linha = dict(linha)
+                valor_ref = float(linha["valor_ref"] or 0)
+                total_nd += valor_ref
+
+                recibo_url = ""
+                nome_arquivo = (linha.get("recibo_ref") or "").strip()
+                if nome_arquivo:
+                    recibo_url = url_for(
+                        "static",
+                        filename=f"uploads/financeiro2/rd_recibos/{os.path.basename(nome_arquivo)}"
+                    )
+
+                linhas_nd.append({
+                    "tipo": "RD",
+                    "data": linha.get("data_ref") or "--",
+                    "detalhe": linha.get("detalhe_ref") or "--",
+                    "valor": valor_ref,
+                    "origem": f"RD({item.get('numero_rd') or '--'})",
+                    "controle": item.get("matricula_rd") or "--",
+                    "cc": item.get("centro_custo_rd") or "--",
+                    "linha": "--",
+                    "recibo": recibo_url,
+                })
+
+        else:
+            valor_operacional = float(item["valor_operacional"] or 0)
+            total_nd += valor_operacional
+
+            recibo_url = ""
+            nome_arquivo = (item.get("anexo_operacional") or "").strip()
+            if nome_arquivo:
+                recibo_url = url_for(
+                    "static",
+                    filename=f"uploads/financeiro2/despesas/{os.path.basename(nome_arquivo)}"
+                )
+
+            linhas_nd.append({
+                "tipo": "OPERACIONAL",
+                "data": item.get("data_documento") or "--",
+                "detalhe": item.get("descricao") or "--",
+                "valor": valor_operacional,
+                "origem": item.get("numero_documento") or "--",
+                "controle": item.get("numero_despesa") or "--",
+                "cc": item.get("centro_custo") or "--",
+                "linha": 1,
+                "recibo": recibo_url,
+            })
+
+    nd = dict(nd)
+    nd["linhas_nd"] = linhas_nd
+    nd["total_nd"] = total_nd
+    nd["referencia"] = _referencia_nd(nd.get("data_nd"))
+    return nd
     
 @bp.route("/notas-debito/<int:nd_id>/despesas")
 @login_required
