@@ -6107,37 +6107,53 @@ def nota_debito_salvar(nd_id: int):
     empresa_nd = _nome_preenchido(request.form.get("empresa_nd")).upper()
     status = _nome_preenchido(request.form.get("status")).upper() or "ABERTA"
     observacao = _nome_preenchido(request.form.get("observacao")).upper()
-    
-    if nd_id:
-    bloqueio = conn.execute(text("""
-        SELECT UPPER(COALESCE(status, '')) AS status
-        FROM financeiro2_notas_debito
-        WHERE id = :id
-    """), {"id": nd_id}).mappings().first()
 
-    if bloqueio and bloqueio["status"] == "CONFIRMADA":
-        flash("ESSA ND ESTÁ CONFIRMADA E NÃO PODE MAIS SER EDITADA.", "warning")
-        return redirect(url_for("financeiro_dois.nota_debito_editar", nd_id=nd_id))
-    
     if not numero_nd or not data_nd or not empresa_nd:
-        flash("PREENCHA NÚMERO ND, DATA E EMPRESA ND.", "warning")
+        flash("PREENCHA NÚMERO ND, DATA ND E EMPRESA ND.", "warning")
         return redirect(url_for("financeiro_dois.nota_debito_editar", nd_id=nd_id))
-    
+
+    status_validos = {"ABERTA", "PARCIAL", "VINCULADA", "REJEITADA", "CANCELADA", "CONFIRMADA"}
+    if status not in status_validos:
+        status = "ABERTA"
+
     engine = get_engine()
+
     with engine.begin() as conn:
-        existe = conn.execute(text("""
+        nd = conn.execute(text("""
+            SELECT
+                id,
+                UPPER(COALESCE(status, '')) AS status
+            FROM financeiro2_notas_debito
+            WHERE id = :id
+        """), {"id": nd_id}).mappings().first()
+
+        if not nd:
+            abort(404)
+
+        if nd_id:
+            bloqueio = conn.execute(text("""
+                SELECT UPPER(COALESCE(status, '')) AS status
+                FROM financeiro2_notas_debito
+                WHERE id = :id
+            """), {"id": nd_id}).mappings().first()
+
+            if bloqueio and bloqueio["status"] == "CONFIRMADA":
+                flash("ESSA ND ESTÁ CONFIRMADA E NÃO PODE MAIS SER EDITADA.", "warning")
+                return redirect(url_for("financeiro_dois.nota_debito_editar", nd_id=nd_id))
+
+        duplicada = conn.execute(text("""
             SELECT id
             FROM financeiro2_notas_debito
-            WHERE UPPER(numero_nd) = :numero_nd
+            WHERE UPPER(COALESCE(numero_nd, '')) = :numero_nd
               AND id <> :id
             LIMIT 1
         """), {
             "numero_nd": numero_nd,
-            "id": nd_id
+            "id": nd_id,
         }).mappings().first()
 
-        if existe:
-            flash("JÁ EXISTE OUTRA ND COM ESSE NÚMERO.", "warning")
+        if duplicada:
+            flash("JÁ EXISTE OUTRA NOTA DE DÉBITO COM ESSE NÚMERO.", "warning")
             return redirect(url_for("financeiro_dois.nota_debito_editar", nd_id=nd_id))
 
         conn.execute(text("""
@@ -6159,7 +6175,7 @@ def nota_debito_salvar(nd_id: int):
             "observacao": observacao,
         })
 
-    flash("ND SALVA COM SUCESSO.", "success")
+    flash("NOTA DE DÉBITO SALVA COM SUCESSO.", "success")
     return redirect(url_for("financeiro_dois.nota_debito_editar", nd_id=nd_id))
 
 def _url_recibo_para_path(url_recibo: str) -> str:
