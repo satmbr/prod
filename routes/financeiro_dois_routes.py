@@ -14,6 +14,7 @@ from datetime import date, datetime
 import uuid
 from werkzeug.utils import secure_filename
 from werkzeug.security import check_password_hash
+from urllib.parse import urlparse, unquote
 
 bp = Blueprint("financeiro_dois", __name__, url_prefix="/financeiro-dois")
 
@@ -5938,6 +5939,7 @@ def nota_debito_editar(nd_id: int):
             total_valor_pendente += item["valor_pendente"]
 
     nd = dict(nd)
+    nd["bloqueada"] = str(nd.get("status", "")).upper() == "CONFIRMADA"
     nd["eh_nova"] = False
     nd["qtd_despesas"] = len(despesas_rel)
     nd["total_linhas_vinculadas"] = total_linhas_vinculadas
@@ -6018,6 +6020,179 @@ def nota_debito_exportar_pdf(nd_id: int):
         if not nd:
             abort(404)
 
+    pdf_final = _gerar_pdf_nd_com_recibos(nd)
+
+    return send_file(
+        pdf_final,
+        as_attachment=True,
+        download_name=f"{nd['numero_nd']}.pdf",
+        mimetype="application/pdf",
+    )
+
+
+@bp.route("/notas-debito/<int:nd_id>/gerar")
+@login_required
+@permission_required("financeiro", "visualizar")
+def nota_debito_gerar(nd_id: int):
+    engine = get_engine()
+
+    with engine.begin() as conn:
+        nd = _carregar_nd_exportacao(conn, nd_id)
+        if not nd:
+            abort(404)
+
+        if not nd["linhas_nd"]:
+            flash("ESSA ND NÃO POSSUI LINHAS PARA GERAÇÃO.", "warning")
+            return redirect(url_for("financeiro_dois.nota_debito_editar", nd_id=nd_id))
+
+        conn.execute(text("""
+            UPDATE financeiro2_notas_debito
+            SET
+                status = 'VINCULADA',
+                atualizado_em = CURRENT_TIMESTAMP
+            WHERE id = :id
+              AND UPPER(COALESCE(status, '')) NOT IN ('REJEITADA', 'CANCELADA', 'CONFIRMADA')
+        """), {"id": nd_id})
+
+    with engine.connect() as conn:
+        nd = _carregar_nd_exportacao(conn, nd_id)
+        if not nd:
+            abort(404)
+
+    pdf_final = _gerar_pdf_nd_com_recibos(nd)
+
+    return send_file(
+        pdf_final,
+        as_attachment=True,
+        download_name=f"{nd['numero_nd']}.pdf",
+        mimetype="application/pdf",
+    )
+    
+@bp.route("/notas-debito/<int:nd_id>/confirmar", methods=["POST"])
+@login_required
+@permission_required("financeiro", "visualizar")
+def nota_debito_confirmar(nd_id: int):
+    if not _usuario_eh_administrador():
+        flash("APENAS O PERFIL ADMINISTRADOR PODE CONFIRMAR A ND.", "danger")
+        return redirect(url_for("financeiro_dois.nota_debito_editar", nd_id=nd_id))
+
+    engine = get_engine()
+    with engine.begin() as conn:
+        nd = conn.execute(text("""
+            SELECT id, UPPER(COALESCE(status, '')) AS status
+            FROM financeiro2_notas_debito
+            WHERE id = :id
+        """), {"id": nd_id}).mappings().first()
+
+        if not nd:
+            abort(404)
+
+        conn.execute(text("""
+            UPDATE financeiro2_notas_debito
+            SET
+                status = 'CONFIRMADA',
+                atualizado_em = CURRENT_TIMESTAMP
+            WHERE id = :id
+        """), {"id": nd_id})
+
+    flash("ND CONFIRMADA COM SUCESSO. EDIÇÕES BLOQUEADAS.", "success")
+    return redirect(url_for("financeiro_dois.nota_debito_editar", nd_id=nd_id))
+
+@bp.route("/notas-debito/<int:nd_id>/salvar", methods=["POST"])
+@login_required
+@permission_required("financeiro", "visualizar")
+def nota_debito_salvar(nd_id: int):
+    numero_nd = _nome_preenchido(request.form.get("numero_nd")).upper()
+    data_nd = _nome_preenchido(request.form.get("data_nd"))
+    empresa_nd = _nome_preenchido(request.form.get("empresa_nd")).upper()
+    status = _nome_preenchido(request.form.get("status")).upper() or "ABERTA"
+    observacao = _nome_preenchido(request.form.get("observacao")).upper()
+    
+    if nd_id:
+    bloqueio = conn.execute(text("""
+        SELECT UPPER(COALESCE(status, '')) AS status
+        FROM financeiro2_notas_debito
+        WHERE id = :id
+    """), {"id": nd_id}).mappings().first()
+
+    if bloqueio and bloqueio["status"] == "CONFIRMADA":
+        flash("ESSA ND ESTÁ CONFIRMADA E NÃO PODE MAIS SER EDITADA.", "warning")
+        return redirect(url_for("financeiro_dois.nota_debito_editar", nd_id=nd_id))
+    
+    if not numero_nd or not data_nd or not empresa_nd:
+        flash("PREENCHA NÚMERO ND, DATA E EMPRESA ND.", "warning")
+        return redirect(url_for("financeiro_dois.nota_debito_editar", nd_id=nd_id))
+    
+    engine = get_engine()
+    with engine.begin() as conn:
+        existe = conn.execute(text("""
+            SELECT id
+            FROM financeiro2_notas_debito
+            WHERE UPPER(numero_nd) = :numero_nd
+              AND id <> :id
+            LIMIT 1
+        """), {
+            "numero_nd": numero_nd,
+            "id": nd_id
+        }).mappings().first()
+
+        if existe:
+            flash("JÁ EXISTE OUTRA ND COM ESSE NÚMERO.", "warning")
+            return redirect(url_for("financeiro_dois.nota_debito_editar", nd_id=nd_id))
+
+        conn.execute(text("""
+            UPDATE financeiro2_notas_debito
+            SET
+                numero_nd = :numero_nd,
+                data_nd = :data_nd,
+                empresa_nd = :empresa_nd,
+                status = :status,
+                observacao = :observacao,
+                atualizado_em = CURRENT_TIMESTAMP
+            WHERE id = :id
+        """), {
+            "id": nd_id,
+            "numero_nd": numero_nd,
+            "data_nd": data_nd,
+            "empresa_nd": empresa_nd,
+            "status": status,
+            "observacao": observacao,
+        })
+
+    flash("ND SALVA COM SUCESSO.", "success")
+    return redirect(url_for("financeiro_dois.nota_debito_editar", nd_id=nd_id))
+
+def _url_recibo_para_path(url_recibo: str) -> str:
+    if not url_recibo:
+        return ""
+
+    parsed = urlparse(url_recibo)
+    caminho = unquote(parsed.path or "")
+
+    marker = "/static/"
+    pos = caminho.find(marker)
+    if pos >= 0:
+        relativo = caminho[pos + len(marker):].lstrip("/")
+        return os.path.join(current_app.static_folder, relativo)
+
+    if caminho.startswith("/"):
+        return caminho
+
+    return ""
+
+
+def _imagem_para_pdf_bytes(path_imagem: str) -> BytesIO:
+    img = Image.open(path_imagem)
+    if img.mode in ("RGBA", "P"):
+        img = img.convert("RGB")
+
+    out = BytesIO()
+    img.save(out, format="PDF", resolution=100.0)
+    out.seek(0)
+    return out
+
+
+def _gerar_pdf_nd_base(nd: dict) -> BytesIO:
     buffer = BytesIO()
     pdf = canvas.Canvas(buffer, pagesize=A4)
     largura, altura = A4
@@ -6117,95 +6292,46 @@ def nota_debito_exportar_pdf(nd_id: int):
 
     pdf.save()
     buffer.seek(0)
-
-    return send_file(
-        buffer,
-        as_attachment=True,
-        download_name=f"{nd['numero_nd']}.pdf",
-        mimetype="application/pdf",
-    )
+    return buffer
 
 
-@bp.route("/notas-debito/<int:nd_id>/gerar")
-@login_required
-@permission_required("financeiro", "visualizar")
-def nota_debito_gerar(nd_id: int):
-    engine = get_engine()
+def _gerar_pdf_nd_com_recibos(nd: dict) -> BytesIO:
+    writer = PdfWriter()
 
-    with engine.begin() as conn:
-        nd = _carregar_nd_exportacao(conn, nd_id)
-        if not nd:
-            abort(404)
+    pdf_base = _gerar_pdf_nd_base(nd)
+    base_reader = PdfReader(pdf_base)
+    for page in base_reader.pages:
+        writer.add_page(page)
 
-        if not nd["linhas_nd"]:
-            flash("ESSA ND NÃO POSSUI LINHAS PARA GERAÇÃO.", "warning")
-            return redirect(url_for("financeiro_dois.nota_debito_editar", nd_id=nd_id))
+    for linha in nd["linhas_nd"]:
+        url_recibo = (linha.get("recibo") or "").strip()
+        if not url_recibo:
+            continue
 
-        conn.execute(text("""
-            UPDATE financeiro2_notas_debito
-            SET
-                status = 'VINCULADA',
-                atualizado_em = CURRENT_TIMESTAMP
-            WHERE id = :id
-              AND UPPER(COALESCE(status, '')) NOT IN ('REJEITADA', 'CANCELADA')
-        """), {"id": nd_id})
+        path_recibo = _url_recibo_para_path(url_recibo)
+        if not path_recibo or not os.path.exists(path_recibo):
+            continue
 
-    flash("ND GERADA COM SUCESSO.", "success")
-    return redirect(url_for("financeiro_dois.nota_debito_exportar_pdf", nd_id=nd_id))
+        ext = os.path.splitext(path_recibo)[1].lower()
 
-@bp.route("/notas-debito/<int:nd_id>/salvar", methods=["POST"])
-@login_required
-@permission_required("financeiro", "visualizar")
-def nota_debito_salvar(nd_id: int):
-    numero_nd = _nome_preenchido(request.form.get("numero_nd")).upper()
-    data_nd = _nome_preenchido(request.form.get("data_nd"))
-    empresa_nd = _nome_preenchido(request.form.get("empresa_nd")).upper()
-    status = _nome_preenchido(request.form.get("status")).upper() or "ABERTA"
-    observacao = _nome_preenchido(request.form.get("observacao")).upper()
+        try:
+            if ext == ".pdf":
+                recibo_reader = PdfReader(path_recibo)
+                for page in recibo_reader.pages:
+                    writer.add_page(page)
+            elif ext in [".jpg", ".jpeg", ".png", ".webp", ".bmp"]:
+                pdf_img = _imagem_para_pdf_bytes(path_recibo)
+                recibo_reader = PdfReader(pdf_img)
+                for page in recibo_reader.pages:
+                    writer.add_page(page)
+        except Exception:
+            continue
 
-    if not numero_nd or not data_nd or not empresa_nd:
-        flash("PREENCHA NÚMERO ND, DATA E EMPRESA ND.", "warning")
-        return redirect(url_for("financeiro_dois.nota_debito_editar", nd_id=nd_id))
-
-    engine = get_engine()
-    with engine.begin() as conn:
-        existe = conn.execute(text("""
-            SELECT id
-            FROM financeiro2_notas_debito
-            WHERE UPPER(numero_nd) = :numero_nd
-              AND id <> :id
-            LIMIT 1
-        """), {
-            "numero_nd": numero_nd,
-            "id": nd_id
-        }).mappings().first()
-
-        if existe:
-            flash("JÁ EXISTE OUTRA ND COM ESSE NÚMERO.", "warning")
-            return redirect(url_for("financeiro_dois.nota_debito_editar", nd_id=nd_id))
-
-        conn.execute(text("""
-            UPDATE financeiro2_notas_debito
-            SET
-                numero_nd = :numero_nd,
-                data_nd = :data_nd,
-                empresa_nd = :empresa_nd,
-                status = :status,
-                observacao = :observacao,
-                atualizado_em = CURRENT_TIMESTAMP
-            WHERE id = :id
-        """), {
-            "id": nd_id,
-            "numero_nd": numero_nd,
-            "data_nd": data_nd,
-            "empresa_nd": empresa_nd,
-            "status": status,
-            "observacao": observacao,
-        })
-
-    flash("ND SALVA COM SUCESSO.", "success")
-    return redirect(url_for("financeiro_dois.nota_debito_editar", nd_id=nd_id))
-    
+    out = BytesIO()
+    writer.write(out)
+    out.seek(0)
+    return out
+  
 def _fmt_valor_br(valor: float) -> str:
     valor = float(valor or 0)
     texto = f"{valor:,.2f}"

@@ -21,11 +21,13 @@
     <div class="page-actions">
       <a class="btn" href="{{ url_for('financeiro_dois.notas_debito') }}">Voltar</a>
 
-      {% if not nd.eh_nova %}
+      {% if not nd.eh_nova and not nd.bloqueada %}
         <a class="btn" href="{{ url_for('financeiro_dois.nota_debito_despesas', nd_id=nd.id) }}">Selecionar despesas</a>
       {% endif %}
 
-      <button type="submit" form="form-nd" class="btn btn-primary">Salvar alterações</button>
+      {% if not nd.bloqueada %}
+        <button type="submit" form="form-nd" class="btn btn-primary">Salvar alterações</button>
+      {% endif %}
     </div>
   </div>
 
@@ -38,98 +40,113 @@
       <section class="main-card">
         <div class="card-title">Dados da ND</div>
 
+        {% if nd.bloqueada %}
+        <div class="lock-banner">
+          Esta ND está confirmada e não pode mais ser editada.
+        </div>
+        {% endif %}
+
         <div class="form-grid four">
           <div class="field">
             <label>Número ND</label>
-            <input class="input-like" type="text" name="numero_nd" value="{{ nd.numero_nd }}" required>
+            <input class="input-like" type="text" name="numero_nd" value="{{ nd.numero_nd }}" required {% if nd.bloqueada %}readonly{% endif %}>
           </div>
 
           <div class="field">
             <label>Data ND</label>
-            <input class="input-like" type="date" name="data_nd" value="{{ nd.data_form }}" required>
+            <input class="input-like" type="date" name="data_nd" value="{{ nd.data_form }}" required {% if nd.bloqueada %}disabled{% endif %}>
+            {% if nd.bloqueada %}
+              <input type="hidden" name="data_nd" value="{{ nd.data_form }}">
+            {% endif %}
           </div>
 
           <div class="field">
             <label>Empresa ND</label>
-            <select class="input-like" name="empresa_nd" required>
+            <select class="input-like" name="empresa_nd" required {% if nd.bloqueada %}disabled{% endif %}>
               <option value="">SELECIONE</option>
               {% for item in empresas_nd %}
                 <option value="{{ item.nome }}" {% if (nd.empresa_nd or '')|upper == (item.nome or '')|upper %}selected{% endif %}>{{ item.nome }}</option>
               {% endfor %}
             </select>
+            {% if nd.bloqueada %}
+              <input type="hidden" name="empresa_nd" value="{{ nd.empresa_nd }}">
+            {% endif %}
           </div>
 
           <div class="field">
             <label>Status</label>
-            <select class="input-like" name="status">
+            <select class="input-like" name="status" {% if nd.bloqueada %}disabled{% endif %}>
               <option value="ABERTA" {% if nd.status == 'ABERTA' %}selected{% endif %}>ABERTA</option>
               <option value="PARCIAL" {% if nd.status == 'PARCIAL' %}selected{% endif %}>PARCIAL</option>
               <option value="VINCULADA" {% if nd.status == 'VINCULADA' %}selected{% endif %}>VINCULADA</option>
               <option value="REJEITADA" {% if nd.status == 'REJEITADA' %}selected{% endif %}>REJEITADA</option>
               <option value="CANCELADA" {% if nd.status == 'CANCELADA' %}selected{% endif %}>CANCELADA</option>
+              <option value="CONFIRMADA" {% if nd.status == 'CONFIRMADA' %}selected{% endif %}>CONFIRMADA</option>
             </select>
+            {% if nd.bloqueada %}
+              <input type="hidden" name="status" value="{{ nd.status }}">
+            {% endif %}
           </div>
         </div>
 
         <div class="field" style="margin-top:14px;">
           <label>Observação</label>
-          <textarea class="input-like textarea-like medium" name="observacao">{{ nd.observacao }}</textarea>
+          <textarea class="input-like textarea-like medium" name="observacao" {% if nd.bloqueada %}readonly{% endif %}>{{ nd.observacao }}</textarea>
         </div>
-		
-		{% if not nd.eh_nova %}
-		<div style="margin-top:18px;">
-		  <div class="card-title" style="margin-bottom:10px;">Linhas da ND</div>
 
-		  <div class="table-wrap">
-			<table class="table">
-			  <thead>
-				<tr>
-				  <th>Data</th>
-				  <th>Detalhe</th>
-				  <th style="text-align:right;">Valor</th>
-				  <th>Origem</th>
-				  <th>Controle</th>
-				  <th>CC</th>
-				  <th>Linha</th>
-				  <th>Recibo</th>
-				</tr>
-			  </thead>
-			  <tbody>
-				{% for linha in nd.linhas_nd %}
-				<tr>
-				  <td>{{ linha.data }}</td>
-				  <td>{{ linha.detalhe }}</td>
-				  <td style="text-align:right;">R$ {{ '%.2f'|format(linha.valor) }}</td>
-				  <td>{{ linha.origem }}</td>
-				  <td>{{ linha.controle }}</td>
-				  <td>{{ linha.cc }}</td>
-				  <td>{{ linha.linha }}</td>
-					<td>
-					  {% if linha.recibo %}
-						<a class="btn btn-sm" href="{{ linha.recibo }}" target="_blank">Abrir recibo</a>
-					  {% else %}
-						--
-					  {% endif %}
-					</td>
-				</tr>
-				{% else %}
-				<tr>
-				  <td colspan="8" class="muted">Nenhuma linha vinculada a esta ND.</td>
-				</tr>
-				{% endfor %}
-			  </tbody>
-			  <tfoot>
-				<tr>
-				  <th colspan="2">Total</th>
-				  <th style="text-align:right;">R$ {{ '%.2f'|format(nd.total_nd or 0) }}</th>
-				  <th colspan="5"></th>
-				</tr>
-			  </tfoot>
-			</table>
-		  </div>
-		</div>
-		{% endif %}
-		
+        {% if not nd.eh_nova %}
+        <div style="margin-top:18px;">
+          <div class="card-title" style="margin-bottom:10px;">Linhas da ND</div>
+
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Data</th>
+                  <th>Detalhe</th>
+                  <th style="text-align:right;">Valor</th>
+                  <th>Origem</th>
+                  <th>Controle</th>
+                  <th>CC</th>
+                  <th>Linha</th>
+                  <th>Recibo</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for linha in nd.linhas_nd %}
+                <tr>
+                  <td>{{ linha.data }}</td>
+                  <td>{{ linha.detalhe }}</td>
+                  <td style="text-align:right;">R$ {{ '%.2f'|format(linha.valor) }}</td>
+                  <td>{{ linha.origem }}</td>
+                  <td>{{ linha.controle }}</td>
+                  <td>{{ linha.cc }}</td>
+                  <td>{{ linha.linha }}</td>
+                  <td>
+                    {% if linha.recibo %}
+                      <a class="btn btn-sm" href="{{ linha.recibo }}" target="_blank">Abrir recibo</a>
+                    {% else %}
+                      --
+                    {% endif %}
+                  </td>
+                </tr>
+                {% else %}
+                <tr>
+                  <td colspan="8" class="muted">Nenhuma linha vinculada a esta ND.</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <th colspan="2">Total</th>
+                  <th style="text-align:right;">R$ {{ '%.2f'|format(nd.total_nd or 0) }}</th>
+                  <th colspan="5"></th>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+        {% endif %}
       </section>
 
       <aside class="side-column">
@@ -149,6 +166,8 @@
                 <span class="badge badge-red">REJEITADA</span>
               {% elif nd.status == 'CANCELADA' %}
                 <span class="badge badge-gray">CANCELADA</span>
+              {% elif nd.status == 'CONFIRMADA' %}
+                <span class="badge badge-dark">CONFIRMADA</span>
               {% else %}
                 <span class="badge badge-blue">ABERTA</span>
               {% endif %}
@@ -162,23 +181,30 @@
           <div class="resume-row total"><span>Valor pendente</span><strong>R$ {{ '%.2f'|format(nd.total_valor_pendente) }}</strong></div>
         </div>
 
-		{% if not nd.eh_nova %}
-		<div class="resume-card">
-		  <div class="resume-title">Ações</div>
-		  <div class="anexo-list">
-			<a class="btn btn-block" href="{{ url_for('financeiro_dois.nota_debito_exportar_pdf', nd_id=nd.id) }}">
-			  Exportar PDF
-			</a>
-			<a class="btn btn-block" href="{{ url_for('financeiro_dois.nota_debito_exportar_excel', nd_id=nd.id) }}">
-			  Exportar Excel
-			</a>
-			<a class="btn btn-block" href="{{ url_for('financeiro_dois.nota_debito_gerar', nd_id=nd.id) }}">
-			  Gerar ND
-			</a>
-		  </div>
-		</div>
-		{% endif %}
+        {% if not nd.eh_nova %}
+        <div class="resume-card">
+          <div class="resume-title">Ações</div>
+          <div class="anexo-list">
+            <a class="btn btn-block" href="{{ url_for('financeiro_dois.nota_debito_exportar_pdf', nd_id=nd.id) }}">
+              Exportar PDF
+            </a>
+            <a class="btn btn-block" href="{{ url_for('financeiro_dois.nota_debito_exportar_excel', nd_id=nd.id) }}">
+              Exportar Excel
+            </a>
+            <a class="btn btn-block" href="{{ url_for('financeiro_dois.nota_debito_gerar', nd_id=nd.id) }}">
+              Gerar ND
+            </a>
 
+            {% if nd.status != 'CONFIRMADA' %}
+            <form method="post" action="{{ url_for('financeiro_dois.nota_debito_confirmar', nd_id=nd.id) }}">
+              <button type="submit" class="btn btn-block">Confirmar ND</button>
+            </form>
+            {% else %}
+            <div class="muted">ND confirmada. Edição bloqueada.</div>
+            {% endif %}
+          </div>
+        </div>
+        {% endif %}
       </aside>
     </div>
   </form>
@@ -209,6 +235,16 @@
 .anexo-item{display:flex;align-items:center;gap:8px;padding:10px 12px;border:1px solid #d9e2ec;border-radius:12px;color:#0f2f4f;background:#f8fbff;}
 .muted{color:#52667a;font-size:13px;}
 
+.lock-banner{
+  margin-bottom:14px;
+  padding:12px 14px;
+  border:1px solid #cbd5e1;
+  border-radius:14px;
+  background:#f8fafc;
+  color:#0f172a;
+  font-weight:700;
+}
+
 .badge{
   display:inline-flex;
   align-items:center;
@@ -227,6 +263,7 @@
 .badge-red{ background:#fee2e2; color:#b91c1c; }
 .badge-blue{ background:#dbeafe; color:#1d4ed8; }
 .badge-gray{ background:#e5e7eb; color:#334155; }
+.badge-dark{ background:#cbd5e1; color:#0f172a; }
 
 .table-wrap{
   width:100%;
