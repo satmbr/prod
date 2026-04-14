@@ -195,19 +195,28 @@
               Gerar ND
             </a>
 
-            {% if nd.status != 'CONFIRMADA' %}
-            <form method="post" action="{{ url_for('financeiro_dois.nota_debito_confirmar', nd_id=nd.id) }}">
-              <button type="submit" class="btn btn-block">Confirmar ND</button>
-            </form>
-            {% else %}
-            <div class="muted">ND confirmada. Edição bloqueada.</div>
-            {% endif %}
+			{% if nd.status != 'CONFIRMADA' %}
+			<button type="submit"
+					form="form-confirmar-nd"
+					class="btn btn-block">
+			  Confirmar ND
+			</button>
+			{% else %}
+			<div class="muted">ND confirmada. Edição bloqueada.</div>
+			{% endif %}
           </div>
         </div>
         {% endif %}
       </aside>
     </div>
   </form>
+	  {% if not nd.eh_nova and nd.status != 'CONFIRMADA' %}
+	<form
+	  id="form-confirmar-nd"
+	  method="post"
+	  action="{{ url_for('financeiro_dois.nota_debito_confirmar', nd_id=nd.id) }}"
+	></form>
+	{% endif %}
 </div>
 
 <style>

@@ -6020,10 +6020,10 @@ def nota_debito_exportar_pdf(nd_id: int):
         if not nd:
             abort(404)
 
-    pdf_final = _gerar_pdf_nd_com_recibos(nd)
+    pdf_base = _gerar_pdf_nd_base(nd)
 
     return send_file(
-        pdf_final,
+        pdf_base,
         as_attachment=True,
         download_name=f"{nd['numero_nd']}.pdf",
         mimetype="application/pdf",
@@ -6078,14 +6078,13 @@ def nota_debito_confirmar(nd_id: int):
 
     engine = get_engine()
     with engine.begin() as conn:
-        nd = conn.execute(text("""
-            SELECT id, UPPER(COALESCE(status, '')) AS status
-            FROM financeiro2_notas_debito
-            WHERE id = :id
-        """), {"id": nd_id}).mappings().first()
-
+        nd = _carregar_nd_exportacao(conn, nd_id)
         if not nd:
             abort(404)
+
+        if not nd["linhas_nd"]:
+            flash("ESSA ND NÃO POSSUI LINHAS E NÃO PODE SER CONFIRMADA.", "warning")
+            return redirect(url_for("financeiro_dois.nota_debito_editar", nd_id=nd_id))
 
         conn.execute(text("""
             UPDATE financeiro2_notas_debito
