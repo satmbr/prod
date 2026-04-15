@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}Buscar despesa | Reembolsos{% endblock %}
+
+{% block content %}
+<div class="page-wrap">
+  <section class="zone">
+    <div class="zone-head">
+      <div class="zone-left">
+        <div class="zone-icon">🔎</div>
+        <div>
+          <div class="zone-title">Buscar despesa já cadastrada</div>
+          <div class="muted">Pesquisa por matrícula, data e valor.</div>
+        </div>
+      </div>
+      <div class="zone-actions">
+        <a class="btn" href="{{ url_for('financeiro_dois.reembolsos_real') }}">Voltar</a>
+      </div>
+    </div>
+
+    <form method="get" action="{{ url_for('financeiro_dois.reembolso_real_buscar_despesa') }}" class="filters-card">
+      <div class="filters-grid">
+        <div class="field">
+          <label>Matrícula</label>
+          <input class="input-like" type="text" name="matricula" value="{{ filtros.matricula }}">
+        </div>
+        <div class="field">
+          <label>Data</label>
+          <input class="input-like" type="date" name="data_lancamento" value="{{ filtros.data_lancamento }}">
+        </div>
+        <div class="field">
+          <label>Valor</label>
+          <input class="input-like" type="text" name="valor" value="{{ filtros.valor }}">
+        </div>
+      </div>
+
+      <div class="zone-actions" style="margin-top:14px;">
+        <button type="submit" class="btn btn-primary">Buscar</button>
+      </div>
+    </form>
+
+    <div class="table-wrap" style="margin-top:16px;">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Reembolso</th>
+            <th>Matrícula</th>
+            <th>Colaborador</th>
+            <th>Data</th>
+            <th>Detalhe</th>
+            <th style="text-align:right;">Valor</th>
+            <th>Recibo</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in resultados %}
+          <tr>
+            <td>
+              <a class="btn btn-sm" href="{{ url_for('financeiro_dois.reembolso_real_editar', reembolso_id=item.reembolso_id) }}">
+                {{ item.numero_reembolso }}
+              </a>
+            </td>
+            <td>{{ item.matricula }}</td>
+            <td>{{ item.colaborador }}</td>
+            <td>{{ item.data }}</td>
+            <td>{{ item.detalhe }}</td>
+            <td style="text-align:right;">R$ {{ '%.2f'|format(item.valor) }}</td>
+            <td>
+              {% if item.anexo_recibo %}
+                <a class="btn btn-sm" href="{{ url_for('financeiro_dois.reembolso_real_abrir_anexo', arquivo=item.anexo_recibo) }}" target="_blank">Abrir recibo</a>
+              {% else %}
+                --
+              {% endif %}
+            </td>
+            <td>{{ item.status_linha }}</td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="8" class="muted">Nenhum resultado encontrado.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+{% endblock %}

@@ -23,29 +23,55 @@
       <div class="resume-row total"><span>Total</span><strong>R$ {{ '%.2f'|format(total_valor or 0) }}</strong></div>
     </div>
 
-    <form method="post" action="{{ url_for('financeiro_dois.reembolso_real_exportar_salvar', reembolso_id=reembolso.id) }}">
-      <div class="filters-card">
-        <div class="filters-grid">
-          <div class="field">
-            <label>Tipo de origem</label>
-            <select class="input-like" name="origem_tipo" required>
-              <option value="">SELECIONE</option>
-              <option value="OM">OM</option>
-              <option value="RD">RD</option>
-            </select>
-          </div>
+	<form method="post" action="{{ url_for('financeiro_dois.reembolso_real_exportar_salvar', reembolso_id=reembolso.id) }}">
+	  <div class="filters-card">
+		<div class="filters-grid">
+		  <div class="field">
+			<label>Tipo de origem</label>
+			<select class="input-like" name="origem_tipo" id="origem_tipo" required onchange="alternarOrigem()">
+			  <option value="">SELECIONE</option>
+			  <option value="OM">OM</option>
+			  <option value="RD">RD</option>
+			</select>
+		  </div>
 
-          <div class="field">
-            <label>ID da origem</label>
-            <input class="input-like" type="number" name="origem_id" required>
-          </div>
-        </div>
+		  <div class="field" id="bloco-om" style="display:none;">
+			<label>Selecionar OM</label>
+			<select class="input-like" name="origem_id_om">
+			  <option value="">SELECIONE</option>
+			  {% for item in oms %}
+				<option value="{{ item.id }}">{{ item.numero }} | {{ item.colaborador }} | {{ item.status }}</option>
+			  {% endfor %}
+			</select>
+		  </div>
 
-        <div class="zone-actions" style="margin-top:14px;">
-          <button type="submit" class="btn btn-primary">Exportar reembolso</button>
-        </div>
-      </div>
-    </form>
+		  <div class="field" id="bloco-rd" style="display:none;">
+			<label>Selecionar RD</label>
+			<select class="input-like" name="origem_id_rd">
+			  <option value="">SELECIONE</option>
+			  {% for item in rds %}
+				<option value="{{ item.id }}">{{ item.numero }} | {{ item.colaborador }} | {{ item.status }}</option>
+			  {% endfor %}
+			</select>
+		  </div>
+		</div>
+
+		<div class="zone-actions" style="margin-top:14px;">
+		  <button type="submit" class="btn btn-primary">Exportar reembolso</button>
+		</div>
+	  </div>
+	</form>
+
+	<script>
+	function alternarOrigem() {
+	  const tipo = document.getElementById('origem_tipo').value;
+	  const blocoOm = document.getElementById('bloco-om');
+	  const blocoRd = document.getElementById('bloco-rd');
+
+	  blocoOm.style.display = tipo === 'OM' ? 'block' : 'none';
+	  blocoRd.style.display = tipo === 'RD' ? 'block' : 'none';
+	}
+	</script>
 
     <div class="om-grid" style="margin-top:16px;">
       <div class="resume-card">

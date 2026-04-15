@@ -770,7 +770,14 @@ def reembolso_real_exportar(reembolso_id: int):
 @permission_required("financeiro", "visualizar")
 def reembolso_real_exportar_salvar(reembolso_id: int):
     origem_tipo = _nome_preenchido(request.form.get("origem_tipo")).upper()
-    origem_id_txt = _nome_preenchido(request.form.get("origem_id"))
+    origem_tipo = _nome_preenchido(request.form.get("origem_tipo")).upper()
+
+    if origem_tipo == "OM":
+        origem_id_txt = _nome_preenchido(request.form.get("origem_id_om"))
+    elif origem_tipo == "RD":
+        origem_id_txt = _nome_preenchido(request.form.get("origem_id_rd"))
+    else:
+        origem_id_txt = ""
 
     if origem_tipo not in ("OM", "RD"):
         flash("SELECIONE UMA ORIGEM VÁLIDA PARA EXPORTAÇÃO.", "warning")
@@ -998,3 +1005,66 @@ def reembolso_real_exportar_salvar(reembolso_id: int):
 
     flash(f"REEMBOLSO EXPORTADO COM SUCESSO PARA {origem_tipo} ({origem_numero}).", "success")
     return redirect(url_for("financeiro_dois.reembolso_real_editar", reembolso_id=reembolso_id))
+    
+@bp.route("/reembolsos-real/buscar-despesa")
+@login_required
+@permission_required("financeiro", "visualizar")
+def reembolso_real_buscar_despesa():
+    matricula = _nome_preenchido(request.args.get("matricula")).upper()
+    data_lancamento = _nome_preenchido(request.args.get("data_lancamento"))
+    valor_txt = _nome_preenchido(request.args.get("valor")).replace(",", ".")
+
+    resultados = []
+    valor = None
+
+    if valor_txt:
+        try:
+            valor = float(valor_txt)
+        except ValueError:
+            valor = None
+
+    engine = get_engine()
+    with engine.connect() as conn:
+        if matricula or data_lancamento or valor is not None:
+            filtros = ["1=1"]
+            params = {}
+
+            if matricula:
+                filtros.append("UPPER(COALESCE(r.matricula_colaborador, '')) = :matricula")
+                params["matricula"] = matricula
+
+            if data_lancamento:
+                filtros.append("l.data_lancamento = :data_lancamento")
+                params["data_lancamento"] = data_lancamento
+
+            if valor is not None:
+                filtros.append("COALESCE(l.valor, 0) = :valor")
+                params["valor"] = valor
+
+            resultados = conn.execute(text(f"""
+                SELECT
+                    r.id AS reembolso_id,
+                    UPPER(COALESCE(r.numero_reembolso, '')) AS numero_reembolso,
+                    UPPER(COALESCE(r.matricula_colaborador, '')) AS matricula,
+                    UPPER(COALESCE(r.nome_colaborador, '')) AS colaborador,
+                    TO_CHAR(l.data_lancamento, 'DD/MM/YYYY') AS data,
+                    UPPER(COALESCE(l.detalhe, '')) AS detalhe,
+                    COALESCE(l.valor, 0) AS valor,
+                    COALESCE(l.anexo_recibo, '') AS anexo_recibo,
+                    UPPER(COALESCE(l.status, 'ATIVO')) AS status_linha
+                FROM financeiro2_reembolsos_linhas l
+                JOIN financeiro2_reembolsos r ON r.id = l.reembolso_id
+                WHERE {' AND '.join(filtros)}
+                ORDER BY l.id DESC
+            """), params).mappings().all()
+
+    return render_template(
+        "financeiro_dois/reembolso_buscar_despesa.html",
+        subnav_links=build_financeiro_dois_subnav("reembolsos"),
+        resultados=resultados,
+        filtros={
+            "matricula": request.args.get("matricula", ""),
+            "data_lancamento": request.args.get("data_lancamento", ""),
+            "valor": request.args.get("valor", ""),
+        }
+    )
