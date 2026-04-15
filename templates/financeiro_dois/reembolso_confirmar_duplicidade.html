@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Confirmar duplicidade | Reembolso{% endblock %}
+
+{% block content %}
+<div class="page-wrap">
+  <section class="zone">
+    <div class="zone-head">
+      <div class="zone-left">
+        <div class="zone-icon">⚠️</div>
+        <div>
+          <div class="zone-title">Possível duplicidade encontrada</div>
+          <div class="muted">Já existe uma linha para este colaborador com a mesma data e o mesmo valor.</div>
+        </div>
+      </div>
+      <div class="zone-actions">
+        <a class="btn" href="{{ url_for('financeiro_dois.reembolso_real_editar', reembolso_id=reembolso_id) }}">Voltar</a>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Reembolso</th>
+            <th>Matrícula</th>
+            <th>Colaborador</th>
+            <th>Data</th>
+            <th>Detalhe</th>
+            <th style="text-align:right;">Valor</th>
+            <th>Recibo</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in duplicadas %}
+          <tr>
+            <td>{{ item.numero_reembolso }}</td>
+            <td>{{ item.matricula }}</td>
+            <td>{{ item.colaborador }}</td>
+            <td>{{ item.data }}</td>
+            <td>{{ item.detalhe }}</td>
+            <td style="text-align:right;">R$ {{ '%.2f'|format(item.valor) }}</td>
+            <td>
+              {% if item.anexo_recibo %}
+                <a class="btn btn-sm" href="{{ url_for('financeiro_dois.reembolso_real_abrir_anexo', arquivo=item.anexo_recibo) }}" target="_blank">Abrir recibo</a>
+              {% else %}
+                --
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <form method="post" action="{{ url_for('financeiro_dois.reembolso_real_linha_confirmar_duplicidade', reembolso_id=reembolso_id) }}" style="margin-top:16px;">
+      <input type="hidden" name="data_lancamento" value="{{ form_data.data_lancamento }}">
+      <input type="hidden" name="detalhe" value="{{ form_data.detalhe }}">
+      <input type="hidden" name="valor" value="{{ form_data.valor }}">
+      <input type="hidden" name="anexo_recibo_salvo" value="{{ form_data.anexo_recibo_salvo }}">
+
+      <div class="zone-actions">
+        <button type="submit" class="btn btn-primary">Salvar mesmo assim</button>
+      </div>
+    </form>
+  </section>
+</div>
+{% endblock %}
