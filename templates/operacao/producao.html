@@ -593,7 +593,7 @@
                   </tr>
                 </thead>
                 <tbody>
-                  {% for d in dados %}
+                  {% for d in dados | sort(attribute='data') %}
                     {% set d_data = d.data|string %}
                     {% set filtro_data = data_partdiaria|string %}
                     {% set destaque = 'linha-destaque' if d_data == filtro_data and d_data != '' else '' %}
@@ -743,7 +743,7 @@
               </tr>
             </thead>
             <tbody>
-              {% for linha in dados_resumo_frentes %}
+              {% for linha in dados_resumo_frentes | sort(attribute='data') %}
                 {% set linha_data = linha.data|string %}
                 {% set filtro_data = data_partdiaria|string %}
                 {% set destaque = 'linha-destaque' if linha_data == filtro_data and linha_data != '' else '' %}
@@ -898,12 +898,16 @@
 </script>
 
 <script>
-  const dadosRen = {{ dados | default([], true) | tojson }};
-  const labelsRen = Array.isArray(dadosRen) ? dadosRen.map(d => d.data) : [];
-  const previstoDia = Array.isArray(dadosRen) ? dadosRen.map(d => d.previsto_dia) : [];
-  const previstoTotal = Array.isArray(dadosRen) ? dadosRen.map(d => d.previsto_total) : [];
-  const realizadoDia = Array.isArray(dadosRen) ? dadosRen.map(d => d.realizado_dia) : [];
-  const realizadoTotal = Array.isArray(dadosRen) ? dadosRen.map(d => d.realizado_total) : [];
+const dadosRenRaw = {{ dados | default([], true) | tojson }};
+const dadosRen = Array.isArray(dadosRenRaw)
+  ? [...dadosRenRaw].sort((a, b) => new Date(a.data) - new Date(b.data))
+  : [];
+
+const labelsRen = dadosRen.map(d => d.data);
+const previstoDia = dadosRen.map(d => d.previsto_dia);
+const previstoTotal = dadosRen.map(d => d.previsto_total);
+const realizadoDia = dadosRen.map(d => d.realizado_dia);
+const realizadoTotal = dadosRen.map(d => d.realizado_total);
 
   if (document.getElementById('graficoProducao')) {
     new Chart(document.getElementById('graficoProducao').getContext('2d'), {
