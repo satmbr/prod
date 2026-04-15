@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Reembolso | Financeiro Dois{% endblock %}
+{% block title %}{{ reembolso.numero_reembolso or 'Novo Reembolso' }} | Financeiro Dois{% endblock %}
 
 {% block content %}
 <div class="page-wrap">
@@ -8,90 +8,167 @@
       <div class="zone-left">
         <div class="zone-icon">💳</div>
         <div>
-          <div class="zone-title">Reembolso #{{ reembolso.id }}</div>
-          <div class="muted">Solicitação com aprovação obrigatória antes do pagamento.</div>
+          <div class="zone-title">{{ reembolso.numero_reembolso or 'NOVO REEMBOLSO' }}</div>
+          <div class="muted">Cadastro do cabeçalho do reembolso e acompanhamento das linhas.</div>
         </div>
       </div>
       <div class="zone-actions">
-        <a class="btn" href="{{ url_for('financeiro_dois.reembolsos') }}">Voltar</a>
-        <a class="btn btn-primary" href="#">Salvar alterações</a>
+        <a class="btn" href="{{ url_for('financeiro_dois.reembolsos_real') }}">Voltar</a>
+        <button type="submit" form="form-reembolso" class="btn btn-primary">Salvar alterações</button>
       </div>
     </div>
 
-    <div class="om-grid">
-      <div class="om-card">
-        <div class="card-title">Dados do reembolso</div>
-        <div class="form-grid">
-          <div class="field">
-            <label>Matrícula</label>
-            <input class="input-like" type="text" value="{{ reembolso.matricula }}" />
+    <form
+      id="form-reembolso"
+      method="post"
+      action="{% if reembolso.eh_novo %}{{ url_for('financeiro_dois.reembolso_real_criar') }}{% else %}{{ url_for('financeiro_dois.reembolso_real_salvar', reembolso_id=reembolso.id) }}{% endif %}"
+    >
+      <div class="om-grid">
+        <div class="om-card">
+          <div class="card-title">Dados do reembolso</div>
+
+          <div class="form-grid">
+            <div class="field">
+              <label>Número</label>
+              <input class="input-like" type="text" value="{{ reembolso.numero_reembolso }}" readonly />
+            </div>
+
+            <div class="field">
+              <label>Matrícula</label>
+              <input class="input-like" type="text" name="matricula" value="{{ reembolso.matricula }}" {% if reembolso.bloqueado %}readonly{% endif %} />
+            </div>
+
+            <div class="field">
+              <label>Colaborador</label>
+              <input class="input-like" type="text" name="colaborador" value="{{ reembolso.colaborador }}" {% if reembolso.bloqueado %}readonly{% endif %} />
+            </div>
+
+            <div class="field">
+              <label>PIX cadastrado</label>
+              <input class="input-like" type="text" name="pix" value="{{ reembolso.pix }}" {% if reembolso.bloqueado %}readonly{% endif %} />
+            </div>
+
+            <div class="field">
+              <label>Tipo chave PIX</label>
+              <input class="input-like" type="text" name="tipo_chave_pix" value="{{ reembolso.tipo_chave_pix }}" {% if reembolso.bloqueado %}readonly{% endif %} />
+            </div>
+
+            <div class="field">
+              <label>Data solicitação</label>
+              <input class="input-like" type="date" name="data_solicitacao" value="{{ reembolso.data_form }}" {% if reembolso.bloqueado %}disabled{% endif %} />
+              {% if reembolso.bloqueado %}
+                <input type="hidden" name="data_solicitacao" value="{{ reembolso.data_form }}">
+              {% endif %}
+            </div>
+
+            <div class="field">
+              <label>Status</label>
+              <select class="input-like" name="status" {% if reembolso.bloqueado %}disabled{% endif %}>
+                <option value="ABERTO" {% if reembolso.status == 'ABERTO' %}selected{% endif %}>ABERTO</option>
+                <option value="EM_ANALISE" {% if reembolso.status == 'EM_ANALISE' %}selected{% endif %}>EM_ANALISE</option>
+                <option value="AGUARDANDO_PAGAMENTO" {% if reembolso.status == 'AGUARDANDO_PAGAMENTO' %}selected{% endif %}>AGUARDANDO_PAGAMENTO</option>
+                <option value="PAGO" {% if reembolso.status == 'PAGO' %}selected{% endif %}>PAGO</option>
+                <option value="EXPORTADO" {% if reembolso.status == 'EXPORTADO' %}selected{% endif %}>EXPORTADO</option>
+              </select>
+              {% if reembolso.bloqueado %}
+                <input type="hidden" name="status" value="{{ reembolso.status }}">
+              {% endif %}
+            </div>
+
+            <div class="field">
+              <label>Aprovação</label>
+              <select class="input-like" name="aprovacao" {% if reembolso.bloqueado %}disabled{% endif %}>
+                <option value="PENDENTE" {% if reembolso.aprovacao == 'PENDENTE' %}selected{% endif %}>PENDENTE</option>
+                <option value="APROVADO" {% if reembolso.aprovacao == 'APROVADO' %}selected{% endif %}>APROVADO</option>
+                <option value="RECUSADO" {% if reembolso.aprovacao == 'RECUSADO' %}selected{% endif %}>RECUSADO</option>
+              </select>
+              {% if reembolso.bloqueado %}
+                <input type="hidden" name="aprovacao" value="{{ reembolso.aprovacao }}">
+              {% endif %}
+            </div>
+
+            <div class="field">
+              <label>Data pagamento</label>
+              <input class="input-like" type="text" value="{{ reembolso.data_pagamento_form or '' }}" readonly />
+            </div>
+
+            <div class="field">
+              <label>Valor pago</label>
+              <input class="input-like" type="text" value="R$ {{ '%.2f'|format(reembolso.valor_pago or 0) }}" readonly />
+            </div>
+
+            <div class="field">
+              <label>Origem exportação</label>
+              <input class="input-like" type="text" value="{{ reembolso.origem_exportacao_numero or '' }}" readonly />
+            </div>
+
+            <div class="field field-full">
+              <label>Observação</label>
+              <textarea class="input-like textarea-like" name="observacao" {% if reembolso.bloqueado %}readonly{% endif %}>{{ reembolso.observacao }}</textarea>
+            </div>
           </div>
-          <div class="field">
-            <label>Colaborador</label>
-            <input class="input-like" type="text" value="{{ reembolso.colaborador }}" />
+
+          {% if not reembolso.eh_novo %}
+          <div style="margin-top:20px;">
+            <div class="card-title">Linhas do reembolso</div>
+
+            <div class="table-wrap">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Data</th>
+                    <th>Detalhe</th>
+                    <th style="text-align:right;">Valor</th>
+                    <th>Recibo</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for linha in reembolso.linhas %}
+                  <tr>
+                    <td>{{ linha.data }}</td>
+                    <td>{{ linha.detalhe }}</td>
+                    <td style="text-align:right;">R$ {{ '%.2f'|format(linha.valor) }}</td>
+                    <td>{{ linha.anexo_recibo or '--' }}</td>
+                    <td>{{ linha.status }}</td>
+                  </tr>
+                  {% else %}
+                  <tr>
+                    <td colspan="5" class="muted">Nenhuma linha cadastrada ainda.</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
           </div>
-          <div class="field">
-            <label>PIX cadastrado</label>
-            <input class="input-like" type="text" value="{{ reembolso.pix }}" />
+          {% endif %}
+        </div>
+
+        <div class="om-side">
+          <div class="resume-card">
+            <div class="resume-title">Resumo</div>
+            <div class="resume-row"><span>Status</span><strong>{{ reembolso.status }}</strong></div>
+            <div class="resume-row"><span>Aprovação</span><strong>{{ reembolso.aprovacao }}</strong></div>
+            <div class="resume-row"><span>Qtd linhas</span><strong>{{ reembolso.total_linhas or 0 }}</strong></div>
+            <div class="resume-row"><span>Fonte pagadora</span><strong>{{ reembolso.origem_exportacao_numero or '--' }}</strong></div>
+            <div class="resume-row resume-total"><span>Valor total</span><strong>R$ {{ '%.2f'|format(reembolso.total_valor or 0) }}</strong></div>
           </div>
-          <div class="field">
-            <label>Data solicitação</label>
-            <input class="input-like" type="text" value="{{ reembolso.data_solicitacao }}" />
-          </div>
-          <div class="field">
-            <label>Valor</label>
-            <input class="input-like" type="text" value="R$ {{ '%.2f'|format(reembolso.valor) }}" />
-          </div>
-          <div class="field">
-            <label>Status</label>
-            <input class="input-like" type="text" value="{{ reembolso.status }}" />
-          </div>
-          <div class="field">
-            <label>Aprovação</label>
-            <input class="input-like" type="text" value="{{ reembolso.aprovacao }}" />
-          </div>
-          <div class="field">
-            <label>Fonte pagadora</label>
-            <input class="input-like" type="text" value="{{ reembolso.fonte_pagadora }}" />
-          </div>
-          <div class="field field-full">
-            <label>Descrição</label>
-            <input class="input-like" type="text" value="{{ reembolso.descricao }}" />
-          </div>
-          <div class="field">
-            <label>Comprovante solicitação</label>
-            <input class="input-like" type="text" value="{{ reembolso.comprovante_solicitacao }}" />
-          </div>
-          <div class="field">
-            <label>Comprovante pagamento</label>
-            <input class="input-like" type="text" value="{{ reembolso.comprovante_pagamento }}" />
-          </div>
-          <div class="field field-full">
-            <label>Observação</label>
-            <textarea class="input-like textarea-like">{{ reembolso.observacao }}</textarea>
+
+          <div class="resume-card">
+            <div class="resume-title">Ações</div>
+            <div class="action-list">
+              {% if not reembolso.eh_novo %}
+              <a href="#" class="btn btn-primary btn-block">Nova linha</a>
+              <a href="#" class="btn btn-block">Registrar pagamento</a>
+              <a href="#" class="btn btn-block">Exportar para OM/RD</a>
+              {% else %}
+              <div class="muted">Salve o reembolso para liberar as próximas ações.</div>
+              {% endif %}
+            </div>
           </div>
         </div>
       </div>
-
-      <div class="om-side">
-        <div class="resume-card">
-          <div class="resume-title">Resumo</div>
-          <div class="resume-row"><span>Status</span><strong>{{ reembolso.status }}</strong></div>
-          <div class="resume-row"><span>Aprovação</span><strong>{{ reembolso.aprovacao }}</strong></div>
-          <div class="resume-row"><span>Fonte pagadora</span><strong>{{ reembolso.fonte_pagadora }}</strong></div>
-          <div class="resume-row resume-total"><span>Valor</span><strong>R$ {{ '%.2f'|format(reembolso.valor) }}</strong></div>
-        </div>
-
-        <div class="resume-card">
-          <div class="resume-title">Ações</div>
-          <div class="action-list">
-            <a href="#" class="btn btn-primary btn-block">Enviar para aprovação</a>
-            <a href="#" class="btn btn-block">Registrar pagamento</a>
-            <a href="#" class="btn btn-block">Salvar comprovante</a>
-          </div>
-        </div>
-      </div>
-    </div>
+    </form>
   </section>
 </div>
 
@@ -102,13 +179,14 @@
   .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;}
   .field label{display:block;margin-bottom:6px;font-size:13px;font-weight:600;color:#334155;}
   .field-full{grid-column:1 / -1;}
-  .input-like{width:100%;height:42px;border:1px solid #d8e1ec;border-radius:12px;padding:0 12px;font-size:14px;background:#fff;}
-  .textarea-like{min-height:96px;padding:12px;resize:vertical;}
+  .input-like{width:100%;min-height:42px;border:1px solid #d8e1ec;border-radius:12px;padding:10px 12px;font-size:14px;background:#fff;}
+  .textarea-like{min-height:96px;resize:vertical;}
   .resume-row{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid #edf2f7;font-size:14px;}
   .resume-row:last-child{border-bottom:none;}
   .resume-total{font-size:15px;font-weight:700;}
   .action-list{display:flex;flex-direction:column;gap:10px;}
   .btn-block{width:100%;text-align:center;}
+  .table-wrap{overflow:auto;}
   @media (max-width:980px){.om-grid{grid-template-columns:1fr;}}
 </style>
 {% endblock %}
