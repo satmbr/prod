@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% block title %}Exportar reembolso | Financeiro Dois{% endblock %}
+
+{% block content %}
+<div class="page-wrap">
+  <section class="zone">
+    <div class="zone-head">
+      <div class="zone-left">
+        <div class="zone-icon">📤</div>
+        <div>
+          <div class="zone-title">Exportar {{ reembolso.numero_reembolso }}</div>
+          <div class="muted">Selecione uma OM ou RD aberta para receber as linhas do reembolso.</div>
+        </div>
+      </div>
+      <div class="zone-actions">
+        <a class="btn" href="{{ url_for('financeiro_dois.reembolso_real_editar', reembolso_id=reembolso.id) }}">Voltar</a>
+      </div>
+    </div>
+
+    <div class="resume-card" style="margin-bottom:16px;">
+      <div class="resume-row"><span>Reembolso</span><strong>{{ reembolso.numero_reembolso }}</strong></div>
+      <div class="resume-row"><span>Linhas ativas</span><strong>{{ linhas|length }}</strong></div>
+      <div class="resume-row total"><span>Total</span><strong>R$ {{ '%.2f'|format(total_valor or 0) }}</strong></div>
+    </div>
+
+    <form method="post" action="{{ url_for('financeiro_dois.reembolso_real_exportar_salvar', reembolso_id=reembolso.id) }}">
+      <div class="filters-card">
+        <div class="filters-grid">
+          <div class="field">
+            <label>Tipo de origem</label>
+            <select class="input-like" name="origem_tipo" required>
+              <option value="">SELECIONE</option>
+              <option value="OM">OM</option>
+              <option value="RD">RD</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label>ID da origem</label>
+            <input class="input-like" type="number" name="origem_id" required>
+          </div>
+        </div>
+
+        <div class="zone-actions" style="margin-top:14px;">
+          <button type="submit" class="btn btn-primary">Exportar reembolso</button>
+        </div>
+      </div>
+    </form>
+
+    <div class="om-grid" style="margin-top:16px;">
+      <div class="resume-card">
+        <div class="resume-title">OMs disponíveis</div>
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Número</th>
+                <th>Colaborador</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in oms %}
+              <tr>
+                <td>{{ item.id }}</td>
+                <td>{{ item.numero }}</td>
+                <td>{{ item.colaborador }}</td>
+                <td>{{ item.status }}</td>
+              </tr>
+              {% else %}
+              <tr><td colspan="4" class="muted">Nenhuma OM disponível.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="resume-card">
+        <div class="resume-title">RDs disponíveis</div>
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Número</th>
+                <th>Colaborador</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in rds %}
+              <tr>
+                <td>{{ item.id }}</td>
+                <td>{{ item.numero }}</td>
+                <td>{{ item.colaborador }}</td>
+                <td>{{ item.status }}</td>
+              </tr>
+              {% else %}
+              <tr><td colspan="4" class="muted">Nenhuma RD disponível.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="resume-card" style="margin-top:16px;">
+      <div class="resume-title">Linhas que serão exportadas</div>
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Detalhe</th>
+              <th style="text-align:right;">Valor</th>
+              <th>Recibo</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for linha in linhas %}
+            <tr>
+              <td>{{ linha.data }}</td>
+              <td>{{ linha.detalhe }}</td>
+              <td style="text-align:right;">R$ {{ '%.2f'|format(linha.valor) }}</td>
+              <td>
+                {% if linha.anexo_recibo %}
+                  <a class="btn btn-sm" href="{{ url_for('financeiro_dois.reembolso_real_abrir_anexo', arquivo=linha.anexo_recibo) }}" target="_blank">Abrir recibo</a>
+                {% else %}
+                  --
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</div>
+{% endblock %}

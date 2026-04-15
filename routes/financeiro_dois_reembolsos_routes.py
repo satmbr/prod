@@ -46,6 +46,20 @@ def _salvar_anexo_reembolso(arquivo):
     arquivo.save(os.path.join(pasta, nome_salvo))
     return nome_salvo
     
+def _salvar_comprovante_pagamento_reembolso(arquivo):
+    if not arquivo or not arquivo.filename:
+        return None
+
+    pasta = os.path.join(current_app.root_path, "static", "uploads", "financeiro2", "reembolsos_pagamentos")
+    os.makedirs(pasta, exist_ok=True)
+
+    nome_seguro = secure_filename(arquivo.filename)
+    extensao = os.path.splitext(nome_seguro)[1].lower()
+    nome_salvo = f"{uuid.uuid4().hex}{extensao}"
+
+    arquivo.save(os.path.join(pasta, nome_salvo))
+    return nome_salvo
+    
 @bp.route("/reembolsos-real/anexo")
 @login_required
 @permission_required("financeiro", "visualizar")
@@ -68,7 +82,27 @@ def reembolso_real_abrir_anexo():
 
     return send_file(caminho, as_attachment=False)
     
+@bp.route("/reembolsos-real/comprovante-pagamento")
+@login_required
+@permission_required("financeiro", "visualizar")
+def reembolso_real_abrir_comprovante_pagamento():
+    arquivo = _nome_preenchido(request.args.get("arquivo"))
+    if not arquivo:
+        abort(404)
 
+    caminho = os.path.join(
+        current_app.root_path,
+        "static",
+        "uploads",
+        "financeiro2",
+        "reembolsos_pagamentos",
+        os.path.basename(arquivo)
+    )
+
+    if not os.path.exists(caminho):
+        abort(404)
+
+    return send_file(caminho, as_attachment=False)  
 
 @bp.route("/reembolsos-real")
 @login_required
@@ -256,6 +290,12 @@ def reembolso_real_editar(reembolso_id: int):
     total_valor = sum(float(l["valor"] or 0) for l in linhas if (l["status"] or "") == "ATIVO")
 
     reembolso = dict(reembolso)
+    reembolso["comprovante_pagamento_url"] = ""
+    if reembolso.get("comprovante_pagamento"):
+        reembolso["comprovante_pagamento_url"] = url_for(
+            "financeiro_dois.reembolso_real_abrir_comprovante_pagamento",
+            arquivo=reembolso["comprovante_pagamento"]
+        )
     reembolso["eh_novo"] = False
     reembolso["linhas"] = linhas
     reembolso["total_linhas"] = len(linhas)
@@ -558,4 +598,403 @@ def reembolso_real_linha_toggle_status(reembolso_id: int, linha_id: int):
         })
 
     flash(f"LINHA ALTERADA PARA {novo_status}.", "success")
+    return redirect(url_for("financeiro_dois.reembolso_real_editar", reembolso_id=reembolso_id))
+    
+@bp.route("/reembolsos-real/<int:reembolso_id>/registrar-pagamento", methods=["POST"])
+@login_required
+@permission_required("financeiro", "visualizar")
+def reembolso_real_registrar_pagamento(reembolso_id: int):
+    data_pagamento = _nome_preenchido(request.form.get("data_pagamento"))
+    valor_pago_txt = _nome_preenchido(request.form.get("valor_pago")).replace(",", ".")
+    observacao_pagamento = _nome_preenchido(request.form.get("observacao_pagamento")).upper()
+
+    if not data_pagamento or not valor_pago_txt:
+        flash("PREENCHA DATA E VALOR DO PAGAMENTO.", "warning")
+        return redirect(url_for("financeiro_dois.reembolso_real_editar", reembolso_id=reembolso_id))
+
+    try:
+        valor_pago = float(valor_pago_txt)
+    except ValueError:
+        flash("VALOR DE PAGAMENTO INVÁLIDO.", "warning")
+        return redirect(url_for("financeiro_dois.reembolso_real_editar", reembolso_id=reembolso_id))
+
+    if valor_pago <= 0:
+        flash("O VALOR DO PAGAMENTO DEVE SER MAIOR QUE ZERO.", "warning")
+        return redirect(url_for("financeiro_dois.reembolso_real_editar", reembolso_id=reembolso_id))
+
+    engine = get_engine()
+    with engine.begin() as conn:
+        reembolso = conn.execute(text("""
+            SELECT
+                id,
+                COALESCE(bloqueado, FALSE) AS bloqueado,
+                COALESCE((
+                    SELECT SUM(COALESCE(l.valor, 0))
+                    FROM financeiro2_reembolsos_linhas l
+                    WHERE l.reembolso_id = financeiro2_reembolsos.id
+                      AND UPPER(COALESCE(l.status, 'ATIVO')) = 'ATIVO'
+                ), 0) AS total_linhas
+            FROM financeiro2_reembolsos
+            WHERE id = :id
+        """), {"id": reembolso_id}).mappings().first()
+
+        if not reembolso:
+            abort(404)
+
+        if bool(reembolso["bloqueado"]):
+            flash("ESTE REEMBOLSO JÁ ESTÁ BLOQUEADO.", "warning")
+            return redirect(url_for("financeiro_dois.reembolso_real_editar", reembolso_id=reembolso_id))
+
+        total_linhas = float(reembolso["total_linhas"] or 0)
+        if total_linhas <= 0:
+            flash("O REEMBOLSO NÃO POSSUI LINHAS E NÃO PODE SER PAGO.", "warning")
+            return redirect(url_for("financeiro_dois.reembolso_real_editar", reembolso_id=reembolso_id))
+
+        arquivo = request.files.get("comprovante_pagamento")
+        nome_comprovante = _salvar_comprovante_pagamento_reembolso(arquivo)
+
+        if not nome_comprovante:
+            flash("ANEXE O COMPROVANTE DE PAGAMENTO.", "warning")
+            return redirect(url_for("financeiro_dois.reembolso_real_editar", reembolso_id=reembolso_id))
+
+        conn.execute(text("""
+            UPDATE financeiro2_reembolsos
+            SET
+                data_pagamento = :data_pagamento,
+                valor_pago = :valor_pago,
+                comprovante_pagamento = :comprovante_pagamento,
+                observacao = CASE
+                    WHEN COALESCE(observacao, '') = '' THEN :observacao
+                    ELSE COALESCE(observacao, '') || ' | ' || :observacao
+                END,
+                status = 'PAGO',
+                aprovacao = CASE
+                    WHEN UPPER(COALESCE(aprovacao, '')) = 'PENDENTE' THEN 'APROVADO'
+                    ELSE aprovacao
+                END,
+                bloqueado = TRUE,
+                atualizado_em = CURRENT_TIMESTAMP
+            WHERE id = :id
+        """), {
+            "id": reembolso_id,
+            "data_pagamento": data_pagamento,
+            "valor_pago": valor_pago,
+            "comprovante_pagamento": nome_comprovante,
+            "observacao": observacao_pagamento or "PAGAMENTO REGISTRADO",
+        })
+
+    flash("PAGAMENTO DO REEMBOLSO REGISTRADO COM SUCESSO. REEMBOLSO BLOQUEADO.", "success")
+    return redirect(url_for("financeiro_dois.reembolso_real_editar", reembolso_id=reembolso_id))
+    
+@bp.route("/reembolsos-real/<int:reembolso_id>/exportar")
+@login_required
+@permission_required("financeiro", "visualizar")
+def reembolso_real_exportar(reembolso_id: int):
+    engine = get_engine()
+
+    with engine.connect() as conn:
+        reembolso = conn.execute(text("""
+            SELECT
+                id,
+                UPPER(COALESCE(numero_reembolso, '')) AS numero_reembolso,
+                UPPER(COALESCE(status, '')) AS status,
+                COALESCE(bloqueado, FALSE) AS bloqueado,
+                UPPER(COALESCE(origem_exportacao_tipo, '')) AS origem_exportacao_tipo,
+                origem_exportacao_id,
+                UPPER(COALESCE(origem_exportacao_numero, '')) AS origem_exportacao_numero
+            FROM financeiro2_reembolsos
+            WHERE id = :id
+        """), {"id": reembolso_id}).mappings().first()
+
+        if not reembolso:
+            abort(404)
+
+        if reembolso["origem_exportacao_tipo"] and reembolso["origem_exportacao_id"]:
+            flash("ESTE REEMBOLSO JÁ FOI EXPORTADO E A ORIGEM NÃO PODE SER ALTERADA.", "warning")
+            return redirect(url_for("financeiro_dois.reembolso_real_editar", reembolso_id=reembolso_id))
+
+        linhas = conn.execute(text("""
+            SELECT
+                id,
+                TO_CHAR(data_lancamento, 'DD/MM/YYYY') AS data,
+                UPPER(COALESCE(detalhe, '')) AS detalhe,
+                COALESCE(valor, 0) AS valor,
+                COALESCE(anexo_recibo, '') AS anexo_recibo,
+                UPPER(COALESCE(status, 'ATIVO')) AS status
+            FROM financeiro2_reembolsos_linhas
+            WHERE reembolso_id = :reembolso_id
+              AND UPPER(COALESCE(status, 'ATIVO')) = 'ATIVO'
+            ORDER BY id
+        """), {"reembolso_id": reembolso_id}).mappings().all()
+
+        if not linhas:
+            flash("O REEMBOLSO NÃO POSSUI LINHAS ATIVAS PARA EXPORTAÇÃO.", "warning")
+            return redirect(url_for("financeiro_dois.reembolso_real_editar", reembolso_id=reembolso_id))
+
+        oms = conn.execute(text("""
+            SELECT
+                id,
+                UPPER(COALESCE(numero_om, '')) AS numero,
+                UPPER(COALESCE(nome_colaborador, '')) AS colaborador,
+                UPPER(COALESCE(status, '')) AS status
+            FROM financeiro2_om
+            WHERE UPPER(COALESCE(status, '')) <> 'PAGA'
+            ORDER BY id DESC
+        """)).mappings().all()
+
+        rds = conn.execute(text("""
+            SELECT
+                id,
+                UPPER(COALESCE(numero_rd, '')) AS numero,
+                UPPER(COALESCE(nome_colaborador, '')) AS colaborador,
+                UPPER(COALESCE(status, '')) AS status
+            FROM financeiro2_rd
+            WHERE UPPER(COALESCE(status, '')) <> 'QUITADA'
+            ORDER BY id DESC
+        """)).mappings().all()
+
+    total_valor = sum(float(x["valor"] or 0) for x in linhas)
+
+    return render_template(
+        "financeiro_dois/reembolso_exportar.html",
+        subnav_links=build_financeiro_dois_subnav("reembolsos"),
+        reembolso=reembolso,
+        linhas=linhas,
+        total_valor=total_valor,
+        oms=oms,
+        rds=rds,
+    )
+    
+@bp.route("/reembolsos-real/<int:reembolso_id>/exportar/salvar", methods=["POST"])
+@login_required
+@permission_required("financeiro", "visualizar")
+def reembolso_real_exportar_salvar(reembolso_id: int):
+    origem_tipo = _nome_preenchido(request.form.get("origem_tipo")).upper()
+    origem_id_txt = _nome_preenchido(request.form.get("origem_id"))
+
+    if origem_tipo not in ("OM", "RD"):
+        flash("SELECIONE UMA ORIGEM VÁLIDA PARA EXPORTAÇÃO.", "warning")
+        return redirect(url_for("financeiro_dois.reembolso_real_exportar", reembolso_id=reembolso_id))
+
+    if not origem_id_txt.isdigit():
+        flash("SELECIONE O REGISTRO DE DESTINO.", "warning")
+        return redirect(url_for("financeiro_dois.reembolso_real_exportar", reembolso_id=reembolso_id))
+
+    origem_id = int(origem_id_txt)
+
+    engine = get_engine()
+    with engine.begin() as conn:
+        reembolso = conn.execute(text("""
+            SELECT
+                id,
+                UPPER(COALESCE(numero_reembolso, '')) AS numero_reembolso,
+                UPPER(COALESCE(origem_exportacao_tipo, '')) AS origem_exportacao_tipo,
+                origem_exportacao_id,
+                UPPER(COALESCE(origem_exportacao_numero, '')) AS origem_exportacao_numero,
+                COALESCE(bloqueado, FALSE) AS bloqueado
+            FROM financeiro2_reembolsos
+            WHERE id = :id
+        """), {"id": reembolso_id}).mappings().first()
+
+        if not reembolso:
+            abort(404)
+
+        if reembolso["origem_exportacao_tipo"] and reembolso["origem_exportacao_id"]:
+            flash("ESTE REEMBOLSO JÁ FOI EXPORTADO E A ORIGEM NÃO PODE SER ALTERADA.", "warning")
+            return redirect(url_for("financeiro_dois.reembolso_real_editar", reembolso_id=reembolso_id))
+
+        linhas = conn.execute(text("""
+            SELECT
+                id,
+                data_lancamento,
+                UPPER(COALESCE(detalhe, '')) AS detalhe,
+                COALESCE(valor, 0) AS valor,
+                COALESCE(anexo_recibo, '') AS anexo_recibo,
+                UPPER(COALESCE(status, 'ATIVO')) AS status
+            FROM financeiro2_reembolsos_linhas
+            WHERE reembolso_id = :reembolso_id
+              AND UPPER(COALESCE(status, 'ATIVO')) = 'ATIVO'
+              AND COALESCE(origem_om_rd_tipo, '') = ''
+              AND origem_om_rd_id IS NULL
+            ORDER BY id
+        """), {"reembolso_id": reembolso_id}).mappings().all()
+
+        if not linhas:
+            flash("NÃO EXISTEM LINHAS ATIVAS PENDENTES DE EXPORTAÇÃO.", "warning")
+            return redirect(url_for("financeiro_dois.reembolso_real_editar", reembolso_id=reembolso_id))
+
+        if origem_tipo == "OM":
+            destino = conn.execute(text("""
+                SELECT
+                    id,
+                    UPPER(COALESCE(numero_om, '')) AS numero,
+                    UPPER(COALESCE(status, '')) AS status
+                FROM financeiro2_om
+                WHERE id = :id
+            """), {"id": origem_id}).mappings().first()
+
+            if not destino:
+                abort(404)
+
+            if destino["status"] == "PAGA":
+                flash("ESSA OM ESTÁ PAGA E BLOQUEADA PARA EXPORTAÇÃO.", "warning")
+                return redirect(url_for("financeiro_dois.reembolso_real_exportar", reembolso_id=reembolso_id))
+
+            for linha in linhas:
+                recibo_seq = conn.execute(text("""
+                    SELECT COALESCE(MAX(recibo), 0) + 1 AS proximo
+                    FROM financeiro2_om_linhas
+                    WHERE om_id = :om_id
+                """), {"om_id": origem_id}).mappings().first()["proximo"]
+
+                nova_linha_id = conn.execute(text("""
+                    INSERT INTO financeiro2_om_linhas (
+                        om_id,
+                        recibo,
+                        data_lancamento,
+                        tipo_linha,
+                        descricao,
+                        detalhes,
+                        categoria,
+                        aplicacao,
+                        valor,
+                        sinal,
+                        moeda_codigo,
+                        cambio,
+                        valor_brl,
+                        anexo_recibo,
+                        status,
+                        criado_em,
+                        atualizado_em
+                    ) VALUES (
+                        :om_id,
+                        :recibo,
+                        :data_lancamento,
+                        'REEMBOLSO',
+                        :descricao_antiga,
+                        :detalhes,
+                        '',
+                        '',
+                        :valor,
+                        '+',
+                        'BRL',
+                        1,
+                        :valor_brl,
+                        :anexo_recibo,
+                        'Ativo',
+                        CURRENT_TIMESTAMP,
+                        CURRENT_TIMESTAMP
+                    )
+                    RETURNING id
+                """), {
+                    "om_id": origem_id,
+                    "recibo": recibo_seq,
+                    "data_lancamento": linha["data_lancamento"],
+                    "descricao_antiga": linha["detalhe"],
+                    "detalhes": linha["detalhe"],
+                    "valor": float(linha["valor"] or 0),
+                    "valor_brl": float(linha["valor"] or 0),
+                    "anexo_recibo": linha["anexo_recibo"],
+                }).scalar()
+
+                conn.execute(text("""
+                    UPDATE financeiro2_reembolsos_linhas
+                    SET
+                        origem_om_rd_tipo = 'OM',
+                        origem_om_rd_id = :origem_id,
+                        origem_om_rd_linha_id = :linha_destino_id,
+                        atualizado_em = CURRENT_TIMESTAMP
+                    WHERE id = :linha_id
+                """), {
+                    "origem_id": origem_id,
+                    "linha_destino_id": nova_linha_id,
+                    "linha_id": linha["id"],
+                })
+
+            origem_numero = destino["numero"]
+
+        else:
+            destino = conn.execute(text("""
+                SELECT
+                    id,
+                    UPPER(COALESCE(numero_rd, '')) AS numero,
+                    UPPER(COALESCE(status, '')) AS status
+                FROM financeiro2_rd
+                WHERE id = :id
+            """), {"id": origem_id}).mappings().first()
+
+            if not destino:
+                abort(404)
+
+            if destino["status"] == "QUITADA":
+                flash("ESSA RD ESTÁ QUITADA E BLOQUEADA PARA EXPORTAÇÃO.", "warning")
+                return redirect(url_for("financeiro_dois.reembolso_real_exportar", reembolso_id=reembolso_id))
+
+            for linha in linhas:
+                nova_linha_id = conn.execute(text("""
+                    INSERT INTO financeiro2_rd_linhas (
+                        rd_id,
+                        data_lancamento,
+                        descricao,
+                        categoria,
+                        aplicacao,
+                        valor,
+                        anexo_recibo,
+                        status,
+                        criado_em,
+                        atualizado_em
+                    ) VALUES (
+                        :rd_id,
+                        :data_lancamento,
+                        :descricao,
+                        '',
+                        '',
+                        :valor,
+                        :anexo_recibo,
+                        'Ativo',
+                        CURRENT_TIMESTAMP,
+                        CURRENT_TIMESTAMP
+                    )
+                    RETURNING id
+                """), {
+                    "rd_id": origem_id,
+                    "data_lancamento": linha["data_lancamento"],
+                    "descricao": linha["detalhe"],
+                    "valor": float(linha["valor"] or 0),
+                    "anexo_recibo": linha["anexo_recibo"],
+                }).scalar()
+
+                conn.execute(text("""
+                    UPDATE financeiro2_reembolsos_linhas
+                    SET
+                        origem_om_rd_tipo = 'RD',
+                        origem_om_rd_id = :origem_id,
+                        origem_om_rd_linha_id = :linha_destino_id,
+                        atualizado_em = CURRENT_TIMESTAMP
+                    WHERE id = :linha_id
+                """), {
+                    "origem_id": origem_id,
+                    "linha_destino_id": nova_linha_id,
+                    "linha_id": linha["id"],
+                })
+
+            origem_numero = destino["numero"]
+
+        conn.execute(text("""
+            UPDATE financeiro2_reembolsos
+            SET
+                origem_exportacao_tipo = :origem_tipo,
+                origem_exportacao_id = :origem_id,
+                origem_exportacao_numero = :origem_numero,
+                status = 'EXPORTADO',
+                atualizado_em = CURRENT_TIMESTAMP
+            WHERE id = :id
+        """), {
+            "id": reembolso_id,
+            "origem_tipo": origem_tipo,
+            "origem_id": origem_id,
+            "origem_numero": origem_numero,
+        })
+
+    flash(f"REEMBOLSO EXPORTADO COM SUCESSO PARA {origem_tipo} ({origem_numero}).", "success")
     return redirect(url_for("financeiro_dois.reembolso_real_editar", reembolso_id=reembolso_id))

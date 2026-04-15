@@ -101,6 +101,14 @@
               <label>Origem exportação</label>
               <input class="input-like" type="text" value="{{ reembolso.origem_exportacao_numero or '' }}" readonly />
             </div>
+			<div class="field">
+			  <label>Comprovante pagamento</label>
+			  {% if reembolso.comprovante_pagamento_url %}
+				<a class="btn btn-block" href="{{ reembolso.comprovante_pagamento_url }}" target="_blank">Abrir comprovante</a>
+			  {% else %}
+				<input class="input-like" type="text" value="" readonly />
+			  {% endif %}
+			</div>
 
             <div class="field field-full">
               <label>Observação</label>
@@ -195,10 +203,37 @@
 				  </div>
 				</form>
 
-				<a href="#" class="btn btn-block">Registrar pagamento</a>
-				<a href="#" class="btn btn-block">Exportar para OM/RD</a>
+				<form method="post" action="{{ url_for('financeiro_dois.reembolso_real_registrar_pagamento', reembolso_id=reembolso.id) }}" enctype="multipart/form-data">
+				  <div class="form-grid" style="grid-template-columns:1fr; gap:10px; margin-top:10px;">
+					<div class="field">
+					  <label>Data pagamento</label>
+					  <input class="input-like" type="date" name="data_pagamento" required>
+					</div>
+					<div class="field">
+					  <label>Valor pago</label>
+					  <input class="input-like" type="text" name="valor_pago" required>
+					</div>
+					<div class="field">
+					  <label>Comprovante PIX</label>
+					  <input class="input-like" type="file" name="comprovante_pagamento" required>
+					</div>
+					<div class="field">
+					  <label>Observação do pagamento</label>
+					  <input class="input-like" type="text" name="observacao_pagamento">
+					</div>
+					<button type="submit" class="btn btn-block">Registrar pagamento</button>
+				  </div>
+				</form>
+
+				<a href="{{ url_for('financeiro_dois.reembolso_real_exportar', reembolso_id=reembolso.id) }}" class="btn btn-block">Exportar para OM/RD</a>
 				{% else %}
-				<div class="muted">Salve o reembolso para liberar as próximas ações.</div>
+				<div class="muted">
+				  {% if reembolso.eh_novo %}
+					Salve o reembolso para liberar as próximas ações.
+				  {% else %}
+					Reembolso bloqueado após pagamento/exportação.
+				  {% endif %}
+				</div>
 				{% endif %}
 			  </div>
 			</div>
