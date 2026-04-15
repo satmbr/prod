@@ -4,6 +4,10 @@
 {% block content %}
 <div class="page-wrap">
 
+  {% set dados_ordenados = dados | sort(attribute='data') %}
+  {% set dados_resumo_frentes_ordenados = dados_resumo_frentes | sort(attribute='data') %}
+  {% set grafico_barra_carregamento_ordenado = grafico_barra_carregamento | sort(attribute='data') %}
+
   <style>
     .prod-toolbar{
       display:grid;
@@ -543,7 +547,7 @@
         <div class="summary-grid">
           <div class="summary-item">
             <div class="k">Datas na série</div>
-            <div class="v">{{ dados|length }}</div>
+            <div class="v">{{ dados_ordenados|length }}</div>
           </div>
           <div class="summary-item">
             <div class="k">Eventos do dia</div>
@@ -551,7 +555,7 @@
           </div>
           <div class="summary-item">
             <div class="k">Frentes resumidas</div>
-            <div class="v">{{ dados_resumo_frentes|length }}</div>
+            <div class="v">{{ dados_resumo_frentes_ordenados|length }}</div>
           </div>
         </div>
       </div>
@@ -593,7 +597,7 @@
                   </tr>
                 </thead>
                 <tbody>
-                  {% for d in dados | sort(attribute='data') %}
+                  {% for d in dados_ordenados %}
                     {% set d_data = d.data|string %}
                     {% set filtro_data = data_partdiaria|string %}
                     {% set destaque = 'linha-destaque' if d_data == filtro_data and d_data != '' else '' %}
@@ -609,7 +613,7 @@
                       <td>{{ d.atraso }} /dia</td>
                     </tr>
                   {% endfor %}
-                  {% if not dados %}
+                  {% if not dados_ordenados %}
                     <tr><td colspan="7">Nenhum registro encontrado para esta EH.</td></tr>
                   {% endif %}
                 </tbody>
@@ -743,7 +747,7 @@
               </tr>
             </thead>
             <tbody>
-              {% for linha in dados_resumo_frentes | sort(attribute='data') %}
+              {% for linha in dados_resumo_frentes_ordenados %}
                 {% set linha_data = linha.data|string %}
                 {% set filtro_data = data_partdiaria|string %}
                 {% set destaque = 'linha-destaque' if linha_data == filtro_data and linha_data != '' else '' %}
@@ -771,7 +775,7 @@
                   <td>{{ linha.seg_bons }}</td>
                 </tr>
               {% endfor %}
-              {% if not dados_resumo_frentes %}
+              {% if not dados_resumo_frentes_ordenados %}
                 <tr><td colspan="15">Nenhum dado disponível para as frentes selecionadas.</td></tr>
               {% endif %}
             </tbody>
@@ -807,7 +811,7 @@
       <div class="zone-actions">
         <button type="button" class="icon-btn" aria-label="Seção percentuais">
           <svg viewBox="0 0 24 24" width="16" height="16">
-            <path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/>
+            <path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v-8z" fill="#16324F"/>
           </svg>
         </button>
         <button type="button" class="icon-btn caret">▾</button>
@@ -898,16 +902,55 @@
 </script>
 
 <script>
-const dadosRenRaw = {{ dados | default([], true) | tojson }};
-const dadosRen = Array.isArray(dadosRenRaw)
-  ? [...dadosRenRaw].sort((a, b) => new Date(a.data) - new Date(b.data))
-  : [];
+  function parseISODateSafe(dateStr) {
+    if (!dateStr) return new Date(0);
+    if (dateStr instanceof Date) return dateStr;
 
-const labelsRen = dadosRen.map(d => d.data);
-const previstoDia = dadosRen.map(d => d.previsto_dia);
-const previstoTotal = dadosRen.map(d => d.previsto_total);
-const realizadoDia = dadosRen.map(d => d.realizado_dia);
-const realizadoTotal = dadosRen.map(d => d.realizado_total);
+    const str = String(dateStr).trim();
+
+    if (str.includes('-')) {
+      const parts = str.split('-');
+      if (parts.length >= 3) {
+        const y = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10) - 1;
+        const d = parseInt(parts[2], 10);
+        return new Date(y, m, d);
+      }
+    }
+
+    if (str.includes('/')) {
+      const parts = str.split('/');
+      if (parts.length >= 3) {
+        const d = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10) - 1;
+        const y = parseInt(parts[2], 10);
+        return new Date(y, m, d);
+      }
+    }
+
+    return new Date(str);
+  }
+
+  function formatLabelDate(dateStr) {
+    if (!dateStr) return "";
+    const str = String(dateStr);
+    if (str.includes('-')) {
+      const p = str.split('-');
+      if (p.length >= 3) return `${p[2]}/${p[1]}/${p[0]}`;
+    }
+    return str;
+  }
+
+  const dadosRenRaw = {{ dados_ordenados | default([], true) | tojson }};
+  const dadosRen = Array.isArray(dadosRenRaw)
+    ? [...dadosRenRaw].sort((a, b) => parseISODateSafe(a.data) - parseISODateSafe(b.data))
+    : [];
+
+  const labelsRen = dadosRen.map(d => formatLabelDate(d.data));
+  const previstoDia = dadosRen.map(d => d.previsto_dia);
+  const previstoTotal = dadosRen.map(d => d.previsto_total);
+  const realizadoDia = dadosRen.map(d => d.realizado_dia);
+  const realizadoTotal = dadosRen.map(d => d.realizado_total);
 
   if (document.getElementById('graficoProducao')) {
     new Chart(document.getElementById('graficoProducao').getContext('2d'), {
@@ -1046,12 +1089,16 @@ const realizadoTotal = dadosRen.map(d => d.realizado_total);
     });
   }
 
-  const barraData = {{ grafico_barra_carregamento | default([], true) | tojson }};
-  const labels02 = Array.isArray(barraData) ? barraData.map(d => d.data) : [];
-  const planejadoDia02 = Array.isArray(barraData) ? barraData.map(d => d.planejado) : [];
-  const executadoDia02 = Array.isArray(barraData) ? barraData.map(d => d.executado) : [];
-  const acumuladoPlan02 = Array.isArray(barraData) ? barraData.map(d => d.acumulado_planejado) : [];
-  const acumuladoExec02 = Array.isArray(barraData) ? barraData.map(d => d.acumulado_executado) : [];
+  const barraDataRaw = {{ grafico_barra_carregamento_ordenado | default([], true) | tojson }};
+  const barraData = Array.isArray(barraDataRaw)
+    ? [...barraDataRaw].sort((a, b) => parseISODateSafe(a.data) - parseISODateSafe(b.data))
+    : [];
+
+  const labels02 = barraData.map(d => formatLabelDate(d.data));
+  const planejadoDia02 = barraData.map(d => d.planejado);
+  const executadoDia02 = barraData.map(d => d.executado);
+  const acumuladoPlan02 = barraData.map(d => d.acumulado_planejado);
+  const acumuladoExec02 = barraData.map(d => d.acumulado_executado);
 
   if (document.getElementById('graficoBarraCarregamento')) {
     new Chart(document.getElementById('graficoBarraCarregamento').getContext('2d'), {
