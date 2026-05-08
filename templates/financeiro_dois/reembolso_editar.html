@@ -20,13 +20,13 @@
       </div>
     </div>
 
-    <form
-      id="form-reembolso"
-      method="post"
-      action="{% if reembolso.eh_novo %}{{ url_for('financeiro_dois.reembolso_real_criar') }}{% else %}{{ url_for('financeiro_dois.reembolso_real_salvar', reembolso_id=reembolso.id) }}{% endif %}"
-    >
-      <div class="om-grid">
-        <div class="om-card">
+    <div class="om-grid">
+      <div class="om-card">
+        <form
+          id="form-reembolso"
+          method="post"
+          action="{% if reembolso.eh_novo %}{{ url_for('financeiro_dois.reembolso_real_criar') }}{% else %}{{ url_for('financeiro_dois.reembolso_real_salvar', reembolso_id=reembolso.id) }}{% endif %}"
+        >
           <div class="card-title">Dados do reembolso</div>
 
           {% if reembolso.bloqueado %}
@@ -65,7 +65,7 @@
               <label>Data solicitação</label>
               <input class="input-like" type="date" name="data_solicitacao" value="{{ reembolso.data_form }}" {% if reembolso.bloqueado %}disabled{% endif %} />
               {% if reembolso.bloqueado %}
-                <input type="hidden" name="data_solicitacao" value="{{ reembolso.data_form }}">
+              <input type="hidden" name="data_solicitacao" value="{{ reembolso.data_form }}">
               {% endif %}
             </div>
 
@@ -79,7 +79,7 @@
                 <option value="EXPORTADO" {% if reembolso.status == 'EXPORTADO' %}selected{% endif %}>EXPORTADO</option>
               </select>
               {% if reembolso.bloqueado %}
-                <input type="hidden" name="status" value="{{ reembolso.status }}">
+              <input type="hidden" name="status" value="{{ reembolso.status }}">
               {% endif %}
             </div>
 
@@ -91,7 +91,7 @@
                 <option value="RECUSADO" {% if reembolso.aprovacao == 'RECUSADO' %}selected{% endif %}>RECUSADO</option>
               </select>
               {% if reembolso.bloqueado %}
-                <input type="hidden" name="aprovacao" value="{{ reembolso.aprovacao }}">
+              <input type="hidden" name="aprovacao" value="{{ reembolso.aprovacao }}">
               {% endif %}
             </div>
 
@@ -113,9 +113,9 @@
             <div class="field">
               <label>Comprovante pagamento</label>
               {% if reembolso.comprovante_pagamento_url %}
-                <a class="btn btn-block" href="{{ reembolso.comprovante_pagamento_url }}" target="_blank">Abrir comprovante</a>
+              <a class="btn btn-block" href="{{ reembolso.comprovante_pagamento_url }}" target="_blank">Abrir comprovante</a>
               {% else %}
-                <input class="input-like" type="text" value="" readonly />
+              <input class="input-like" type="text" value="" readonly />
               {% endif %}
             </div>
 
@@ -124,131 +124,131 @@
               <textarea class="input-like textarea-like" name="observacao" {% if reembolso.bloqueado %}readonly{% endif %}>{{ reembolso.observacao }}</textarea>
             </div>
           </div>
+        </form>
 
-          {% if not reembolso.eh_novo %}
-          <div style="margin-top:20px;">
-            <div class="card-title">Linhas do reembolso</div>
+        {% if not reembolso.eh_novo %}
+        <div style="margin-top:20px;">
+          <div class="card-title">Linhas do reembolso</div>
 
-            <div class="table-wrap">
-              <table class="table">
-                <thead>
-                  <tr>
-                    <th>Data</th>
-                    <th>Detalhe</th>
-                    <th style="text-align:right;">Valor</th>
-                    <th>Recibo</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {% for linha in reembolso.linhas %}
-                  <tr>
-                    <td>{{ linha.data }}</td>
-                    <td>{{ linha.detalhe }}</td>
-                    <td style="text-align:right;">R$ {{ '%.2f'|format(linha.valor) }}</td>
-                    <td>
-                      {% if linha.anexo_recibo %}
-                        <a class="btn btn-sm" href="{{ url_for('financeiro_dois.reembolso_real_abrir_anexo', arquivo=linha.anexo_recibo) }}" target="_blank">Abrir recibo</a>
-                      {% else %}
-                        --
-                      {% endif %}
-                    </td>
-                    <td>
-                      {{ linha.status }}
-                      {% if not reembolso.bloqueado %}
-                      <form method="post" action="{{ url_for('financeiro_dois.reembolso_real_linha_toggle_status', reembolso_id=reembolso.id, linha_id=linha.id) }}" style="margin-top:6px;">
-                        <button type="submit" class="btn btn-sm">
-                          {% if linha.status == 'ATIVO' %}Inativar{% else %}Ativar{% endif %}
-                        </button>
-                      </form>
-                      {% endif %}
-                    </td>
-                  </tr>
-                  {% else %}
-                  <tr>
-                    <td colspan="5" class="muted">Nenhuma linha cadastrada ainda.</td>
-                  </tr>
-                  {% endfor %}
-                </tbody>
-              </table>
-            </div>
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Data</th>
+                  <th>Detalhe</th>
+                  <th style="text-align:right;">Valor</th>
+                  <th>Recibo</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for linha in reembolso.linhas %}
+                <tr>
+                  <td>{{ linha.data }}</td>
+                  <td>{{ linha.detalhe }}</td>
+                  <td style="text-align:right;">R$ {{ '%.2f'|format(linha.valor) }}</td>
+                  <td>
+                    {% if linha.anexo_recibo %}
+                    <a class="btn btn-sm" href="{{ url_for('financeiro_dois.reembolso_real_abrir_anexo', arquivo=linha.anexo_recibo) }}" target="_blank">Abrir recibo</a>
+                    {% else %}
+                    --
+                    {% endif %}
+                  </td>
+                  <td>
+                    {{ linha.status }}
+                    {% if not reembolso.bloqueado %}
+                    <form method="post" action="{{ url_for('financeiro_dois.reembolso_real_linha_toggle_status', reembolso_id=reembolso.id, linha_id=linha.id) }}" style="margin-top:6px;">
+                      <button type="submit" class="btn btn-sm">
+                        {% if linha.status == 'ATIVO' %}Inativar{% else %}Ativar{% endif %}
+                      </button>
+                    </form>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% else %}
+                <tr>
+                  <td colspan="5" class="muted">Nenhuma linha cadastrada ainda.</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
           </div>
-          {% endif %}
+        </div>
+        {% endif %}
+      </div>
+
+      <div class="om-side">
+        <div class="resume-card">
+          <div class="resume-title">Resumo</div>
+          <div class="resume-row"><span>Status</span><strong>{{ reembolso.status }}</strong></div>
+          <div class="resume-row"><span>Aprovação</span><strong>{{ reembolso.aprovacao }}</strong></div>
+          <div class="resume-row"><span>Qtd linhas</span><strong>{{ reembolso.total_linhas or 0 }}</strong></div>
+          <div class="resume-row"><span>Fonte pagadora</span><strong>{{ reembolso.origem_exportacao_numero or '--' }}</strong></div>
+          <div class="resume-row resume-total"><span>Valor total</span><strong>R$ {{ '%.2f'|format(reembolso.total_valor or 0) }}</strong></div>
         </div>
 
-        <div class="om-side">
-          <div class="resume-card">
-            <div class="resume-title">Resumo</div>
-            <div class="resume-row"><span>Status</span><strong>{{ reembolso.status }}</strong></div>
-            <div class="resume-row"><span>Aprovação</span><strong>{{ reembolso.aprovacao }}</strong></div>
-            <div class="resume-row"><span>Qtd linhas</span><strong>{{ reembolso.total_linhas or 0 }}</strong></div>
-            <div class="resume-row"><span>Fonte pagadora</span><strong>{{ reembolso.origem_exportacao_numero or '--' }}</strong></div>
-            <div class="resume-row resume-total"><span>Valor total</span><strong>R$ {{ '%.2f'|format(reembolso.total_valor or 0) }}</strong></div>
-          </div>
-
-          <div class="resume-card">
-            <div class="resume-title">Ações</div>
-            <div class="action-list">
-              {% if not reembolso.eh_novo and not reembolso.bloqueado %}
-              <form method="post" action="{{ url_for('financeiro_dois.reembolso_real_linha_nova', reembolso_id=reembolso.id) }}" enctype="multipart/form-data">
-                <div class="form-grid" style="grid-template-columns:1fr; gap:10px;">
-                  <div class="field">
-                    <label>Data da linha</label>
-                    <input class="input-like" type="date" name="data_lancamento" required>
-                  </div>
-                  <div class="field">
-                    <label>Detalhe</label>
-                    <input class="input-like" type="text" name="detalhe" required>
-                  </div>
-                  <div class="field">
-                    <label>Valor</label>
-                    <input class="input-like" type="text" name="valor" required>
-                  </div>
-                  <div class="field">
-                    <label>Recibo</label>
-                    <input class="input-like" type="file" name="anexo_recibo">
-                  </div>
-                  <button type="submit" class="btn btn-primary btn-block">Nova linha</button>
+        <div class="resume-card">
+          <div class="resume-title">Ações</div>
+          <div class="action-list">
+            {% if not reembolso.eh_novo and not reembolso.bloqueado %}
+            <form method="post" action="{{ url_for('financeiro_dois.reembolso_real_linha_nova', reembolso_id=reembolso.id) }}" enctype="multipart/form-data">
+              <div class="form-grid" style="grid-template-columns:1fr; gap:10px;">
+                <div class="field">
+                  <label>Data da linha</label>
+                  <input class="input-like" type="date" name="data_lancamento" required>
                 </div>
-              </form>
-
-              <form method="post" action="{{ url_for('financeiro_dois.reembolso_real_registrar_pagamento', reembolso_id=reembolso.id) }}" enctype="multipart/form-data">
-                <div class="form-grid" style="grid-template-columns:1fr; gap:10px; margin-top:10px;">
-                  <div class="field">
-                    <label>Data pagamento</label>
-                    <input class="input-like" type="date" name="data_pagamento" required>
-                  </div>
-                  <div class="field">
-                    <label>Valor pago</label>
-                    <input class="input-like" type="text" name="valor_pago" required>
-                  </div>
-                  <div class="field">
-                    <label>Comprovante PIX</label>
-                    <input class="input-like" type="file" name="comprovante_pagamento" required>
-                  </div>
-                  <div class="field">
-                    <label>Observação do pagamento</label>
-                    <input class="input-like" type="text" name="observacao_pagamento">
-                  </div>
-                  <button type="submit" class="btn btn-block">Registrar pagamento</button>
+                <div class="field">
+                  <label>Detalhe</label>
+                  <input class="input-like" type="text" name="detalhe" required>
                 </div>
-              </form>
-
-              <a href="{{ url_for('financeiro_dois.reembolso_real_exportar', reembolso_id=reembolso.id) }}" class="btn btn-block">Exportar para OM/RD</a>
-              {% else %}
-              <div class="muted">
-                {% if reembolso.eh_novo %}
-                  Salve o reembolso para liberar as próximas ações.
-                {% else %}
-                  Reembolso bloqueado após pagamento/exportação.
-                {% endif %}
+                <div class="field">
+                  <label>Valor</label>
+                  <input class="input-like" type="text" name="valor" required>
+                </div>
+                <div class="field">
+                  <label>Recibo</label>
+                  <input class="input-like" type="file" name="anexo_recibo">
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">Nova linha</button>
               </div>
+            </form>
+
+            <form method="post" action="{{ url_for('financeiro_dois.reembolso_real_registrar_pagamento', reembolso_id=reembolso.id) }}" enctype="multipart/form-data">
+              <div class="form-grid" style="grid-template-columns:1fr; gap:10px; margin-top:10px;">
+                <div class="field">
+                  <label>Data pagamento</label>
+                  <input class="input-like" type="date" name="data_pagamento" required>
+                </div>
+                <div class="field">
+                  <label>Valor pago</label>
+                  <input class="input-like" type="text" name="valor_pago" required>
+                </div>
+                <div class="field">
+                  <label>Comprovante PIX</label>
+                  <input class="input-like" type="file" name="comprovante_pagamento" required>
+                </div>
+                <div class="field">
+                  <label>Observação do pagamento</label>
+                  <input class="input-like" type="text" name="observacao_pagamento">
+                </div>
+                <button type="submit" class="btn btn-block">Registrar pagamento</button>
+              </div>
+            </form>
+
+            <a href="{{ url_for('financeiro_dois.reembolso_real_exportar', reembolso_id=reembolso.id) }}" class="btn btn-block">Exportar para OM/RD</a>
+            {% else %}
+            <div class="muted">
+              {% if reembolso.eh_novo %}
+              Salve o reembolso para liberar as próximas ações.
+              {% else %}
+              Reembolso bloqueado após pagamento/exportação.
               {% endif %}
             </div>
+            {% endif %}
           </div>
         </div>
       </div>
-    </form>
+    </div>
   </section>
 </div>
 
