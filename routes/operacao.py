@@ -1,4 +1,5 @@
 from datetime import date
+import json
 from flask import Blueprint, render_template, request, redirect, url_for, session
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
@@ -504,6 +505,80 @@ def frente_delete():
 # -------------------------------------------------------------------
 # /operacao/registro  (Planejado x Realizado)
 # -------------------------------------------------------------------
+def _numero_positivo(valor):
+    """Converte textos vindos do formulário para número positivo."""
+    if valor is None:
+        return None
+
+    txt = str(valor).strip().replace(".", "").replace(",", ".") if "," in str(valor) else str(valor).strip()
+
+    if not txt:
+        return None
+
+    try:
+        numero = float(txt)
+    except (TypeError, ValueError):
+        return None
+
+    if numero < 0:
+        return None
+
+    return numero
+
+
+def _upsert_producao(conn, tabela: str, campo: str, eh_id, frente_id, data_str, valor) -> str:
+    """
+    Salva um valor diário por EH + Frente + Data.
+
+    Primeiro tenta atualizar um registro existente. Se não existir, insere.
+    Isso evita erro quando já houver lançamento do mesmo dia e também permite
+    corrigir o valor diário sem criar duplicidade no acompanhamento.
+    """
+    tabelas_permitidas = {
+        "producao_realizada": "realizado",
+        "producao_planejada": "planejado",
+    }
+
+    if tabela not in tabelas_permitidas or tabelas_permitidas[tabela] != campo:
+        raise ValueError("Tabela/campo de produção inválido.")
+
+    result = conn.execute(
+        text(
+            f"""
+            UPDATE {tabela}
+               SET {campo} = :val
+             WHERE eh_id = :eh
+               AND frente_id = :fr
+               AND data = :dt
+            """
+        ),
+        {"eh": eh_id, "fr": frente_id, "dt": data_str, "val": valor},
+    )
+
+    if result.rowcount and result.rowcount > 0:
+        return "atualizado"
+
+    conn.execute(
+        text(
+            f"""
+            INSERT INTO {tabela} (eh_id, frente_id, data, {campo})
+            VALUES (:eh, :fr, :dt, :val)
+            """
+        ),
+        {"eh": eh_id, "fr": frente_id, "dt": data_str, "val": valor},
+    )
+    return "inserido"
+
+
+def _redirect_registro(msg: str | None = None, keep_open: str | None = None):
+    params = {}
+    if msg:
+        params["msg"] = msg
+    if keep_open:
+        params["keep_open"] = keep_open
+    return redirect(url_for("operacao.registro", **params))
+
+
 @bp.route("/registro", methods=["GET"])
 @login_required
 @permission_required("operacao", "visualizar")
@@ -517,10 +592,27 @@ def registro():
         ffr = request.args.get("ffr") or None
         fdt = request.args.get("fdt") or None
 
+        where = []
+        params = {}
+
+        if feh:
+            where.append("e.id = :feh")
+            params["feh"] = feh
+
+        if ffr:
+            where.append("f.id = :ffr")
+            params["ffr"] = ffr
+
+        if fdt:
+            where.append("r.data = :fdt")
+            params["fdt"] = fdt
+
+        wh_rlz = "WHERE " + " AND ".join(where) if where else ""
+
         lista_rlz = (
             conn.execute(
                 text(
-                    """
+                    f"""
                     SELECT
                         r.id,
                         r.data,
@@ -530,18 +622,37 @@ def registro():
                     FROM producao_realizada r
                     JOIN entre_house e   ON e.id = r.eh_id
                     JOIN frente_equipe f ON f.id = r.frente_id
+                    {wh_rlz}
                     ORDER BY r.data, e.eh, f.frente
                     """
-                )
+                ),
+                params,
             )
             .mappings()
             .all()
         )
 
+        where_pln = []
+        params_pln = {}
+
+        if feh:
+            where_pln.append("e.id = :feh")
+            params_pln["feh"] = feh
+
+        if ffr:
+            where_pln.append("f.id = :ffr")
+            params_pln["ffr"] = ffr
+
+        if fdt:
+            where_pln.append("p.data = :fdt")
+            params_pln["fdt"] = fdt
+
+        wh_pln = "WHERE " + " AND ".join(where_pln) if where_pln else ""
+
         lista_pln = (
             conn.execute(
                 text(
-                    """
+                    f"""
                     SELECT
                         p.id,
                         p.data,
@@ -551,9 +662,11 @@ def registro():
                     FROM producao_planejada p
                     JOIN entre_house e   ON e.id = p.eh_id
                     JOIN frente_equipe f ON f.id = p.frente_id
+                    {wh_pln}
                     ORDER BY p.data, e.eh, f.frente
                     """
-                )
+                ),
+                params_pln,
             )
             .mappings()
             .all()
@@ -570,8 +683,9 @@ def registro():
         feh=feh,
         ffr=ffr,
         fdt=fdt,
-        keep_open=None,
-        msg=None,
+        today=date.today().isoformat(),
+        keep_open=request.args.get("keep_open"),
+        msg=request.args.get("msg"),
     )
 
 
@@ -582,24 +696,98 @@ def registro_realizada_create():
     eh_id = request.form.get("eh_id")
     fr_id = request.form.get("frente_id")
     data_str = request.form.get("data")
-    realizado = request.form.get("realizado")
+    realizado = _numero_positivo(request.form.get("realizado"))
 
-    if not (eh_id and fr_id and data_str and realizado):
-        return redirect(url_for("operacao.registro"))
+    if not (eh_id and fr_id and data_str and realizado is not None):
+        return _redirect_registro("Preencha EH, Frente, Data e Executado.", "realizada")
 
-    engine = get_engine()
-    with engine.begin() as conn:
-        conn.execute(
-            text(
-                """
-                INSERT INTO producao_realizada (eh_id, frente_id, data, realizado)
-                VALUES (:eh, :fr, :dt, :val)
-                """
-            ),
-            {"eh": eh_id, "fr": fr_id, "dt": data_str, "val": realizado},
-        )
+    try:
+        engine = get_engine()
+        with engine.begin() as conn:
+            status = _upsert_producao(
+                conn,
+                "producao_realizada",
+                "realizado",
+                eh_id,
+                fr_id,
+                data_str,
+                realizado,
+            )
 
-    return redirect(url_for("operacao.registro", keep_open="realizada"))
+        msg = "Registro executado salvo." if status == "inserido" else "Registro executado atualizado."
+        return _redirect_registro(msg, "realizada")
+    except Exception as e:
+        return _redirect_registro(f"Erro ao salvar executado: {e}", "realizada")
+
+
+@bp.route("/registro/realizada/create_lote", methods=["POST"])
+@login_required
+@permission_required("operacao", "criar")
+def registro_realizada_create_lote():
+    raw = (request.form.get("lancamentos_json") or "").strip()
+
+    if not raw:
+        return _redirect_registro("Nenhum lançamento executado foi enviado.", "realizada")
+
+    try:
+        itens = json.loads(raw)
+    except Exception:
+        return _redirect_registro("Lista de executados inválida. Recarregue a página e tente novamente.", "realizada")
+
+    if not isinstance(itens, list) or not itens:
+        return _redirect_registro("Nenhum lançamento executado válido foi informado.", "realizada")
+
+    salvos = 0
+    inseridos = 0
+    atualizados = 0
+
+    try:
+        engine = get_engine()
+        with engine.begin() as conn:
+            for item in itens:
+                if not isinstance(item, dict):
+                    continue
+
+                eh_id = item.get("eh_id")
+                fr_id = item.get("frente_id")
+                data_str = (item.get("data") or "").strip()
+                realizado = _numero_positivo(item.get("realizado"))
+
+                if not (eh_id and fr_id and data_str and realizado is not None):
+                    continue
+
+                status = _upsert_producao(
+                    conn,
+                    "producao_realizada",
+                    "realizado",
+                    eh_id,
+                    fr_id,
+                    data_str,
+                    realizado,
+                )
+                salvos += 1
+                if status == "inserido":
+                    inseridos += 1
+                else:
+                    atualizados += 1
+
+        if salvos == 0:
+            return _redirect_registro("Nenhum lançamento executado válido foi salvo.", "realizada")
+
+        detalhes = []
+        if inseridos:
+            detalhes.append(f"{inseridos} novo(s)")
+        if atualizados:
+            detalhes.append(f"{atualizados} atualizado(s)")
+
+        msg = f"{salvos} lançamento(s) executado(s) salvo(s) com sucesso"
+        if detalhes:
+            msg += f" ({', '.join(detalhes)})"
+        msg += "."
+
+        return _redirect_registro(msg, "realizada")
+    except Exception as e:
+        return _redirect_registro(f"Erro ao salvar executados em lote: {e}", "realizada")
 
 
 @bp.route("/registro/realizada/delete", methods=["POST"])
@@ -608,16 +796,18 @@ def registro_realizada_create():
 def registro_realizada_delete():
     rid = request.form.get("id")
     if not rid:
-        return redirect(url_for("operacao.registro"))
+        return _redirect_registro("Registro executado não informado.", "realizada")
 
-    engine = get_engine()
-    with engine.begin() as conn:
-        conn.execute(
-            text("DELETE FROM producao_realizada WHERE id = :id"),
-            {"id": rid}
-        )
-
-    return redirect(url_for("operacao.registro", keep_open="realizada"))
+    try:
+        engine = get_engine()
+        with engine.begin() as conn:
+            conn.execute(
+                text("DELETE FROM producao_realizada WHERE id = :id"),
+                {"id": rid},
+            )
+        return _redirect_registro("Registro executado excluído.", "realizada")
+    except Exception as e:
+        return _redirect_registro(f"Erro ao excluir executado: {e}", "realizada")
 
 
 @bp.route("/registro/planejada/create", methods=["POST"])
@@ -627,24 +817,98 @@ def registro_planejada_create():
     eh_id = request.form.get("eh_id")
     fr_id = request.form.get("frente_id")
     data_str = request.form.get("data")
-    planejado = request.form.get("planejado")
+    planejado = _numero_positivo(request.form.get("planejado"))
 
-    if not (eh_id and fr_id and data_str and planejado):
-        return redirect(url_for("operacao.registro"))
+    if not (eh_id and fr_id and data_str and planejado is not None):
+        return _redirect_registro("Preencha EH, Frente, Data e Planejado.", "planejada")
 
-    engine = get_engine()
-    with engine.begin() as conn:
-        conn.execute(
-            text(
-                """
-                INSERT INTO producao_planejada (eh_id, frente_id, data, planejado)
-                VALUES (:eh, :fr, :dt, :val)
-                """
-            ),
-            {"eh": eh_id, "fr": fr_id, "dt": data_str, "val": planejado},
-        )
+    try:
+        engine = get_engine()
+        with engine.begin() as conn:
+            status = _upsert_producao(
+                conn,
+                "producao_planejada",
+                "planejado",
+                eh_id,
+                fr_id,
+                data_str,
+                planejado,
+            )
 
-    return redirect(url_for("operacao.registro", keep_open="planejada"))
+        msg = "Registro planejado salvo." if status == "inserido" else "Registro planejado atualizado."
+        return _redirect_registro(msg, "planejada")
+    except Exception as e:
+        return _redirect_registro(f"Erro ao salvar planejado: {e}", "planejada")
+
+
+@bp.route("/registro/planejada/create_lote", methods=["POST"])
+@login_required
+@permission_required("operacao", "criar")
+def registro_planejada_create_lote():
+    raw = (request.form.get("lancamentos_json") or "").strip()
+
+    if not raw:
+        return _redirect_registro("Nenhum lançamento planejado foi enviado.", "planejada")
+
+    try:
+        itens = json.loads(raw)
+    except Exception:
+        return _redirect_registro("Lista de planejados inválida. Recarregue a página e tente novamente.", "planejada")
+
+    if not isinstance(itens, list) or not itens:
+        return _redirect_registro("Nenhum lançamento planejado válido foi informado.", "planejada")
+
+    salvos = 0
+    inseridos = 0
+    atualizados = 0
+
+    try:
+        engine = get_engine()
+        with engine.begin() as conn:
+            for item in itens:
+                if not isinstance(item, dict):
+                    continue
+
+                eh_id = item.get("eh_id")
+                fr_id = item.get("frente_id")
+                data_str = (item.get("data") or "").strip()
+                planejado = _numero_positivo(item.get("planejado"))
+
+                if not (eh_id and fr_id and data_str and planejado is not None):
+                    continue
+
+                status = _upsert_producao(
+                    conn,
+                    "producao_planejada",
+                    "planejado",
+                    eh_id,
+                    fr_id,
+                    data_str,
+                    planejado,
+                )
+                salvos += 1
+                if status == "inserido":
+                    inseridos += 1
+                else:
+                    atualizados += 1
+
+        if salvos == 0:
+            return _redirect_registro("Nenhum lançamento planejado válido foi salvo.", "planejada")
+
+        detalhes = []
+        if inseridos:
+            detalhes.append(f"{inseridos} novo(s)")
+        if atualizados:
+            detalhes.append(f"{atualizados} atualizado(s)")
+
+        msg = f"{salvos} lançamento(s) planejado(s) salvo(s) com sucesso"
+        if detalhes:
+            msg += f" ({', '.join(detalhes)})"
+        msg += "."
+
+        return _redirect_registro(msg, "planejada")
+    except Exception as e:
+        return _redirect_registro(f"Erro ao salvar planejados em lote: {e}", "planejada")
 
 
 @bp.route("/registro/planejada/delete", methods=["POST"])
@@ -653,13 +917,16 @@ def registro_planejada_create():
 def registro_planejada_delete():
     pid = request.form.get("id")
     if not pid:
-        return redirect(url_for("operacao.registro"))
+        return _redirect_registro("Registro planejado não informado.", "planejada")
 
-    engine = get_engine()
-    with engine.begin() as conn:
-        conn.execute(
-            text("DELETE FROM producao_planejada WHERE id = :id"),
-            {"id": pid}
-        )
+    try:
+        engine = get_engine()
+        with engine.begin() as conn:
+            conn.execute(
+                text("DELETE FROM producao_planejada WHERE id = :id"),
+                {"id": pid},
+            )
+        return _redirect_registro("Registro planejado excluído.", "planejada")
+    except Exception as e:
+        return _redirect_registro(f"Erro ao excluir planejado: {e}", "planejada")
 
-    return redirect(url_for("operacao.registro", keep_open="planejada"))

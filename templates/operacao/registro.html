@@ -61,6 +61,7 @@
       text-decoration:none;
       cursor:pointer;
       box-sizing:border-box;
+      font-size:13px;
     }
     .btn:hover{
       filter:brightness(.98);
@@ -73,6 +74,11 @@
     .btn.success{
       background:#234d20;
       border-color:#234d20;
+      color:#fff;
+    }
+    .btn.warning{
+      background:#7a5a00;
+      border-color:#7a5a00;
       color:#fff;
     }
     .btn.info{
@@ -109,42 +115,74 @@
     .table .acoes-col{
       min-width:140px;
     }
+    .num{
+      text-align:right;
+      white-space:nowrap;
+    }
 
     .flash-wrap{
       display:flex;
       flex-direction:column;
       gap:10px;
     }
-
     .flash{
       padding:12px 14px;
       border-radius:12px;
       border:1px solid #d9e1ea;
       background:#f5f8fc;
     }
-
     .flash.success{
       background:#eefaf0;
       border-color:#bfe0c6;
       color:#25613a;
     }
-
     .flash.warning{
       background:#fff9e8;
       border-color:#f1df9b;
       color:#7a5a00;
     }
-
     .flash.danger{
       background:#fff3f3;
       border-color:#f1c0c0;
       color:#9f2d2d;
     }
-
     .flash.info{
       background:#eef6ff;
       border-color:#c9d7e6;
       color:#204564;
+    }
+
+    .batch-area{
+      margin-top:16px;
+      padding-top:14px;
+      border-top:1px solid #e3e8ef;
+    }
+    .batch-summary{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      margin-bottom:10px;
+      padding:10px 12px;
+      border:1px solid #d9e1ea;
+      border-radius:12px;
+      background:#f8fbff;
+    }
+    .batch-title{
+      font-weight:700;
+      color:#16324F;
+    }
+    .batch-meta{
+      color:#5c6b7d;
+      font-size:13px;
+      font-weight:600;
+    }
+    .batch-table-wrap{
+      overflow:auto;
+    }
+    .batch-table td,
+    .batch-table th{
+      white-space:nowrap;
     }
 
     /* ===== PADRÃO COMPACTO IGUAL AO OPERACAO/PRODUCAO ===== */
@@ -209,6 +247,10 @@
       .toolbar-actions a.btn{
         flex:1 1 auto;
       }
+      .batch-summary{
+        align-items:flex-start;
+        flex-direction:column;
+      }
     }
   </style>
 
@@ -256,11 +298,11 @@
 
     <div class="zone-body collapsed" id="z-executado">
       {% if can_create %}
-      <form method="post" action="{{ url_for('operacao.registro_realizada_create') }}">
+      <form id="ex-lote-form" method="post" action="#" onsubmit="return false;">
         <div class="toolbar-row toolbar-5">
           <label class="field">
             <span>EH *</span>
-            <select name="eh_id" required>
+            <select name="eh_id" id="ex_eh_id" required>
               <option value="">-- selecione --</option>
               {% for e in eh_list %}
                 <option value="{{ e.id }}" {{ 'selected' if feh and feh|string == e.id|string else '' }}>{{ e.eh }}</option>
@@ -270,7 +312,7 @@
 
           <label class="field">
             <span>Frente *</span>
-            <select name="frente_id" required>
+            <select name="frente_id" id="ex_frente_id" required>
               <option value="">-- selecione --</option>
               {% for f in fr_list %}
                 <option value="{{ f.id }}" {{ 'selected' if ffr and ffr|string == f.id|string else '' }}>{{ f.frente }}</option>
@@ -280,19 +322,56 @@
 
           <label class="field">
             <span>Data *</span>
-            <input type="date" name="data" value="{{ fdt or '' }}" required>
+            <input type="date" name="data" id="ex_data" value="{{ fdt or today }}" required>
           </label>
 
           <label class="field">
             <span>Executado (dia) *</span>
-            <input type="number" name="realizado" min="0" step="1" placeholder="Qtd do dia" required>
+            <input type="number" name="realizado" id="ex_realizado" min="0" step="1" placeholder="Qtd do dia" required>
           </label>
 
           <div class="toolbar-actions">
-            <button class="btn success" type="submit">💾 Salvar</button>
+            <button class="btn primary" type="button" id="ex-add-lancamento">➕ Adicionar à lista</button>
           </div>
         </div>
       </form>
+
+      <div class="batch-area">
+        <div class="batch-summary">
+          <div class="batch-title">
+            Executados pendentes
+            <span id="ex-contador" class="batch-meta">(0 itens)</span>
+          </div>
+          <div id="ex-total" class="batch-meta">Total: 0</div>
+        </div>
+
+        <div class="batch-table-wrap">
+          <table class="table batch-table">
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>EH</th>
+                <th>Frente</th>
+                <th>Executado</th>
+                <th class="acoes-col">Ações</th>
+              </tr>
+            </thead>
+            <tbody id="ex-lote-body">
+              <tr id="ex-lote-vazio">
+                <td colspan="5">Nenhum executado adicionado ainda.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <form method="post" action="{{ url_for('operacao.registro_realizada_create_lote') }}" id="ex-salvar-tudo-form" style="margin-top:12px;">
+          <input type="hidden" name="lancamentos_json" id="ex_lancamentos_json">
+          <div class="toolbar-actions" style="justify-content:flex-end;">
+            <button class="btn warning" type="button" id="ex-limpar-lista">🧹 Limpar lista</button>
+            <button class="btn success" type="button" id="ex-salvar-tudo">💾 Salvar tudo</button>
+          </div>
+        </form>
+      </div>
       {% endif %}
 
       <form method="get" action="{{ url_for('operacao.registro') }}" class="{% if can_create %}subtle-filter{% endif %}">
@@ -389,11 +468,11 @@
 
     <div class="zone-body collapsed" id="z-planejado">
       {% if can_create %}
-      <form method="post" action="{{ url_for('operacao.registro_planejada_create') }}">
+      <form id="pl-lote-form" method="post" action="#" onsubmit="return false;">
         <div class="toolbar-row toolbar-5">
           <label class="field">
             <span>EH *</span>
-            <select name="eh_id" required>
+            <select name="eh_id" id="pl_eh_id" required>
               <option value="">-- selecione --</option>
               {% for e in eh_list %}
                 <option value="{{ e.id }}" {{ 'selected' if feh and feh|string == e.id|string else '' }}>{{ e.eh }}</option>
@@ -403,7 +482,7 @@
 
           <label class="field">
             <span>Frente *</span>
-            <select name="frente_id" required>
+            <select name="frente_id" id="pl_frente_id" required>
               <option value="">-- selecione --</option>
               {% for f in fr_list %}
                 <option value="{{ f.id }}" {{ 'selected' if ffr and ffr|string == f.id|string else '' }}>{{ f.frente }}</option>
@@ -413,19 +492,56 @@
 
           <label class="field">
             <span>Data *</span>
-            <input type="date" name="data" value="{{ fdt or '' }}" required>
+            <input type="date" name="data" id="pl_data" value="{{ fdt or today }}" required>
           </label>
 
           <label class="field">
             <span>Planejado (dia) *</span>
-            <input type="number" name="planejado" min="0" step="1" placeholder="Qtd do dia" required>
+            <input type="number" name="planejado" id="pl_planejado" min="0" step="1" placeholder="Qtd do dia" required>
           </label>
 
           <div class="toolbar-actions">
-            <button class="btn success" type="submit">💾 Salvar</button>
+            <button class="btn primary" type="button" id="pl-add-lancamento">➕ Adicionar à lista</button>
           </div>
         </div>
       </form>
+
+      <div class="batch-area">
+        <div class="batch-summary">
+          <div class="batch-title">
+            Planejados pendentes
+            <span id="pl-contador" class="batch-meta">(0 itens)</span>
+          </div>
+          <div id="pl-total" class="batch-meta">Total: 0</div>
+        </div>
+
+        <div class="batch-table-wrap">
+          <table class="table batch-table">
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>EH</th>
+                <th>Frente</th>
+                <th>Planejado</th>
+                <th class="acoes-col">Ações</th>
+              </tr>
+            </thead>
+            <tbody id="pl-lote-body">
+              <tr id="pl-lote-vazio">
+                <td colspan="5">Nenhum planejado adicionado ainda.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <form method="post" action="{{ url_for('operacao.registro_planejada_create_lote') }}" id="pl-salvar-tudo-form" style="margin-top:12px;">
+          <input type="hidden" name="lancamentos_json" id="pl_lancamentos_json">
+          <div class="toolbar-actions" style="justify-content:flex-end;">
+            <button class="btn warning" type="button" id="pl-limpar-lista">🧹 Limpar lista</button>
+            <button class="btn success" type="button" id="pl-salvar-tudo">💾 Salvar tudo</button>
+          </div>
+        </form>
+      </div>
       {% endif %}
 
       <form method="get" action="{{ url_for('operacao.registro') }}" class="{% if can_create %}subtle-filter{% endif %}">
@@ -585,4 +701,253 @@
     }
   })();
 </script>
+
+{% if can_create %}
+<script>
+  const opRegistroListas = {
+    executado: [],
+    planejado: []
+  };
+
+  const opRegistroConfig = {
+    executado: {
+      prefix: "ex",
+      campoValor: "realizado",
+      rotuloValor: "Executado",
+      rotuloVazio: "Nenhum executado adicionado ainda.",
+      focoDepoisAdicionar: "ex_frente_id"
+    },
+    planejado: {
+      prefix: "pl",
+      campoValor: "planejado",
+      rotuloValor: "Planejado",
+      rotuloVazio: "Nenhum planejado adicionado ainda.",
+      focoDepoisAdicionar: "pl_frente_id"
+    }
+  };
+
+  function opEscapeHtml(valor) {
+    return String(valor || "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  function opFormatarData(dataIso) {
+    if (!dataIso || !dataIso.includes("-")) return dataIso || "";
+    const partes = dataIso.split("-");
+    if (partes.length !== 3) return dataIso;
+    return `${partes[2]}/${partes[1]}/${partes[0]}`;
+  }
+
+  function opNumero(valor) {
+    const txt = String(valor || "").trim().replace(",", ".");
+    if (!txt) return NaN;
+    return Number(txt);
+  }
+
+  function opFormatarNumero(valor) {
+    const num = Number(valor || 0);
+    return num.toLocaleString("pt-BR", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2
+    });
+  }
+
+  function opConfig(tipo) {
+    return opRegistroConfig[tipo];
+  }
+
+  function opElemento(id) {
+    return document.getElementById(id);
+  }
+
+  function opRenderTabela(tipo) {
+    const cfg = opConfig(tipo);
+    const lista = opRegistroListas[tipo];
+    const body = opElemento(`${cfg.prefix}-lote-body`);
+    const contador = opElemento(`${cfg.prefix}-contador`);
+    const total = opElemento(`${cfg.prefix}-total`);
+    const hidden = opElemento(`${cfg.prefix}_lancamentos_json`);
+
+    if (!body || !contador || !total || !hidden) return;
+
+    body.innerHTML = "";
+
+    if (!lista.length) {
+      const tr = document.createElement("tr");
+      tr.id = `${cfg.prefix}-lote-vazio`;
+      tr.innerHTML = `<td colspan="5">${cfg.rotuloVazio}</td>`;
+      body.appendChild(tr);
+    } else {
+      lista.forEach(function(item, index) {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${opEscapeHtml(opFormatarData(item.data))}</td>
+          <td>${opEscapeHtml(item.eh_label)}</td>
+          <td>${opEscapeHtml(item.frente_label)}</td>
+          <td class="num">${opFormatarNumero(item[cfg.campoValor])}</td>
+          <td>
+            <div class="row-actions">
+              <button type="button" class="btn info" onclick="opEditarLancamento('${tipo}', ${index})">✏️ Editar</button>
+              <button type="button" class="btn danger" onclick="opRemoverLancamento('${tipo}', ${index})">🗑️ Remover</button>
+            </div>
+          </td>
+        `;
+        body.appendChild(tr);
+      });
+    }
+
+    const soma = lista.reduce(function(acc, item) {
+      return acc + Number(item[cfg.campoValor] || 0);
+    }, 0);
+
+    contador.textContent = `(${lista.length} ${lista.length === 1 ? "item" : "itens"})`;
+    total.textContent = `Total: ${opFormatarNumero(soma)}`;
+    hidden.value = JSON.stringify(lista);
+  }
+
+  function opLerFormulario(tipo) {
+    const cfg = opConfig(tipo);
+    const eh = opElemento(`${cfg.prefix}_eh_id`);
+    const frente = opElemento(`${cfg.prefix}_frente_id`);
+    const data = opElemento(`${cfg.prefix}_data`);
+    const valorInput = opElemento(`${cfg.prefix}_${cfg.campoValor}`);
+
+    if (!eh || !frente || !data || !valorInput) return null;
+
+    const ehId = eh.value;
+    const frenteId = frente.value;
+    const dataVal = data.value;
+    const valor = opNumero(valorInput.value);
+
+    if (!ehId || !frenteId || !dataVal || Number.isNaN(valor)) {
+      alert(`Preencha EH, Frente, Data e ${cfg.rotuloValor}.`);
+      return null;
+    }
+
+    if (valor < 0) {
+      alert(`${cfg.rotuloValor} não pode ser negativo.`);
+      return null;
+    }
+
+    return {
+      eh_id: ehId,
+      eh_label: eh.options[eh.selectedIndex].text,
+      frente_id: frenteId,
+      frente_label: frente.options[frente.selectedIndex].text,
+      data: dataVal,
+      [cfg.campoValor]: valor
+    };
+  }
+
+  function opAdicionarLancamento(tipo) {
+    const cfg = opConfig(tipo);
+    const item = opLerFormulario(tipo);
+    if (!item) return;
+
+    const lista = opRegistroListas[tipo];
+    const duplicado = lista.some(function(l) {
+      return l.eh_id === item.eh_id &&
+             l.frente_id === item.frente_id &&
+             l.data === item.data;
+    });
+
+    if (duplicado) {
+      alert("Esse lançamento já está na lista pendente. Use Editar para ajustar o valor antes de salvar.");
+      return;
+    }
+
+    lista.push(item);
+    lista.sort(function(a, b) {
+      const chaveA = `${a.data}|${a.eh_label}|${a.frente_label}`;
+      const chaveB = `${b.data}|${b.eh_label}|${b.frente_label}`;
+      return chaveA.localeCompare(chaveB);
+    });
+
+    opRenderTabela(tipo);
+
+    opElemento(`${cfg.prefix}_frente_id`).value = "";
+    opElemento(`${cfg.prefix}_${cfg.campoValor}`).value = "";
+    const foco = opElemento(cfg.focoDepoisAdicionar);
+    if (foco) foco.focus();
+  }
+
+  function opEditarLancamento(tipo, index) {
+    const cfg = opConfig(tipo);
+    const lista = opRegistroListas[tipo];
+    const item = lista[index];
+    if (!item) return;
+
+    opElemento(`${cfg.prefix}_eh_id`).value = item.eh_id;
+    opElemento(`${cfg.prefix}_frente_id`).value = item.frente_id;
+    opElemento(`${cfg.prefix}_data`).value = item.data;
+    opElemento(`${cfg.prefix}_${cfg.campoValor}`).value = item[cfg.campoValor];
+
+    lista.splice(index, 1);
+    opRenderTabela(tipo);
+    opElemento(`${cfg.prefix}_${cfg.campoValor}`).focus();
+  }
+
+  function opRemoverLancamento(tipo, index) {
+    const lista = opRegistroListas[tipo];
+    lista.splice(index, 1);
+    opRenderTabela(tipo);
+  }
+
+  function opLimparLista(tipo) {
+    const lista = opRegistroListas[tipo];
+    if (!lista.length) {
+      alert("A lista já está vazia.");
+      return;
+    }
+
+    if (!confirm("Deseja limpar todos os lançamentos pendentes?")) {
+      return;
+    }
+
+    lista.length = 0;
+    opRenderTabela(tipo);
+  }
+
+  function opSalvarTudo(tipo) {
+    const cfg = opConfig(tipo);
+    const lista = opRegistroListas[tipo];
+
+    if (!lista.length) {
+      alert("Adicione pelo menos um lançamento antes de salvar.");
+      return;
+    }
+
+    opElemento(`${cfg.prefix}_lancamentos_json`).value = JSON.stringify(lista);
+    opElemento(`${cfg.prefix}-salvar-tudo-form`).submit();
+  }
+
+  opElemento("ex-add-lancamento").addEventListener("click", function() {
+    opAdicionarLancamento("executado");
+  });
+  opElemento("pl-add-lancamento").addEventListener("click", function() {
+    opAdicionarLancamento("planejado");
+  });
+
+  opElemento("ex-limpar-lista").addEventListener("click", function() {
+    opLimparLista("executado");
+  });
+  opElemento("pl-limpar-lista").addEventListener("click", function() {
+    opLimparLista("planejado");
+  });
+
+  opElemento("ex-salvar-tudo").addEventListener("click", function() {
+    opSalvarTudo("executado");
+  });
+  opElemento("pl-salvar-tudo").addEventListener("click", function() {
+    opSalvarTudo("planejado");
+  });
+
+  opRenderTabela("executado");
+  opRenderTabela("planejado");
+</script>
+{% endif %}
 {% endblock %}
