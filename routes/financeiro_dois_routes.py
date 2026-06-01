@@ -174,6 +174,11 @@ def _resolver_caminho_anexo_om(nome_arquivo: str) -> str | None:
         current_app.root_path, "static", "uploads", "financeiro2", "om_recibos", os.path.basename(nome_arquivo)
     ))
 
+    # Recibos exportados a partir de reembolsos podem continuar fisicamente nesta pasta.
+    candidatos.append(os.path.join(
+        current_app.root_path, "static", "uploads", "financeiro2", "reembolsos", os.path.basename(nome_arquivo)
+    ))
+
     # Legados possíveis
     candidatos.append(os.path.join(
         current_app.root_path, "static", "uploads", "financeiro2", os.path.basename(nome_arquivo)
@@ -2200,6 +2205,44 @@ def om_exportar_excel(om_id: int):
 def om_abrir_anexo():
     nome_arquivo = _nome_preenchido(request.args.get("arquivo"))
     caminho = _resolver_caminho_anexo_om(nome_arquivo)
+    if not caminho:
+        abort(404)
+    return send_file(caminho, as_attachment=False)
+
+
+
+def _resolver_caminho_anexo_rd(nome_arquivo: str) -> str | None:
+    if not nome_arquivo:
+        return None
+
+    nome_arquivo = str(nome_arquivo).strip().replace("\\", "/")
+    if not nome_arquivo:
+        return None
+
+    base = os.path.basename(nome_arquivo)
+    candidatos = [
+        os.path.join(current_app.root_path, nome_arquivo.lstrip("/")),
+        os.path.join(current_app.root_path, "static", "uploads", "financeiro2", "rd_recibos", base),
+        os.path.join(current_app.root_path, "static", "uploads", "financeiro2", "reembolsos", base),
+        os.path.join(current_app.root_path, "static", "uploads", "financeiro2", "recibos", base),
+        os.path.join(current_app.root_path, "static", "uploads", "financeiro2", base),
+        os.path.join(current_app.root_path, "static", "uploads", "rd_recibos", base),
+        os.path.join(current_app.root_path, "static", "uploads", "recibos", base),
+    ]
+
+    for caminho in candidatos:
+        if caminho and os.path.exists(caminho):
+            return caminho
+
+    return None
+
+
+@bp.route("/rd/anexo")
+@login_required
+@permission_required("financeiro", "visualizar")
+def rd_abrir_anexo():
+    nome_arquivo = _nome_preenchido(request.args.get("arquivo"))
+    caminho = _resolver_caminho_anexo_rd(nome_arquivo)
     if not caminho:
         abort(404)
     return send_file(caminho, as_attachment=False)
@@ -4712,16 +4755,8 @@ def rd_exportar_pdf(rd_id: int):
         if not nome_anexo:
             continue
 
-        caminho = os.path.join(
-            current_app.root_path,
-            "static",
-            "uploads",
-            "financeiro2",
-            "rd_recibos",
-            nome_anexo
-        )
-
-        if not os.path.exists(caminho):
+        caminho = _resolver_caminho_anexo_rd(nome_anexo)
+        if not caminho:
             continue
 
         extensao = os.path.splitext(caminho)[1].lower()

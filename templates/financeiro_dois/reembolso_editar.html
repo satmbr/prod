@@ -63,7 +63,7 @@
 
             <div class="field">
               <label>Data solicitação</label>
-              <input class="input-like" type="date" name="data_solicitacao" value="{{ reembolso.data_form }}" {% if reembolso.bloqueado %}disabled{% endif %} />
+              <input class="input-like" type="date" name="data_solicitacao" value="{{ reembolso.data_form }}" min="1900-01-01" max="2100-12-31" required {% if reembolso.bloqueado %}disabled{% endif %} />
               {% if reembolso.bloqueado %}
               <input type="hidden" name="data_solicitacao" value="{{ reembolso.data_form }}">
               {% endif %}
@@ -195,7 +195,7 @@
               <div class="form-grid" style="grid-template-columns:1fr; gap:10px;">
                 <div class="field">
                   <label>Data da linha</label>
-                  <input class="input-like" type="date" name="data_lancamento" required>
+                  <input class="input-like" type="date" name="data_lancamento" min="1900-01-01" max="2100-12-31" required>
                 </div>
                 <div class="field">
                   <label>Detalhe</label>
@@ -207,7 +207,7 @@
                 </div>
                 <div class="field">
                   <label>Recibo</label>
-                  <input class="input-like" type="file" name="anexo_recibo">
+                  <input class="input-like" type="file" name="anexo_recibo" accept=".pdf,image/*">
                 </div>
                 <button type="submit" class="btn btn-primary btn-block">Nova linha</button>
               </div>
@@ -217,7 +217,7 @@
               <div class="form-grid" style="grid-template-columns:1fr; gap:10px; margin-top:10px;">
                 <div class="field">
                   <label>Data pagamento</label>
-                  <input class="input-like" type="date" name="data_pagamento" required>
+                  <input class="input-like" type="date" name="data_pagamento" min="1900-01-01" max="2100-12-31" required>
                 </div>
                 <div class="field">
                   <label>Valor pago</label>
@@ -225,7 +225,7 @@
                 </div>
                 <div class="field">
                   <label>Comprovante PIX</label>
-                  <input class="input-like" type="file" name="comprovante_pagamento" required>
+                  <input class="input-like" type="file" name="comprovante_pagamento" accept=".pdf,image/*" required>
                 </div>
                 <div class="field">
                   <label>Observação do pagamento</label>

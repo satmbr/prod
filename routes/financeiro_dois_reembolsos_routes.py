@@ -1,14 +1,111 @@
 from flask import render_template, request, redirect, url_for, flash, abort, current_app, send_file
 from sqlalchemy import text
-from datetime import date
+from datetime import date, datetime
 
 from db import get_engine
 from routes.auth import login_required, permission_required
 from routes.financeiro_dois_routes import bp, build_financeiro_dois_subnav, _nome_preenchido
 
 import os
+import re
+import shutil
 import uuid
 from werkzeug.utils import secure_filename
+
+
+DATA_MINIMA_REEMBOLSO = date(1900, 1, 1)
+DATA_MAXIMA_REEMBOLSO = date(2100, 12, 31)
+
+
+def _validar_data_iso(valor: str | None) -> date | None:
+    """Valida datas recebidas dos formulários HTML no padrão YYYY-MM-DD.
+
+    Isso evita erros como 20263-03-27, datas impossíveis e anos fora do intervalo
+    aceito pelo sistema antes de enviar o valor ao PostgreSQL.
+    """
+    valor = _nome_preenchido(valor)
+    if not valor or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", valor):
+        return None
+
+    try:
+        data = datetime.strptime(valor, "%Y-%m-%d").date()
+    except ValueError:
+        return None
+
+    if data < DATA_MINIMA_REEMBOLSO or data > DATA_MAXIMA_REEMBOLSO:
+        return None
+
+    return data
+
+
+def _flash_data_invalida(nome_campo: str = "DATA"):
+    flash(
+        f"{nome_campo} INVÁLIDA. USE UMA DATA REAL NO FORMATO DD/MM/AAAA, ENTRE 1900 E 2100.",
+        "warning",
+    )
+
+
+def _resolver_caminho_anexo_reembolso(nome_arquivo: str | None) -> str | None:
+    """Localiza recibos de reembolso em pastas atuais e legadas.
+
+    Ao exportar para OM/RD, o recibo pode estar salvo originalmente na pasta de
+    reembolsos ou já copiado para om_recibos/rd_recibos. Essa função evita 404.
+    """
+    nome_arquivo = _nome_preenchido(nome_arquivo).replace("\\", "/")
+    if not nome_arquivo:
+        return None
+
+    base = os.path.basename(nome_arquivo)
+    candidatos = [
+        os.path.join(current_app.root_path, nome_arquivo.lstrip("/")),
+        os.path.join(current_app.root_path, "static", "uploads", "financeiro2", "reembolsos", base),
+        os.path.join(current_app.root_path, "static", "uploads", "financeiro2", "om_recibos", base),
+        os.path.join(current_app.root_path, "static", "uploads", "financeiro2", "rd_recibos", base),
+        os.path.join(current_app.root_path, "static", "uploads", "financeiro2", "recibos", base),
+        os.path.join(current_app.root_path, "static", "uploads", "financeiro2", base),
+    ]
+
+    for caminho in candidatos:
+        if caminho and os.path.exists(caminho):
+            return caminho
+
+    return None
+
+
+def _copiar_recibo_reembolso_para_destino(nome_arquivo: str | None, origem_tipo: str) -> str:
+    """Copia o recibo do reembolso para a pasta usada pela OM/RD.
+
+    A OM abre recibos em static/uploads/financeiro2/om_recibos e a RD em
+    static/uploads/financeiro2/rd_recibos. Sem essa cópia, o registro exportado
+    ficava com o nome do arquivo, mas o botão Abrir não encontrava o recibo.
+    """
+    nome_arquivo = _nome_preenchido(nome_arquivo)
+    if not nome_arquivo:
+        return ""
+
+    origem_tipo = _nome_preenchido(origem_tipo).upper()
+    pasta_destino = "om_recibos" if origem_tipo == "OM" else "rd_recibos"
+    caminho_origem = _resolver_caminho_anexo_reembolso(nome_arquivo)
+    nome_base = os.path.basename(nome_arquivo.replace("\\", "/"))
+
+    if not caminho_origem or not nome_base:
+        return nome_base or nome_arquivo
+
+    pasta = os.path.join(current_app.root_path, "static", "uploads", "financeiro2", pasta_destino)
+    os.makedirs(pasta, exist_ok=True)
+
+    caminho_destino = os.path.join(pasta, nome_base)
+    try:
+        if os.path.abspath(caminho_origem) != os.path.abspath(caminho_destino):
+            shutil.copy2(caminho_origem, caminho_destino)
+    except Exception as exc:
+        current_app.logger.warning(
+            "Não foi possível copiar recibo de reembolso para %s: %s",
+            pasta_destino,
+            exc,
+        )
+
+    return nome_base
 
 
 def _proximo_numero_reembolso(conn, dt_ref: date | None = None) -> str:
@@ -65,19 +162,8 @@ def _salvar_comprovante_pagamento_reembolso(arquivo):
 @permission_required("financeiro", "visualizar")
 def reembolso_real_abrir_anexo():
     arquivo = _nome_preenchido(request.args.get("arquivo"))
-    if not arquivo:
-        abort(404)
-
-    caminho = os.path.join(
-        current_app.root_path,
-        "static",
-        "uploads",
-        "financeiro2",
-        "reembolsos",
-        os.path.basename(arquivo)
-    )
-
-    if not os.path.exists(caminho):
+    caminho = _resolver_caminho_anexo_reembolso(arquivo)
+    if not caminho:
         abort(404)
 
     return send_file(caminho, as_attachment=False)
@@ -192,6 +278,11 @@ def reembolso_real_criar():
         flash("PREENCHA MATRÍCULA, COLABORADOR, CHAVE PIX E DATA DA SOLICITAÇÃO.", "warning")
         return redirect(url_for("financeiro_dois.reembolso_real_novo"))
 
+    data_solicitacao_validada = _validar_data_iso(data_solicitacao)
+    if not data_solicitacao_validada:
+        _flash_data_invalida("DATA DA SOLICITAÇÃO")
+        return redirect(url_for("financeiro_dois.reembolso_real_novo"))
+
     engine = get_engine()
     with engine.begin() as conn:
         numero_reembolso = _proximo_numero_reembolso(conn)
@@ -231,7 +322,7 @@ def reembolso_real_criar():
             "colaborador": colaborador,
             "pix": pix,
             "tipo_chave_pix": tipo_chave_pix,
-            "data_solicitacao": data_solicitacao,
+            "data_solicitacao": data_solicitacao_validada,
             "observacao": observacao,
         }).scalar()
 
@@ -324,6 +415,11 @@ def reembolso_real_salvar(reembolso_id: int):
         flash("PREENCHA MATRÍCULA, COLABORADOR, CHAVE PIX E DATA DA SOLICITAÇÃO.", "warning")
         return redirect(url_for("financeiro_dois.reembolso_real_editar", reembolso_id=reembolso_id))
 
+    data_solicitacao_validada = _validar_data_iso(data_solicitacao)
+    if not data_solicitacao_validada:
+        _flash_data_invalida("DATA DA SOLICITAÇÃO")
+        return redirect(url_for("financeiro_dois.reembolso_real_editar", reembolso_id=reembolso_id))
+
     engine = get_engine()
     with engine.begin() as conn:
         reembolso = conn.execute(text("""
@@ -358,7 +454,7 @@ def reembolso_real_salvar(reembolso_id: int):
             "colaborador": colaborador,
             "pix": pix,
             "tipo_chave_pix": tipo_chave_pix,
-            "data_solicitacao": data_solicitacao,
+            "data_solicitacao": data_solicitacao_validada,
             "status": status,
             "aprovacao": aprovacao,
             "observacao": observacao,
@@ -378,6 +474,11 @@ def reembolso_real_linha_nova(reembolso_id: int):
 
     if not data_lancamento or not detalhe or not valor_txt:
         flash("PREENCHA DATA, DETALHE E VALOR.", "warning")
+        return redirect(url_for("financeiro_dois.reembolso_real_editar", reembolso_id=reembolso_id))
+
+    data_lancamento_validada = _validar_data_iso(data_lancamento)
+    if not data_lancamento_validada:
+        _flash_data_invalida("DATA DA LINHA")
         return redirect(url_for("financeiro_dois.reembolso_real_editar", reembolso_id=reembolso_id))
 
     try:
@@ -434,7 +535,7 @@ def reembolso_real_linha_nova(reembolso_id: int):
                 ORDER BY l.id DESC
             """), {
                 "matricula": reembolso["matricula"],
-                "data_lancamento": data_lancamento,
+                "data_lancamento": data_lancamento_validada,
                 "valor": valor,
             }).mappings().all()
 
@@ -477,7 +578,7 @@ def reembolso_real_linha_nova(reembolso_id: int):
             )
         """), {
             "reembolso_id": reembolso_id,
-            "data_lancamento": data_lancamento,
+            "data_lancamento": data_lancamento_validada,
             "detalhe": detalhe,
             "valor": valor,
             "anexo_recibo": nome_arquivo,
@@ -494,6 +595,15 @@ def reembolso_real_linha_confirmar_duplicidade(reembolso_id: int):
     detalhe = _nome_preenchido(request.form.get("detalhe")).upper()
     valor_txt = _nome_preenchido(request.form.get("valor")).replace(",", ".")
     anexo_recibo_salvo = _nome_preenchido(request.form.get("anexo_recibo_salvo"))
+
+    if not data_lancamento or not detalhe or not valor_txt:
+        flash("PREENCHA DATA, DETALHE E VALOR.", "warning")
+        return redirect(url_for("financeiro_dois.reembolso_real_editar", reembolso_id=reembolso_id))
+
+    data_lancamento_validada = _validar_data_iso(data_lancamento)
+    if not data_lancamento_validada:
+        _flash_data_invalida("DATA DA LINHA")
+        return redirect(url_for("financeiro_dois.reembolso_real_editar", reembolso_id=reembolso_id))
 
     try:
         valor = float(valor_txt)
@@ -541,7 +651,7 @@ def reembolso_real_linha_confirmar_duplicidade(reembolso_id: int):
             )
         """), {
             "reembolso_id": reembolso_id,
-            "data_lancamento": data_lancamento,
+            "data_lancamento": data_lancamento_validada,
             "detalhe": detalhe,
             "valor": valor,
             "anexo_recibo": anexo_recibo_salvo or None,
@@ -612,6 +722,11 @@ def reembolso_real_registrar_pagamento(reembolso_id: int):
         flash("PREENCHA DATA E VALOR DO PAGAMENTO.", "warning")
         return redirect(url_for("financeiro_dois.reembolso_real_editar", reembolso_id=reembolso_id))
 
+    data_pagamento_validada = _validar_data_iso(data_pagamento)
+    if not data_pagamento_validada:
+        _flash_data_invalida("DATA DO PAGAMENTO")
+        return redirect(url_for("financeiro_dois.reembolso_real_editar", reembolso_id=reembolso_id))
+
     try:
         valor_pago = float(valor_pago_txt)
     except ValueError:
@@ -677,7 +792,7 @@ def reembolso_real_registrar_pagamento(reembolso_id: int):
             WHERE id = :id
         """), {
             "id": reembolso_id,
-            "data_pagamento": data_pagamento,
+            "data_pagamento": data_pagamento_validada,
             "valor_pago": valor_pago,
             "comprovante_pagamento": nome_comprovante,
             "observacao": observacao_pagamento or "PAGAMENTO REGISTRADO",
@@ -848,6 +963,8 @@ def reembolso_real_exportar_salvar(reembolso_id: int):
                 return redirect(url_for("financeiro_dois.reembolso_real_exportar", reembolso_id=reembolso_id))
 
             for linha in linhas:
+                anexo_exportado = _copiar_recibo_reembolso_para_destino(linha["anexo_recibo"], "OM")
+
                 recibo_seq = conn.execute(text("""
                     SELECT COALESCE(MAX(recibo), 0) + 1 AS proximo
                     FROM financeiro2_om_linhas
@@ -901,7 +1018,7 @@ def reembolso_real_exportar_salvar(reembolso_id: int):
                     "detalhes": linha["detalhe"],
                     "valor": float(linha["valor"] or 0),
                     "valor_brl": float(linha["valor"] or 0),
-                    "anexo_recibo": linha["anexo_recibo"],
+                    "anexo_recibo": anexo_exportado,
                 }).scalar()
 
                 conn.execute(text("""
@@ -938,6 +1055,8 @@ def reembolso_real_exportar_salvar(reembolso_id: int):
                 return redirect(url_for("financeiro_dois.reembolso_real_exportar", reembolso_id=reembolso_id))
 
             for linha in linhas:
+                anexo_exportado = _copiar_recibo_reembolso_para_destino(linha["anexo_recibo"], "RD")
+
                 nova_linha_id = conn.execute(text("""
                     INSERT INTO financeiro2_rd_linhas (
                         rd_id,
@@ -968,7 +1087,7 @@ def reembolso_real_exportar_salvar(reembolso_id: int):
                     "data_lancamento": linha["data_lancamento"],
                     "descricao": linha["detalhe"],
                     "valor": float(linha["valor"] or 0),
-                    "anexo_recibo": linha["anexo_recibo"],
+                    "anexo_recibo": anexo_exportado,
                 }).scalar()
 
                 conn.execute(text("""
@@ -1016,6 +1135,13 @@ def reembolso_real_buscar_despesa():
 
     resultados = []
     valor = None
+    data_lancamento_validada = None
+
+    if data_lancamento:
+        data_lancamento_validada = _validar_data_iso(data_lancamento)
+        if not data_lancamento_validada:
+            _flash_data_invalida("DATA DE LANÇAMENTO")
+            data_lancamento = ""
 
     if valor_txt:
         try:
@@ -1033,9 +1159,9 @@ def reembolso_real_buscar_despesa():
                 filtros.append("UPPER(COALESCE(r.matricula_colaborador, '')) = :matricula")
                 params["matricula"] = matricula
 
-            if data_lancamento:
+            if data_lancamento_validada:
                 filtros.append("l.data_lancamento = :data_lancamento")
-                params["data_lancamento"] = data_lancamento
+                params["data_lancamento"] = data_lancamento_validada
 
             if valor is not None:
                 filtros.append("COALESCE(l.valor, 0) = :valor")
