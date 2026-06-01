@@ -25,7 +25,7 @@
         </div>
         <div class="field">
           <label>Data</label>
-          <input class="input-like" type="date" name="data_lancamento" value="{{ filtros.data_lancamento }}">
+          <input class="input-like" type="date" name="data_lancamento" value="{{ filtros.data_lancamento }}" min="1900-01-01" max="2100-12-31">
         </div>
         <div class="field">
           <label>Valor</label>
@@ -67,7 +67,7 @@
             <td style="text-align:right;">R$ {{ '%.2f'|format(item.valor) }}</td>
             <td>
               {% if item.anexo_recibo %}
-                <a class="btn btn-sm" href="{{ url_for('financeiro_dois.reembolso_real_abrir_anexo', arquivo=item.anexo_recibo) }}" target="_blank">Abrir recibo</a>
+                <a class="btn btn-sm" href="{{ url_for('financeiro_dois.reembolso_real_abrir_recibo_linha', linha_id=item.linha_id) }}" target="_blank">Abrir recibo</a>
               {% else %}
                 --
               {% endif %}

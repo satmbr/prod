@@ -149,7 +149,7 @@
                   <td style="text-align:right;">R$ {{ '%.2f'|format(linha.valor) }}</td>
                   <td>
                     {% if linha.anexo_recibo %}
-                    <a class="btn btn-sm" href="{{ url_for('financeiro_dois.reembolso_real_abrir_anexo', arquivo=linha.anexo_recibo) }}" target="_blank">Abrir recibo</a>
+                    <a class="btn btn-sm" href="{{ url_for('financeiro_dois.reembolso_real_abrir_recibo_linha', linha_id=linha.id) }}" target="_blank">Abrir recibo</a>
                     {% else %}
                     --
                     {% endif %}

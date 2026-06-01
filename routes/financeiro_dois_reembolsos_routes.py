@@ -9,6 +9,7 @@ from routes.financeiro_dois_routes import bp, build_financeiro_dois_subnav, _nom
 import os
 import re
 import shutil
+import mimetypes
 import uuid
 from werkzeug.utils import secure_filename
 
@@ -45,40 +46,129 @@ def _flash_data_invalida(nome_campo: str = "DATA"):
     )
 
 
-def _resolver_caminho_anexo_reembolso(nome_arquivo: str | None) -> str | None:
-    """Localiza recibos de reembolso em pastas atuais e legadas.
+EXTENSOES_RECIBO_PERMITIDAS = {".pdf", ".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".tif", ".tiff"}
 
-    Ao exportar para OM/RD, o recibo pode estar salvo originalmente na pasta de
-    reembolsos ou já copiado para om_recibos/rd_recibos. Essa função evita 404.
+
+def _extensao_upload_valida(arquivo) -> str | None:
+    """Retorna a extensão do upload se for PDF/imagem permitido."""
+    if not arquivo or not arquivo.filename:
+        return None
+
+    nome_seguro = secure_filename(arquivo.filename or "")
+    extensao = os.path.splitext(nome_seguro)[1].lower()
+
+    if not extensao:
+        extensao = (mimetypes.guess_extension(arquivo.mimetype or "") or "").lower()
+        if extensao == ".jpe":
+            extensao = ".jpg"
+
+    if extensao not in EXTENSOES_RECIBO_PERMITIDAS:
+        return None
+
+    return extensao
+
+
+def _pastas_upload_financeiro2(*subpastas: str) -> list[str]:
+    """Gera pastas possíveis para uploads no Railway/local.
+
+    O caminho principal continua sendo static/uploads/financeiro2, mas mantemos
+    fallbacks para instance/uploads e /tmp em caso de ambiente com restrição de escrita.
+    """
+    rel = os.path.join("uploads", "financeiro2", *subpastas)
+    return [
+        os.path.join(current_app.root_path, "static", rel),
+        os.path.join(current_app.instance_path, rel),
+        os.path.join("/tmp", "prod_uploads", "financeiro2", *subpastas),
+    ]
+
+
+def _salvar_upload_financeiro2(arquivo, subpasta: str) -> str | None:
+    if not arquivo or not arquivo.filename:
+        return None
+
+    extensao = _extensao_upload_valida(arquivo)
+    if not extensao:
+        raise ValueError("FORMATO DE ARQUIVO NÃO PERMITIDO. ANEXE PDF OU IMAGEM.")
+
+    nome_salvo = f"{uuid.uuid4().hex}{extensao}"
+    ultimo_erro = None
+
+    for pasta in _pastas_upload_financeiro2(subpasta):
+        try:
+            os.makedirs(pasta, exist_ok=True)
+            destino = os.path.join(pasta, nome_salvo)
+            arquivo.save(destino)
+            return nome_salvo
+        except Exception as exc:
+            ultimo_erro = exc
+            try:
+                arquivo.stream.seek(0)
+            except Exception:
+                pass
+            current_app.logger.warning("Falha ao salvar upload em %s: %s", pasta, exc)
+
+    raise RuntimeError(f"Não foi possível salvar o arquivo enviado: {ultimo_erro}")
+
+
+def _candidatos_caminho_anexo_reembolso(nome_arquivo: str | None) -> list[str]:
+    """Monta a lista de caminhos possíveis para localizar recibos.
+
+    Aceita tanto nome simples salvo no banco (uuid.pdf) quanto caminhos relativos
+    antigos, como static/uploads/financeiro2/reembolsos/uuid.pdf.
     """
     nome_arquivo = _nome_preenchido(nome_arquivo).replace("\\", "/")
     if not nome_arquivo:
-        return None
+        return []
 
     base = os.path.basename(nome_arquivo)
-    candidatos = [
-        os.path.join(current_app.root_path, nome_arquivo.lstrip("/")),
-        os.path.join(current_app.root_path, "static", "uploads", "financeiro2", "reembolsos", base),
-        os.path.join(current_app.root_path, "static", "uploads", "financeiro2", "om_recibos", base),
-        os.path.join(current_app.root_path, "static", "uploads", "financeiro2", "rd_recibos", base),
-        os.path.join(current_app.root_path, "static", "uploads", "financeiro2", "recibos", base),
-        os.path.join(current_app.root_path, "static", "uploads", "financeiro2", base),
+    candidatos: list[str] = []
+
+    def add(caminho: str | None):
+        if not caminho:
+            return
+        caminho = os.path.normpath(caminho)
+        if caminho not in candidatos:
+            candidatos.append(caminho)
+
+    # Caminho absoluto legado, se já estiver dentro do projeto/ambiente.
+    if os.path.isabs(nome_arquivo):
+        add(nome_arquivo)
+
+    # Caminhos relativos antigos armazenados no banco.
+    for raiz in {current_app.root_path, os.getcwd()}:
+        add(os.path.join(raiz, nome_arquivo.lstrip("/")))
+        add(os.path.join(raiz, "static", nome_arquivo.lstrip("/")))
+
+    # Pastas atuais e legadas do financeiro dois.
+    subpastas = [
+        "reembolsos",
+        "reembolsos_pagamentos",
+        "om_recibos",
+        "rd_recibos",
+        "recibos",
+        "",
     ]
+    for subpasta in subpastas:
+        for pasta in _pastas_upload_financeiro2(subpasta):
+            add(os.path.join(pasta, base))
 
-    for caminho in candidatos:
-        if caminho and os.path.exists(caminho):
+    # Static tradicional, caso _pastas_upload_financeiro2 seja alterado no futuro.
+    for subpasta in subpastas:
+        add(os.path.join(current_app.root_path, "static", "uploads", "financeiro2", subpasta, base))
+
+    return candidatos
+
+
+def _resolver_caminho_anexo_reembolso(nome_arquivo: str | None) -> str | None:
+    """Localiza recibos de reembolso em pastas atuais e legadas."""
+    for caminho in _candidatos_caminho_anexo_reembolso(nome_arquivo):
+        if caminho and os.path.exists(caminho) and os.path.isfile(caminho):
             return caminho
-
     return None
 
 
 def _copiar_recibo_reembolso_para_destino(nome_arquivo: str | None, origem_tipo: str) -> str:
-    """Copia o recibo do reembolso para a pasta usada pela OM/RD.
-
-    A OM abre recibos em static/uploads/financeiro2/om_recibos e a RD em
-    static/uploads/financeiro2/rd_recibos. Sem essa cópia, o registro exportado
-    ficava com o nome do arquivo, mas o botão Abrir não encontrava o recibo.
-    """
+    """Copia o recibo do reembolso para a pasta usada pela OM/RD."""
     nome_arquivo = _nome_preenchido(nome_arquivo)
     if not nome_arquivo:
         return ""
@@ -89,24 +179,32 @@ def _copiar_recibo_reembolso_para_destino(nome_arquivo: str | None, origem_tipo:
     nome_base = os.path.basename(nome_arquivo.replace("\\", "/"))
 
     if not caminho_origem or not nome_base:
+        current_app.logger.warning(
+            "Recibo de reembolso não localizado para exportação. arquivo=%s candidatos=%s",
+            nome_arquivo,
+            _candidatos_caminho_anexo_reembolso(nome_arquivo),
+        )
         return nome_base or nome_arquivo
 
-    pasta = os.path.join(current_app.root_path, "static", "uploads", "financeiro2", pasta_destino)
-    os.makedirs(pasta, exist_ok=True)
+    copiado = False
+    for pasta in _pastas_upload_financeiro2(pasta_destino):
+        try:
+            os.makedirs(pasta, exist_ok=True)
+            caminho_destino = os.path.join(pasta, nome_base)
+            if os.path.abspath(caminho_origem) != os.path.abspath(caminho_destino):
+                shutil.copy2(caminho_origem, caminho_destino)
+            copiado = True
+        except Exception as exc:
+            current_app.logger.warning(
+                "Não foi possível copiar recibo de reembolso para %s: %s",
+                pasta,
+                exc,
+            )
 
-    caminho_destino = os.path.join(pasta, nome_base)
-    try:
-        if os.path.abspath(caminho_origem) != os.path.abspath(caminho_destino):
-            shutil.copy2(caminho_origem, caminho_destino)
-    except Exception as exc:
-        current_app.logger.warning(
-            "Não foi possível copiar recibo de reembolso para %s: %s",
-            pasta_destino,
-            exc,
-        )
+    if not copiado:
+        current_app.logger.warning("Recibo não foi copiado para nenhuma pasta de destino: %s", nome_base)
 
     return nome_base
-
 
 def _proximo_numero_reembolso(conn, dt_ref: date | None = None) -> str:
     dt_ref = dt_ref or date.today()
@@ -130,32 +228,10 @@ def _proximo_numero_reembolso(conn, dt_ref: date | None = None) -> str:
     return f"{prefixo}{seq:04d}"
 
 def _salvar_anexo_reembolso(arquivo):
-    if not arquivo or not arquivo.filename:
-        return None
-
-    pasta = os.path.join(current_app.root_path, "static", "uploads", "financeiro2", "reembolsos")
-    os.makedirs(pasta, exist_ok=True)
-
-    nome_seguro = secure_filename(arquivo.filename)
-    extensao = os.path.splitext(nome_seguro)[1].lower()
-    nome_salvo = f"{uuid.uuid4().hex}{extensao}"
-
-    arquivo.save(os.path.join(pasta, nome_salvo))
-    return nome_salvo
+    return _salvar_upload_financeiro2(arquivo, "reembolsos")
     
 def _salvar_comprovante_pagamento_reembolso(arquivo):
-    if not arquivo or not arquivo.filename:
-        return None
-
-    pasta = os.path.join(current_app.root_path, "static", "uploads", "financeiro2", "reembolsos_pagamentos")
-    os.makedirs(pasta, exist_ok=True)
-
-    nome_seguro = secure_filename(arquivo.filename)
-    extensao = os.path.splitext(nome_seguro)[1].lower()
-    nome_salvo = f"{uuid.uuid4().hex}{extensao}"
-
-    arquivo.save(os.path.join(pasta, nome_salvo))
-    return nome_salvo
+    return _salvar_upload_financeiro2(arquivo, "reembolsos_pagamentos")
     
 @bp.route("/reembolsos-real/anexo")
 @login_required
@@ -168,27 +244,59 @@ def reembolso_real_abrir_anexo():
 
     return send_file(caminho, as_attachment=False)
     
+
+@bp.route("/reembolsos-real/linhas/<int:linha_id>/recibo")
+@login_required
+@permission_required("financeiro", "visualizar")
+def reembolso_real_abrir_recibo_linha(linha_id: int):
+    """Abre o recibo pelo ID da linha, evitando falha por querystring/nome de arquivo."""
+    engine = get_engine()
+    with engine.connect() as conn:
+        linha = conn.execute(text("""
+            SELECT
+                id,
+                reembolso_id,
+                COALESCE(anexo_recibo, '') AS anexo_recibo
+            FROM financeiro2_reembolsos_linhas
+            WHERE id = :linha_id
+        """), {"linha_id": linha_id}).mappings().first()
+
+    if not linha:
+        abort(404)
+
+    arquivo = _nome_preenchido(linha["anexo_recibo"])
+    caminho = _resolver_caminho_anexo_reembolso(arquivo)
+    if not caminho:
+        current_app.logger.warning(
+            "Recibo de reembolso não encontrado. linha_id=%s arquivo=%s candidatos=%s",
+            linha_id,
+            arquivo,
+            _candidatos_caminho_anexo_reembolso(arquivo),
+        )
+        flash(
+            "O REGISTRO POSSUI NOME DE RECIBO NO BANCO, MAS O ARQUIVO NÃO FOI ENCONTRADO NO SERVIDOR. "
+            "ANEXE O RECIBO NOVAMENTE OU VERIFIQUE SE HOUVE REDEPLOY APÓS O UPLOAD.",
+            "warning",
+        )
+        return redirect(url_for("financeiro_dois.reembolso_real_editar", reembolso_id=linha["reembolso_id"]))
+
+    return send_file(caminho, as_attachment=False, download_name=os.path.basename(caminho))
+
 @bp.route("/reembolsos-real/comprovante-pagamento")
 @login_required
 @permission_required("financeiro", "visualizar")
 def reembolso_real_abrir_comprovante_pagamento():
     arquivo = _nome_preenchido(request.args.get("arquivo"))
-    if not arquivo:
+    caminho = _resolver_caminho_anexo_reembolso(arquivo)
+    if not caminho:
+        current_app.logger.warning(
+            "Comprovante de pagamento de reembolso não encontrado. arquivo=%s candidatos=%s",
+            arquivo,
+            _candidatos_caminho_anexo_reembolso(arquivo),
+        )
         abort(404)
 
-    caminho = os.path.join(
-        current_app.root_path,
-        "static",
-        "uploads",
-        "financeiro2",
-        "reembolsos_pagamentos",
-        os.path.basename(arquivo)
-    )
-
-    if not os.path.exists(caminho):
-        abort(404)
-
-    return send_file(caminho, as_attachment=False)  
+    return send_file(caminho, as_attachment=False, download_name=os.path.basename(caminho))  
 
 @bp.route("/reembolsos-real")
 @login_required
@@ -512,7 +620,15 @@ def reembolso_real_linha_nova(reembolso_id: int):
         nome_arquivo = None
         arquivo = request.files.get("anexo_recibo")
         if arquivo and arquivo.filename:
-            nome_arquivo = _salvar_anexo_reembolso(arquivo)
+            try:
+                nome_arquivo = _salvar_anexo_reembolso(arquivo)
+            except ValueError as exc:
+                flash(str(exc), "warning")
+                return redirect(url_for("financeiro_dois.reembolso_real_editar", reembolso_id=reembolso_id))
+            except Exception as exc:
+                current_app.logger.exception("Erro ao salvar recibo do reembolso: %s", exc)
+                flash("NÃO FOI POSSÍVEL SALVAR O RECIBO. TENTE NOVAMENTE.", "danger")
+                return redirect(url_for("financeiro_dois.reembolso_real_editar", reembolso_id=reembolso_id))
 
         if not forcar_salvamento:
             duplicadas = conn.execute(text("""
@@ -766,7 +882,15 @@ def reembolso_real_registrar_pagamento(reembolso_id: int):
             return redirect(url_for("financeiro_dois.reembolso_real_editar", reembolso_id=reembolso_id))
 
         arquivo = request.files.get("comprovante_pagamento")
-        nome_comprovante = _salvar_comprovante_pagamento_reembolso(arquivo)
+        try:
+            nome_comprovante = _salvar_comprovante_pagamento_reembolso(arquivo)
+        except ValueError as exc:
+            flash(str(exc), "warning")
+            return redirect(url_for("financeiro_dois.reembolso_real_editar", reembolso_id=reembolso_id))
+        except Exception as exc:
+            current_app.logger.exception("Erro ao salvar comprovante de pagamento do reembolso: %s", exc)
+            flash("NÃO FOI POSSÍVEL SALVAR O COMPROVANTE. TENTE NOVAMENTE.", "danger")
+            return redirect(url_for("financeiro_dois.reembolso_real_editar", reembolso_id=reembolso_id))
 
         if not nome_comprovante:
             flash("ANEXE O COMPROVANTE DE PAGAMENTO.", "warning")
@@ -884,7 +1008,6 @@ def reembolso_real_exportar(reembolso_id: int):
 @login_required
 @permission_required("financeiro", "visualizar")
 def reembolso_real_exportar_salvar(reembolso_id: int):
-    origem_tipo = _nome_preenchido(request.form.get("origem_tipo")).upper()
     origem_tipo = _nome_preenchido(request.form.get("origem_tipo")).upper()
 
     if origem_tipo == "OM":
@@ -1173,6 +1296,7 @@ def reembolso_real_buscar_despesa():
                     UPPER(COALESCE(r.numero_reembolso, '')) AS numero_reembolso,
                     UPPER(COALESCE(r.matricula_colaborador, '')) AS matricula,
                     UPPER(COALESCE(r.nome_colaborador, '')) AS colaborador,
+                    l.id AS linha_id,
                     TO_CHAR(l.data_lancamento, 'DD/MM/YYYY') AS data,
                     UPPER(COALESCE(l.detalhe, '')) AS detalhe,
                     COALESCE(l.valor, 0) AS valor,
