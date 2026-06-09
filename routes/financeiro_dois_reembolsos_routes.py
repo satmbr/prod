@@ -11,7 +11,9 @@ import re
 import shutil
 import mimetypes
 import uuid
+from io import BytesIO
 from werkzeug.utils import secure_filename
+from PIL import Image
 
 
 DATA_MINIMA_REEMBOLSO = date(1900, 1, 1)
@@ -49,8 +51,43 @@ def _flash_data_invalida(nome_campo: str = "DATA"):
 EXTENSOES_RECIBO_PERMITIDAS = {".pdf", ".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".tif", ".tiff"}
 
 
+_ASSINATURAS_VALIDAS_R = {
+    b"%PDF": ".pdf",
+    b"\x89PNG": ".png",
+    b"\xff\xd8\xff": ".jpg",
+    b"GIF8": ".gif",
+    b"BM": ".bmp",
+    b"II*\x00": ".tif",
+    b"MM\x00*": ".tif",
+    b"RIFF": ".webp",
+}
+
+def _validar_magic_bytes_r(stream) -> bool:
+    try:
+        cab = stream.read(8)
+        stream.seek(0)
+        for assinatura in _ASSINATURAS_VALIDAS_R:
+            if cab.startswith(assinatura):
+                return True
+    except Exception:
+        pass
+    return False
+
+def _comprimir_imagem_r(stream, extensao: str) -> tuple[bytes, str]:
+    try:
+        img = Image.open(stream)
+        img = img.convert("RGB")
+        if img.width > 2000 or img.height > 2000:
+            img.thumbnail((2000, 2000), Image.LANCZOS)
+        buf = BytesIO()
+        img.save(buf, format="JPEG", quality=75, optimize=True)
+        return buf.getvalue(), ".jpg"
+    except Exception:
+        stream.seek(0)
+        return stream.read(), extensao
+
 def _extensao_upload_valida(arquivo) -> str | None:
-    """Retorna a extensão do upload se for PDF/imagem permitido."""
+    """Retorna a extensão do upload se for PDF/imagem permitido, validando magic bytes."""
     if not arquivo or not arquivo.filename:
         return None
 
@@ -65,6 +102,10 @@ def _extensao_upload_valida(arquivo) -> str | None:
     if extensao not in EXTENSOES_RECIBO_PERMITIDAS:
         return None
 
+    if not _validar_magic_bytes_r(arquivo.stream):
+        return None
+
+    arquivo.stream.seek(0)
     return extensao
 
 
@@ -90,6 +131,13 @@ def _salvar_upload_financeiro2(arquivo, subpasta: str) -> str | None:
     if not extensao:
         raise ValueError("FORMATO DE ARQUIVO NÃO PERMITIDO. ANEXE PDF OU IMAGEM.")
 
+    # Comprime imagens antes de salvar
+    if extensao in {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".tif", ".tiff"}:
+        dados, extensao = _comprimir_imagem_r(arquivo.stream, extensao)
+        conteudo_bytes = dados
+    else:
+        conteudo_bytes = None
+
     nome_salvo = f"{uuid.uuid4().hex}{extensao}"
     ultimo_erro = None
 
@@ -97,7 +145,11 @@ def _salvar_upload_financeiro2(arquivo, subpasta: str) -> str | None:
         try:
             os.makedirs(pasta, exist_ok=True)
             destino = os.path.join(pasta, nome_salvo)
-            arquivo.save(destino)
+            if conteudo_bytes is not None:
+                with open(destino, "wb") as f:
+                    f.write(conteudo_bytes)
+            else:
+                arquivo.save(destino)
             return nome_salvo
         except Exception as exc:
             ultimo_erro = exc

@@ -54,18 +54,6 @@ def create_app():
     from routes.colaboradores import bp as colaboradores_bp
     app.register_blueprint(colaboradores_bp)
     
-    from routes.financeiro import bp as financeiro_bp
-    app.register_blueprint(financeiro_bp)
-
-    from routes.financeiro_despesas import bp as financeiro_despesas_bp
-    app.register_blueprint(financeiro_despesas_bp)
-
-    from routes.financeiro_faturas import bp as financeiro_faturas_bp
-    app.register_blueprint(financeiro_faturas_bp)
-
-    from routes.financeiro_nd import bp as financeiro_nd_bp
-    app.register_blueprint(financeiro_nd_bp)
-    
     from routes.financeiro_dois_routes import bp as financeiro_dois_bp
     app.register_blueprint(financeiro_dois_bp)
 
@@ -116,8 +104,8 @@ def create_app():
         if "financeiro:visualizar" in permissoes or "auth:administrar" in permissoes:
             cards.append({
                 "titulo": "Financeiro",
-                "descricao": "Controle despesas, faturas, notas de débito e documentos financeiros.",
-                "href": url_for("financeiro.index"),
+                "descricao": "Controle OM, RD, despesas, notas de débito, reembolsos e previsões financeiras.",
+                "href": url_for("financeiro_dois.index"),
                 "botao": "Acessar módulo"
             })
 

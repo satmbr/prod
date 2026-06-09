@@ -16,7 +16,7 @@ from werkzeug.utils import secure_filename
 from werkzeug.security import check_password_hash
 from urllib.parse import urlparse, unquote
 
-bp = Blueprint("financeiro_dois", __name__, url_prefix="/financeiro-dois")
+bp = Blueprint("financeiro_dois", __name__, url_prefix="/financeiro")
 
 def _calcular_saldo_om(conn, om_id: int) -> float:
     saldo = conn.execute(text("""
@@ -559,18 +559,74 @@ def _proximo_numero_despesa(conn, dt_ref: date | None = None) -> str:
 
     return f"{prefixo}{seq:04d}"
 
+_EXTENSOES_DESPESA_PERMITIDAS = {".pdf", ".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".tif", ".tiff"}
+_MIME_IMAGEM = {"image/png", "image/jpeg", "image/webp", "image/gif", "image/bmp", "image/tiff"}
+_ASSINATURAS_VALIDAS = {
+    b"%PDF": ".pdf",
+    b"\x89PNG": ".png",
+    b"\xff\xd8\xff": ".jpg",
+    b"GIF8": ".gif",
+    b"BM": ".bmp",
+    b"II*\x00": ".tif",
+    b"MM\x00*": ".tif",
+    b"RIFF": ".webp",
+}
+
+def _validar_magic_bytes(stream) -> bool:
+    """Verifica se o arquivo começa com uma assinatura conhecida."""
+    try:
+        cabecalho = stream.read(8)
+        stream.seek(0)
+        for assinatura in _ASSINATURAS_VALIDAS:
+            if cabecalho.startswith(assinatura):
+                return True
+    except Exception:
+        pass
+    return False
+
+def _comprimir_imagem(stream, extensao: str) -> tuple[bytes, str]:
+    """Comprime imagem usando Pillow. Retorna bytes e extensão final (.jpg)."""
+    try:
+        img = Image.open(stream)
+        img = img.convert("RGB")
+        # Redimensiona se muito grande
+        max_dim = 2000
+        if img.width > max_dim or img.height > max_dim:
+            img.thumbnail((max_dim, max_dim), Image.LANCZOS)
+        from io import BytesIO
+        buf = BytesIO()
+        img.save(buf, format="JPEG", quality=75, optimize=True)
+        return buf.getvalue(), ".jpg"
+    except Exception:
+        stream.seek(0)
+        return stream.read(), extensao
+
 def _salvar_anexo_despesa(arquivo):
     if not arquivo or not arquivo.filename:
         return None, None
 
-    pasta = os.path.join("static", "uploads", "financeiro2", "despesas")
+    nome_original = secure_filename(arquivo.filename or "")
+    extensao = os.path.splitext(nome_original)[1].lower()
+
+    if extensao not in _EXTENSOES_DESPESA_PERMITIDAS:
+        raise ValueError("Formato não permitido. Envie PDF ou imagem (JPG, PNG, WEBP, GIF, BMP, TIF).")
+
+    if not _validar_magic_bytes(arquivo.stream):
+        raise ValueError("Arquivo inválido ou corrompido. Envie PDF ou imagem real.")
+
+    arquivo.stream.seek(0)
+    pasta = os.path.join(current_app.root_path, "static", "uploads", "financeiro2", "despesas")
     os.makedirs(pasta, exist_ok=True)
 
-    nome_original = secure_filename(arquivo.filename)
-    extensao = os.path.splitext(nome_original)[1].lower()
-    nome_salvo = f"{uuid.uuid4().hex}{extensao}"
+    if extensao in {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".tif", ".tiff"}:
+        dados, extensao = _comprimir_imagem(arquivo.stream, extensao)
+        nome_salvo = f"{uuid.uuid4().hex}{extensao}"
+        with open(os.path.join(pasta, nome_salvo), "wb") as f:
+            f.write(dados)
+    else:
+        nome_salvo = f"{uuid.uuid4().hex}{extensao}"
+        arquivo.save(os.path.join(pasta, nome_salvo))
 
-    arquivo.save(os.path.join(pasta, nome_salvo))
     return nome_salvo, nome_original
 
 # =========================
@@ -1758,18 +1814,27 @@ def om_linha_nova(om_id: int):
         arquivo = request.files.get("anexo_recibo")
 
         if arquivo and arquivo.filename:
-            import os
-            import uuid
-            from werkzeug.utils import secure_filename
-
-            pasta = os.path.join("static", "uploads", "financeiro2", "om_recibos")
-            os.makedirs(pasta, exist_ok=True)
-
             nome_seguro = secure_filename(arquivo.filename)
             extensao = os.path.splitext(nome_seguro)[1].lower()
-            nome_arquivo = f"{uuid.uuid4().hex}{extensao}"
-            caminho = os.path.join(pasta, nome_arquivo)
-            arquivo.save(caminho)
+            if extensao not in _EXTENSOES_DESPESA_PERMITIDAS:
+                flash("Formato de recibo não permitido. Envie PDF ou imagem.", "warning")
+                return redirect(url_for("financeiro_dois.om_editar", om_id=om_id))
+            if not _validar_magic_bytes(arquivo.stream):
+                flash("Arquivo de recibo inválido ou corrompido.", "warning")
+                return redirect(url_for("financeiro_dois.om_editar", om_id=om_id))
+            arquivo.stream.seek(0)
+
+            pasta = os.path.join(current_app.root_path, "static", "uploads", "financeiro2", "om_recibos")
+            os.makedirs(pasta, exist_ok=True)
+
+            if extensao in {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".tif", ".tiff"}:
+                dados, extensao = _comprimir_imagem(arquivo.stream, extensao)
+                nome_arquivo = f"{uuid.uuid4().hex}{extensao}"
+                with open(os.path.join(pasta, nome_arquivo), "wb") as f:
+                    f.write(dados)
+            else:
+                nome_arquivo = f"{uuid.uuid4().hex}{extensao}"
+                arquivo.save(os.path.join(pasta, nome_arquivo))
 
         if not forcar_salvamento:
             duplicadas = conn.execute(text("""
@@ -2883,18 +2948,27 @@ def rd_linha_nova(rd_id: int):
         arquivo = request.files.get("anexo_recibo")
 
         if arquivo and arquivo.filename:
-            import os
-            import uuid
-            from werkzeug.utils import secure_filename
-
-            pasta = os.path.join("static", "uploads", "financeiro2", "rd_recibos")
-            os.makedirs(pasta, exist_ok=True)
-
             nome_seguro = secure_filename(arquivo.filename)
             extensao = os.path.splitext(nome_seguro)[1].lower()
-            nome_arquivo = f"{uuid.uuid4().hex}{extensao}"
-            caminho = os.path.join(pasta, nome_arquivo)
-            arquivo.save(caminho)
+            if extensao not in _EXTENSOES_DESPESA_PERMITIDAS:
+                flash("Formato de recibo não permitido. Envie PDF ou imagem.", "warning")
+                return redirect(url_for("financeiro_dois.rd_editar", rd_id=rd_id))
+            if not _validar_magic_bytes(arquivo.stream):
+                flash("Arquivo de recibo inválido ou corrompido.", "warning")
+                return redirect(url_for("financeiro_dois.rd_editar", rd_id=rd_id))
+            arquivo.stream.seek(0)
+
+            pasta = os.path.join(current_app.root_path, "static", "uploads", "financeiro2", "rd_recibos")
+            os.makedirs(pasta, exist_ok=True)
+
+            if extensao in {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".tif", ".tiff"}:
+                dados, extensao = _comprimir_imagem(arquivo.stream, extensao)
+                nome_arquivo = f"{uuid.uuid4().hex}{extensao}"
+                with open(os.path.join(pasta, nome_arquivo), "wb") as f:
+                    f.write(dados)
+            else:
+                nome_arquivo = f"{uuid.uuid4().hex}{extensao}"
+                arquivo.save(os.path.join(pasta, nome_arquivo))
 
         if not forcar_salvamento:
             duplicadas = conn.execute(text("""
@@ -3713,7 +3787,11 @@ def despesa_criar():
         }).scalar()
 
         arquivo = request.files.get("anexo")
-        nome_salvo, nome_original = _salvar_anexo_despesa(arquivo)
+        try:
+            nome_salvo, nome_original = _salvar_anexo_despesa(arquivo)
+        except ValueError as e:
+            flash(str(e), "warning")
+            nome_salvo = None
         if nome_salvo:
             conn.execute(text("""
                 INSERT INTO financeiro2_despesas_anexos (
@@ -4070,7 +4148,11 @@ def despesa_salvar(despesa_id: int):
         })
 
         arquivo = request.files.get("anexo")
-        nome_salvo, nome_original = _salvar_anexo_despesa(arquivo)
+        try:
+            nome_salvo, nome_original = _salvar_anexo_despesa(arquivo)
+        except ValueError as e:
+            flash(str(e), "warning")
+            nome_salvo = None
         if nome_salvo:
             conn.execute(text("""
                 INSERT INTO financeiro2_despesas_anexos (
@@ -4825,12 +4907,77 @@ def rd_exportar_pdf(rd_id: int):
 @login_required
 @permission_required("financeiro", "visualizar")
 def previsao():
-    previsoes = [
-        {"id": 1, "data": "15/03/2026", "vencimento": "20/03/2026", "tipo_documento": "NF", "numero_documento": "NF-4587", "fornecedor": "Hotel Exemplo", "descricao": "Hospedagem equipe", "centro_custo": "ADM", "valor": 950.00, "status_despesa": "Pendente", "status_nd": "Não vinculada", "motivo_status_nd": ""},
-        {"id": 2, "data": "14/03/2026", "vencimento": "18/03/2026", "tipo_documento": "Fatura", "numero_documento": "FAT-9001", "fornecedor": "Posto Modelo", "descricao": "Combustível", "centro_custo": "OPERACAO", "valor": 420.50, "status_despesa": "Paga", "status_nd": "Em espera", "motivo_status_nd": "Aguardando decisão da área"},
-        {"id": 3, "data": "13/03/2026", "vencimento": "25/03/2026", "tipo_documento": "NFS", "numero_documento": "NFS-1102", "fornecedor": "Serviço X", "descricao": "Serviço de apoio", "centro_custo": "MANUTENCAO", "valor": 780.30, "status_despesa": "Pendente", "status_nd": "Rejeitada", "motivo_status_nd": "Fora do escopo da ND atual"},
+    busca = request.args.get("busca", "").strip()
+    status_nd_filtro = request.args.get("status_nd", "").strip()
+    status_despesa_filtro = request.args.get("status_despesa", "").strip()
+
+    conditions = [
+        "UPPER(COALESCE(d.status_nd, 'NÃO VINCULADA')) <> 'VINCULADA'"
     ]
-    return render_template("financeiro_dois/previsao.html", subnav_links=build_financeiro_dois_subnav("previsao"), previsoes=previsoes)
+    params: dict = {}
+
+    if busca:
+        conditions.append(
+            "(LOWER(COALESCE(d.fornecedor,'')) LIKE :busca "
+            "OR LOWER(COALESCE(d.numero_documento,'')) LIKE :busca "
+            "OR LOWER(COALESCE(d.descricao,'')) LIKE :busca)"
+        )
+        params["busca"] = f"%{busca.lower()}%"
+
+    if status_nd_filtro:
+        conditions.append("UPPER(COALESCE(d.status_nd,'NÃO VINCULADA')) = :status_nd")
+        params["status_nd"] = status_nd_filtro.upper()
+
+    if status_despesa_filtro:
+        conditions.append("LOWER(COALESCE(d.status,'')) = :status_despesa")
+        params["status_despesa"] = status_despesa_filtro.lower()
+
+    where_sql = "WHERE " + " AND ".join(conditions) if conditions else ""
+
+    sql = f"""
+        SELECT
+            d.id,
+            TO_CHAR(d.data, 'DD/MM/YYYY') AS data,
+            TO_CHAR(d.data_vencimento, 'DD/MM/YYYY') AS vencimento,
+            COALESCE(td.nome, d.tipo_documento, '') AS tipo_documento,
+            COALESCE(d.numero_documento, '') AS numero_documento,
+            COALESCE(d.fornecedor, '') AS fornecedor,
+            COALESCE(d.descricao, '') AS descricao,
+            COALESCE(cc.nome, d.centro_custo, '') AS centro_custo,
+            COALESCE(d.status, 'Pendente') AS status_despesa,
+            COALESCE(d.status_nd, 'NÃO VINCULADA') AS status_nd,
+            COALESCE(d.motivo_status_nd, '') AS motivo_status_nd,
+            COALESCE(d.valor, 0) AS valor
+        FROM financeiro2_despesas d
+        LEFT JOIN financeiro2_cad_tipos_documento td ON td.id = d.tipo_documento_id
+        LEFT JOIN financeiro2_cad_centros_custo cc ON cc.id = d.centro_custo_id
+        {where_sql}
+        ORDER BY d.data DESC NULLS LAST, d.id DESC
+        LIMIT 500
+    """
+
+    engine = get_engine()
+    with engine.connect() as conn:
+        try:
+            previsoes = conn.execute(text(sql), params).mappings().all()
+        except Exception:
+            previsoes = []
+
+    # Totalizadores por status ND
+    totais = {}
+    for row in previsoes:
+        s = str(row["status_nd"]).upper()
+        totais[s] = totais.get(s, 0) + 1
+
+    return render_template(
+        "financeiro_dois/previsao.html",
+        subnav_links=build_financeiro_dois_subnav("previsao"),
+        previsoes=previsoes,
+        totais=totais,
+        busca=busca,
+        status_nd_filtro=status_nd_filtro,
+        status_despesa_filtro=status_despesa_filtro,
+    )
 
 
 # =========================

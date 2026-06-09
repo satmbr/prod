@@ -1,43 +1,61 @@
 {% extends "base.html" %}
-{% block title %}Previsão | Financeiro Dois{% endblock %}
+{% block title %}Previsão | Financeiro{% endblock %}
 
 {% block content %}
 <div class="page-wrap">
+
+  {# ── Totalizadores ── #}
+  {% if totais %}
+  <div style="display:flex;gap:8px;flex-wrap:wrap;">
+    {% for status, qtd in totais.items() %}
+    <div style="background:#fff;border:1px solid var(--pru-border);border-radius:var(--pru-radius-sm);padding:8px 14px;min-width:130px;box-shadow:var(--pru-shadow);">
+      <div style="font-size:9px;font-weight:700;color:var(--pru-muted);text-transform:uppercase;letter-spacing:.04em;">{{ status }}</div>
+      <div style="font-size:20px;font-weight:800;color:var(--pru-blue);margin-top:2px;">{{ qtd }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
   <section class="zone">
     <div class="zone-head">
       <div class="zone-left">
         <div class="zone-icon">📊</div>
         <div>
           <div class="zone-title">Previsão</div>
-          <div class="muted">Despesas não vinculadas, em espera ou rejeitadas para ND.</div>
+          <div style="font-size:10px;color:var(--pru-muted);">Despesas não vinculadas, em espera ou rejeitadas para ND.</div>
         </div>
       </div>
     </div>
 
-    <div class="filters-card">
-      <div class="filters-grid">
-        <div class="field">
-          <label>Busca</label>
-          <input type="text" class="input-like" placeholder="Fornecedor, número ou descrição" />
+    {# ── Filtros ── #}
+    <div style="padding:8px;border-bottom:1px solid var(--pru-border);background:#f9fbfd;">
+      <form method="get" style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end;">
+        <div>
+          <label class="form-label">Busca</label>
+          <input type="text" name="busca" value="{{ busca }}" class="form-control" placeholder="Fornecedor, número, descrição" style="width:220px;">
         </div>
-        <div class="field">
-          <label>Status ND</label>
-          <select class="input-like">
-            <option>Todos</option>
-            <option>Não vinculada</option>
-            <option>Em espera</option>
-            <option>Rejeitada</option>
+        <div>
+          <label class="form-label">Status ND</label>
+          <select name="status_nd" class="form-select" style="width:160px;">
+            <option value="">Todos</option>
+            <option value="NÃO VINCULADA" {% if status_nd_filtro == 'NÃO VINCULADA' %}selected{% endif %}>Não vinculada</option>
+            <option value="EM ESPERA" {% if status_nd_filtro == 'EM ESPERA' %}selected{% endif %}>Em espera</option>
+            <option value="REJEITADA" {% if status_nd_filtro == 'REJEITADA' %}selected{% endif %}>Rejeitada</option>
+            <option value="PARCIAL" {% if status_nd_filtro == 'PARCIAL' %}selected{% endif %}>Parcial</option>
           </select>
         </div>
-        <div class="field">
-          <label>Status despesa</label>
-          <select class="input-like">
-            <option>Todos</option>
-            <option>Pendente</option>
-            <option>Paga</option>
+        <div>
+          <label class="form-label">Status despesa</label>
+          <select name="status_despesa" class="form-select" style="width:140px;">
+            <option value="">Todos</option>
+            <option value="pendente" {% if status_despesa_filtro == 'pendente' %}selected{% endif %}>Pendente</option>
+            <option value="paga" {% if status_despesa_filtro == 'paga' %}selected{% endif %}>Paga</option>
+            <option value="aprovada" {% if status_despesa_filtro == 'aprovada' %}selected{% endif %}>Aprovada</option>
           </select>
         </div>
-      </div>
+        <button type="submit" class="btn btn-primary">Filtrar</button>
+        <a href="{{ url_for('financeiro_dois.previsao') }}" class="btn">Limpar</a>
+      </form>
     </div>
 
     <div class="table-wrap">
@@ -54,29 +72,35 @@
             <th>Status despesa</th>
             <th>Status ND</th>
             <th>Motivo</th>
-            <th style="text-align:right;">Valor</th>
-            <th style="width:160px;">Ações</th>
+            <th class="num">Valor (R$)</th>
+            <th style="width:80px;"></th>
           </tr>
         </thead>
         <tbody>
           {% for item in previsoes %}
           <tr>
-            <td>{{ item.data }}</td>
-            <td>{{ item.vencimento }}</td>
+            <td>{{ item.data or '—' }}</td>
+            <td>{{ item.vencimento or '—' }}</td>
             <td>{{ item.tipo_documento }}</td>
             <td><strong>{{ item.numero_documento }}</strong></td>
             <td>{{ item.fornecedor }}</td>
             <td>{{ item.descricao }}</td>
             <td>{{ item.centro_custo }}</td>
-            <td>{{ item.status_despesa }}</td>
-            <td>{{ item.status_nd }}</td>
-            <td>{{ item.motivo_status_nd }}</td>
-            <td style="text-align:right;">R$ {{ '%.2f'|format(item.valor) }}</td>
             <td>
-              <div class="table-actions">
-                <a class="btn btn-sm" href="{{ url_for('financeiro_dois.despesa_editar', despesa_id=item.id) }}">Abrir</a>
-              </div>
+              <span class="badge-status {{ item.status_despesa | lower | replace(' ','_') }}">{{ item.status_despesa }}</span>
             </td>
+            <td>
+              <span class="badge-status nd_{{ item.status_nd | lower | replace(' ','_') | replace('ã','a') | replace('ê','e') }}">{{ item.status_nd }}</span>
+            </td>
+            <td style="max-width:180px;white-space:normal;font-size:9px;color:var(--pru-muted);">{{ item.motivo_status_nd }}</td>
+            <td class="num">{{ '%.2f'|format(item.valor|float) }}</td>
+            <td>
+              <a class="btn btn-sm btn-primary" href="{{ url_for('financeiro_dois.despesa_editar', despesa_id=item.id) }}">Abrir</a>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="12" style="text-align:center;padding:20px;color:var(--pru-muted);">Nenhuma despesa em previsão encontrada.</td>
           </tr>
           {% endfor %}
         </tbody>
@@ -86,13 +110,13 @@
 </div>
 
 <style>
-  .filters-card{background:#fff;border:1px solid #d8e1ec;border-radius:18px;padding:18px;margin-bottom:16px;box-shadow:0 6px 18px rgba(15,23,42,.05);}
-  .filters-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;}
-  .field label{display:block;margin-bottom:6px;font-size:13px;font-weight:600;color:#334155;}
-  .input-like{width:100%;height:42px;border:1px solid #d8e1ec;border-radius:12px;padding:0 12px;font-size:14px;background:#fff;}
-  .input-like:focus{outline:none;border-color:#9db6cf;box-shadow:0 0 0 3px rgba(22,50,79,.08);}
-  .table-wrap{overflow:auto;}
-  .table-actions{display:flex;gap:8px;flex-wrap:wrap;}
-  .btn-sm{padding:7px 10px;font-size:12px;line-height:1;}
+.badge-status{display:inline-block;padding:2px 7px;border-radius:999px;font-size:9px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;}
+.badge-status.pendente{background:#fef3c7;color:#92400e;}
+.badge-status.paga{background:#d1fae5;color:#065f46;}
+.badge-status.aprovada{background:#dbeafe;color:#1e40af;}
+.badge-status.nd_nao_vinculada{background:#fee2e2;color:#991b1b;}
+.badge-status.nd_em_espera{background:#fef9c3;color:#713f12;}
+.badge-status.nd_rejeitada{background:#f3e8ff;color:#6b21a8;}
+.badge-status.nd_parcial{background:#ffedd5;color:#9a3412;}
 </style>
 {% endblock %}

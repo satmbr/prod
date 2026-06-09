@@ -1,107 +1,265 @@
 {% extends "base.html" %}
-{% block title %}Auditoria | PRUMAT{% endblock %}
+{% block title %}Auditoria | PRUMAT ERP{% endblock %}
+{% block module_name %}Auditoria{% endblock %}
 
 {% block content %}
 <div class="page-wrap">
-  <section class="zone">
-    <div class="zone-head">
-      <div class="zone-left">
-        <div>
-          <h2 style="margin:0;">Logs de auditoria</h2>
-          <div style="color:#667487; font-size:14px; margin-top:4px;">
-            Últimos eventos administrativos e acessos do sistema
-          </div>
+
+  {# ── Cabeçalho ── #}
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+    <div>
+      <h2 style="margin:0;color:var(--brand-blue);">Logs de Auditoria</h2>
+      <div class="text-muted text-sm" style="margin-top:2px;">Rastreamento completo de eventos e acessos do sistema</div>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;">
+      <a href="{{ url_for('auth.exportar_logs_csv', username=filtros.username, evento=filtros.evento, data_ini=filtros.data_ini, data_fim=filtros.data_fim) }}"
+         class="btn btn-outline">⬇ CSV</a>
+      <a href="{{ url_for('auth.exportar_logs_excel', username=filtros.username, evento=filtros.evento, data_ini=filtros.data_ini, data_fim=filtros.data_fim) }}"
+         class="btn btn-outline">⬇ Excel</a>
+      <a href="{{ url_for('auth.usuarios') }}" class="btn">Usuários</a>
+    </div>
+  </div>
+
+  {# ── Stat cards ── #}
+  {% if stats %}
+  <div class="stat-cards">
+    <div class="stat-card">
+      <div class="stat-card-label">Total de eventos</div>
+      <div class="stat-card-value">{{ stats.total_geral | int }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card-label">Últimas 24h</div>
+      <div class="stat-card-value" style="color:#1e6b4d;">{{ stats.ultimas_24h | int }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card-label">Últimos 7 dias</div>
+      <div class="stat-card-value" style="color:#1e4d8c;">{{ stats.ultimos_7d | int }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card-label">Usuários distintos</div>
+      <div class="stat-card-value">{{ stats.usuarios_distintos | int }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card-label">Logins registrados</div>
+      <div class="stat-card-value">{{ stats.total_logins | int }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card-label">Erros / negados</div>
+      <div class="stat-card-value" style="color:#991b1b;">{{ stats.total_erros | int }}</div>
+    </div>
+  </div>
+  {% endif %}
+
+  {# ── Linha: Top usuários + Top eventos + Atividade diária ── #}
+  <div style="display:grid;grid-template-columns:1fr 1fr 2fr;gap:10px;flex-wrap:wrap;">
+
+    {# Top usuários #}
+    <div class="zone">
+      <div class="zone-head" style="cursor:default;">
+        <div class="zone-left">
+          <div class="zone-icon">👤</div>
+          <div class="zone-title">Top usuários</div>
         </div>
       </div>
-		<div class="zone-actions" style="display:flex; gap:10px; flex-wrap:wrap;">
-		  <a
-			href="{{ url_for('auth.exportar_logs_csv', username=filtros.username, evento=filtros.evento, data_ini=filtros.data_ini, data_fim=filtros.data_fim) }}"
-			class="btn-outline"
-		  >
-			Exportar CSV
-		  </a>
-
-		  <a
-			href="{{ url_for('auth.exportar_logs_excel', username=filtros.username, evento=filtros.evento, data_ini=filtros.data_ini, data_fim=filtros.data_fim) }}"
-			class="btn-outline"
-		  >
-			Exportar Excel
-		  </a>
-
-		  <a href="{{ url_for('auth.usuarios') }}" class="btn-outline">Voltar</a>
-		</div>
+      <div class="zone-body" style="padding:10px;">
+        {% for u in top_usuarios %}
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border-soft);">
+          <span style="font-size:12px;font-weight:600;">{{ u.username }}</span>
+          <span style="font-size:11px;color:var(--text-muted);background:var(--surface-2);padding:2px 7px;border-radius:999px;border:1px solid var(--border);">{{ u.qtd }}</span>
+        </div>
+        {% else %}
+        <div class="text-muted text-sm">Sem dados.</div>
+        {% endfor %}
+      </div>
     </div>
 
-    <div style="padding:20px; border-bottom:1px solid #d9e1ea;">
+    {# Top eventos #}
+    <div class="zone">
+      <div class="zone-head" style="cursor:default;">
+        <div class="zone-left">
+          <div class="zone-icon">📋</div>
+          <div class="zone-title">Top eventos</div>
+        </div>
+      </div>
+      <div class="zone-body" style="padding:10px;">
+        {% for e in top_eventos %}
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border-soft);">
+          <span style="font-size:11px;font-weight:600;word-break:break-all;">{{ e.evento }}</span>
+          <span style="font-size:11px;color:var(--text-muted);background:var(--surface-2);padding:2px 7px;border-radius:999px;border:1px solid var(--border);flex-shrink:0;margin-left:6px;">{{ e.qtd }}</span>
+        </div>
+        {% else %}
+        <div class="text-muted text-sm">Sem dados.</div>
+        {% endfor %}
+      </div>
+    </div>
+
+    {# Atividade diária (mini bar chart) #}
+    <div class="zone">
+      <div class="zone-head" style="cursor:default;">
+        <div class="zone-left">
+          <div class="zone-icon">📈</div>
+          <div class="zone-title">Atividade — últimos 14 dias</div>
+        </div>
+      </div>
+      <div class="zone-body" style="padding:10px;">
+        {% if atividade_diaria %}
+          {% set max_qtd = atividade_diaria | map(attribute='qtd') | map('int') | max %}
+          <div style="display:flex;align-items:flex-end;gap:3px;height:60px;">
+            {% for d in atividade_diaria %}
+              {% set pct = ((d.qtd | int) / max_qtd * 100) if max_qtd > 0 else 0 %}
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;" title="{{ d.dia }}: {{ d.qtd }} eventos">
+                <div style="width:100%;background:var(--brand-blue);border-radius:2px 2px 0 0;height:{{ pct | int }}%;min-height:2px;"></div>
+              </div>
+            {% endfor %}
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-top:4px;">
+            <span style="font-size:9px;color:var(--text-muted);">{{ atividade_diaria[0].dia }}</span>
+            <span style="font-size:9px;color:var(--text-muted);">{{ atividade_diaria[-1].dia }}</span>
+          </div>
+        {% else %}
+          <div class="text-muted text-sm">Sem dados nos últimos 14 dias.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  {# ── Filtros ── #}
+  <section class="zone">
+    <div class="zone-head" style="cursor:default;">
+      <div class="zone-left">
+        <div class="zone-icon">🔍</div>
+        <div class="zone-title">Filtrar registros</div>
+      </div>
+      <div class="zone-actions">
+        <a href="{{ url_for('auth.logs') }}" class="btn btn-sm">Limpar</a>
+      </div>
+    </div>
+    <div class="zone-body">
       <form method="get" action="{{ url_for('auth.logs') }}">
-        <div style="display:grid; grid-template-columns: 1.2fr 1.2fr 1fr 1fr auto auto; gap:12px; align-items:end;">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;align-items:flex-end;">
           <div>
-            <label style="display:block; margin-bottom:6px; font-weight:600;">Usuário</label>
-            <input type="text" name="username" value="{{ filtros.username or '' }}"
-                   style="width:100%; height:40px; border:1px solid #d9e1ea; border-radius:10px; padding:0 12px;">
+            <label class="form-label">Usuário</label>
+            <input type="text" name="username" value="{{ filtros.username or '' }}" class="form-control" placeholder="username">
           </div>
-
           <div>
-            <label style="display:block; margin-bottom:6px; font-weight:600;">Evento</label>
-            <input type="text" name="evento" value="{{ filtros.evento or '' }}"
-                   style="width:100%; height:40px; border:1px solid #d9e1ea; border-radius:10px; padding:0 12px;">
+            <label class="form-label">Evento</label>
+            <input type="text" name="evento" value="{{ filtros.evento or '' }}" class="form-control" placeholder="ex: login, criação">
           </div>
-
           <div>
-            <label style="display:block; margin-bottom:6px; font-weight:600;">Data inicial</label>
-            <input type="date" name="data_ini" value="{{ filtros.data_ini or '' }}"
-                   style="width:100%; height:40px; border:1px solid #d9e1ea; border-radius:10px; padding:0 12px;">
+            <label class="form-label">IP</label>
+            <input type="text" name="ip" value="{{ filtros.ip or '' }}" class="form-control" placeholder="ex: 192.168">
           </div>
-
           <div>
-            <label style="display:block; margin-bottom:6px; font-weight:600;">Data final</label>
-            <input type="date" name="data_fim" value="{{ filtros.data_fim or '' }}"
-                   style="width:100%; height:40px; border:1px solid #d9e1ea; border-radius:10px; padding:0 12px;">
+            <label class="form-label">Data inicial</label>
+            <input type="date" name="data_ini" value="{{ filtros.data_ini or '' }}" class="form-control">
           </div>
-
           <div>
-            <button type="submit" class="btn-primary">Filtrar</button>
+            <label class="form-label">Data final</label>
+            <input type="date" name="data_fim" value="{{ filtros.data_fim or '' }}" class="form-control">
           </div>
-
           <div>
-            <a href="{{ url_for('auth.logs') }}" class="btn-outline">Limpar</a>
+            <button type="submit" class="btn btn-primary" style="width:100%;">Filtrar</button>
           </div>
         </div>
       </form>
     </div>
+  </section>
 
-    <div style="padding:20px;">
-      <div style="overflow-x:auto;">
-        <table class="data-table" style="width:100%;">
-          <thead>
-            <tr>
-              <th>Data/Hora</th>
-              <th>Usuário</th>
-              <th>Evento</th>
-              <th>Detalhes</th>
-              <th>IP</th>
-              <th>User-Agent</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for log in logs %}
-            <tr>
-              <td>{{ log.criado_em }}</td>
-              <td>{{ log.username or '' }}</td>
-              <td>{{ log.evento }}</td>
-              <td>{{ log.detalhes or '' }}</td>
-              <td>{{ log.ip or '' }}</td>
-              <td style="max-width:320px; white-space:normal;">{{ log.user_agent or '' }}</td>
-            </tr>
-            {% else %}
-            <tr>
-              <td colspan="6" style="text-align:center;">Nenhum log encontrado.</td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
+  {# ── Tabela de logs ── #}
+  <section class="zone">
+    <div class="zone-head" style="cursor:default;">
+      <div class="zone-left">
+        <div class="zone-icon">📄</div>
+        <div>
+          <div class="zone-title">Registros</div>
+          <div class="text-muted text-sm">{{ total_rows }} evento(s) encontrado(s) — página {{ pagina }} de {{ total_paginas }}</div>
+        </div>
       </div>
     </div>
+
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Data/Hora</th>
+            <th>Usuário</th>
+            <th>Evento</th>
+            <th>Detalhes</th>
+            <th>IP</th>
+            <th>User-Agent</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for log in logs %}
+          <tr>
+            <td style="white-space:nowrap;">{{ log.criado_em }}</td>
+            <td>
+              {% if log.username %}
+              <span style="background:var(--info-bg);color:var(--info);padding:1px 6px;border-radius:999px;font-size:10px;font-weight:700;">{{ log.username }}</span>
+              {% endif %}
+            </td>
+            <td>
+              <span class="evento-badge evento-{{ log.evento | lower | replace(' ','_') | replace(':','_') | truncate(20, false, '') }}">{{ log.evento }}</span>
+            </td>
+            <td style="max-width:300px;white-space:normal;font-size:11px;color:var(--text-secondary);">{{ log.detalhes or '' }}</td>
+            <td style="font-size:11px;font-family:monospace;">{{ log.ip or '' }}</td>
+            <td style="max-width:220px;white-space:normal;font-size:10px;color:var(--text-muted);">{{ log.user_agent or '' }}</td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="6" style="text-align:center;padding:24px;color:var(--text-muted);">Nenhum log encontrado.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {# Paginação #}
+    {% if total_paginas > 1 %}
+    <div style="padding:10px 14px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--border-soft);flex-wrap:wrap;gap:6px;">
+      <div class="text-muted text-sm">Página {{ pagina }} / {{ total_paginas }} — {{ total_rows }} registros</div>
+      <div style="display:flex;gap:4px;flex-wrap:wrap;">
+        {% if pagina > 1 %}
+        <a href="{{ url_for('auth.logs', pagina=1, username=filtros.username, evento=filtros.evento, data_ini=filtros.data_ini, data_fim=filtros.data_fim, ip=filtros.ip) }}" class="btn btn-sm">« Primeira</a>
+        <a href="{{ url_for('auth.logs', pagina=pagina-1, username=filtros.username, evento=filtros.evento, data_ini=filtros.data_ini, data_fim=filtros.data_fim, ip=filtros.ip) }}" class="btn btn-sm">‹ Anterior</a>
+        {% endif %}
+
+        {% for p in range([1, pagina-2]|max, [total_paginas+1, pagina+3]|min) %}
+        <a href="{{ url_for('auth.logs', pagina=p, username=filtros.username, evento=filtros.evento, data_ini=filtros.data_ini, data_fim=filtros.data_fim, ip=filtros.ip) }}"
+           class="btn btn-sm{% if p == pagina %} btn-primary{% endif %}">{{ p }}</a>
+        {% endfor %}
+
+        {% if pagina < total_paginas %}
+        <a href="{{ url_for('auth.logs', pagina=pagina+1, username=filtros.username, evento=filtros.evento, data_ini=filtros.data_ini, data_fim=filtros.data_fim, ip=filtros.ip) }}" class="btn btn-sm">Próxima ›</a>
+        <a href="{{ url_for('auth.logs', pagina=total_paginas, username=filtros.username, evento=filtros.evento, data_ini=filtros.data_ini, data_fim=filtros.data_fim, ip=filtros.ip) }}" class="btn btn-sm">Última »</a>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
   </section>
+
 </div>
+
+<style>
+.evento-badge {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+}
+[class*="evento-login"] { background: #dcfce7; color: #166534; border-color: #86efac; }
+[class*="evento-logout"] { background: #f1f5f9; color: #475569; border-color: #cbd5e1; }
+[class*="evento-erro"], [class*="evento-falha"], [class*="evento-negado"] { background: var(--danger-bg); color: var(--danger); border-color: #fca5a5; }
+[class*="evento-criado"], [class*="evento_novo"], [class*="evento_insert"] { background: var(--info-bg); color: var(--info); border-color: #93c5fd; }
+[class*="evento_alterado"], [class*="evento_update"] { background: var(--warning-bg); color: var(--warning); border-color: #fcd34d; }
+
+@media (max-width: 900px) {
+  .stat-cards { grid-template-columns: repeat(2, 1fr); }
+  div[style*="grid-template-columns:1fr 1fr 2fr"] { grid-template-columns: 1fr !important; }
+}
+</style>
 {% endblock %}

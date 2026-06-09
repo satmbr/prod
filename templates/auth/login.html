@@ -1,108 +1,58 @@
 {% extends "base.html" %}
-{% block title %}Login | PRUMAT{% endblock %}
+{% block title %}Login | PRUMAT ERP{% endblock %}
 
 {% block content %}
-<div class="page-wrap" style="max-width: 520px; margin: 40px auto;">
-  <section class="zone" style="overflow:hidden;">
-    <div style="background:linear-gradient(180deg, #16324F 0%, #1d3e61 100%); padding:28px 28px 22px;">
-      <div style="display:flex; align-items:center; gap:14px;">
-        <img src="{{ url_for('static', filename='logo-prumat.png') }}" alt="PRUMAT" style="height:44px; width:auto; display:block;">
-        <div>
-          <h2 style="margin:0; color:#fff;">Acesso ao Sistema</h2>
-          <div style="color:#d9e6f2; font-size:14px; margin-top:4px;">
-            Informe seu usuário e senha para continuar
+<div style="min-height:calc(100vh - 120px);display:flex;align-items:center;justify-content:center;padding:24px;">
+  <div style="max-width:420px;width:100%;">
+
+    <div style="text-align:center;margin-bottom:24px;">
+      <img src="{{ url_for('static', filename='logo-prumat.png') }}" alt="PRUMAT"
+           style="height:48px;object-fit:contain;margin-bottom:14px;">
+      <h2 style="color:var(--brand-blue);margin:0 0 4px;">Acesso ao Sistema</h2>
+      <div class="text-muted text-sm">Informe seu usuário e senha para continuar</div>
+    </div>
+
+    <div class="zone">
+      <div class="zone-body" style="padding:24px;">
+        <form method="post" action="{{ url_for('auth.login') }}">
+          <div style="margin-bottom:14px;">
+            <label class="form-label" for="username">Usuário</label>
+            <input type="text" id="username" name="username" required autofocus
+                   class="form-control" style="height:38px;">
           </div>
-        </div>
+
+          <div style="margin-bottom:20px;">
+            <label class="form-label" for="senha">Senha</label>
+            <div style="display:flex;gap:6px;">
+              <input type="password" id="senha" name="senha" required
+                     class="form-control" style="height:38px;">
+              <button type="button" id="toggleSenha" class="btn btn-outline" style="flex-shrink:0;width:72px;">
+                Mostrar
+              </button>
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-primary" style="width:100%;height:38px;font-size:13px;">
+            Entrar
+          </button>
+        </form>
       </div>
     </div>
 
-    <div style="padding:26px;">
-      {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-          {% for category, message in messages %}
-            {% set bg = '#eef6ff' %}
-            {% set border = '#c9d7e6' %}
-            {% set color = '#204564' %}
-
-            {% if category == 'erro' %}
-              {% set bg = '#fff3f3' %}
-              {% set border = '#f1c0c0' %}
-              {% set color = '#9f2d2d' %}
-            {% elif category == 'sucesso' %}
-              {% set bg = '#eefaf0' %}
-              {% set border = '#bfe0c6' %}
-              {% set color = '#25613a' %}
-            {% elif category == 'aviso' %}
-              {% set bg = '#fff9e8' %}
-              {% set border = '#f1df9b' %}
-              {% set color = '#7a5a00' %}
-            {% endif %}
-
-            <div style="margin-bottom:12px; padding:12px 14px; border-radius:12px; background:{{ bg }}; border:1px solid {{ border }}; color:{{ color }};">
-              {{ message }}
-            </div>
-          {% endfor %}
-        {% endif %}
-      {% endwith %}
-
-      <form method="post" action="{{ url_for('auth.login') }}">
-        <div style="margin-bottom:16px;">
-          <label for="username" style="display:block; margin-bottom:6px; font-weight:700;">Usuário</label>
-          <input
-            type="text"
-            id="username"
-            name="username"
-            required
-            autofocus
-            style="width:100%; height:44px; border:1px solid #d9e1ea; border-radius:10px; padding:0 12px;"
-          >
-        </div>
-
-        <div style="margin-bottom:18px;">
-          <label for="senha" style="display:block; margin-bottom:6px; font-weight:700;">Senha</label>
-          <div style="display:flex; gap:8px;">
-            <input
-              type="password"
-              id="senha"
-              name="senha"
-              required
-              style="flex:1; height:44px; border:1px solid #d9e1ea; border-radius:10px; padding:0 12px;"
-            >
-            <button
-              type="button"
-              id="toggleSenha"
-              class="btn-outline"
-              style="height:44px; min-width:86px;"
-            >
-              Mostrar
-            </button>
-          </div>
-        </div>
-
-        <button
-          type="submit"
-          class="btn-primary"
-          style="width:100%; height:46px;"
-        >
-          Entrar
-        </button>
-      </form>
-    </div>
-  </section>
+  </div>
 </div>
 
 <script>
-  (function () {
-    const senha = document.getElementById('senha');
-    const botao = document.getElementById('toggleSenha');
-
-    if (senha && botao) {
-      botao.addEventListener('click', function () {
-        const visivel = senha.type === 'text';
-        senha.type = visivel ? 'password' : 'text';
-        botao.textContent = visivel ? 'Mostrar' : 'Ocultar';
-      });
-    }
-  })();
+(function(){
+  const senha = document.getElementById('senha');
+  const botao = document.getElementById('toggleSenha');
+  if(senha && botao){
+    botao.addEventListener('click', function(){
+      const vis = senha.type === 'text';
+      senha.type = vis ? 'password' : 'text';
+      botao.textContent = vis ? 'Mostrar' : 'Ocultar';
+    });
+  }
+})();
 </script>
 {% endblock %}

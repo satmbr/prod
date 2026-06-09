@@ -820,10 +820,11 @@ def acesso_negado(e):
     return render_template("auth/acesso_negado.html"), 403
 
 def montar_filtros_logs():
-    username = (request.args.get("username") or "").strip()
-    evento = (request.args.get("evento") or "").strip()
-    data_ini = (request.args.get("data_ini") or "").strip()
-    data_fim = (request.args.get("data_fim") or "").strip()
+    username  = (request.args.get("username")  or "").strip()
+    evento    = (request.args.get("evento")    or "").strip()
+    data_ini  = (request.args.get("data_ini")  or "").strip()
+    data_fim  = (request.args.get("data_fim")  or "").strip()
+    ip_filtro = (request.args.get("ip")        or "").strip()
 
     where = []
     params = {}
@@ -844,45 +845,111 @@ def montar_filtros_logs():
         where.append("criado_em <= :data_fim")
         params["data_fim"] = f"{data_fim} 23:59:59"
 
-    where_sql = ""
-    if where:
-        where_sql = "WHERE " + " AND ".join(where)
+    if ip_filtro:
+        where.append("ip ILIKE :ip")
+        params["ip"] = f"%{ip_filtro}%"
+
+    where_sql = ("WHERE " + " AND ".join(where)) if where else ""
 
     filtros = {
         "username": username,
         "evento": evento,
         "data_ini": data_ini,
-        "data_fim": data_fim
+        "data_fim": data_fim,
+        "ip": ip_filtro,
     }
 
     return where_sql, params, filtros
+
 
 @bp.get("/logs")
 @login_required
 @admin_required
 def logs():
+    POR_PAGINA = 100
+    pagina = max(1, int(request.args.get("pagina", 1) or 1))
+
     where_sql, params, filtros = montar_filtros_logs()
 
-    sql = f"""
-        SELECT
-            id,
-            usuario_id,
-            username,
-            evento,
-            detalhes,
-            ip,
-            user_agent,
-            criado_em
-        FROM usuario_logs
-        {where_sql}
-        ORDER BY criado_em DESC
-        LIMIT 500
-    """
+    engine = get_engine()
+    with engine.connect() as conn:
 
-    with get_engine().connect() as conn:
-        rows = conn.execute(text(sql), params).mappings().all()
+        # Total de registros (para paginação)
+        total_rows = conn.execute(
+            text(f"SELECT COUNT(*) FROM usuario_logs {where_sql}"), params
+        ).scalar() or 0
 
-    return render_template("auth/logs.html", logs=rows, filtros=filtros)
+        total_paginas = max(1, (total_rows + POR_PAGINA - 1) // POR_PAGINA)
+        pagina = min(pagina, total_paginas)
+        offset = (pagina - 1) * POR_PAGINA
+
+        params_pag = dict(params)
+        params_pag["limit"] = POR_PAGINA
+        params_pag["offset"] = offset
+
+        rows = conn.execute(text(f"""
+            SELECT id, usuario_id, username, evento, detalhes, ip, user_agent, criado_em
+            FROM usuario_logs
+            {where_sql}
+            ORDER BY criado_em DESC
+            LIMIT :limit OFFSET :offset
+        """), params_pag).mappings().all()
+
+        # Estatísticas gerais (últimas 24h e totais)
+        stats = conn.execute(text("""
+            SELECT
+                COUNT(*) AS total_geral,
+                COUNT(*) FILTER (WHERE criado_em >= NOW() - INTERVAL '24 hours') AS ultimas_24h,
+                COUNT(*) FILTER (WHERE criado_em >= NOW() - INTERVAL '7 days')  AS ultimos_7d,
+                COUNT(DISTINCT username) AS usuarios_distintos,
+                COUNT(*) FILTER (WHERE evento ILIKE '%login%')  AS total_logins,
+                COUNT(*) FILTER (WHERE evento ILIKE '%erro%' OR evento ILIKE '%falha%' OR evento ILIKE '%negado%') AS total_erros
+            FROM usuario_logs
+        """)).mappings().first()
+
+        # Top 5 usuários mais ativos
+        top_usuarios = conn.execute(text("""
+            SELECT username, COUNT(*) AS qtd
+            FROM usuario_logs
+            WHERE username IS NOT NULL AND username <> ''
+            GROUP BY username
+            ORDER BY qtd DESC
+            LIMIT 5
+        """)).mappings().all()
+
+        # Top 5 eventos mais frequentes
+        top_eventos = conn.execute(text("""
+            SELECT evento, COUNT(*) AS qtd
+            FROM usuario_logs
+            WHERE evento IS NOT NULL
+            GROUP BY evento
+            ORDER BY qtd DESC
+            LIMIT 5
+        """)).mappings().all()
+
+        # Eventos por dia (últimos 14 dias) para mini-gráfico
+        atividade_diaria = conn.execute(text("""
+            SELECT
+                TO_CHAR(criado_em::date, 'DD/MM') AS dia,
+                COUNT(*) AS qtd
+            FROM usuario_logs
+            WHERE criado_em >= NOW() - INTERVAL '14 days'
+            GROUP BY criado_em::date
+            ORDER BY criado_em::date ASC
+        """)).mappings().all()
+
+    return render_template(
+        "auth/logs.html",
+        logs=rows,
+        filtros=filtros,
+        pagina=pagina,
+        total_paginas=total_paginas,
+        total_rows=total_rows,
+        stats=stats,
+        top_usuarios=top_usuarios,
+        top_eventos=top_eventos,
+        atividade_diaria=atividade_diaria,
+    )
 
 @bp.get("/minha-conta")
 @login_required

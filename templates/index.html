@@ -1,56 +1,85 @@
 {% extends "base.html" %}
-{% block title %}Dashboard | PRUMAT{% endblock %}
+{% block title %}Dashboard | PRUMAT ERP{% endblock %}
+{% block module_name %}Dashboard{% endblock %}
 
 {% block content %}
 <div class="page-wrap">
 
+  <div>
+    <h2 style="color:var(--brand-blue);margin-bottom:4px;">Bem-vindo, {{ current_user_name }}!</h2>
+    <div class="text-muted text-sm">Acesse os módulos disponíveis para o seu perfil.</div>
+  </div>
+
+  {# ── Módulos ── #}
+  {% if cards %}
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;">
+    {% for card in cards %}
+    <a href="{{ card.href }}" class="module-card">
+      <div class="module-card-title">{{ card.titulo }}</div>
+      <div class="module-card-desc">{{ card.descricao }}</div>
+      <div class="module-card-cta">{{ card.botao }} →</div>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="alert alert-warning">Nenhum módulo disponível para o seu perfil.</div>
+  {% endif %}
+
+  {# ── Atalhos do usuário ── #}
   <section class="zone">
-    <div class="zone-head">
+    <div class="zone-head" style="cursor:default;">
       <div class="zone-left">
-        <div class="zone-icon">🏠</div>
-        <div>
-          <div class="zone-title">Dashboard</div>
-          <div style="font-size:13px; color:#667487; margin-top:4px;">
-            Acesse rapidamente os módulos disponíveis conforme o seu perfil de acesso.
-          </div>
-        </div>
+        <div class="zone-icon">👤</div>
+        <div class="zone-title">Minha conta</div>
       </div>
     </div>
-
-    <div style="padding:24px;">
-      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:18px;">
-        {% for card in cards %}
-          <a href="{{ card.href }}" style="background:#fff; border:1px solid #d9e1ea; border-radius:14px; padding:18px; display:block;">
-            <h3 style="margin:0 0 8px 0; color:#16324F;">{{ card.titulo }}</h3>
-            <p style="margin:0; color:#667487;">{{ card.descricao }}</p>
-          </a>
-        {% else %}
-          <div class="alert">
-            Nenhum módulo está disponível para o seu perfil no momento.
-          </div>
-        {% endfor %}
-      </div>
-
-      <div style="margin-top:18px; display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:18px;">
-        <a href="{{ url_for('auth.minha_conta') }}" style="background:#fff; border:1px solid #d9e1ea; border-radius:14px; padding:18px; display:block;">
-          <h3 style="margin:0 0 8px 0; color:#16324F;">Minha conta</h3>
-          <p style="margin:0; color:#667487;">Gerencie seus dados e senha de acesso.</p>
-        </a>
-
-        <a href="{{ url_for('auth.trocar_senha') }}" style="background:#fff; border:1px solid #d9e1ea; border-radius:14px; padding:18px; display:block;">
-          <h3 style="margin:0 0 8px 0; color:#16324F;">Segurança</h3>
-          <p style="margin:0; color:#667487;">Atualize sua senha de acesso ao sistema.</p>
-        </a>
-
+    <div class="zone-body">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <a href="{{ url_for('auth.minha_conta') }}" class="btn">Meu perfil</a>
+        <a href="{{ url_for('auth.trocar_senha') }}" class="btn">Alterar senha</a>
         {% if 'auth:administrar' in current_user_permissions %}
-        <a href="{{ url_for('auth.usuarios') }}" style="background:#fff; border:1px solid #d9e1ea; border-radius:14px; padding:18px; display:block;">
-          <h3 style="margin:0 0 8px 0; color:#16324F;">Administração</h3>
-          <p style="margin:0; color:#667487;">Gerencie usuários, perfis e auditoria do sistema.</p>
-        </a>
+        <a href="{{ url_for('auth.usuarios') }}" class="btn btn-primary">Administração</a>
+        <a href="{{ url_for('auth.logs') }}" class="btn">Auditoria</a>
         {% endif %}
       </div>
     </div>
   </section>
 
 </div>
+
+<style>
+.module-card {
+  display: block;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px;
+  box-shadow: var(--shadow);
+  transition: box-shadow .18s, border-color .18s, transform .15s;
+  text-decoration: none;
+  color: inherit;
+}
+.module-card:hover {
+  box-shadow: var(--shadow-md);
+  border-color: var(--brand-blue-3);
+  transform: translateY(-2px);
+}
+.module-card-title {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--brand-blue);
+  margin-bottom: 6px;
+}
+.module-card-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-bottom: 12px;
+}
+.module-card-cta {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--brand-blue-3);
+}
+</style>
 {% endblock %}

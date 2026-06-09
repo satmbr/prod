@@ -1,49 +1,42 @@
 {% extends "base.html" %}
-{% block title %}PRUMAT | Início{% endblock %}
+{% block title %}PRUMAT ERP | Início{% endblock %}
 
 {% block content %}
-<div class="page-wrap">
+<div style="min-height:calc(100vh - 120px);display:flex;align-items:center;justify-content:center;padding:24px;">
+  <div style="max-width:520px;width:100%;text-align:center;">
 
-  <section class="zone">
-    <div class="zone-head">
-      <div class="zone-left">
-        <div class="zone-icon">🏢</div>
-        <div>
-          <div class="zone-title">Sistema PRUMAT</div>
-          <div style="font-size:13px; color:#667487; margin-top:4px;">
-            Plataforma interna para gestão operacional, equipamentos, colaboradores e acessos.
-          </div>
-        </div>
+    <img src="{{ url_for('static', filename='logo-prumat.png') }}" alt="PRUMAT"
+         style="height:56px;object-fit:contain;margin-bottom:20px;">
+
+    <h1 style="font-size:26px;font-weight:800;color:var(--brand-blue);margin-bottom:8px;">PRUMAT ERP</h1>
+    <p style="font-size:14px;color:var(--text-muted);margin-bottom:32px;line-height:1.6;">
+      Plataforma integrada para gestão de operação, equipamentos,<br>colaboradores e financeiro.
+    </p>
+
+    <a href="{{ url_for('auth.login') }}"
+       class="btn btn-primary btn-lg"
+       style="width:100%;max-width:240px;font-size:14px;height:42px;">
+      Entrar no sistema
+    </a>
+
+    <div style="margin-top:32px;display:grid;grid-template-columns:repeat(3,1fr);gap:10px;text-align:left;">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;">
+        <div style="font-size:18px;margin-bottom:6px;">⚙️</div>
+        <div style="font-size:12px;font-weight:700;color:var(--text-primary);">Operação</div>
+        <div style="font-size:11px;color:var(--text-muted);">Produção e registros diários</div>
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;">
+        <div style="font-size:18px;margin-bottom:6px;">💰</div>
+        <div style="font-size:12px;font-weight:700;color:var(--text-primary);">Financeiro</div>
+        <div style="font-size:11px;color:var(--text-muted);">OM, RD, despesas e ND</div>
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;">
+        <div style="font-size:18px;margin-bottom:6px;">🔒</div>
+        <div style="font-size:12px;font-weight:700;color:var(--text-primary);">Segurança</div>
+        <div style="font-size:11px;color:var(--text-muted);">Perfis e auditoria</div>
       </div>
     </div>
 
-    <div style="padding:24px;">
-      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:18px;">
-
-        <a href="{{ url_for('auth.login') }}" style="background:#fff; border:1px solid #d9e1ea; border-radius:14px; padding:18px; display:block;">
-          <h3 style="margin:0 0 8px 0; color:#16324F;">Entrar no sistema</h3>
-          <p style="margin:0; color:#667487;">
-            Acesse o ambiente interno com seu usuário e senha.
-          </p>
-        </a>
-
-        <div style="background:#fff; border:1px solid #d9e1ea; border-radius:14px; padding:18px; display:block;">
-          <h3 style="margin:0 0 8px 0; color:#16324F;">Ambiente integrado</h3>
-          <p style="margin:0; color:#667487;">
-            Reúna em um só lugar operação, equipamentos, colaboradores, manutenção e financeiro.
-          </p>
-        </div>
-
-        <div style="background:#fff; border:1px solid #d9e1ea; border-radius:14px; padding:18px; display:block;">
-          <h3 style="margin:0 0 8px 0; color:#16324F;">Gestão padronizada</h3>
-          <p style="margin:0; color:#667487;">
-            Navegue por módulos com interface única, simples e organizada.
-          </p>
-        </div>
-
-      </div>
-    </div>
-  </section>
-
+  </div>
 </div>
 {% endblock %}
