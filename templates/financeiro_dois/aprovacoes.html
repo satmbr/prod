@@ -1,44 +1,76 @@
 {% extends "base.html" %}
 {% block title %}Aprovações | Financeiro{% endblock %}
+{% block module_name %}Aprovações{% endblock %}
 
 {% block content %}
 <div class="page-wrap">
+
+  {# ── Totalizadores ── #}
+  {% if totais %}
+  <div style="display:flex;gap:8px;flex-wrap:wrap;">
+    <div class="stat-card" style="min-width:130px;">
+      <div class="stat-card-label">Pendentes</div>
+      <div class="stat-card-value" style="color:#d97706;">{{ totais.pendentes | int }}</div>
+    </div>
+    <div class="stat-card" style="min-width:130px;">
+      <div class="stat-card-label">Aprovados</div>
+      <div class="stat-card-value" style="color:var(--success);">{{ totais.aprovados | int }}</div>
+    </div>
+    <div class="stat-card" style="min-width:130px;">
+      <div class="stat-card-label">Rejeitados</div>
+      <div class="stat-card-value" style="color:var(--danger);">{{ totais.rejeitados | int }}</div>
+    </div>
+  </div>
+  {% endif %}
+
+  {# ── Filtros ── #}
   <section class="zone">
-    <div class="zone-head">
+    <div class="zone-head" style="cursor:default;">
+      <div class="zone-left">
+        <div class="zone-icon">🔍</div>
+        <div class="zone-title">Filtros</div>
+      </div>
+      <div class="zone-actions">
+        <a href="{{ url_for('financeiro_dois.aprovacoes') }}" class="btn btn-sm">Limpar</a>
+      </div>
+    </div>
+    <div class="zone-body">
+      <form method="get" style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;">
+        <div>
+          <label class="form-label">Status</label>
+          <select name="status" class="form-select" style="width:140px;">
+            <option value="TODOS"    {% if status_f == 'TODOS'    %}selected{% endif %}>Todos</option>
+            <option value="PENDENTE" {% if status_f == 'PENDENTE' %}selected{% endif %}>Pendente</option>
+            <option value="APROVADO" {% if status_f == 'APROVADO' %}selected{% endif %}>Aprovado</option>
+            <option value="REJEITADO"{% if status_f == 'REJEITADO'%}selected{% endif %}>Rejeitado</option>
+          </select>
+        </div>
+        <div>
+          <label class="form-label">Tipo</label>
+          <select name="tipo" class="form-select" style="width:140px;">
+            <option value="">Todos</option>
+            <option value="DESPESA"   {% if tipo_f == 'DESPESA'   %}selected{% endif %}>Despesa</option>
+            <option value="REEMBOLSO" {% if tipo_f == 'REEMBOLSO' %}selected{% endif %}>Reembolso</option>
+          </select>
+        </div>
+        <div>
+          <label class="form-label">Busca</label>
+          <input type="text" name="busca" value="{{ busca_f }}" class="form-control"
+                 placeholder="Referência, solicitante, descrição" style="width:240px;">
+        </div>
+        <button type="submit" class="btn btn-primary">Filtrar</button>
+      </form>
+    </div>
+  </section>
+
+  {# ── Tabela ── #}
+  <section class="zone">
+    <div class="zone-head" style="cursor:default;">
       <div class="zone-left">
         <div class="zone-icon">✅</div>
         <div>
-          <div class="zone-title">Aprovações</div>
-          <div class="muted">Fila de aprovações para exclusões e alterações sensíveis.</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="filters-card">
-      <div class="filters-grid">
-        <div class="field">
-          <label>Busca</label>
-          <input type="text" class="input-like" placeholder="Tipo, módulo ou referência" />
-        </div>
-        <div class="field">
-          <label>Status</label>
-          <select class="input-like">
-            <option>Todos</option>
-            <option>Pendente</option>
-            <option>Aprovado</option>
-            <option>Recusado</option>
-          </select>
-        </div>
-        <div class="field">
-          <label>Módulo</label>
-          <select class="input-like">
-            <option>Todos</option>
-            <option>Reembolsos</option>
-            <option>Despesas</option>
-            <option>OM</option>
-            <option>RD</option>
-            <option>ND</option>
-          </select>
+          <div class="zone-title">Solicitações de aprovação</div>
+          <div class="muted">Despesas e reembolsos aguardando aprovação ou já processados</div>
         </div>
       </div>
     </div>
@@ -47,43 +79,116 @@
       <table class="table">
         <thead>
           <tr>
+            <th>#</th>
             <th>Tipo</th>
-            <th>Módulo</th>
             <th>Referência</th>
-            <th>Motivo</th>
+            <th>Descrição</th>
+            <th class="num">Valor (R$)</th>
             <th>Solicitado por</th>
-            <th>Data solicitação</th>
+            <th>Data</th>
             <th>Status</th>
-            <th>Aprovado por</th>
-            <th>Data aprovação</th>
+            <th>Processado por</th>
+            <th>Data proc.</th>
+            <th>Observação</th>
+            {% if pode_aprovar %}<th style="width:170px;">Ação</th>{% endif %}
           </tr>
         </thead>
         <tbody>
-          {% for item in solicitacoes %}
+          {% for s in solicitacoes %}
           <tr>
-            <td>{{ item.tipo }}</td>
-            <td>{{ item.modulo }}</td>
-            <td><strong>{{ item.referencia }}</strong></td>
-            <td>{{ item.motivo }}</td>
-            <td>{{ item.solicitado_por }}</td>
-            <td>{{ item.data_solicitacao }}</td>
-            <td>{{ item.status }}</td>
-            <td>{{ item.aprovado_por }}</td>
-            <td>{{ item.data_aprovacao }}</td>
+            <td style="font-size:10px;color:var(--text-muted);">{{ s.id }}</td>
+            <td><span class="badge-tipo badge-{{ s.tipo | lower }}">{{ s.tipo }}</span></td>
+            <td>
+              {% if s.tipo == 'DESPESA' %}
+                <a href="{{ url_for('financeiro_dois.despesa_editar', despesa_id=s.referencia_id) }}"
+                   class="ref-link">{{ s.referencia_num }}</a>
+              {% else %}
+                <strong>{{ s.referencia_num }}</strong>
+              {% endif %}
+            </td>
+            <td style="max-width:200px;white-space:normal;font-size:11px;">{{ s.descricao }}</td>
+            <td class="num">{{ '%.2f'|format(s.valor|float) if s.valor else '—' }}</td>
+            <td style="font-weight:600;">{{ s.solicitado_por }}</td>
+            <td style="white-space:nowrap;font-size:11px;">{{ s.solicitado_em }}</td>
+            <td><span class="badge-st-aprov badge-{{ s.status | lower }}">{{ s.status }}</span></td>
+            <td style="font-size:11px;">{{ s.aprovado_por }}</td>
+            <td style="white-space:nowrap;font-size:11px;">{{ s.aprovado_em }}</td>
+            <td style="max-width:160px;white-space:normal;font-size:10px;color:var(--text-muted);">{{ s.obs_aprovacao }}</td>
+            {% if pode_aprovar %}
+            <td>
+              {% if s.status == 'PENDENTE' %}
+              <div style="display:flex;gap:4px;">
+                <form method="post"
+                      action="{{ url_for('financeiro_dois.aprovacao_aprovar', aprov_id=s.id) }}"
+                      id="fa-{{ s.id }}">
+                  <input type="hidden" name="obs_aprovacao" id="oa-{{ s.id }}" value="">
+                  <button type="button" class="btn btn-sm btn-success"
+                          onclick="doAprovar({{ s.id }})">✓ Aprovar</button>
+                </form>
+                <form method="post"
+                      action="{{ url_for('financeiro_dois.aprovacao_rejeitar', aprov_id=s.id) }}"
+                      id="fr-{{ s.id }}">
+                  <input type="hidden" name="obs_aprovacao" id="or-{{ s.id }}" value="">
+                  <button type="button" class="btn btn-sm btn-danger"
+                          onclick="doRejeitar({{ s.id }})">✕ Rejeitar</button>
+                </form>
+              </div>
+              {% else %}
+              <span class="text-muted text-sm">—</span>
+              {% endif %}
+            </td>
+            {% endif %}
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="{{ 12 if pode_aprovar else 11 }}"
+                style="text-align:center;padding:24px;color:var(--text-muted);">
+              Nenhuma solicitação encontrada para os filtros selecionados.
+            </td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
   </section>
+
+  {# ── Info: como solicitar aprovação ── #}
+  <div class="section-note">
+    <strong>Como solicitar aprovação:</strong> Na tela de edição de uma despesa ou reembolso,
+    use o botão <em>"Solicitar aprovação"</em>. O item aparecerá nesta fila com status <em>PENDENTE</em>
+    para que um aprovador com a permissão <code>financeiro:aprovar</code> possa processar.
+    {% if not pode_aprovar %}
+    <br><em>Você não possui permissão de aprovação. Solicite ao administrador que habilite
+    <code>financeiro:aprovar</code> no seu perfil.</em>
+    {% endif %}
+  </div>
+
 </div>
 
 <style>
-  .filters-card{background:#fff;border:1px solid #d8e1ec;border-radius:18px;padding:18px;margin-bottom:16px;box-shadow:0 6px 18px rgba(15,23,42,.05);}
-  .filters-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;}
-  .field label{display:block;margin-bottom:6px;font-size:13px;font-weight:600;color:#334155;}
-  .input-like{width:100%;height:42px;border:1px solid #d8e1ec;border-radius:12px;padding:0 12px;font-size:14px;background:#fff;}
-  .input-like:focus{outline:none;border-color:#9db6cf;box-shadow:0 0 0 3px rgba(22,50,79,.08);}
-  .table-wrap{overflow:auto;}
+.badge-tipo{display:inline-block;padding:2px 8px;border-radius:999px;font-size:9px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;}
+.badge-tipo.badge-despesa{background:#dbeafe;color:#1e40af;}
+.badge-tipo.badge-reembolso{background:#ede9fe;color:#6b21a8;}
+.badge-st-aprov{display:inline-block;padding:2px 8px;border-radius:999px;font-size:9px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;}
+.badge-st-aprov.badge-pendente{background:#fef3c7;color:#92400e;}
+.badge-st-aprov.badge-aprovado{background:#dcfce7;color:#166534;}
+.badge-st-aprov.badge-rejeitado{background:#fee2e2;color:#991b1b;}
+.ref-link{color:var(--brand-blue);font-weight:700;text-decoration:underline;}
+.ref-link:hover{color:var(--brand-blue-2);}
 </style>
+
+<script>
+function doAprovar(id){
+  var obs = prompt("Observação (opcional):", "");
+  if(obs === null) return;
+  document.getElementById("oa-"+id).value = obs;
+  document.getElementById("fa-"+id).submit();
+}
+function doRejeitar(id){
+  var obs = prompt("Motivo da rejeição (obrigatório):", "");
+  if(obs === null || !obs.trim()){ alert("Informe o motivo."); return; }
+  document.getElementById("or-"+id).value = obs;
+  document.getElementById("fr-"+id).submit();
+}
+</script>
 {% endblock %}

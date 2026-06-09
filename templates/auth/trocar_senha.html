@@ -56,11 +56,11 @@
         </div>
 
         <div style="display:flex; gap:12px;">
-          <button type="submit" class="btn-primary">Salvar senha</button>
+          <button type="submit" class="btn btn-primary">Salvar senha</button>
           {% if reset_user %}
-            <a href="{{ url_for('auth.usuarios') }}" class="btn-outline">Voltar</a>
+            <a href="{{ url_for('auth.usuarios') }}" class="btn btn-outline">Voltar</a>
           {% else %}
-            <a href="{{ url_for('dashboard') }}" class="btn-outline">Cancelar</a>
+            <a href="{{ url_for('dashboard') }}" class="btn btn-outline">Cancelar</a>
           {% endif %}
         </div>
       </form>

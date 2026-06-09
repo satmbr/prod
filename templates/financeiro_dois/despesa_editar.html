@@ -29,6 +29,18 @@
         <a class="btn" href="{{ url_for('financeiro_dois.rd_editar', rd_id=despesa.origem_id) }}">Abrir origem RD</a>
       {% endif %}
 
+      {% if not despesa.eh_nova %}
+      <form method="post" action="{{ url_for('financeiro_dois.aprovacao_solicitar') }}" style="display:inline;">
+        <input type="hidden" name="tipo"           value="DESPESA">
+        <input type="hidden" name="referencia_id"  value="{{ despesa.id }}">
+        <input type="hidden" name="referencia_num" value="{{ despesa.numero_despesa }}">
+        <input type="hidden" name="descricao"      value="{{ despesa.descricao }}">
+        <input type="hidden" name="valor"          value="{{ despesa.valor }}">
+        <input type="hidden" name="redirect_url"   value="{{ url_for('financeiro_dois.despesa_editar', despesa_id=despesa.id) }}">
+        <button type="submit" class="btn btn-warning">Solicitar aprovação</button>
+      </form>
+      {% endif %}
+
       <button type="submit" form="form-despesa" class="btn btn-primary">Salvar alterações</button>
     </div>
   </div>

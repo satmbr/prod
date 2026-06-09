@@ -12,25 +12,32 @@ def create_app():
     def controlar_sessao():
         rotas_livres = {
             "auth.login",
-            "static"
+            "auth.logout",
+            "home",
+            "health",
+            "static",
         }
 
         if request.endpoint in rotas_livres or request.endpoint is None:
             return
 
-        if "usuario_id" in session:
-            agora = datetime.utcnow().timestamp()
-            ultimo_acesso = session.get("ultimo_acesso")
+        # Redireciona usuário não autenticado para qualquer rota protegida
+        if "usuario_id" not in session:
+            flash("Faça login para acessar esta página.", "warning")
+            return redirect(url_for("auth.login"))
 
-            if ultimo_acesso:
-                tempo_inativo = agora - ultimo_acesso
-                if tempo_inativo > 1800:  # 30 minutos
-                    session.clear()
-                    flash("Sua sessão expirou por inatividade. Faça login novamente.", "erro")
-                    return redirect(url_for("auth.login"))
+        agora = datetime.utcnow().timestamp()
+        ultimo_acesso = session.get("ultimo_acesso")
 
-            session["ultimo_acesso"] = agora
-            session.permanent = True
+        if ultimo_acesso:
+            tempo_inativo = agora - ultimo_acesso
+            if tempo_inativo > 1800:  # 30 minutos
+                session.clear()
+                flash("Sua sessão expirou por inatividade. Faça login novamente.", "warning")
+                return redirect(url_for("auth.login"))
+
+        session["ultimo_acesso"] = agora
+        session.permanent = True
 
     @app.context_processor
     def inject_user():

@@ -14,8 +14,8 @@
         </div>
       </div>
       <div class="zone-actions" style="display:flex; gap:10px;">
-        <a href="{{ url_for('auth.perfis') }}" class="btn-outline">Perfis</a>
-        <a href="{{ url_for('auth.novo_usuario') }}" class="btn-primary">+ Novo usuário</a>
+        <a href="{{ url_for('auth.perfis') }}" class="btn btn-outline">Perfis</a>
+        <a href="{{ url_for('auth.novo_usuario') }}" class="btn btn-primary">+ Novo usuário</a>
       </div>
     </div>
 
@@ -31,7 +31,7 @@
       {% endwith %}
 
       <div style="overflow-x:auto;">
-        <table class="data-table" style="width:100%;">
+        <table class="table" style="width:100%;">
           <thead>
             <tr>
               <th>Nome</th>
@@ -57,10 +57,10 @@
               <td>{{ u.ultimo_login or '' }}</td>
               <td>{{ u.criado_em or '' }}</td>
               <td style="text-align:center; white-space:nowrap;">
-                <a href="{{ url_for('auth.editar_usuario', usuario_id=u.id) }}" class="btn-outline">Editar</a>
-                <a href="{{ url_for('auth.resetar_senha', usuario_id=u.id) }}" class="btn-outline">Resetar senha</a>
+                <a href="{{ url_for('auth.editar_usuario', usuario_id=u.id) }}" class="btn btn-outline">Editar</a>
+                <a href="{{ url_for('auth.resetar_senha', usuario_id=u.id) }}" class="btn btn-outline">Resetar senha</a>
                 <form method="post" action="{{ url_for('auth.toggle_usuario', usuario_id=u.id) }}" style="display:inline;">
-                  <button type="submit" class="btn-outline">
+                  <button type="submit" class="btn btn-outline">
                     {{ 'Inativar' if u.ativo else 'Ativar' }}
                   </button>
                 </form>

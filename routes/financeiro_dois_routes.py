@@ -153,51 +153,64 @@ def _status_nd_rd(conn, rd_id: int) -> str:
         return "PARCIAL"
     return "VINCULADA"    
 
-def _resolver_caminho_anexo_om(nome_arquivo: str) -> str | None:
-    if not nome_arquivo:
-        return None
+def _resolver_candidatos_arquivo(nome_arquivo: str, subpastas: list[str]) -> list[str]:
+    """Gera lista de caminhos candidatos para um arquivo de upload.
 
+    Verifica root_path/static, cwd/static, instance e /tmp (Railway).
+    """
+    if not nome_arquivo:
+        return []
     nome_arquivo = str(nome_arquivo).strip().replace("\\", "/")
-    if not nome_arquivo:
-        return None
+    base = os.path.basename(nome_arquivo)
+    candidatos: list[str] = []
 
-    candidatos = []
+    raizes = [current_app.root_path, os.getcwd()]
 
-    # Se já vier um caminho relativo completo
-    candidatos.append(os.path.join(current_app.root_path, nome_arquivo))
+    # Caminho literal (já pode ser absoluto ou relativo completo)
+    for raiz in raizes:
+        candidatos.append(os.path.join(raiz, nome_arquivo.lstrip("/")))
 
-    # Se vier começando por static/
-    candidatos.append(os.path.join(current_app.root_path, nome_arquivo.lstrip("/")))
+    # Cada subpasta conhecida dentro de static/uploads/financeiro2
+    for raiz in raizes:
+        for sp in subpastas:
+            candidatos.append(os.path.join(raiz, "static", "uploads", "financeiro2", sp, base))
+        candidatos.append(os.path.join(raiz, "static", "uploads", "financeiro2", base))
 
-    # Caminho atual
-    candidatos.append(os.path.join(
-        current_app.root_path, "static", "uploads", "financeiro2", "om_recibos", os.path.basename(nome_arquivo)
-    ))
+    # Fallback /tmp (Railway não persiste static/)
+    for sp in subpastas:
+        candidatos.append(os.path.join("/tmp", "prod_uploads", "financeiro2", sp, base))
+    candidatos.append(os.path.join("/tmp", "prod_uploads", "financeiro2", base))
 
-    # Recibos exportados a partir de reembolsos podem continuar fisicamente nesta pasta.
-    candidatos.append(os.path.join(
-        current_app.root_path, "static", "uploads", "financeiro2", "reembolsos", os.path.basename(nome_arquivo)
-    ))
+    # Deduplica mantendo ordem
+    seen: set[str] = set()
+    unique: list[str] = []
+    for c in candidatos:
+        n = os.path.normpath(c)
+        if n not in seen:
+            seen.add(n)
+            unique.append(n)
+    return unique
 
-    # Legados possíveis
-    candidatos.append(os.path.join(
-        current_app.root_path, "static", "uploads", "financeiro2", os.path.basename(nome_arquivo)
-    ))
-    candidatos.append(os.path.join(
-        current_app.root_path, "static", "uploads", "financeiro2", "recibos", os.path.basename(nome_arquivo)
-    ))
-    candidatos.append(os.path.join(
-        current_app.root_path, "static", "uploads", "om_recibos", os.path.basename(nome_arquivo)
-    ))
-    candidatos.append(os.path.join(
-        current_app.root_path, "static", "uploads", "recibos", os.path.basename(nome_arquivo)
-    ))
 
-    for caminho in candidatos:
-        if caminho and os.path.exists(caminho):
+def _resolver_caminho_arquivo(nome_arquivo: str, subpastas: list[str]) -> str | None:
+    for caminho in _resolver_candidatos_arquivo(nome_arquivo, subpastas):
+        if os.path.exists(caminho):
             return caminho
-
     return None
+
+
+def _resolver_caminho_anexo_om(nome_arquivo: str) -> str | None:
+    return _resolver_caminho_arquivo(
+        nome_arquivo,
+        ["om_recibos", "reembolsos", "rd_recibos", "recibos", "despesas"],
+    )
+
+
+def _resolver_caminho_anexo_despesa(nome_arquivo: str) -> str | None:
+    return _resolver_caminho_arquivo(
+        nome_arquivo,
+        ["despesas", "om_recibos", "rd_recibos", "reembolsos", "recibos"],
+    )
         
 def _recalcular_status_nd(conn, nd_id: int):
     nd = conn.execute(text("""
@@ -2277,29 +2290,10 @@ def om_abrir_anexo():
 
 
 def _resolver_caminho_anexo_rd(nome_arquivo: str) -> str | None:
-    if not nome_arquivo:
-        return None
-
-    nome_arquivo = str(nome_arquivo).strip().replace("\\", "/")
-    if not nome_arquivo:
-        return None
-
-    base = os.path.basename(nome_arquivo)
-    candidatos = [
-        os.path.join(current_app.root_path, nome_arquivo.lstrip("/")),
-        os.path.join(current_app.root_path, "static", "uploads", "financeiro2", "rd_recibos", base),
-        os.path.join(current_app.root_path, "static", "uploads", "financeiro2", "reembolsos", base),
-        os.path.join(current_app.root_path, "static", "uploads", "financeiro2", "recibos", base),
-        os.path.join(current_app.root_path, "static", "uploads", "financeiro2", base),
-        os.path.join(current_app.root_path, "static", "uploads", "rd_recibos", base),
-        os.path.join(current_app.root_path, "static", "uploads", "recibos", base),
-    ]
-
-    for caminho in candidatos:
-        if caminho and os.path.exists(caminho):
-            return caminho
-
-    return None
+    return _resolver_caminho_arquivo(
+        nome_arquivo,
+        ["rd_recibos", "reembolsos", "om_recibos", "recibos", "despesas"],
+    )
 
 
 @bp.route("/rd/anexo")
@@ -2311,6 +2305,18 @@ def rd_abrir_anexo():
     if not caminho:
         abort(404)
     return send_file(caminho, as_attachment=False)
+
+
+@bp.route("/despesas/anexo")
+@login_required
+@permission_required("financeiro", "visualizar")
+def despesa_abrir_anexo():
+    nome_arquivo = _nome_preenchido(request.args.get("arquivo"))
+    caminho = _resolver_caminho_anexo_despesa(nome_arquivo)
+    if not caminho:
+        abort(404)
+    return send_file(caminho, as_attachment=False)
+
 
 @bp.route("/om/<int:om_id>/exportar/pdf")
 @login_required
@@ -4907,52 +4913,78 @@ def rd_exportar_pdf(rd_id: int):
 @login_required
 @permission_required("financeiro", "visualizar")
 def previsao():
-    busca = request.args.get("busca", "").strip()
-    status_nd_filtro = request.args.get("status_nd", "").strip()
-    status_despesa_filtro = request.args.get("status_despesa", "").strip()
+    from datetime import date as _date
+    busca               = request.args.get("busca", "").strip()
+    status_nd_filtro    = request.args.get("status_nd", "").strip().upper()
+    status_desp_filtro  = request.args.get("status_despesa", "").strip().upper()
+    mes_filtro          = request.args.get("mes", "").strip()       # YYYY-MM
+    venc_ini_filtro     = request.args.get("venc_ini", "").strip()  # YYYY-MM-DD
+    venc_fim_filtro     = request.args.get("venc_fim", "").strip()
 
-    conditions = [
-        "UPPER(COALESCE(d.status_nd, 'NÃO VINCULADA')) <> 'VINCULADA'"
-    ]
+    # Mês corrente como padrão quando nenhum filtro de período foi informado
+    hoje = _date.today()
+    if not mes_filtro and not venc_ini_filtro and not venc_fim_filtro:
+        mes_filtro = hoje.strftime("%Y-%m")
+
+    conditions = ["UPPER(COALESCE(d.status_nd, 'NÃO VINCULADA')) <> 'VINCULADA'"]
     params: dict = {}
 
     if busca:
         conditions.append(
-            "(LOWER(COALESCE(d.fornecedor,'')) LIKE :busca "
-            "OR LOWER(COALESCE(d.numero_documento,'')) LIKE :busca "
-            "OR LOWER(COALESCE(d.descricao,'')) LIKE :busca)"
+            "(LOWER(COALESCE(d.fornecedor,'')) LIKE :busca"
+            " OR LOWER(COALESCE(d.numero_documento,'')) LIKE :busca"
+            " OR LOWER(COALESCE(d.descricao,'')) LIKE :busca)"
         )
         params["busca"] = f"%{busca.lower()}%"
 
     if status_nd_filtro:
         conditions.append("UPPER(COALESCE(d.status_nd,'NÃO VINCULADA')) = :status_nd")
-        params["status_nd"] = status_nd_filtro.upper()
+        params["status_nd"] = status_nd_filtro
 
-    if status_despesa_filtro:
-        conditions.append("LOWER(COALESCE(d.status,'')) = :status_despesa")
-        params["status_despesa"] = status_despesa_filtro.lower()
+    if status_desp_filtro:
+        conditions.append("UPPER(COALESCE(d.status_despesa,'')) = :status_despesa")
+        params["status_despesa"] = status_desp_filtro
 
-    where_sql = "WHERE " + " AND ".join(conditions) if conditions else ""
+    # Filtro de mês pelo vencimento
+    if mes_filtro:
+        try:
+            ano, mes = int(mes_filtro[:4]), int(mes_filtro[5:7])
+            conditions.append(
+                "EXTRACT(YEAR  FROM d.vencimento) = :ano_venc"
+                " AND EXTRACT(MONTH FROM d.vencimento) = :mes_venc"
+            )
+            params["ano_venc"] = ano
+            params["mes_venc"] = mes
+        except (ValueError, IndexError):
+            pass
+    else:
+        if venc_ini_filtro:
+            conditions.append("d.vencimento >= :venc_ini")
+            params["venc_ini"] = venc_ini_filtro
+        if venc_fim_filtro:
+            conditions.append("d.vencimento <= :venc_fim")
+            params["venc_fim"] = venc_fim_filtro
+
+    where_sql = "WHERE " + " AND ".join(conditions)
 
     sql = f"""
         SELECT
             d.id,
-            TO_CHAR(d.data, 'DD/MM/YYYY') AS data,
-            TO_CHAR(d.data_vencimento, 'DD/MM/YYYY') AS vencimento,
-            COALESCE(td.nome, d.tipo_documento, '') AS tipo_documento,
-            COALESCE(d.numero_documento, '') AS numero_documento,
-            COALESCE(d.fornecedor, '') AS fornecedor,
-            COALESCE(d.descricao, '') AS descricao,
-            COALESCE(cc.nome, d.centro_custo, '') AS centro_custo,
-            COALESCE(d.status, 'Pendente') AS status_despesa,
-            COALESCE(d.status_nd, 'NÃO VINCULADA') AS status_nd,
-            COALESCE(d.motivo_status_nd, '') AS motivo_status_nd,
-            COALESCE(d.valor, 0) AS valor
+            TO_CHAR(d.data_documento, 'DD/MM/YYYY')  AS data,
+            TO_CHAR(d.vencimento,     'DD/MM/YYYY')  AS vencimento,
+            d.vencimento                             AS vencimento_raw,
+            COALESCE(d.tipo_documento,  '')          AS tipo_documento,
+            COALESCE(d.numero_documento,'')          AS numero_documento,
+            COALESCE(d.fornecedor,      '')          AS fornecedor,
+            COALESCE(d.descricao,       '')          AS descricao,
+            COALESCE(d.centro_custo,    '')          AS centro_custo,
+            COALESCE(d.status_despesa, 'PENDENTE')   AS status_despesa,
+            COALESCE(d.status_nd, 'NÃO VINCULADA')  AS status_nd,
+            COALESCE(d.motivo_status_nd, '')         AS motivo_status_nd,
+            COALESCE(d.valor, 0)                     AS valor
         FROM financeiro2_despesas d
-        LEFT JOIN financeiro2_cad_tipos_documento td ON td.id = d.tipo_documento_id
-        LEFT JOIN financeiro2_cad_centros_custo cc ON cc.id = d.centro_custo_id
         {where_sql}
-        ORDER BY d.data DESC NULLS LAST, d.id DESC
+        ORDER BY d.vencimento ASC NULLS LAST, d.id ASC
         LIMIT 500
     """
 
@@ -4960,23 +4992,31 @@ def previsao():
     with engine.connect() as conn:
         try:
             previsoes = conn.execute(text(sql), params).mappings().all()
-        except Exception:
+        except Exception as e:
+            current_app.logger.error("Erro previsao: %s", e)
             previsoes = []
 
-    # Totalizadores por status ND
-    totais = {}
+    # Totalizadores
+    totais: dict = {}
+    total_valor = 0.0
     for row in previsoes:
         s = str(row["status_nd"]).upper()
         totais[s] = totais.get(s, 0) + 1
+        total_valor += float(row["valor"] or 0)
 
     return render_template(
         "financeiro_dois/previsao.html",
         subnav_links=build_financeiro_dois_subnav("previsao"),
         previsoes=previsoes,
         totais=totais,
+        total_valor=total_valor,
+        hoje_date=hoje,
         busca=busca,
         status_nd_filtro=status_nd_filtro,
-        status_despesa_filtro=status_despesa_filtro,
+        status_desp_filtro=status_desp_filtro,
+        mes_filtro=mes_filtro,
+        venc_ini_filtro=venc_ini_filtro,
+        venc_fim_filtro=venc_fim_filtro,
     )
 
 
@@ -5031,16 +5071,275 @@ def reembolso_editar(reembolso_id: int):
 # APROVACOES
 # =========================
 
+# ── helpers de aprovação ──────────────────────────────────────────
+
+def _garantir_tabela_aprovacoes(conn):
+    """Cria a tabela e a permissão se ainda não existirem (migration automática)."""
+    conn.execute(text("""
+        CREATE TABLE IF NOT EXISTS financeiro2_aprovacoes (
+            id              SERIAL PRIMARY KEY,
+            tipo            VARCHAR(30)  NOT NULL,
+            referencia_id   INTEGER      NOT NULL,
+            referencia_num  VARCHAR(60)  NOT NULL,
+            descricao       TEXT,
+            valor           NUMERIC(15,2),
+            solicitado_por  VARCHAR(80)  NOT NULL,
+            solicitado_em   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            status          VARCHAR(20)  NOT NULL DEFAULT 'PENDENTE',
+            aprovado_por    VARCHAR(80),
+            aprovado_em     TIMESTAMP,
+            obs_aprovacao   TEXT
+        )
+    """))
+    # Garante que a permissão financeiro:aprovar existe na tabela de permissões
+    conn.execute(text("""
+        INSERT INTO permissoes (modulo, acao, descricao)
+        SELECT 'financeiro', 'aprovar', 'Aprovar ou rejeitar solicitações financeiras'
+        WHERE NOT EXISTS (
+            SELECT 1 FROM permissoes
+            WHERE modulo = 'financeiro' AND acao = 'aprovar'
+        )
+    """))
+
+
+def _criar_aprovacao(conn, tipo: str, referencia_id: int, referencia_num: str,
+                     descricao: str, valor: float | None):
+    """Insere uma solicitação de aprovação e retorna o id gerado."""
+    _garantir_tabela_aprovacoes(conn)
+    row = conn.execute(text("""
+        INSERT INTO financeiro2_aprovacoes
+            (tipo, referencia_id, referencia_num, descricao, valor, solicitado_por)
+        VALUES
+            (:tipo, :ref_id, :ref_num, :desc, :valor, :username)
+        RETURNING id
+    """), {
+        "tipo":     tipo.upper(),
+        "ref_id":   referencia_id,
+        "ref_num":  referencia_num,
+        "desc":     (descricao or "").strip(),
+        "valor":    valor,
+        "username": session.get("username") or session.get("usuario_nome") or "sistema",
+    }).mappings().first()
+    return row["id"] if row else None
+
+
+# ── rotas de aprovações ───────────────────────────────────────────
+
 @bp.route("/aprovacoes")
 @login_required
 @permission_required("financeiro", "visualizar")
 def aprovacoes():
-    solicitacoes = [
-        {"id": 1, "tipo": "Aprovação de reembolso", "modulo": "Reembolsos", "referencia": "REB-0001", "motivo": "Solicitação inicial de pagamento", "solicitado_por": "LME", "data_solicitacao": "15/03/2026", "status": "Pendente", "aprovado_por": "", "data_aprovacao": ""},
-        {"id": 2, "tipo": "Solicitar alteração", "modulo": "Despesas", "referencia": "FAT-9001", "motivo": "Despesa importada de OM", "solicitado_por": "ABC", "data_solicitacao": "14/03/2026", "status": "Aprovado", "aprovado_por": "ADM", "data_aprovacao": "15/03/2026"},
-        {"id": 3, "tipo": "Solicitar exclusão", "modulo": "OM", "referencia": "OM-2026-0002", "motivo": "Registro duplicado", "solicitado_por": "XYZ", "data_solicitacao": "13/03/2026", "status": "Recusado", "aprovado_por": "ADM", "data_aprovacao": "14/03/2026"},
-    ]
-    return render_template("financeiro_dois/aprovacoes.html", subnav_links=build_financeiro_dois_subnav("aprovacoes"), solicitacoes=solicitacoes)
+    status_f = (request.args.get("status") or "PENDENTE").strip().upper()
+    tipo_f   = (request.args.get("tipo")   or "").strip().upper()
+    busca_f  = (request.args.get("busca")  or "").strip()
+
+    engine = get_engine()
+    with engine.connect() as conn:
+        _garantir_tabela_aprovacoes(conn)
+
+        conds = ["1=1"]
+        params: dict = {}
+
+        if status_f and status_f != "TODOS":
+            conds.append("a.status = :status")
+            params["status"] = status_f
+
+        if tipo_f:
+            conds.append("a.tipo = :tipo")
+            params["tipo"] = tipo_f
+
+        if busca_f:
+            conds.append(
+                "(LOWER(a.referencia_num) LIKE :busca"
+                " OR LOWER(a.solicitado_por) LIKE :busca"
+                " OR LOWER(COALESCE(a.descricao,'')) LIKE :busca)"
+            )
+            params["busca"] = f"%{busca_f.lower()}%"
+
+        where = "WHERE " + " AND ".join(conds)
+
+        solicitacoes = conn.execute(text(f"""
+            SELECT
+                a.id,
+                a.tipo,
+                a.referencia_id,
+                a.referencia_num,
+                COALESCE(a.descricao, '') AS descricao,
+                COALESCE(a.valor, 0)     AS valor,
+                a.solicitado_por,
+                TO_CHAR(a.solicitado_em, 'DD/MM/YYYY HH24:MI') AS solicitado_em,
+                a.status,
+                COALESCE(a.aprovado_por, '')  AS aprovado_por,
+                TO_CHAR(a.aprovado_em, 'DD/MM/YYYY HH24:MI') AS aprovado_em,
+                COALESCE(a.obs_aprovacao, '') AS obs_aprovacao
+            FROM financeiro2_aprovacoes a
+            {where}
+            ORDER BY
+                CASE a.status WHEN 'PENDENTE' THEN 0 ELSE 1 END,
+                a.solicitado_em DESC
+            LIMIT 300
+        """), params).mappings().all()
+
+        totais = conn.execute(text("""
+            SELECT
+                COUNT(*) FILTER (WHERE status = 'PENDENTE')  AS pendentes,
+                COUNT(*) FILTER (WHERE status = 'APROVADO')  AS aprovados,
+                COUNT(*) FILTER (WHERE status = 'REJEITADO') AS rejeitados
+            FROM financeiro2_aprovacoes
+        """)).mappings().first()
+
+    pode_aprovar = user_can("financeiro:aprovar")
+
+    return render_template(
+        "financeiro_dois/aprovacoes.html",
+        subnav_links=build_financeiro_dois_subnav("aprovacoes"),
+        solicitacoes=solicitacoes,
+        totais=totais,
+        status_f=status_f,
+        tipo_f=tipo_f,
+        busca_f=busca_f,
+        pode_aprovar=pode_aprovar,
+    )
+
+
+@bp.route("/aprovacoes/<int:aprov_id>/aprovar", methods=["POST"])
+@login_required
+@permission_required("financeiro", "aprovar")
+def aprovacao_aprovar(aprov_id: int):
+    obs = (request.form.get("obs_aprovacao") or "").strip()
+    engine = get_engine()
+    with engine.begin() as conn:
+        _garantir_tabela_aprovacoes(conn)
+        aprov = conn.execute(text(
+            "SELECT id, tipo, referencia_id, status FROM financeiro2_aprovacoes WHERE id = :id"
+        ), {"id": aprov_id}).mappings().first()
+
+        if not aprov:
+            flash("Solicitação não encontrada.", "danger")
+            return redirect(url_for("financeiro_dois.aprovacoes"))
+
+        if aprov["status"] != "PENDENTE":
+            flash("Esta solicitação já foi processada.", "warning")
+            return redirect(url_for("financeiro_dois.aprovacoes"))
+
+        username = session.get("username") or session.get("usuario_nome") or "sistema"
+        conn.execute(text("""
+            UPDATE financeiro2_aprovacoes
+            SET status = 'APROVADO',
+                aprovado_por = :username,
+                aprovado_em  = CURRENT_TIMESTAMP,
+                obs_aprovacao = :obs
+            WHERE id = :id
+        """), {"username": username, "obs": obs, "id": aprov_id})
+
+        # Atualiza status da despesa ou reembolso vinculado
+        if aprov["tipo"] == "DESPESA":
+            conn.execute(text("""
+                UPDATE financeiro2_despesas
+                SET status_despesa = 'APROVADA',
+                    atualizado_em  = CURRENT_TIMESTAMP
+                WHERE id = :id
+            """), {"id": aprov["referencia_id"]})
+        elif aprov["tipo"] == "REEMBOLSO":
+            conn.execute(text("""
+                UPDATE financeiro2_reembolsos
+                SET status_aprovacao = 'APROVADO',
+                    aprovado_por     = :username,
+                    aprovado_em      = CURRENT_TIMESTAMP
+                WHERE id = :id
+            """), {"username": username, "id": aprov["referencia_id"]})
+
+    flash("Solicitação aprovada com sucesso.", "success")
+    return redirect(url_for("financeiro_dois.aprovacoes"))
+
+
+@bp.route("/aprovacoes/<int:aprov_id>/rejeitar", methods=["POST"])
+@login_required
+@permission_required("financeiro", "aprovar")
+def aprovacao_rejeitar(aprov_id: int):
+    obs = (request.form.get("obs_aprovacao") or "").strip()
+    if not obs:
+        flash("Informe o motivo da rejeição.", "warning")
+        return redirect(url_for("financeiro_dois.aprovacoes"))
+
+    engine = get_engine()
+    with engine.begin() as conn:
+        _garantir_tabela_aprovacoes(conn)
+        aprov = conn.execute(text(
+            "SELECT id, tipo, referencia_id, status FROM financeiro2_aprovacoes WHERE id = :id"
+        ), {"id": aprov_id}).mappings().first()
+
+        if not aprov:
+            flash("Solicitação não encontrada.", "danger")
+            return redirect(url_for("financeiro_dois.aprovacoes"))
+
+        if aprov["status"] != "PENDENTE":
+            flash("Esta solicitação já foi processada.", "warning")
+            return redirect(url_for("financeiro_dois.aprovacoes"))
+
+        username = session.get("username") or session.get("usuario_nome") or "sistema"
+        conn.execute(text("""
+            UPDATE financeiro2_aprovacoes
+            SET status = 'REJEITADO',
+                aprovado_por  = :username,
+                aprovado_em   = CURRENT_TIMESTAMP,
+                obs_aprovacao = :obs
+            WHERE id = :id
+        """), {"username": username, "obs": obs, "id": aprov_id})
+
+        if aprov["tipo"] == "DESPESA":
+            conn.execute(text("""
+                UPDATE financeiro2_despesas
+                SET status_despesa = 'REJEITADA',
+                    atualizado_em  = CURRENT_TIMESTAMP
+                WHERE id = :id
+            """), {"id": aprov["referencia_id"]})
+        elif aprov["tipo"] == "REEMBOLSO":
+            conn.execute(text("""
+                UPDATE financeiro2_reembolsos
+                SET status_aprovacao = 'REJEITADO',
+                    aprovado_por     = :username,
+                    aprovado_em      = CURRENT_TIMESTAMP
+                WHERE id = :id
+            """), {"username": username, "id": aprov["referencia_id"]})
+
+    flash("Solicitação rejeitada.", "warning")
+    return redirect(url_for("financeiro_dois.aprovacoes"))
+
+
+@bp.route("/aprovacoes/solicitar", methods=["POST"])
+@login_required
+@permission_required("financeiro", "visualizar")
+def aprovacao_solicitar():
+    """Endpoint genérico para criar uma solicitação de aprovação a partir de despesa ou reembolso."""
+    tipo          = (request.form.get("tipo") or "").strip().upper()
+    referencia_id = request.form.get("referencia_id", type=int)
+    referencia_num = (request.form.get("referencia_num") or "").strip()
+    descricao     = (request.form.get("descricao") or "").strip()
+    valor         = request.form.get("valor", type=float)
+    redirect_url  = request.form.get("redirect_url") or url_for("financeiro_dois.aprovacoes")
+
+    if tipo not in ("DESPESA", "REEMBOLSO") or not referencia_id:
+        flash("Dados inválidos para solicitação de aprovação.", "danger")
+        return redirect(redirect_url)
+
+    engine = get_engine()
+    with engine.begin() as conn:
+        # Verifica se já existe aprovação pendente para este item
+        existente = conn.execute(text("""
+            SELECT id FROM financeiro2_aprovacoes
+            WHERE tipo = :tipo AND referencia_id = :ref_id AND status = 'PENDENTE'
+            LIMIT 1
+        """), {"tipo": tipo, "ref_id": referencia_id}).fetchone()
+
+        if existente:
+            flash("Já existe uma solicitação de aprovação pendente para este item.", "warning")
+            return redirect(redirect_url)
+
+        _criar_aprovacao(conn, tipo, referencia_id, referencia_num, descricao, valor)
+
+    flash("Solicitação de aprovação enviada com sucesso.", "success")
+    return redirect(redirect_url)
 
 
 # =========================

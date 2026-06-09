@@ -14,6 +14,17 @@
       </div>
       <div class="zone-actions">
         <a class="btn" href="{{ url_for('financeiro_dois.reembolsos_real') }}">Voltar</a>
+        {% if reembolso.id and reembolso.id != 0 %}
+        <form method="post" action="{{ url_for('financeiro_dois.aprovacao_solicitar') }}" style="display:inline;">
+          <input type="hidden" name="tipo"           value="REEMBOLSO">
+          <input type="hidden" name="referencia_id"  value="{{ reembolso.id }}">
+          <input type="hidden" name="referencia_num" value="{{ reembolso.numero_reembolso or reembolso.id }}">
+          <input type="hidden" name="descricao"      value="{{ reembolso.descricao or '' }}">
+          <input type="hidden" name="valor"          value="{{ reembolso.valor_total or '' }}">
+          <input type="hidden" name="redirect_url"   value="{{ request.url }}">
+          <button type="submit" class="btn btn-warning">Solicitar aprovação</button>
+        </form>
+        {% endif %}
         {% if not reembolso.bloqueado %}
         <button type="submit" form="form-reembolso" class="btn btn-primary">Salvar alterações</button>
         {% endif %}
