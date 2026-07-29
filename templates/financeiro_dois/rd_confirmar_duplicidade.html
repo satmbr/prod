@@ -46,7 +46,7 @@
               <td>R$ {{ '%.2f'|format(item.valor) }}</td>
               <td>
                 {% if item.anexo_recibo %}
-                <a class="btn btn-sm" href="{{ url_for('static', filename='uploads/financeiro2/' ~ item.pasta_recibo ~ '/' ~ item.anexo_recibo) }}" target="_blank">ABRIR RECIBO</a>
+                <a class="btn btn-sm" href="{{ url_for('financeiro_dois.rd_abrir_anexo', arquivo=item.anexo_recibo) }}" target="_blank">ABRIR RECIBO</a>
                 {% else %}
                 —
                 {% endif %}

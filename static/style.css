@@ -212,8 +212,12 @@ a { color: inherit; text-decoration: none; }
   align-items: center;
   justify-content: center;
   width: 30px; height: 30px;
+  padding: 0;
+  border: 0;
+  background: transparent;
   border-radius: var(--radius-sm);
   color: var(--sidebar-muted);
+  cursor: pointer;
   flex-shrink: 0;
   transition: background .15s, color .15s;
 }

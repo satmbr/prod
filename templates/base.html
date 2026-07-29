@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <meta name="csrf-token" content="{{ csrf_token() }}">
   <title>{% block title %}PRUMAT ERP{% endblock %}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
@@ -88,9 +89,11 @@
             <div class="sidebar-user-role">{{ current_user_profile or 'Sem perfil' }}</div>
           </div>
         </a>
-        <a href="{{ url_for('auth.logout') }}" class="sidebar-logout" title="Sair">
-          <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5-5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>
-        </a>
+        <form method="post" action="{{ url_for('auth.logout') }}" style="margin:0;">
+          <button type="submit" class="sidebar-logout" title="Sair" aria-label="Sair">
+            <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5-5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>
+          </button>
+        </form>
       {% else %}
         <a href="{{ url_for('auth.login') }}" class="sidebar-link">Entrar</a>
       {% endif %}
@@ -147,6 +150,20 @@
 
 <script>
 (function(){
+  const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+  const csrfToken = csrfMeta ? csrfMeta.content : "";
+  if (csrfToken) {
+    document.querySelectorAll('form').forEach(function(form) {
+      if ((form.method || "get").toLowerCase() !== "post") return;
+      if (form.querySelector('input[name="csrf_token"]')) return;
+      const input = document.createElement("input");
+      input.type = "hidden";
+      input.name = "csrf_token";
+      input.value = csrfToken;
+      form.appendChild(input);
+    });
+  }
+
   const toggle = document.getElementById('sidebarToggle');
   const sidebar = document.getElementById('sidebar');
   if(toggle && sidebar){

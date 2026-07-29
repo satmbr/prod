@@ -780,6 +780,15 @@
 <script>
   const pdLancamentos = [];
 
+  function pdEscapeHtml(valor) {
+    return String(valor ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
   function pdDuracaoEmMinutos(inicio, fim) {
     const [hi, mi] = inicio.split(":").map(Number);
     const [hf, mf] = fim.split(":").map(Number);
@@ -829,13 +838,13 @@
       pdLancamentos.forEach((item, index) => {
         const tr = document.createElement("tr");
         tr.innerHTML = `
-          <td>${item.data}</td>
-          <td>${item.maquina_label}</td>
-          <td>${item.atividade_label}</td>
-          <td>${item.hora_inicio}</td>
-          <td>${item.hora_fim}</td>
-          <td>${pdCalcularDuracao(item.hora_inicio, item.hora_fim)}</td>
-          <td>${item.obs || ""}</td>
+          <td>${pdEscapeHtml(item.data)}</td>
+          <td>${pdEscapeHtml(item.maquina_label)}</td>
+          <td>${pdEscapeHtml(item.atividade_label)}</td>
+          <td>${pdEscapeHtml(item.hora_inicio)}</td>
+          <td>${pdEscapeHtml(item.hora_fim)}</td>
+          <td>${pdEscapeHtml(pdCalcularDuracao(item.hora_inicio, item.hora_fim))}</td>
+          <td>${pdEscapeHtml(item.obs || "")}</td>
           <td>
             <div class="row-actions">
               <button type="button" class="btn info" onclick="pdEditarLancamento(${index})">✏️ Editar</button>

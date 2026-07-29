@@ -32,6 +32,51 @@ def user_can(chave: str) -> bool:
     permissoes = session.get("permissoes", [])
     return chave in permissoes or "auth:administrar" in permissoes
 
+_ROTAS_FINANCEIRAS_DE_CRIACAO = {
+    "aplicacao_nova",
+    "aprovacao_solicitar",
+    "categoria_nova",
+    "centro_custo_novo",
+    "despesa_criar",
+    "despesa_importar_origem",
+    "descricao_nova",
+    "empresa_nd_nova",
+    "moeda_nova",
+    "nota_debito_criar",
+    "om_nova",
+    "parametro_novo",
+    "rd_nova",
+    "reembolso_real_criar",
+    "status_despesa_novo",
+    "status_nd_novo",
+    "tipo_documento_novo",
+}
+
+_ROTAS_FINANCEIRAS_DE_APROVACAO = {
+    "aprovacao_aprovar",
+    "aprovacao_rejeitar",
+}
+
+
+@bp.before_request
+def proteger_mutacoes_financeiras():
+    """Separa leitura, criação, edição e aprovação no módulo financeiro."""
+    if request.method not in {"POST", "PUT", "PATCH", "DELETE"}:
+        return None
+
+    endpoint = (request.endpoint or "").rsplit(".", 1)[-1]
+    if endpoint in _ROTAS_FINANCEIRAS_DE_APROVACAO:
+        acao = "aprovar"
+    elif endpoint in _ROTAS_FINANCEIRAS_DE_CRIACAO:
+        acao = "criar"
+    else:
+        acao = "editar"
+
+    if not user_can(f"financeiro:{acao}"):
+        abort(403)
+    return None
+
+
 def build_financeiro_dois_subnav(active: str | None):
     links = []
 
@@ -51,9 +96,23 @@ def build_financeiro_dois_subnav(active: str | None):
 def _nome_preenchido(valor: str | None) -> str:
     return (valor or "").strip()
 
+def _pasta_upload_financeiro2(*subpastas: str) -> str:
+    return os.path.join(current_app.config["UPLOAD_ROOT"], "financeiro2", *subpastas)
+
 
 def _redirect_cadastros():
     return redirect(url_for("financeiro_dois.cadastros"))
+
+def _url_redirecionamento_local(valor: str | None, padrao: str) -> str:
+    valor = _nome_preenchido(valor)
+    if not valor:
+        return padrao
+
+    destino = urlparse(valor)
+    if destino.scheme or destino.netloc or not destino.path.startswith("/"):
+        return padrao
+    return valor
+
 
 def _toggle_status_generico(tabela: str, item_id: int, campo_nome: str = "nome"):
     engine = get_engine()
@@ -154,32 +213,31 @@ def _status_nd_rd(conn, rd_id: int) -> str:
     return "VINCULADA"    
 
 def _resolver_candidatos_arquivo(nome_arquivo: str, subpastas: list[str]) -> list[str]:
-    """Gera lista de caminhos candidatos para um arquivo de upload.
-
-    Verifica root_path/static, cwd/static, instance e /tmp (Railway).
-    """
+    """Gera caminhos permitidos usando somente o nome-base do anexo."""
     if not nome_arquivo:
         return []
     nome_arquivo = str(nome_arquivo).strip().replace("\\", "/")
     base = os.path.basename(nome_arquivo)
+    if not base or base in {".", ".."}:
+        return []
+
     candidatos: list[str] = []
+    raizes = [
+        _pasta_upload_financeiro2(),
+        os.path.join(current_app.root_path, "static", "uploads", "financeiro2"),
+        os.path.join(current_app.instance_path, "uploads", "financeiro2"),
+        os.path.join("/tmp", "prod_uploads", "financeiro2"),
+    ]
 
-    raizes = [current_app.root_path, os.getcwd()]
-
-    # Caminho literal (já pode ser absoluto ou relativo completo)
     for raiz in raizes:
-        candidatos.append(os.path.join(raiz, nome_arquivo.lstrip("/")))
-
-    # Cada subpasta conhecida dentro de static/uploads/financeiro2
-    for raiz in raizes:
-        for sp in subpastas:
-            candidatos.append(os.path.join(raiz, "static", "uploads", "financeiro2", sp, base))
-        candidatos.append(os.path.join(raiz, "static", "uploads", "financeiro2", base))
-
-    # Fallback /tmp (Railway não persiste static/)
-    for sp in subpastas:
-        candidatos.append(os.path.join("/tmp", "prod_uploads", "financeiro2", sp, base))
-    candidatos.append(os.path.join("/tmp", "prod_uploads", "financeiro2", base))
+        raiz_real = os.path.realpath(raiz)
+        for sp in [*subpastas, ""]:
+            candidato = os.path.realpath(os.path.join(raiz_real, sp, base))
+            try:
+                if os.path.commonpath([raiz_real, candidato]) == raiz_real:
+                    candidatos.append(candidato)
+            except ValueError:
+                continue
 
     # Deduplica mantendo ordem
     seen: set[str] = set()
@@ -628,7 +686,7 @@ def _salvar_anexo_despesa(arquivo):
         raise ValueError("Arquivo inválido ou corrompido. Envie PDF ou imagem real.")
 
     arquivo.stream.seek(0)
-    pasta = os.path.join(current_app.root_path, "static", "uploads", "financeiro2", "despesas")
+    pasta = _pasta_upload_financeiro2("despesas")
     os.makedirs(pasta, exist_ok=True)
 
     if extensao in {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".tif", ".tiff"}:
@@ -1837,7 +1895,7 @@ def om_linha_nova(om_id: int):
                 return redirect(url_for("financeiro_dois.om_editar", om_id=om_id))
             arquivo.stream.seek(0)
 
-            pasta = os.path.join(current_app.root_path, "static", "uploads", "financeiro2", "om_recibos")
+            pasta = _pasta_upload_financeiro2("om_recibos")
             os.makedirs(pasta, exist_ok=True)
 
             if extensao in {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".tif", ".tiff"}:
@@ -2964,7 +3022,7 @@ def rd_linha_nova(rd_id: int):
                 return redirect(url_for("financeiro_dois.rd_editar", rd_id=rd_id))
             arquivo.stream.seek(0)
 
-            pasta = os.path.join(current_app.root_path, "static", "uploads", "financeiro2", "rd_recibos")
+            pasta = _pasta_upload_financeiro2("rd_recibos")
             os.makedirs(pasta, exist_ok=True)
 
             if extensao in {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".tif", ".tiff"}:
@@ -5317,7 +5375,10 @@ def aprovacao_solicitar():
     referencia_num = (request.form.get("referencia_num") or "").strip()
     descricao     = (request.form.get("descricao") or "").strip()
     valor         = request.form.get("valor", type=float)
-    redirect_url  = request.form.get("redirect_url") or url_for("financeiro_dois.aprovacoes")
+    redirect_url = _url_redirecionamento_local(
+        request.form.get("redirect_url"),
+        url_for("financeiro_dois.aprovacoes"),
+    )
 
     if tipo not in ("DESPESA", "REEMBOLSO") or not referencia_id:
         flash("Dados inválidos para solicitação de aprovação.", "danger")
@@ -7699,6 +7760,58 @@ def nota_debito_operacional(nd_id: int, despesa_id: int):
                 _recalcular_status_nd(conn, nd_id)
                 flash("DESPESA OPERACIONAL DESCONSIDERADA PARA ESTA ND.", "success")
 
+            elif acao == "reverter":
+                if not _usuario_eh_administrador():
+                    flash("APENAS O PERFIL ADMINISTRADOR PODE REVERTER DESPESA OPERACIONAL.", "danger")
+                    return redirect(url_for(
+                        "financeiro_dois.nota_debito_operacional",
+                        nd_id=nd_id,
+                        despesa_id=despesa_id,
+                    ))
+
+                pertence_a_nd = (
+                    despesa["nd_numero"] == nd["numero_nd"]
+                    or despesa["numero_nd_desconsiderada"] == nd["numero_nd"]
+                )
+                if not pertence_a_nd:
+                    flash("ESSA DESPESA NÃO ESTÁ VINCULADA OU DESCONSIDERADA POR ESTA ND.", "warning")
+                    return redirect(url_for(
+                        "financeiro_dois.nota_debito_operacional",
+                        nd_id=nd_id,
+                        despesa_id=despesa_id,
+                    ))
+
+                conn.execute(text("""
+                    DELETE FROM financeiro2_notas_debito_despesas
+                    WHERE nd_id = :nd_id
+                      AND despesa_id = :despesa_id
+                """), {
+                    "nd_id": nd_id,
+                    "despesa_id": despesa_id,
+                })
+
+                conn.execute(text("""
+                    UPDATE financeiro2_despesas
+                    SET
+                        status_nd = 'NÃO VINCULADA',
+                        nd_numero = CASE
+                            WHEN UPPER(COALESCE(nd_numero, '')) = :numero_nd THEN NULL
+                            ELSE nd_numero
+                        END,
+                        numero_nd_desconsiderada = CASE
+                            WHEN UPPER(COALESCE(numero_nd_desconsiderada, '')) = :numero_nd THEN NULL
+                            ELSE numero_nd_desconsiderada
+                        END,
+                        atualizado_em = CURRENT_TIMESTAMP
+                    WHERE id = :id
+                """), {
+                    "id": despesa_id,
+                    "numero_nd": nd["numero_nd"],
+                })
+
+                _recalcular_status_nd(conn, nd_id)
+                flash("DESPESA OPERACIONAL REVERTIDA COM SUCESSO.", "success")
+
             else:
                 flash("AÇÃO INVÁLIDA.", "warning")
 
@@ -7744,6 +7857,7 @@ def nota_debito_operacional(nd_id: int, despesa_id: int):
         subnav_links=build_financeiro_dois_subnav("notas_debito"),
         nd=nd,
         despesa=despesa,
+        pode_reverter=_usuario_eh_administrador(),
     )
     
 @bp.route("/om/<int:om_id>/desvincular")

@@ -268,7 +268,7 @@
           {% elif despesa.anexos %}
             <div class="anexo-list">
               {% for anexo in despesa.anexos %}
-                <a class="anexo-item" href="{{ url_for('static', filename='uploads/financeiro2/despesas/' ~ anexo.arquivo) }}" target="_blank">
+                <a class="anexo-item" href="{{ url_for('financeiro_dois.despesa_abrir_anexo', arquivo=anexo.arquivo) }}" target="_blank">
                   <span>{{ anexo.nome_original or anexo.arquivo }}</span>
                 </a>
               {% endfor %}

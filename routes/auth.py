@@ -135,21 +135,22 @@ def login():
             ).mappings().first()
 
         if not usuario:
-            if usuario["bloqueado_ate"] and usuario["bloqueado_ate"] > datetime.utcnow():
-                registrar_log(
-                    evento="login_bloqueado_temporario",
-                    detalhes=f"Usuário bloqueado até {usuario['bloqueado_ate']}",
-                    usuario_id=usuario["id"],
-                    username=usuario["username"]
-                )
-                flash("Usuário temporariamente bloqueado por excesso de tentativas. Tente novamente mais tarde.", "erro")
-                return render_template("auth/login.html")
             registrar_log(
                 evento="login_invalido",
                 detalhes="Usuário não encontrado",
                 username=username
             )
             flash("Usuário ou senha inválidos.", "erro")
+            return render_template("auth/login.html")
+
+        if usuario["bloqueado_ate"] and usuario["bloqueado_ate"] > datetime.utcnow():
+            registrar_log(
+                evento="login_bloqueado_temporario",
+                detalhes=f"Usuário bloqueado até {usuario['bloqueado_ate']}",
+                usuario_id=usuario["id"],
+                username=usuario["username"]
+            )
+            flash("Usuário temporariamente bloqueado por excesso de tentativas. Tente novamente mais tarde.", "erro")
             return render_template("auth/login.html")
 
         if not usuario["ativo"]:
@@ -244,7 +245,7 @@ def login():
     return render_template("auth/login.html")
 
 
-@bp.get("/logout")
+@bp.post("/logout")
 def logout():
     registrar_log(
         evento="logout",

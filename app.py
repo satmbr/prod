@@ -1,15 +1,47 @@
-from flask import Flask, session, redirect, url_for, request, flash, render_template
+from flask import Flask, session, redirect, url_for, request, flash, render_template, abort
+from flask_wtf.csrf import CSRFProtect, CSRFError
 import os
 from datetime import timedelta, datetime
 
+csrf = CSRFProtect()
 
 def create_app():
     app = Flask(__name__)
-    app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "troque-esta-chave-em-producao")
+    secret_key = os.getenv("SECRET_KEY")
+    if not secret_key:
+        raise RuntimeError("SECRET_KEY não definida no ambiente.")
+
+    em_railway = bool(os.getenv("RAILWAY_ENVIRONMENT") or os.getenv("RAILWAY_PROJECT_ID"))
+    cookie_secure = os.getenv("SESSION_COOKIE_SECURE")
+
+    app.config["SECRET_KEY"] = secret_key
     app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(minutes=30)
+    app.config["SESSION_COOKIE_HTTPONLY"] = True
+    app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+    app.config["SESSION_COOKIE_SECURE"] = (
+        cookie_secure.lower() in {"1", "true", "yes", "on"}
+        if cookie_secure is not None
+        else em_railway
+    )
+    app.config["MAX_CONTENT_LENGTH"] = int(os.getenv("MAX_CONTENT_LENGTH", 20 * 1024 * 1024))
+    app.config["UPLOAD_ROOT"] = os.path.abspath(
+        os.getenv("UPLOAD_ROOT") or os.path.join(app.instance_path, "uploads")
+    )
+
+    csrf.init_app(app)
+
+    @app.errorhandler(CSRFError)
+    def csrf_error(_erro):
+        return "Requisição inválida ou expirada. Atualize a página e tente novamente.", 400
 
     @app.before_request
     def controlar_sessao():
+        if request.endpoint == "static":
+            arquivo_estatico = (request.view_args or {}).get("filename", "")
+            caminho = str(arquivo_estatico).replace("\\", "/").lstrip("/")
+            if caminho.startswith("uploads/"):
+                abort(404)
+
         rotas_livres = {
             "auth.login",
             "auth.logout",

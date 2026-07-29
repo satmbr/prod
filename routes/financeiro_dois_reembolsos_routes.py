@@ -4,7 +4,12 @@ from datetime import date, datetime
 
 from db import get_engine
 from routes.auth import login_required, permission_required
-from routes.financeiro_dois_routes import bp, build_financeiro_dois_subnav, _nome_preenchido
+from routes.financeiro_dois_routes import (
+    bp,
+    build_financeiro_dois_subnav,
+    _nome_preenchido,
+    _pasta_upload_financeiro2,
+)
 
 import os
 import re
@@ -110,17 +115,8 @@ def _extensao_upload_valida(arquivo) -> str | None:
 
 
 def _pastas_upload_financeiro2(*subpastas: str) -> list[str]:
-    """Gera pastas possíveis para uploads no Railway/local.
-
-    O caminho principal continua sendo static/uploads/financeiro2, mas mantemos
-    fallbacks para instance/uploads e /tmp em caso de ambiente com restrição de escrita.
-    """
-    rel = os.path.join("uploads", "financeiro2", *subpastas)
-    return [
-        os.path.join(current_app.root_path, "static", rel),
-        os.path.join(current_app.instance_path, rel),
-        os.path.join("/tmp", "prod_uploads", "financeiro2", *subpastas),
-    ]
+    """Retorna o diretório configurado para armazenamento persistente."""
+    return [_pasta_upload_financeiro2(*subpastas)]
 
 
 def _salvar_upload_financeiro2(arquivo, subpasta: str) -> str | None:
@@ -169,10 +165,10 @@ def _candidatos_caminho_anexo_reembolso(nome_arquivo: str | None) -> list[str]:
     antigos, como static/uploads/financeiro2/reembolsos/uuid.pdf.
     """
     nome_arquivo = _nome_preenchido(nome_arquivo).replace("\\", "/")
-    if not nome_arquivo:
+    base = os.path.basename(nome_arquivo)
+    if not base or base in {".", ".."}:
         return []
 
-    base = os.path.basename(nome_arquivo)
     candidatos: list[str] = []
 
     def add(caminho: str | None):
@@ -181,15 +177,6 @@ def _candidatos_caminho_anexo_reembolso(nome_arquivo: str | None) -> list[str]:
         caminho = os.path.normpath(caminho)
         if caminho not in candidatos:
             candidatos.append(caminho)
-
-    # Caminho absoluto legado, se já estiver dentro do projeto/ambiente.
-    if os.path.isabs(nome_arquivo):
-        add(nome_arquivo)
-
-    # Caminhos relativos antigos armazenados no banco.
-    for raiz in {current_app.root_path, os.getcwd()}:
-        add(os.path.join(raiz, nome_arquivo.lstrip("/")))
-        add(os.path.join(raiz, "static", nome_arquivo.lstrip("/")))
 
     # Pastas atuais e legadas do financeiro dois.
     subpastas = [
@@ -201,12 +188,13 @@ def _candidatos_caminho_anexo_reembolso(nome_arquivo: str | None) -> list[str]:
         "",
     ]
     for subpasta in subpastas:
-        for pasta in _pastas_upload_financeiro2(subpasta):
-            add(os.path.join(pasta, base))
+        add(os.path.join(_pasta_upload_financeiro2(subpasta), base))
 
-    # Static tradicional, caso _pastas_upload_financeiro2 seja alterado no futuro.
+    # Pastas legadas, restritas ao nome-base para impedir path traversal.
     for subpasta in subpastas:
         add(os.path.join(current_app.root_path, "static", "uploads", "financeiro2", subpasta, base))
+        add(os.path.join(current_app.instance_path, "uploads", "financeiro2", subpasta, base))
+        add(os.path.join("/tmp", "prod_uploads", "financeiro2", subpasta, base))
 
     return candidatos
 

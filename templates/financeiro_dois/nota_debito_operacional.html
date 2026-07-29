@@ -38,7 +38,8 @@
 
         {% if pode_reverter and (despesa.nd_numero == nd.numero_nd or despesa.numero_nd_desconsiderada == nd.numero_nd) %}
         <div class="form-actions-top" style="margin-top:12px;">
-          <form method="post" action="{{ url_for('financeiro_dois.nota_debito_operacional_reverter', nd_id=nd.id, despesa_id=despesa.id) }}">
+          <form method="post" action="{{ url_for('financeiro_dois.nota_debito_operacional', nd_id=nd.id, despesa_id=despesa.id) }}">
+            <input type="hidden" name="acao" value="reverter">
             <button type="submit" class="btn">Reverter</button>
           </form>
         </div>
