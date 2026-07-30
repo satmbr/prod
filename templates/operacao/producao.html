@@ -74,11 +74,14 @@
             {% endfor %}
           </select>
         </label>
-        <label class="field"><span>Parte diária P190</span><input type="date" name="data_parte_diaria" value="{{ d.data_parte_diaria or '' }}"></label>
+        <label class="field"><span>Parte diária P190</span><input type="date" name="data_parte_diaria" value="{{ d.data_parte_diaria or '' }}" required></label>
         <div class="actions">
           <button class="btn primary" type="submit">Atualizar</button>
           {% if d.eh_id %}
             <a class="btn info" href="{{ url_for('operacao.producao_relatorio', eh_id=d.eh_id, data_parte_diaria=d.data_parte_diaria) }}">Exportar Excel</a>
+          {% endif %}
+          {% if d.eh_id and d.data_parte_diaria %}
+            <a class="btn success" href="{{ url_for('operacao.producao_relatorio_diario_pdf', eh_id=d.eh_id, data_parte_diaria=d.data_parte_diaria) }}">Relatório diário PDF</a>
           {% endif %}
         </div>
       </form>

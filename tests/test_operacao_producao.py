@@ -73,6 +73,11 @@ class SeparacaoTelasProducaoTests(unittest.TestCase):
         self.assertNotIn('name="fim"', self.producao)
         self.assertIn("Período completo da EH", self.producao)
 
+    def test_producao_oferece_relatorio_diario_por_eh_e_data(self):
+        self.assertIn("producao_relatorio_diario_pdf", self.producao)
+        self.assertIn('name="data_parte_diaria"', self.producao)
+        self.assertIn("PDF", self.producao)
+
     def test_registro_concentra_apontamentos_operacionais(self):
         self.assertNotIn("registro_parte_diaria_create", self.registro)
         self.assertIn("equipamentos.partdiaria", self.registro)

@@ -1,6 +1,6 @@
 from datetime import date
 import json
-from flask import Blueprint, flash, render_template, request, redirect, send_file, url_for, session
+from flask import Blueprint, current_app, flash, render_template, request, redirect, send_file, url_for, session
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -11,6 +11,7 @@ from routes.operacao_producao import (
     carregar_dashboard,
     gerar_relatorio_xlsx,
 )
+from routes.operacao_relatorio_pdf import gerar_relatorio_diario_pdf
 from db import get_engine
 
 bp = Blueprint("operacao", __name__, url_prefix="/operacao")
@@ -1189,5 +1190,40 @@ def producao_relatorio():
         as_attachment=True,
         download_name=f"producao_eh_{eh_id}_{dashboard['inicio']}_{dashboard['fim']}.xlsx",
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+
+
+@bp.route("/producao/relatorio-diario.pdf")
+@login_required
+@permission_required("operacao", "visualizar")
+def producao_relatorio_diario_pdf():
+    eh_id_raw = request.args.get("eh_id")
+    data_referencia = _data_iso_ou_none(request.args.get("data_parte_diaria"))
+    if not eh_id_raw or not eh_id_raw.isdigit() or not data_referencia:
+        flash("Selecione a EH e a data da Parte Diária para gerar o PDF.", "warning")
+        return redirect(url_for("operacao.producao"))
+
+    eh_id = int(eh_id_raw)
+    with get_engine().connect() as conn:
+        dashboard = carregar_dashboard(
+            conn,
+            eh_id,
+            data_parte_diaria=data_referencia,
+        )
+    nome_eh = next(
+        (item["nome"] for item in dashboard["ehs"] if int(item["id"]) == eh_id),
+        f"EH-{eh_id}",
+    )
+    arquivo = gerar_relatorio_diario_pdf(
+        dashboard,
+        nome_eh,
+        data_referencia,
+        current_app.root_path,
+    )
+    return send_file(
+        arquivo,
+        as_attachment=True,
+        download_name=f"diario_producao_eh_{eh_id}_{data_referencia}.pdf",
+        mimetype="application/pdf",
     )
 
