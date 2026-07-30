@@ -1,10 +1,16 @@
 from datetime import date
 import json
-from flask import Blueprint, render_template, request, redirect, url_for, session
+from flask import Blueprint, flash, render_template, request, redirect, send_file, url_for, session
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
 from routes.auth import login_required, permission_required
+from routes.operacao_producao import (
+    CATEGORIAS_IMPACTO,
+    STATUS_IMPACTO,
+    carregar_dashboard,
+    gerar_relatorio_xlsx,
+)
 from db import get_engine
 
 bp = Blueprint("operacao", __name__, url_prefix="/operacao")
@@ -77,7 +83,11 @@ def load_eh_frentes(conn):
     try:
         fr_list = (
             conn.execute(
-                text("SELECT id, frente FROM frente_equipe ORDER BY frente")
+                text(
+                    "SELECT id, frente FROM frente_equipe "
+                    "WHERE COALESCE(escopo, 'EH') = 'EH' "
+                    "ORDER BY COALESCE(ordem, 999), frente"
+                )
             )
             .mappings()
             .all()
@@ -110,6 +120,25 @@ def index():
 @permission_required("operacao", "visualizar")
 def producao():
     engine = get_engine()
+
+    with engine.connect() as conn:
+        eh_id_raw = request.args.get("eh_id")
+        eh_id = int(eh_id_raw) if eh_id_raw and eh_id_raw.isdigit() else None
+        dashboard = carregar_dashboard(
+            conn,
+            eh_id,
+            _data_iso_ou_none(request.args.get("inicio")),
+            _data_iso_ou_none(request.args.get("fim")),
+        )
+
+    return render_template(
+        "operacao/producao.html",
+        subnav_links=build_operacao_subnav("producao"),
+        dashboard=dashboard,
+        can_create=user_can("operacao:criar"),
+        can_edit=user_can("operacao:editar"),
+        can_delete=user_can("operacao:excluir"),
+    )
 
     with engine.connect() as conn:
         ehs = []
@@ -526,6 +555,15 @@ def _numero_positivo(valor):
     return numero
 
 
+def _data_iso_ou_none(valor):
+    if not valor:
+        return None
+    try:
+        return date.fromisoformat(str(valor)).isoformat()
+    except (TypeError, ValueError):
+        return None
+
+
 def _upsert_producao(conn, tabela: str, campo: str, eh_id, frente_id, data_str, valor) -> str:
     """
     Salva um valor diário por EH + Frente + Data.
@@ -929,4 +967,256 @@ def registro_planejada_delete():
         return _redirect_registro("Registro planejado excluído.", "planejada")
     except Exception as e:
         return _redirect_registro(f"Erro ao excluir planejado: {e}", "planejada")
+
+
+# -------------------------------------------------------------------
+# Produção: parâmetros, saldos, impactos, pátio e relatório
+# -------------------------------------------------------------------
+def _redirecionar_producao(eh_id, inicio=None, fim=None):
+    params = {}
+    if eh_id:
+        params["eh_id"] = eh_id
+    if inicio:
+        params["inicio"] = inicio
+    if fim:
+        params["fim"] = fim
+    return redirect(url_for("operacao.producao", **params))
+
+
+@bp.route("/producao/configuracao", methods=["POST"])
+@login_required
+@permission_required("operacao", "editar")
+def producao_configuracao():
+    eh_id = request.form.get("eh_id")
+    meta = _numero_positivo(request.form.get("meta_total"))
+    produtividade = _numero_positivo(request.form.get("produtividade_dia"))
+    data_inicio = _data_iso_ou_none(request.form.get("data_inicio"))
+    data_fim = _data_iso_ou_none(request.form.get("data_fim_planejada"))
+    if data_inicio and data_fim and data_inicio > data_fim:
+        flash("O fim planejado não pode ser anterior ao início.", "warning")
+        return _redirecionar_producao(eh_id)
+    if not eh_id or meta is None or not produtividade:
+        flash("Informe a EH, a meta e uma produtividade diária maior que zero.", "warning")
+        return _redirecionar_producao(eh_id)
+
+    with get_engine().begin() as conn:
+        conn.execute(
+            text(
+                """
+                INSERT INTO operacao_eh_config
+                    (eh_id, meta_total, produtividade_dia, data_inicio,
+                     data_fim_planejada, observacao, atualizado_por)
+                VALUES
+                    (:eh_id, :meta, :produtividade, :inicio, :fim, :observacao, :usuario)
+                ON CONFLICT (eh_id) DO UPDATE SET
+                    meta_total = EXCLUDED.meta_total,
+                    produtividade_dia = EXCLUDED.produtividade_dia,
+                    data_inicio = EXCLUDED.data_inicio,
+                    data_fim_planejada = EXCLUDED.data_fim_planejada,
+                    observacao = EXCLUDED.observacao,
+                    atualizado_em = NOW(),
+                    atualizado_por = EXCLUDED.atualizado_por
+                """
+            ),
+            {
+                "eh_id": eh_id,
+                "meta": meta,
+                "produtividade": produtividade,
+                "inicio": data_inicio,
+                "fim": data_fim,
+                "observacao": (request.form.get("observacao") or "").strip() or None,
+                "usuario": session.get("usuario_id"),
+            },
+        )
+    flash("Parâmetros da EH atualizados.", "success")
+    return _redirecionar_producao(eh_id)
+
+
+@bp.route("/producao/saldos-iniciais", methods=["POST"])
+@login_required
+@permission_required("operacao", "editar")
+def producao_saldos_iniciais():
+    eh_id = request.form.get("eh_id")
+    data_referencia = _data_iso_ou_none(request.form.get("data_referencia"))
+    codigos = (
+        "PULMAO_CHAO",
+        "NOVOS_VAGOES",
+        "GRAMPOS_ABERTOS",
+        "GALOCHAS_ABERTAS",
+        "PREGACAO_ABERTA",
+        "VELHOS_VAGOES",
+    )
+    valores = {codigo: _numero_positivo(request.form.get(codigo)) for codigo in codigos}
+    if not eh_id or not data_referencia or any(valor is None for valor in valores.values()):
+        flash("Informe a data e todos os saldos iniciais com valores não negativos.", "warning")
+        return _redirecionar_producao(eh_id)
+
+    with get_engine().begin() as conn:
+        for codigo, quantidade in valores.items():
+            conn.execute(
+                text(
+                    """
+                    INSERT INTO operacao_saldo_inicial
+                        (eh_id, data_referencia, saldo_codigo, quantidade, atualizado_por)
+                    VALUES (:eh_id, :data, :codigo, :quantidade, :usuario)
+                    ON CONFLICT (eh_id, data_referencia, saldo_codigo) DO UPDATE SET
+                        quantidade = EXCLUDED.quantidade,
+                        atualizado_em = NOW(),
+                        atualizado_por = EXCLUDED.atualizado_por
+                    """
+                ),
+                {
+                    "eh_id": eh_id,
+                    "data": data_referencia,
+                    "codigo": codigo,
+                    "quantidade": quantidade,
+                    "usuario": session.get("usuario_id"),
+                },
+            )
+    flash("Saldos iniciais atualizados. Todo o fluxo foi recalculado.", "success")
+    return _redirecionar_producao(eh_id)
+
+
+@bp.route("/producao/impactos", methods=["POST"])
+@login_required
+@permission_required("operacao", "criar")
+def producao_impacto_create():
+    eh_id = request.form.get("eh_id")
+    data_impacto = request.form.get("data")
+    minutos = _numero_positivo(request.form.get("minutos_perdidos"))
+    descricao = (request.form.get("descricao") or "").strip()
+    categorias_validas = {codigo for codigo, _ in CATEGORIAS_IMPACTO}
+    status_validos = {codigo for codigo, _ in STATUS_IMPACTO}
+    categoria = request.form.get("categoria") or "OUTRO"
+    status = request.form.get("status") or "ABERTO"
+    if (
+        not eh_id
+        or not _data_iso_ou_none(data_impacto)
+        or minutos is None
+        or not descricao
+        or categoria not in categorias_validas
+        or status not in status_validos
+    ):
+        flash("Preencha data, minutos perdidos e descrição do impacto.", "warning")
+        return _redirecionar_producao(eh_id)
+
+    with get_engine().begin() as conn:
+        conn.execute(
+            text(
+                """
+                INSERT INTO operacao_impacto
+                    (data, eh_id, frente_id, hora_inicio, hora_fim, minutos_perdidos,
+                     categoria, descricao, responsavel, providencia, status, criado_por)
+                VALUES
+                    (:data, :eh_id, :frente_id, :hora_inicio, :hora_fim, :minutos,
+                     :categoria, :descricao, :responsavel, :providencia, :status, :usuario)
+                """
+            ),
+            {
+                "data": data_impacto,
+                "eh_id": eh_id,
+                "frente_id": request.form.get("frente_id") or None,
+                "hora_inicio": request.form.get("hora_inicio") or None,
+                "hora_fim": request.form.get("hora_fim") or None,
+                "minutos": int(minutos),
+                "categoria": categoria,
+                "descricao": descricao,
+                "responsavel": (request.form.get("responsavel") or "").strip() or None,
+                "providencia": (request.form.get("providencia") or "").strip() or None,
+                "status": status,
+                "usuario": session.get("usuario_id"),
+            },
+        )
+    flash("Impacto diário registrado.", "success")
+    return _redirecionar_producao(eh_id, data_impacto, data_impacto)
+
+
+@bp.route("/producao/impactos/<int:impacto_id>/excluir", methods=["POST"])
+@login_required
+@permission_required("operacao", "excluir")
+def producao_impacto_delete(impacto_id):
+    eh_id = request.form.get("eh_id")
+    with get_engine().begin() as conn:
+        conn.execute(text("DELETE FROM operacao_impacto WHERE id = :id"), {"id": impacto_id})
+    flash("Impacto excluído.", "success")
+    return _redirecionar_producao(eh_id)
+
+
+@bp.route("/producao/patio", methods=["POST"])
+@login_required
+@permission_required("operacao", "criar")
+def producao_patio_create():
+    eh_id = request.form.get("eh_id")
+    quantidade = _numero_positivo(request.form.get("quantidade"))
+    classificacao = request.form.get("classificacao") or "BOM"
+    if (
+        not _data_iso_ou_none(request.form.get("data"))
+        or quantidade is None
+        or classificacao not in {"BOM", "RUIM"}
+    ):
+        flash("Informe a data e a quantidade segregada.", "warning")
+        return _redirecionar_producao(eh_id)
+
+    with get_engine().begin() as conn:
+        conn.execute(
+            text(
+                """
+                INSERT INTO operacao_patio
+                    (data, patio, classificacao, quantidade, origem_eh_id, observacao, criado_por)
+                VALUES (:data, :patio, :classificacao, :quantidade, :origem, :observacao, :usuario)
+                """
+            ),
+            {
+                "data": request.form.get("data"),
+                "patio": (request.form.get("patio") or "").strip() or "Pátio principal",
+                "classificacao": classificacao,
+                "quantidade": quantidade,
+                "origem": eh_id or None,
+                "observacao": (request.form.get("observacao") or "").strip() or None,
+                "usuario": session.get("usuario_id"),
+            },
+        )
+    flash("Segregação de pátio registrada.", "success")
+    return _redirecionar_producao(eh_id)
+
+
+@bp.route("/producao/patio/<int:registro_id>/excluir", methods=["POST"])
+@login_required
+@permission_required("operacao", "excluir")
+def producao_patio_delete(registro_id):
+    eh_id = request.form.get("eh_id")
+    with get_engine().begin() as conn:
+        conn.execute(text("DELETE FROM operacao_patio WHERE id = :id"), {"id": registro_id})
+    flash("Registro de pátio excluído.", "success")
+    return _redirecionar_producao(eh_id)
+
+
+@bp.route("/producao/relatorio.xlsx")
+@login_required
+@permission_required("operacao", "visualizar")
+def producao_relatorio():
+    eh_id_raw = request.args.get("eh_id")
+    if not eh_id_raw or not eh_id_raw.isdigit():
+        flash("Selecione uma EH para gerar o relatório.", "warning")
+        return redirect(url_for("operacao.producao"))
+
+    eh_id = int(eh_id_raw)
+    with get_engine().connect() as conn:
+        dashboard = carregar_dashboard(
+            conn,
+            eh_id,
+            _data_iso_ou_none(request.args.get("inicio")),
+            _data_iso_ou_none(request.args.get("fim")),
+        )
+    nome_eh = next(
+        (item["nome"] for item in dashboard["ehs"] if int(item["id"]) == eh_id),
+        f"EH-{eh_id}",
+    )
+    arquivo = gerar_relatorio_xlsx(dashboard, nome_eh)
+    return send_file(
+        arquivo,
+        as_attachment=True,
+        download_name=f"producao_eh_{eh_id}_{dashboard['inicio']}_{dashboard['fim']}.xlsx",
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
 

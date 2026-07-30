@@ -2,1288 +2,347 @@
 {% block title %}Operação · Produção{% endblock %}
 
 {% block content %}
-<div class="page-wrap">
-
-  {% set dados_ordenados = dados | sort(attribute='data') %}
-  {% set dados_resumo_frentes_ordenados = dados_resumo_frentes | sort(attribute='data') %}
-  {% set grafico_barra_carregamento_ordenado = grafico_barra_carregamento | sort(attribute='data') %}
-
+{% set d = dashboard %}
+<div class="page-wrap production-page">
   <style>
-    .prod-toolbar{
-      display:grid;
-      grid-template-columns: 1fr 1fr auto;
-      gap:6px;
-      align-items:end;
-    }
-
-    .prod-toolbar .field > span{
-      display:block;
-      margin-bottom:4px;
-      font-weight:600;
-      color:#394150;
-    }
-
-    .prod-toolbar .field input,
-    .prod-toolbar .field select{
-      width:100%;
-    }
-
-    .prod-actions{
-      display:flex;
-      gap:4px;
-      align-items:end;
-      flex-wrap:wrap;
-    }
-
-    .prod-hero{
-      display:grid;
-      grid-template-columns: 1.2fr .8fr;
-      gap:8px;
-      align-items:start;
-    }
-
-    .hero-card{
-      border:1px solid var(--pru-border);
-      border-radius:8px;
-      background:linear-gradient(180deg, #fbfdff 0%, #f5f9fc 100%);
-      padding:6px 8px;
-      min-height:56px;
-      display:flex;
-      flex-direction:column;
-      justify-content:center;
-    }
-
-    .hero-title{
-      font-size:9px;
-      font-weight:700;
-      letter-spacing:.04em;
-      color:#6b7a8d;
-      text-transform:uppercase;
-      margin-bottom:2px;
-    }
-
-    .hero-value{
-      font-size:11px;
-      font-weight:700;
-      color:var(--pru-blue);
-      line-height:1.1;
-    }
-
-    .hero-sub{
-      color:#5d6b7c;
-      margin-top:2px;
-      font-size:9px;
-    }
-
-    .layout-tabela-grafico{
-      display:grid;
-      grid-template-columns: minmax(360px, 1.15fr) minmax(260px, .85fr);
-      gap:8px;
-      align-items:start;
-    }
-
-    .col-tabela,
-    .col-grafico{
-      min-width:0;
-    }
-
-    .chart-card{
-      border:1px solid var(--pru-border);
-      border-radius:8px;
-      background:#fff;
-      padding:6px;
-      height:auto;
-      min-height:auto;
-      box-shadow:var(--pru-shadow);
-    }
-
-    .chart-card.chart-sm{
-      height:290px;
-    }
-
-    .chart-card.chart-lg{
-      height:340px;
-    }
-
-    .chart-title{
-      font-size:9px;
-      font-weight:700;
-      color:var(--pru-blue);
-      margin-bottom:5px;
-    }
-
-    .chart-wrap{
-      position:relative;
-      width:100%;
-      height:250px;
-      min-height:250px;
-      max-height:250px;
-    }
-
-    .chart-wrap.chart-wrap-lg{
-      height:300px;
-      min-height:300px;
-      max-height:300px;
-    }
-
-    .chart-wrap canvas{
-      width:100% !important;
-      height:100% !important;
-      display:block;
-    }
-
-    .table-card{
-      border:1px solid var(--pru-border);
-      border-radius:8px;
-      background:#fff;
-      padding:6px;
-      box-shadow:var(--pru-shadow);
-      height:auto;
-    }
-
-    .prod-table th,
-    .prod-table td{
-      padding:4px 5px !important;
-      font-size:9px !important;
-    }
-
-    .table-card-title{
-      font-size:9px;
-      font-weight:700;
-      color:var(--pru-blue);
-      margin-bottom:5px;
-    }
-
-    .linha-destaque{
-      background-color:#E2EFDA !important;
-    }
-
-    .prod-table th,
-    .prod-table td{
-      text-align:center !important;
-      vertical-align:middle !important;
-      white-space:nowrap;
-      line-height:1.05;
-    }
-
-    .prod-table thead th{
-      text-align:center !important;
-    }
-
-    .prod-table tbody td{
-      text-align:center !important;
-    }
-
-    #op-frentes .prod-table th,
-    #op-frentes .prod-table td{
-      padding:3px 4px !important;
-      font-size:8px !important;
-    }
-
-    #op-frentes .table-wrap{
-      max-height:340px;
-      overflow:auto;
-    }
-
-    .prod-table td.text-left,
-    .prod-table th.text-left{
-      text-align:center !important;
-    }
-
-    .summary-grid{
-      display:grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap:8px;
-    }
-
-    .summary-item{
-      border:1px solid var(--pru-border);
-      border-radius:8px;
-      background:#fff;
-      padding:6px;
-      box-shadow:var(--pru-shadow);
-    }
-
-    .summary-item .k{
-      font-size:8px;
-      color:#6b7a8d;
-      text-transform:uppercase;
-      letter-spacing:.04em;
-      font-weight:700;
-      margin-bottom:2px;
-    }
-
-    .summary-item .v{
-      font-size:11px;
-      color:var(--pru-blue);
-      font-weight:700;
-    }
-
-    .gauge-container{
-      display:grid;
-      grid-template-columns: repeat(auto-fit, minmax(95px, 1fr));
-      gap:8px;
-      margin-top:2px;
-    }
-
-    .gauge-item{
-      position:relative;
-      border:1px solid var(--pru-border);
-      border-radius:8px;
-      background:#fff;
-      padding:6px 5px 5px;
-      box-shadow:var(--pru-shadow);
-      display:flex;
-      flex-direction:column;
-      align-items:center;
-      justify-content:center;
-      min-height:125px;
-    }
-
-    .gauge-item .gauge-canvas-wrap{
-      width:68px;
-      height:68px;
-      position:relative;
-      margin-bottom:5px;
-    }
-
-    .gauge-item canvas{
-      width:100% !important;
-      height:100% !important;
-    }
-
-    .gauge-item img{
-      position:absolute;
-      top:50%;
-      left:50%;
-      width:18px;
-      height:18px;
-      transform:translate(-50%, -50%);
-      z-index:5;
-      pointer-events:none;
-    }
-
-    .gauge-label{
-      text-align:center;
-      font-weight:700;
-      font-size:8px;
-      color:var(--pru-blue);
-      line-height:1.15;
-    }
-
-    .duo-charts{
-      display:grid;
-      grid-template-columns: 1.15fr .85fr;
-      gap:10px;
-      align-items:stretch;
-    }
-
-    .brand-strip{
-      display:grid;
-      grid-template-columns: auto 1fr auto;
-      gap:8px;
-      align-items:center;
-      border:1px solid var(--pru-border);
-      border-radius:8px;
-      background:linear-gradient(180deg, #fff 0%, #f8fbff 100%);
-      padding:5px 8px;
-      box-shadow:var(--pru-shadow);
-    }
-
-    .brand-strip img{
-      height:16px;
-      width:auto;
-      object-fit:contain;
-      display:block;
-    }
-
-    .brand-strip-center{
-      min-width:0;
-    }
-
-    .brand-strip-top{
-      display:flex;
-      gap:8px;
-      align-items:center;
-      flex-wrap:wrap;
-      margin-bottom:3px;
-    }
-
-    .brand-badge{
-      display:inline-flex;
-      align-items:center;
-      min-height:16px;
-      padding:1px 6px;
-      border-radius:999px;
-      background:#edf3f8;
-      border:1px solid var(--pru-border);
-      color:var(--pru-blue);
-      font-size:8px;
-      font-weight:700;
-      text-transform:uppercase;
-      letter-spacing:.03em;
-    }
-
-    .brand-scope{
-      font-size:9px;
-      color:#445366;
-      line-height:1.15;
-      font-weight:600;
-    }
-
-    .flash-wrap{
-      display:flex;
-      flex-direction:column;
-      gap:10px;
-    }
-
-    .flash{
-      padding:12px 14px;
-      border-radius:12px;
-      border:1px solid #d9e1ea;
-      background:#f5f8fc;
-    }
-
-    .flash.success{
-      background:#eefaf0;
-      border-color:#bfe0c6;
-      color:#25613a;
-    }
-
-    .flash.warning{
-      background:#fff9e8;
-      border-color:#f1df9b;
-      color:#7a5a00;
-    }
-
-    .flash.danger{
-      background:#fff3f3;
-      border-color:#f1c0c0;
-      color:#9f2d2d;
-    }
-
-    .flash.info{
-      background:#eef6ff;
-      border-color:#c9d7e6;
-      color:#204564;
-    }
-
-    @media (max-width: 1100px){
-      .prod-hero,
-      .layout-tabela-grafico,
-      .duo-charts,
-      .summary-grid{
-        grid-template-columns:1fr;
-      }
-    }
-
-    @media (max-width: 780px){
-      .prod-toolbar{
-        grid-template-columns:1fr;
-      }
-
-      .prod-actions{
-        justify-content:stretch;
-      }
-
-      .prod-actions .btn{
-        flex:1 1 auto;
-      }
-
-      .brand-strip{
-        grid-template-columns:1fr;
-        justify-items:start;
-      }
-    }
-
-    #op-prod-filtros.zone-body,
-    #op-renovacao.zone-body,
-    #op-partdiaria.zone-body,
-    #op-frentes.zone-body,
-    #op-gauges.zone-body{
-      padding:6px;
-    }
-
-    .zone-head[data-target="#op-prod-filtros"],
-    .zone-head[data-target="#op-renovacao"],
-    .zone-head[data-target="#op-partdiaria"],
-    .zone-head[data-target="#op-frentes"],
-    .zone-head[data-target="#op-gauges"]{
-      padding:5px 7px;
-    }
-
-    .zone-head[data-target="#op-prod-filtros"] .zone-title,
-    .zone-head[data-target="#op-renovacao"] .zone-title,
-    .zone-head[data-target="#op-partdiaria"] .zone-title,
-    .zone-head[data-target="#op-frentes"] .zone-title,
-    .zone-head[data-target="#op-gauges"] .zone-title{
-      font-size:10px;
-    }
-
-    .zone-head[data-target="#op-prod-filtros"] .zone-icon,
-    .zone-head[data-target="#op-renovacao"] .zone-icon,
-    .zone-head[data-target="#op-partdiaria"] .zone-icon,
-    .zone-head[data-target="#op-frentes"] .zone-icon,
-    .zone-head[data-target="#op-gauges"] .zone-icon{
-      width:18px;
-      height:18px;
-      min-width:18px;
-      font-size:9px;
-    }
-
-    .zone-head[data-target="#op-prod-filtros"] .icon-btn,
-    .zone-head[data-target="#op-renovacao"] .icon-btn,
-    .zone-head[data-target="#op-partdiaria"] .icon-btn,
-    .zone-head[data-target="#op-frentes"] .icon-btn,
-    .zone-head[data-target="#op-gauges"] .icon-btn{
-      width:18px;
-      height:18px;
-    }
-
-    .zone-head[data-target="#op-prod-filtros"] .icon-btn svg,
-    .zone-head[data-target="#op-renovacao"] .icon-btn svg,
-    .zone-head[data-target="#op-partdiaria"] .icon-btn svg,
-    .zone-head[data-target="#op-frentes"] .icon-btn svg,
-    .zone-head[data-target="#op-gauges"] .icon-btn svg{
-      width:9px;
-      height:9px;
-    }
+    .production-page { --navy:#16324f; --blue:#246b9e; --teal:#0f8b8d; --green:#26845b; --red:#b42318; --amber:#b7791f; }
+    .production-page .zone { margin-bottom:12px; }
+    .production-page .zone-body { padding:12px; }
+    .prod-filter, .form-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; align-items:end; }
+    .prod-filter .actions { display:flex; gap:8px; flex-wrap:wrap; }
+    .field span { display:block; margin-bottom:4px; color:#405267; font-weight:700; font-size:11px; }
+    .field input, .field select, .field textarea { width:100%; }
+    .field textarea { min-height:70px; resize:vertical; }
+    .kpi-grid { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:8px; margin-top:12px; }
+    .kpi { padding:10px; border:1px solid #d9e2ec; border-radius:9px; background:#fff; box-shadow:0 2px 8px rgba(22,50,79,.05); }
+    .kpi .label { color:#60758a; font-size:10px; font-weight:700; min-height:25px; text-transform:uppercase; letter-spacing:.03em; }
+    .kpi .value { color:var(--navy); font-size:20px; font-weight:800; margin-top:3px; }
+    .kpi .sub { color:#6f7f90; font-size:10px; margin-top:2px; }
+    .kpi.good { border-left:4px solid var(--green); }
+    .kpi.warn { border-left:4px solid var(--amber); }
+    .kpi.danger { border-left:4px solid var(--red); }
+    .flow-grid { display:grid; grid-template-columns:repeat(6,minmax(130px,1fr)); gap:8px; }
+    .flow-card { position:relative; border:1px solid #d9e2ec; border-radius:9px; padding:10px; background:linear-gradient(180deg,#fff,#f7fafc); }
+    .flow-card:not(:last-child)::after { content:"›"; position:absolute; right:-8px; top:28px; color:#789; font-size:20px; z-index:2; }
+    .flow-card .name { color:#5a6c80; font-size:10px; font-weight:800; text-transform:uppercase; }
+    .flow-card .number { color:var(--navy); font-size:19px; font-weight:800; margin-top:5px; }
+    .flow-card.negative { border-color:#f3a7a2; background:#fff5f4; }
+    .flow-card.negative .number { color:var(--red); }
+    .grid-2 { display:grid; grid-template-columns:1.15fr .85fr; gap:12px; }
+    .panel { border:1px solid #d9e2ec; border-radius:9px; background:#fff; padding:10px; }
+    .panel-title { color:var(--navy); font-size:12px; font-weight:800; margin-bottom:9px; }
+    .chart-box { position:relative; height:310px; }
+    .table-scroll { overflow:auto; max-height:430px; }
+    .prod-table { width:100%; border-collapse:collapse; }
+    .prod-table th, .prod-table td { padding:7px 6px !important; font-size:10px !important; text-align:right; white-space:nowrap; }
+    .prod-table th:first-child, .prod-table td:first-child, .prod-table .left { text-align:left; }
+    .prod-table thead th { position:sticky; top:0; z-index:1; background:#edf3f8; color:var(--navy); }
+    .prod-table tr.alert-row { background:#fff4f2; }
+    .status-pill { display:inline-block; padding:2px 7px; border-radius:999px; font-size:9px; font-weight:800; }
+    .status-open { background:#fff1d6; color:#8a5a00; }
+    .status-progress { background:#e3f0fb; color:#195c91; }
+    .status-done { background:#def4e8; color:#17623e; }
+    .class-good { color:#17623e; font-weight:800; }
+    .class-bad { color:#9e2b22; font-weight:800; }
+    .form-actions { display:flex; gap:8px; align-items:center; margin-top:10px; }
+    details.editor { border:1px solid #d9e2ec; border-radius:9px; background:#f9fbfd; margin-top:10px; }
+    details.editor summary { cursor:pointer; color:var(--navy); font-weight:800; padding:10px 12px; }
+    details.editor form { padding:0 12px 12px; }
+    .hint { color:#60758a; font-size:10px; margin:4px 0 8px; }
+    .empty { color:#718096; text-align:center !important; padding:20px !important; }
+    .alert-banner { border:1px solid #f0b3ad; background:#fff5f4; color:#8e241d; padding:9px 11px; border-radius:8px; margin-top:10px; font-size:11px; }
+    .section-note { color:#60758a; font-size:10px; font-weight:400; margin-left:6px; }
+    @media(max-width:1100px){ .kpi-grid{grid-template-columns:repeat(3,1fr)} .flow-grid{grid-template-columns:repeat(3,1fr)} }
+    @media(max-width:780px){ .prod-filter,.form-grid,.grid-2{grid-template-columns:1fr} .kpi-grid{grid-template-columns:repeat(2,1fr)} .flow-grid{grid-template-columns:1fr 1fr} }
   </style>
 
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
-
-  {% with messages = get_flashed_messages(with_categories=true) %}
-    {% if messages %}
-      <section class="zone">
-        <div class="zone-body">
-          <div class="flash-wrap">
-            {% for category, message in messages %}
-              <div class="flash {{ category }}">{{ message }}</div>
-            {% endfor %}
-          </div>
-        </div>
-      </section>
-    {% endif %}
-  {% endwith %}
-
-  {% if msg %}
-    <section class="zone">
-      <div class="zone-body">
-        <div class="flash info">{{ msg }}</div>
-      </div>
-    </section>
-  {% endif %}
-
   <section class="zone">
-    <header class="zone-head" data-target="#op-prod-filtros">
+    <header class="zone-head">
       <div class="zone-left">
         <span class="zone-icon">📈</span>
-        <div class="zone-title">Produção · Acompanhamento Geral</div>
-      </div>
-      <div class="zone-actions">
-        <button type="button" class="icon-btn" aria-label="Seção de filtros">
-          <svg viewBox="0 0 24 24" width="16" height="16">
-            <path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/>
-          </svg>
-        </button>
-        <button type="button" class="icon-btn caret">▾</button>
+        <div class="zone-title">Produção · Renovação por EH</div>
       </div>
     </header>
-
-    <div class="zone-body" id="op-prod-filtros">
-      <div class="brand-strip" style="margin-bottom:10px;">
-        <img src="{{ url_for('static', filename='vale-logo.png') }}" alt="Vale">
-        <div class="brand-strip-center">
-          <div class="brand-strip-top">
-            <span class="brand-badge">Contrato 5900124188</span>
-            <span class="brand-badge">Empresa PRUMAT</span>
-          </div>
-          <div class="brand-scope">Operação e manutenção da renovadora P-190 · EFVM</div>
-        </div>
-        <img src="{{ url_for('static', filename='logo-prumat.png') }}" alt="PRUMAT">
-      </div>
-
-      <form method="GET">
-        <div class="prod-toolbar">
-          <label class="field">
-            <span>EH</span>
-            <select name="eh_id" id="eh_id">
-              <option value="">-- selecione --</option>
-              {% for eh in ehs %}
-                <option value="{{ eh.id }}" {% if eh_id is not none and eh_id == eh.id %}selected{% endif %}>
-                  {{ eh.nome }}
-                </option>
-              {% endfor %}
-            </select>
-          </label>
-
-          <label class="field">
-            <span>Data de referência</span>
-            <input type="date"
-                   name="data_partdiaria"
-                   id="data_partdiaria"
-                   value="{{ data_partdiaria }}">
-          </label>
-
-          <div class="prod-actions">
-            <button class="btn primary" type="submit">🔄 Atualizar</button>
-          </div>
+    <div class="zone-body">
+      <form method="get" class="prod-filter">
+        <label class="field">
+          <span>Entre Houses (EH)</span>
+          <select name="eh_id" required>
+            {% for eh in d.ehs %}
+              <option value="{{ eh.id }}" {{ 'selected' if d.eh_id == eh.id else '' }}>{{ eh.nome }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label class="field"><span>Início do período</span><input type="date" name="inicio" value="{{ d.inicio or '' }}"></label>
+        <label class="field"><span>Fim do período</span><input type="date" name="fim" value="{{ d.fim or '' }}"></label>
+        <div class="actions">
+          <button class="btn primary" type="submit">Atualizar</button>
+          {% if d.eh_id %}
+            <a class="btn info" href="{{ url_for('operacao.producao_relatorio', eh_id=d.eh_id, inicio=d.inicio, fim=d.fim) }}">Exportar Excel</a>
+          {% endif %}
         </div>
       </form>
 
-      <div class="prod-hero" style="margin-top:10px;">
-        <div class="hero-card">
-          <div class="hero-title">Escopo</div>
-          <div class="hero-value">Renovação P190 · Produção e Parte Diária</div>
-          <div class="hero-sub">
-            EH selecionada:
-            {% for eh in ehs %}
-              {% if eh_id == eh.id %}{{ eh.nome }}{% endif %}
-            {% endfor %}
-          </div>
-        </div>
-
-        <div class="summary-grid">
-          <div class="summary-item">
-            <div class="k">Datas na série</div>
-            <div class="v">{{ dados_ordenados|length }}</div>
-          </div>
-          <div class="summary-item">
-            <div class="k">Eventos do dia</div>
-            <div class="v">{{ dados_partdiaria|length }}</div>
-          </div>
-          <div class="summary-item">
-            <div class="k">Frentes resumidas</div>
-            <div class="v">{{ dados_resumo_frentes_ordenados|length }}</div>
-          </div>
-        </div>
+      {% if d.eh_id %}
+      <div class="kpi-grid">
+        <div class="kpi good"><div class="label">Renovado no período</div><div class="value">{{ '{:,.0f}'.format(d.kpis.renovado).replace(',', '.') }}</div><div class="sub">dormentes</div></div>
+        <div class="kpi"><div class="label">Planejado no período</div><div class="value">{{ '{:,.0f}'.format(d.kpis.planejado).replace(',', '.') }}</div><div class="sub">desvio {{ '{:+,.0f}'.format(d.kpis.desvio).replace(',', '.') }}</div></div>
+        <div class="kpi {{ 'warn' if d.kpis.atraso_dias > 0 else 'good' }}"><div class="label">Atraso estimado</div><div class="value">{{ '%.1f'|format(d.kpis.atraso_dias) }}</div><div class="sub">dias a {{ '{:,.0f}'.format(d.config.produtividade_dia).replace(',', '.') }}/dia</div></div>
+        <div class="kpi"><div class="label">Meta da EH</div><div class="value">{{ '%.1f'|format(d.kpis.percentual) }}%</div><div class="sub">{{ '{:,.0f}'.format(d.kpis.meta).replace(',', '.') }} dormentes</div></div>
+        <div class="kpi {{ 'warn' if d.kpis.minutos_impacto else '' }}"><div class="label">Impactos</div><div class="value">{{ '%.1f'|format(d.kpis.minutos_impacto / 60) }} h</div><div class="sub">no período selecionado</div></div>
+        <div class="kpi {{ 'danger' if d.kpis.alertas else 'good' }}"><div class="label">Inconsistências</div><div class="value">{{ d.kpis.alertas }}</div><div class="sub">saldos negativos nos dias</div></div>
       </div>
+      {% if d.kpis.alertas %}
+        <div class="alert-banner">Há saldos negativos no fluxo. Cadastre os saldos iniciais corretos ou revise os apontamentos históricos antes de usar esses números como estoque físico.</div>
+      {% endif %}
+      {% endif %}
     </div>
   </section>
 
+  {% if d.eh_id %}
   <section class="zone">
-    <header class="zone-head" data-target="#op-renovacao">
+    <header class="zone-head">
       <div class="zone-left">
         <span class="zone-icon">🚆</span>
-        <div class="zone-title">01 · Renovação</div>
-      </div>
-      <div class="zone-actions">
-        <button type="button" class="icon-btn" aria-label="Seção renovação">
-          <svg viewBox="0 0 24 24" width="16" height="16">
-            <path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/>
-          </svg>
-        </button>
-        <button type="button" class="icon-btn caret">▾</button>
+        <div class="zone-title">Saldos atuais do fluxo</div>
       </div>
     </header>
-
-    <div class="zone-body" id="op-renovacao">
-      <div class="layout-tabela-grafico">
-        <div class="col-tabela">
-          <div class="table-card">
-            <div class="table-card-title">Planejado x realizado</div>
-            <div class="table-wrap">
-              <table class="table prod-table">
-                <thead>
-                  <tr>
-                    <th>Data</th>
-                    <th>Planejado no dia</th>
-                    <th>Planejado total</th>
-                    <th>Executado no dia</th>
-                    <th>Executado total</th>
-                    <th>Diferença</th>
-                    <th>Atraso</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {% for d in dados_ordenados %}
-                    {% set d_data = d.data|string %}
-                    {% set filtro_data = data_partdiaria|string %}
-                    {% set destaque = 'linha-destaque' if d_data == filtro_data and d_data != '' else '' %}
-                    <tr class="{{ destaque }}">
-                      <td>
-                        {{ d.data.split('-')[2] }}-{{ d.data.split('-')[1] }}-{{ d.data.split('-')[0] }}
-                      </td>
-                      <td>{{ d.previsto_dia }}</td>
-                      <td>{{ d.previsto_total }}</td>
-                      <td>{{ d.realizado_dia }}</td>
-                      <td>{{ d.realizado_total }}</td>
-                      <td>{{ d.diferenca }}</td>
-                      <td>{{ d.atraso }} /dia</td>
-                    </tr>
-                  {% endfor %}
-                  {% if not dados_ordenados %}
-                    <tr><td colspan="7">Nenhum registro encontrado para esta EH.</td></tr>
-                  {% endif %}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-
-        <div class="col-grafico">
-          <div class="chart-card chart-lg">
-            <div class="chart-title">Renovação · planejado x executado</div>
-            <div class="chart-wrap chart-wrap-lg">
-              <canvas id="graficoProducao"></canvas>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <section class="zone">
-    <header class="zone-head" data-target="#op-partdiaria">
-      <div class="zone-left">
-        <span class="zone-icon">🕒</span>
-        <div class="zone-title">Parte Diária · P190-66001</div>
-      </div>
-      <div class="zone-actions">
-        <button type="button" class="icon-btn" aria-label="Seção parte diária">
-          <svg viewBox="0 0 24 24" width="16" height="16">
-            <path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/>
-          </svg>
-        </button>
-        <button type="button" class="icon-btn caret">▾</button>
-      </div>
-    </header>
-
-    <div class="zone-body" id="op-partdiaria">
-      <div class="layout-tabela-grafico">
-        <div class="col-tabela">
-          <div class="table-card">
-            <div class="table-card-title">Eventos do dia</div>
-            <div class="table-wrap">
-              <table class="table prod-table">
-                <thead>
-                  <tr>
-                    <th class="text-left">Evento</th>
-                    <th>Início</th>
-                    <th>Fim</th>
-                    <th>Duração</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {% for item in dados_partdiaria %}
-                    <tr>
-                      <td class="text-left">{{ item.atividade }}</td>
-                      <td>{{ item.hora_inicio }}</td>
-                      <td>{{ item.hora_fim }}</td>
-                      <td>
-                        {{ item.duracao|int // 60 }}:{% if item.duracao|int % 60 < 10 %}0{% endif %}{{ item.duracao|int % 60 }}
-                      </td>
-                    </tr>
-                  {% endfor %}
-                  {% if not dados_partdiaria %}
-                    <tr>
-                      <td colspan="4">Nenhum registro para a data selecionada.</td>
-                    </tr>
-                  {% endif %}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-
-        <div class="col-grafico">
-          <div class="chart-card chart-lg">
-            <div class="chart-title">Parte diária · tempo por atividade</div>
-            <div class="chart-wrap chart-wrap-lg">
-              <canvas id="graficoPartDiaria"></canvas>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <section class="zone">
-    <header class="zone-head" data-target="#op-frentes">
-      <div class="zone-left">
-        <span class="zone-icon">📦</span>
-        <div class="zone-title">Frentes Diversas · Resumo Consolidado</div>
-      </div>
-      <div class="zone-actions">
-        <button type="button" class="icon-btn" aria-label="Seção frentes">
-          <svg viewBox="0 0 24 24" width="16" height="16">
-            <path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="#16324F"/>
-          </svg>
-        </button>
-        <button type="button" class="icon-btn caret">▾</button>
-      </div>
-    </header>
-
-    <div class="zone-body" id="op-frentes">
-      <div class="table-card">
-        <div class="table-card-title">Carregamento, remoções, pregação e segregação</div>
-        <div class="table-wrap">
-          <table class="table prod-table">
-            <thead>
-              <tr>
-                <th rowspan="2">Data</th>
-                <th colspan="4">Carregamento e descarregamento</th>
-                <th colspan="3">Remoção grampos</th>
-                <th colspan="3">Remoção galochas</th>
-                <th colspan="2">Pregação</th>
-                <th colspan="2">Segregação</th>
-              </tr>
-              <tr>
-                <th>Carregado</th>
-                <th>Saldo</th>
-                <th>Acumulado</th>
-                <th>Desc. velho / novo</th>
-                <th>Remoção</th>
-                <th>Frente aberta</th>
-                <th>Acumulado</th>
-                <th>Remoção</th>
-                <th>Frente aberta</th>
-                <th>Acumulado</th>
-                <th>Aplicado</th>
-                <th>Aberto</th>
-                <th>DMTs ruins</th>
-                <th>DMTs bons</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for linha in dados_resumo_frentes_ordenados %}
-                {% set linha_data = linha.data|string %}
-                {% set filtro_data = data_partdiaria|string %}
-                {% set destaque = 'linha-destaque' if linha_data == filtro_data and linha_data != '' else '' %}
-                <tr class="{{ destaque }}">
-                  <td>
-                    {% if linha.data is string %}
-                      {{ linha.data.split('-')[2] }}-{{ linha.data.split('-')[1] }}-{{ linha.data.split('-')[0] }}
-                    {% else %}
-                      {{ linha.data.strftime('%d-%m-%Y') }}
-                    {% endif %}
-                  </td>
-                  <td>{{ linha.carregado }}</td>
-                  <td>{{ linha.saldo }}</td>
-                  <td>{{ linha.acumulado_carregado }}</td>
-                  <td>{{ linha.desc_velho }} / {{ linha.desc_novo }}</td>
-                  <td>{{ linha.rem_grampos }}</td>
-                  <td>{{ linha.fa_grampos }}</td>
-                  <td>{{ linha.acum_rem_grampos }}</td>
-                  <td>{{ linha.rem_galochas }}</td>
-                  <td>{{ linha.fa_galochas }}</td>
-                  <td>{{ linha.acum_rem_galochas }}</td>
-                  <td>{{ linha.aplicado }}</td>
-                  <td>{{ linha.aberto }}</td>
-                  <td>{{ linha.seg_ruins }}</td>
-                  <td>{{ linha.seg_bons }}</td>
-                </tr>
-              {% endfor %}
-              {% if not dados_resumo_frentes_ordenados %}
-                <tr><td colspan="15">Nenhum dado disponível para as frentes selecionadas.</td></tr>
-              {% endif %}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <div class="duo-charts" style="margin-top:10px;">
-        <div class="chart-card chart-sm">
-          <div class="chart-title">Carregamento novo · planejado x executado</div>
-          <div class="chart-wrap">
-            <canvas id="graficoBarraCarregamento"></canvas>
-          </div>
-        </div>
-
-        <div class="chart-card chart-sm">
-          <div class="chart-title">Carregamento novo · avanço acumulado</div>
-          <div class="chart-wrap">
-            <canvas id="graficoBateriaCarregamento"></canvas>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  {% if percentuais_graficos is defined and percentuais_graficos %}
-  <section class="zone">
-    <header class="zone-head" data-target="#op-gauges">
-      <div class="zone-left">
-        <span class="zone-icon">🎯</span>
-        <div class="zone-title">Percentuais por Frente</div>
-      </div>
-      <div class="zone-actions">
-        <button type="button" class="icon-btn" aria-label="Seção percentuais">
-          <svg viewBox="0 0 24 24" width="16" height="16">
-            <path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v-8z" fill="#16324F"/>
-          </svg>
-        </button>
-        <button type="button" class="icon-btn caret">▾</button>
-      </div>
-    </header>
-
-    <div class="zone-body" id="op-gauges">
-      <div class="gauge-container">
-        {% for frente, item in percentuais_graficos.items() %}
-          <div class="gauge-item">
-            <div class="gauge-canvas-wrap">
-              <canvas id="gauge_{{ loop.index }}"></canvas>
-              <img src="{{ url_for('static', filename='icones/' + item.icone) }}" alt="ícone">
-            </div>
-            <div class="gauge-label">{{ item.titulo }}</div>
+    <div class="zone-body">
+      <div class="flow-grid">
+        {% for codigo, rotulo in d.saldos_definicao %}
+          {% set valor = d.kpis[codigo] %}
+          <div class="flow-card {{ 'negative' if valor < 0 else '' }}">
+            <div class="name">{{ rotulo }}</div>
+            <div class="number">{{ '{:,.0f}'.format(valor).replace(',', '.') }}</div>
           </div>
         {% endfor %}
       </div>
+      <p class="hint">Base dos saldos: {{ d.saldo_inicial.data_referencia }}. Renovação consome novos dos vagões e frentes abertas; também gera dormentes velhos e pregação em aberto.</p>
+
+      {% if can_edit %}
+      <details class="editor">
+        <summary>Configurar meta, produtividade e período da EH</summary>
+        <form method="post" action="{{ url_for('operacao.producao_configuracao') }}">
+          <input type="hidden" name="eh_id" value="{{ d.eh_id }}">
+          <div class="form-grid">
+            <label class="field"><span>Meta total</span><input type="number" min="0" step="1" name="meta_total" value="{{ d.config.meta_total }}" required></label>
+            <label class="field"><span>Produtividade diária</span><input type="number" min="1" step="1" name="produtividade_dia" value="{{ d.config.produtividade_dia }}" required></label>
+            <label class="field"><span>Início planejado</span><input type="date" name="data_inicio" value="{{ d.config.data_inicio or '' }}"></label>
+            <label class="field"><span>Fim planejado</span><input type="date" name="data_fim_planejada" value="{{ d.config.data_fim_planejada or '' }}"></label>
+          </div>
+          <label class="field"><span>Observação</span><textarea name="observacao">{{ d.config.observacao }}</textarea></label>
+          <div class="form-actions"><button class="btn primary" type="submit">Salvar parâmetros</button></div>
+        </form>
+      </details>
+
+      <details class="editor">
+        <summary>Informar ou corrigir saldos iniciais</summary>
+        <form method="post" action="{{ url_for('operacao.producao_saldos_iniciais') }}">
+          <input type="hidden" name="eh_id" value="{{ d.eh_id }}">
+          <p class="hint">Use a posição física conhecida no início do acompanhamento. Os saldos seguintes serão recalculados automaticamente.</p>
+          <div class="form-grid">
+            <label class="field"><span>Data de referência</span><input type="date" name="data_referencia" value="{{ d.saldo_inicial.data_referencia }}" required></label>
+            {% for codigo, rotulo in d.saldos_definicao %}
+              <label class="field"><span>{{ rotulo }}</span><input type="number" min="0" step="1" name="{{ codigo }}" value="{{ d.saldo_inicial.valores[codigo] }}" required></label>
+            {% endfor %}
+          </div>
+          <div class="form-actions"><button class="btn primary" type="submit">Salvar e recalcular</button></div>
+        </form>
+      </details>
+      {% endif %}
     </div>
   </section>
-  {% endif %}
 
+  <section class="zone">
+    <header class="zone-head">
+      <div class="zone-left"><span class="zone-icon">📊</span><div class="zone-title">Evolução da renovação e dos saldos</div></div>
+    </header>
+    <div class="zone-body">
+      <div class="grid-2">
+        <div class="panel"><div class="panel-title">Planejado x realizado acumulado</div><div class="chart-box"><canvas id="chart-renovacao"></canvas></div></div>
+        <div class="panel"><div class="panel-title">Estoques e serviços em aberto</div><div class="chart-box"><canvas id="chart-saldos"></canvas></div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="zone">
+    <header class="zone-head">
+      <div class="zone-left"><span class="zone-icon">📋</span><div class="zone-title">Acompanhamento diário <span class="section-note">valores do dia e posição final</span></div></div>
+    </header>
+    <div class="zone-body">
+      <div class="table-scroll">
+        <table class="table prod-table">
+          <thead>
+            <tr>
+              <th>Data</th><th>Plan.</th><th>Renov.</th><th>Desc. novo</th><th>Carreg.</th>
+              <th>Rem. grampos</th><th>Rem. galochas</th><th>Pregação</th><th>Desc. velho</th>
+              <th>Pulmão</th><th>Novos vagões</th><th>Grampos abertos</th><th>Galochas abertas</th>
+              <th>Pregação aberta</th><th>Velhos vagões</th>
+            </tr>
+          </thead>
+          <tbody>
+          {% for item in d.diario %}
+            <tr class="{{ 'alert-row' if item.inconsistencias else '' }}">
+              <td>{{ item.data[8:10] }}/{{ item.data[5:7] }}/{{ item.data[0:4] }}</td>
+              <td>{{ item.planejado|int }}</td><td><strong>{{ item.RENOVACAO|int }}</strong></td>
+              <td>{{ item.DESCARREGAMENTO_NOVO|int }}</td><td>{{ item.CARREGAMENTO_NOVO|int }}</td>
+              <td>{{ item.REMOCAO_GRAMPOS|int }}</td><td>{{ item.REMOCAO_GALOCHAS|int }}</td>
+              <td>{{ item.APLICACAO_GRAMPOS|int }}</td><td>{{ item.DESCARREGAMENTO_VELHO|int }}</td>
+              {% for codigo, rotulo in d.saldos_definicao %}
+                <td class="{{ 'class-bad' if item.saldos[codigo] < 0 else '' }}">{{ item.saldos[codigo]|int }}</td>
+              {% endfor %}
+            </tr>
+          {% else %}
+            <tr><td colspan="15" class="empty">Nenhuma produção no período selecionado.</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="zone">
+    <header class="zone-head">
+      <div class="zone-left"><span class="zone-icon">⏱️</span><div class="zone-title">Impactos diários</div></div>
+    </header>
+    <div class="zone-body">
+      <div class="grid-2">
+        <div class="panel">
+          <div class="panel-title">Impactos registrados</div>
+          <div class="table-scroll">
+            <table class="table prod-table">
+              <thead><tr><th>Data</th><th class="left">Categoria / descrição</th><th>Tempo</th><th>Status</th>{% if can_delete %}<th></th>{% endif %}</tr></thead>
+              <tbody>
+              {% for item in d.impactos %}
+                <tr>
+                  <td>{{ item.data.strftime('%d/%m/%Y') }}</td>
+                  <td class="left"><strong>{{ dict(d.categorias_impacto).get(item.categoria, item.categoria) }}</strong><br>{{ item.descricao }}{% if item.frente %}<br><small>{{ item.frente }}</small>{% endif %}</td>
+                  <td>{{ item.minutos_perdidos }} min</td>
+                  <td><span class="status-pill {{ 'status-done' if item.status == 'RESOLVIDO' else ('status-progress' if item.status == 'EM_TRATAMENTO' else 'status-open') }}">{{ dict(d.status_impacto).get(item.status, item.status) }}</span></td>
+                  {% if can_delete %}<td><form method="post" action="{{ url_for('operacao.producao_impacto_delete', impacto_id=item.id) }}" onsubmit="return confirm('Excluir este impacto?')"><input type="hidden" name="eh_id" value="{{ d.eh_id }}"><button class="btn danger" type="submit">Excluir</button></form></td>{% endif %}
+                </tr>
+              {% else %}
+                <tr><td colspan="{{ 5 if can_delete else 4 }}" class="empty">Nenhum impacto registrado no período.</td></tr>
+              {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="panel"><div class="panel-title">Horas perdidas por categoria</div><div class="chart-box"><canvas id="chart-impactos"></canvas></div></div>
+      </div>
+
+      {% if can_create %}
+      <details class="editor">
+        <summary>Registrar impacto do dia</summary>
+        <form method="post" action="{{ url_for('operacao.producao_impacto_create') }}">
+          <input type="hidden" name="eh_id" value="{{ d.eh_id }}">
+          <div class="form-grid">
+            <label class="field"><span>Data</span><input type="date" name="data" value="{{ d.fim }}" required></label>
+            <label class="field"><span>Frente afetada</span><select name="frente_id"><option value="">Geral da EH</option>{% for frente in d.frentes %}<option value="{{ frente.id }}">{{ frente.frente }}</option>{% endfor %}</select></label>
+            <label class="field"><span>Categoria</span><select name="categoria">{% for codigo, rotulo in d.categorias_impacto %}<option value="{{ codigo }}">{{ rotulo }}</option>{% endfor %}</select></label>
+            <label class="field"><span>Status</span><select name="status">{% for codigo, rotulo in d.status_impacto %}<option value="{{ codigo }}">{{ rotulo }}</option>{% endfor %}</select></label>
+            <label class="field"><span>Hora inicial</span><input type="time" name="hora_inicio"></label>
+            <label class="field"><span>Hora final</span><input type="time" name="hora_fim"></label>
+            <label class="field"><span>Minutos perdidos</span><input type="number" min="0" name="minutos_perdidos" required></label>
+            <label class="field"><span>Responsável</span><input type="text" maxlength="160" name="responsavel"></label>
+          </div>
+          <div class="form-grid" style="grid-template-columns:1fr 1fr">
+            <label class="field"><span>Descrição</span><textarea name="descricao" required></textarea></label>
+            <label class="field"><span>Providência / plano de ação</span><textarea name="providencia"></textarea></label>
+          </div>
+          <div class="form-actions"><button class="btn primary" type="submit">Registrar impacto</button></div>
+        </form>
+      </details>
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="zone">
+    <header class="zone-head">
+      <div class="zone-left"><span class="zone-icon">🏗️</span><div class="zone-title">Segregação no pátio <span class="section-note">controle separado da EH</span></div></div>
+    </header>
+    <div class="zone-body">
+      <div class="kpi-grid" style="grid-template-columns:repeat(2,minmax(0,240px)); margin-top:0">
+        <div class="kpi good"><div class="label">Bom (reaproveitável)</div><div class="value">{{ '{:,.0f}'.format(d.patio_totais.BOM).replace(',', '.') }}</div></div>
+        <div class="kpi danger"><div class="label">Ruim (não aproveitável)</div><div class="value">{{ '{:,.0f}'.format(d.patio_totais.RUIM).replace(',', '.') }}</div></div>
+      </div>
+      <div class="table-scroll" style="margin-top:10px">
+        <table class="table prod-table">
+          <thead><tr><th>Data</th><th class="left">Pátio</th><th>Classificação</th><th>Quantidade</th><th class="left">Origem / observação</th>{% if can_delete %}<th></th>{% endif %}</tr></thead>
+          <tbody>
+          {% for item in d.patio %}
+            <tr>
+              <td>{{ item.data.strftime('%d/%m/%Y') }}</td><td class="left">{{ item.patio }}</td>
+              <td class="{{ 'class-good' if item.classificacao == 'BOM' else 'class-bad' }}">{{ 'Bom (reaproveitável)' if item.classificacao == 'BOM' else 'Ruim (não aproveitável)' }}</td>
+              <td>{{ item.quantidade|int }}</td><td class="left">{{ item.origem_eh or 'Sem origem informada' }}{% if item.observacao %}<br><small>{{ item.observacao }}</small>{% endif %}</td>
+              {% if can_delete %}<td><form method="post" action="{{ url_for('operacao.producao_patio_delete', registro_id=item.id) }}" onsubmit="return confirm('Excluir este registro de pátio?')"><input type="hidden" name="eh_id" value="{{ d.eh_id }}"><button class="btn danger" type="submit">Excluir</button></form></td>{% endif %}
+            </tr>
+          {% else %}
+            <tr><td colspan="{{ 6 if can_delete else 5 }}" class="empty">Nenhuma segregação registrada no período.</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% if can_create %}
+      <details class="editor">
+        <summary>Registrar segregação</summary>
+        <form method="post" action="{{ url_for('operacao.producao_patio_create') }}">
+          <input type="hidden" name="eh_id" value="{{ d.eh_id }}">
+          <div class="form-grid">
+            <label class="field"><span>Data</span><input type="date" name="data" value="{{ d.fim }}" required></label>
+            <label class="field"><span>Pátio</span><input type="text" name="patio" value="Pátio principal" maxlength="120"></label>
+            <label class="field"><span>Classificação</span><select name="classificacao"><option value="BOM">Bom (reaproveitável)</option><option value="RUIM">Ruim (não aproveitável)</option></select></label>
+            <label class="field"><span>Quantidade</span><input type="number" min="0" step="1" name="quantidade" required></label>
+          </div>
+          <label class="field"><span>Observação</span><input type="text" name="observacao"></label>
+          <div class="form-actions"><button class="btn primary" type="submit">Registrar segregação</button></div>
+        </form>
+      </details>
+      {% endif %}
+    </div>
+  </section>
+  {% else %}
+    <section class="zone"><div class="zone-body empty">Cadastre uma EH para iniciar o acompanhamento.</div></section>
+  {% endif %}
 </div>
 
+{% if d.eh_id %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-  const zoneStorageKey = "operacao_producao_zone_state";
-
-  function getZoneState() {
-    try {
-      return JSON.parse(localStorage.getItem(zoneStorageKey) || "{}");
-    } catch (e) {
-      return {};
-    }
-  }
-
-  function setZoneState(state) {
-    localStorage.setItem(zoneStorageKey, JSON.stringify(state));
-  }
-
-  function setZoneOpen(sel, open) {
-    const body = document.querySelector(sel);
-    const head = document.querySelector(`.zone-head[data-target="${sel}"]`);
-    const caret = head ? head.querySelector(".caret") : null;
-    if (!body) return;
-
-    if (open) {
-      body.classList.remove("collapsed");
-      if (caret) caret.textContent = "▴";
-    } else {
-      body.classList.add("collapsed");
-      if (caret) caret.textContent = "▾";
-    }
-  }
-
-  document.querySelectorAll(".zone-head").forEach(h => {
-    const sel = h.getAttribute("data-target");
-    const state = getZoneState();
-    const saved = state[sel];
-
-    if (saved === true) {
-      setZoneOpen(sel, true);
-    } else if (saved === false) {
-      setZoneOpen(sel, false);
-    } else {
-      const body = document.querySelector(sel);
-      const caret = h.querySelector(".caret");
-      if (body && !body.classList.contains("collapsed")) {
-        if (caret) caret.textContent = "▴";
-      } else {
-        if (caret) caret.textContent = "▾";
-      }
-    }
-
-    h.addEventListener("click", (e) => {
-      if (e.target.closest(".icon-btn") && !e.target.closest(".caret")) return;
-
-      const body = document.querySelector(sel);
-      if (!body) return;
-
-      const willOpen = body.classList.contains("collapsed");
-      setZoneOpen(sel, willOpen);
-
-      const state = getZoneState();
-      state[sel] = willOpen;
-      setZoneState(state);
-    });
+  const chartData = {{ d.grafico | tojson }};
+  const brDate = value => {
+    const p = String(value).split("-");
+    return p.length === 3 ? `${p[2]}/${p[1]}` : value;
+  };
+  const baseOptions = {
+    responsive:true, maintainAspectRatio:false, interaction:{mode:"index",intersect:false},
+    plugins:{legend:{position:"bottom",labels:{boxWidth:12,font:{size:10}}}},
+    scales:{x:{ticks:{font:{size:9},maxRotation:0}},y:{beginAtZero:true,ticks:{font:{size:9}}}}
+  };
+  new Chart(document.getElementById("chart-renovacao"), {
+    type:"line",
+    data:{labels:chartData.labels.map(brDate),datasets:[
+      {label:"Planejado",data:chartData.planejado,borderColor:"#7891a8",backgroundColor:"transparent",borderDash:[5,4],tension:.2},
+      {label:"Renovado",data:chartData.renovacao,borderColor:"#26845b",backgroundColor:"rgba(38,132,91,.12)",fill:true,tension:.2}
+    ]},
+    options:baseOptions
+  });
+  new Chart(document.getElementById("chart-saldos"), {
+    type:"line",
+    data:{labels:chartData.labels.map(brDate),datasets:[
+      {label:"Pulmão",data:chartData.pulmao,borderColor:"#246b9e",tension:.2},
+      {label:"Novos vagões",data:chartData.vagoes,borderColor:"#7258a5",tension:.2},
+      {label:"Grampos abertos",data:chartData.grampos,borderColor:"#d17a22",tension:.2},
+      {label:"Galochas abertas",data:chartData.galochas,borderColor:"#a44f91",tension:.2},
+      {label:"Pregação aberta",data:chartData.pregacao,borderColor:"#0f8b8d",tension:.2}
+    ]},
+    options:baseOptions
+  });
+  new Chart(document.getElementById("chart-impactos"), {
+    type:"bar",
+    data:{labels:chartData.impacto_labels,datasets:[{label:"Horas perdidas",data:chartData.impacto_horas,backgroundColor:"#d17a22"}]},
+    options:{...baseOptions,indexAxis:"y"}
   });
 </script>
-
-<script>
-  function parseISODateSafe(dateStr) {
-    if (!dateStr) return new Date(0);
-    if (dateStr instanceof Date) return dateStr;
-
-    const str = String(dateStr).trim();
-
-    if (str.includes('-')) {
-      const parts = str.split('-');
-      if (parts.length >= 3) {
-        const y = parseInt(parts[0], 10);
-        const m = parseInt(parts[1], 10) - 1;
-        const d = parseInt(parts[2], 10);
-        return new Date(y, m, d);
-      }
-    }
-
-    if (str.includes('/')) {
-      const parts = str.split('/');
-      if (parts.length >= 3) {
-        const d = parseInt(parts[0], 10);
-        const m = parseInt(parts[1], 10) - 1;
-        const y = parseInt(parts[2], 10);
-        return new Date(y, m, d);
-      }
-    }
-
-    return new Date(str);
-  }
-
-  function formatLabelDate(dateStr) {
-    if (!dateStr) return "";
-    const str = String(dateStr);
-    if (str.includes('-')) {
-      const p = str.split('-');
-      if (p.length >= 3) return `${p[2]}/${p[1]}/${p[0]}`;
-    }
-    return str;
-  }
-
-  const dadosRenRaw = {{ dados_ordenados | default([], true) | tojson }};
-  const dadosRen = Array.isArray(dadosRenRaw)
-    ? [...dadosRenRaw].sort((a, b) => parseISODateSafe(a.data) - parseISODateSafe(b.data))
-    : [];
-
-  const labelsRen = dadosRen.map(d => formatLabelDate(d.data));
-  const previstoDia = dadosRen.map(d => d.previsto_dia);
-  const previstoTotal = dadosRen.map(d => d.previsto_total);
-  const realizadoDia = dadosRen.map(d => d.realizado_dia);
-  const realizadoTotal = dadosRen.map(d => d.realizado_total);
-
-  if (document.getElementById('graficoProducao')) {
-    new Chart(document.getElementById('graficoProducao').getContext('2d'), {
-      type: 'bar',
-      data: {
-        labels: labelsRen,
-        datasets: [
-          {
-            label: 'Planejado no dia',
-            data: previstoDia,
-            backgroundColor: 'rgba(0, 123, 255, 0.5)',
-            borderColor: 'rgba(0, 123, 255, 1)',
-            borderWidth: 1,
-            yAxisID: 'y'
-          },
-          {
-            label: 'Executado no dia',
-            data: realizadoDia,
-            backgroundColor: 'rgba(40, 167, 69, 0.5)',
-            borderColor: 'rgba(40, 167, 69, 1)',
-            borderWidth: 1,
-            yAxisID: 'y'
-          },
-          {
-            label: 'Planejado acumulado',
-            data: previstoTotal,
-            type: 'line',
-            borderColor: 'orange',
-            backgroundColor: 'transparent',
-            borderWidth: 2,
-            pointRadius: 3,
-            yAxisID: 'y1'
-          },
-          {
-            label: 'Executado acumulado',
-            data: realizadoTotal,
-            type: 'line',
-            borderColor: 'orangered',
-            backgroundColor: 'transparent',
-            borderWidth: 2,
-            pointRadius: 3,
-            yAxisID: 'y1'
-          }
-        ]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: {
-            position: 'bottom',
-            labels: {
-              boxWidth: 10,
-              boxHeight: 10,
-              font: { size: 10 },
-              padding: 10
-            }
-          }
-        },
-        scales: {
-          y: {
-            beginAtZero: true,
-            position: 'left'
-          },
-          y1: {
-            beginAtZero: true,
-            position: 'right',
-            grid: { drawOnChartArea: false }
-          }
-        }
-      }
-    });
-  }
-
-  function formatMinToTime(min) {
-    const h = Math.floor(min / 60);
-    const m = min % 60;
-    return h.toString().padStart(2, '0') + ':' + m.toString().padStart(2, '0');
-  }
-
-  {% if grafico_atividades is defined %}
-    const partLabels = {{ grafico_atividades.labels | tojson }};
-    const partTempos = {{ grafico_atividades.tempos | tojson }};
-  {% else %}
-    const partLabels = [];
-    const partTempos = [];
-  {% endif %}
-
-  if (document.getElementById('graficoPartDiaria')) {
-    new Chart(document.getElementById('graficoPartDiaria').getContext('2d'), {
-      type: 'bar',
-      data: {
-        labels: partLabels,
-        datasets: [{
-          label: 'Tempo por atividade',
-          data: partTempos,
-          backgroundColor: 'orange',
-          borderColor: 'black',
-          borderWidth: 1
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label: function(ctx) {
-                return formatMinToTime(ctx.parsed.y);
-              }
-            }
-          },
-          datalabels: {
-            display: true,
-            color: 'black',
-            anchor: 'end',
-            align: 'top',
-            font: {
-              weight: 'bold',
-              size: 10
-            },
-            formatter: function(value) {
-              return formatMinToTime(value);
-            }
-          }
-        },
-        scales: {
-          y: {
-            beginAtZero: true,
-            grace: '20%'
-          }
-        }
-      },
-      plugins: [ChartDataLabels]
-    });
-  }
-
-  const barraDataRaw = {{ grafico_barra_carregamento_ordenado | default([], true) | tojson }};
-  const barraData = Array.isArray(barraDataRaw)
-    ? [...barraDataRaw].sort((a, b) => parseISODateSafe(a.data) - parseISODateSafe(b.data))
-    : [];
-
-  const labels02 = barraData.map(d => formatLabelDate(d.data));
-  const planejadoDia02 = barraData.map(d => d.planejado);
-  const executadoDia02 = barraData.map(d => d.executado);
-  const acumuladoPlan02 = barraData.map(d => d.acumulado_planejado);
-  const acumuladoExec02 = barraData.map(d => d.acumulado_executado);
-
-  if (document.getElementById('graficoBarraCarregamento')) {
-    new Chart(document.getElementById('graficoBarraCarregamento').getContext('2d'), {
-      type: 'bar',
-      data: {
-        labels: labels02,
-        datasets: [
-          {
-            label: 'Planejado no dia',
-            data: planejadoDia02,
-            backgroundColor: 'rgba(255, 193, 7, 0.6)',
-            borderColor: 'rgba(255, 193, 7, 1)',
-            borderWidth: 1,
-            yAxisID: 'y'
-          },
-          {
-            label: 'Executado no dia',
-            data: executadoDia02,
-            backgroundColor: 'rgba(76, 175, 80, 0.6)',
-            borderColor: 'rgba(76, 175, 80, 1)',
-            borderWidth: 1,
-            yAxisID: 'y'
-          },
-          {
-            label: 'Acumulado previsto',
-            data: acumuladoPlan02,
-            type: 'line',
-            borderColor: 'orange',
-            backgroundColor: 'transparent',
-            borderWidth: 2,
-            pointRadius: 3,
-            yAxisID: 'y1'
-          },
-          {
-            label: 'Acumulado executado',
-            data: acumuladoExec02,
-            type: 'line',
-            borderColor: 'green',
-            backgroundColor: 'transparent',
-            borderWidth: 2,
-            pointRadius: 3,
-            yAxisID: 'y1'
-          }
-        ]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: {
-            position: 'bottom',
-            labels: {
-              boxWidth: 10,
-              boxHeight: 10,
-              font: { size: 10 },
-              padding: 10
-            }
-          }
-        },
-        scales: {
-          y: {
-            beginAtZero: true
-          },
-          y1: {
-            beginAtZero: true,
-            position: 'right',
-            grid: { drawOnChartArea: false }
-          }
-        }
-      }
-    });
-  }
-
-  const bateria = {{ grafico_bateria_carregamento | default({}, true) | tojson }};
-  let total = 1;
-  let acumPlan = 0;
-  let acumExec = 0;
-
-  if (bateria && typeof bateria === 'object') {
-    total = bateria.planejado_total || 1;
-    acumPlan = bateria.planejado_acumulado || 0;
-    acumExec = bateria.executado_acumulado || 0;
-  }
-
-  const percPlan = Math.min((acumPlan / total) * 100, 100);
-  const percExec = Math.min((acumExec / total) * 100, 100);
-
-  if (document.getElementById('graficoBateriaCarregamento')) {
-    new Chart(document.getElementById('graficoBateriaCarregamento').getContext('2d'), {
-      type: 'bar',
-      data: {
-        labels: [''],
-        datasets: [
-          {
-            label: `Planejado (${acumPlan} / ${total})`,
-            data: [percPlan],
-            backgroundColor: 'rgba(255, 193, 7, 0.8)',
-            barThickness: 24
-          },
-          {
-            label: `Executado acumulado (${acumExec} / ${total})`,
-            data: [percExec],
-            backgroundColor: 'rgba(76, 175, 80, 0.9)',
-            barThickness: 24
-          }
-        ]
-      },
-      options: {
-        indexAxis: 'y',
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: {
-            position: 'bottom',
-            labels: {
-              boxWidth: 10,
-              boxHeight: 10,
-              font: { size: 10 },
-              padding: 10
-            }
-          },
-          tooltip: {
-            callbacks: {
-              label: ctx => `${ctx.dataset.label}: ${ctx.raw.toFixed(1)}%`
-            }
-          }
-        },
-        scales: {
-          x: {
-            stacked: false,
-            beginAtZero: true,
-            max: 100,
-            title: { display: true, text: '%' }
-          },
-          y: { stacked: false }
-        }
-      }
-    });
-  }
-
-  {% if percentuais_graficos is defined %}
-  {% for frente, item in percentuais_graficos.items() %}
-  (function() {
-    const ctx = document.getElementById('gauge_{{ loop.index }}');
-    if (!ctx) return;
-
-    new Chart(ctx.getContext('2d'), {
-      type: 'doughnut',
-      data: {
-        labels: ['Executado', 'Planejado'],
-        datasets: [{
-          data: [{{ item.percentual_executado }}, {{ 100 - item.percentual_executado }}],
-          backgroundColor: [
-            'rgba(40, 167, 69, 0.85)',
-            'rgba(255, 193, 7, 0.4)'
-          ],
-          borderWidth: 1
-        }]
-      },
-      options: {
-        cutout: '65%',
-        responsive: true,
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label: function(context) {
-                return context.label + ': ' + context.raw.toFixed(1) + '%';
-              }
-            }
-          },
-          datalabels: {
-            display: true,
-            color: '#000',
-            font: { weight: 'bold', size: 12 },
-            formatter: function(value, context) {
-              return context.dataIndex === 0 ? value.toFixed(1) + '%' : '';
-            }
-          }
-        }
-      },
-      plugins: [ChartDataLabels]
-    });
-  })();
-  {% endfor %}
-  {% endif %}
-</script>
+{% endif %}
 {% endblock %}
