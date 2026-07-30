@@ -1,7 +1,7 @@
 import unittest
 from pathlib import Path
 
-from routes.operacao_producao import calcular_atraso_equivalente, calcular_saldos
+from routes.operacao_producao import SALDOS, calcular_atraso_equivalente, calcular_saldos
 
 
 class SaldosProducaoTests(unittest.TestCase):
@@ -56,6 +56,13 @@ class SaldosProducaoTests(unittest.TestCase):
         atraso = calcular_atraso_equivalente(1000, [850, 500])
         self.assertAlmostEqual(atraso, 1.3)
 
+    def test_saldos_usam_nomenclatura_operacional(self):
+        rotulos = dict(SALDOS)
+        self.assertEqual(rotulos["PULMAO_CHAO"], "DMTs Pulmão")
+        self.assertEqual(rotulos["NOVOS_VAGOES"], "DMTs Vagões")
+        self.assertEqual(rotulos["GRAMPOS_ABERTOS"], "Remoção em Aberto")
+        self.assertEqual(rotulos["GALOCHAS_ABERTAS"], "Galochas em Aberto")
+
 
 class SeparacaoTelasProducaoTests(unittest.TestCase):
     def setUp(self):
@@ -77,6 +84,13 @@ class SeparacaoTelasProducaoTests(unittest.TestCase):
         self.assertIn("producao_relatorio_diario_pdf", self.producao)
         self.assertIn('name="data_parte_diaria"', self.producao)
         self.assertIn("PDF", self.producao)
+
+    def test_producao_preserva_grafico_acumulado_e_adiciona_versao_em_barras(self):
+        self.assertIn('id="chart-renovacao"', self.producao)
+        self.assertIn('id="chart-renovacao-barras"', self.producao)
+        self.assertIn('type:"line"', self.producao)
+        self.assertIn('type:"bar"', self.producao)
+        self.assertNotIn("Estoques e serviços em aberto", self.producao)
 
     def test_registro_concentra_apontamentos_operacionais(self):
         self.assertNotIn("registro_parte_diaria_create", self.registro)

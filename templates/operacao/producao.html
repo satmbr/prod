@@ -135,7 +135,7 @@
     <div class="zone-body">
       <div class="grid-2">
         <div class="panel"><div class="panel-title">Planejado x realizado acumulado</div><div class="chart-box"><canvas id="chart-renovacao"></canvas></div></div>
-        <div class="panel"><div class="panel-title">Estoques e serviços em aberto</div><div class="chart-box"><canvas id="chart-saldos"></canvas></div></div>
+        <div class="panel"><div class="panel-title">Planejado x realizado acumulado em barras</div><div class="chart-box"><canvas id="chart-renovacao-barras"></canvas></div></div>
       </div>
     </div>
   </section>
@@ -297,14 +297,11 @@
     ]},
     options:baseOptions
   });
-  new Chart(document.getElementById("chart-saldos"), {
-    type:"line",
+  new Chart(document.getElementById("chart-renovacao-barras"), {
+    type:"bar",
     data:{labels:chartData.labels.map(brDate),datasets:[
-      {label:"Pulmão",data:chartData.pulmao,borderColor:"#246b9e",tension:.2},
-      {label:"Novos vagões",data:chartData.vagoes,borderColor:"#7258a5",tension:.2},
-      {label:"Grampos abertos",data:chartData.grampos,borderColor:"#d17a22",tension:.2},
-      {label:"Galochas abertas",data:chartData.galochas,borderColor:"#a44f91",tension:.2},
-      {label:"Pregação aberta",data:chartData.pregacao,borderColor:"#0f8b8d",tension:.2}
+      {label:"Planejado",data:chartData.planejado,backgroundColor:"rgba(120,145,168,.78)",borderColor:"#7891a8",borderWidth:1},
+      {label:"Realizado",data:chartData.renovacao,backgroundColor:"rgba(38,132,91,.82)",borderColor:"#26845b",borderWidth:1}
     ]},
     options:baseOptions
   });

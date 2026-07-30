@@ -18,10 +18,10 @@ CODIGOS_EH = (
 )
 
 SALDOS = (
-    ("PULMAO_CHAO", "Pulmão no chão"),
-    ("NOVOS_VAGOES", "Novos nos vagões"),
-    ("GRAMPOS_ABERTOS", "Grampos removidos em aberto"),
-    ("GALOCHAS_ABERTAS", "Galochas removidas em aberto"),
+    ("PULMAO_CHAO", "DMTs Pulmão"),
+    ("NOVOS_VAGOES", "DMTs Vagões"),
+    ("GRAMPOS_ABERTOS", "Remoção em Aberto"),
+    ("GALOCHAS_ABERTAS", "Galochas em Aberto"),
     ("PREGACAO_ABERTA", "Pregação em aberto"),
     ("VELHOS_VAGOES", "Velhos nos vagões"),
 )
