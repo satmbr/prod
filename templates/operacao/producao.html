@@ -8,7 +8,8 @@
     .production-page { --navy:#16324f; --blue:#246b9e; --teal:#0f8b8d; --green:#26845b; --red:#b42318; --amber:#b7791f; }
     .production-page .zone { margin-bottom:12px; }
     .production-page .zone-body { padding:12px; }
-    .prod-filter, .form-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; align-items:end; }
+    .prod-filter { display:grid; grid-template-columns:1.35fr repeat(3,minmax(150px,1fr)) auto; gap:10px; align-items:end; }
+    .form-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; align-items:end; }
     .prod-filter .actions { display:flex; gap:8px; flex-wrap:wrap; }
     .field span { display:block; margin-bottom:4px; color:#405267; font-weight:700; font-size:11px; }
     .field input, .field select, .field textarea { width:100%; }
@@ -75,10 +76,11 @@
         </label>
         <label class="field"><span>Início do período</span><input type="date" name="inicio" value="{{ d.inicio or '' }}"></label>
         <label class="field"><span>Fim do período</span><input type="date" name="fim" value="{{ d.fim or '' }}"></label>
+        <label class="field"><span>Parte diária P190</span><input type="date" name="data_parte_diaria" value="{{ d.data_parte_diaria or '' }}"></label>
         <div class="actions">
           <button class="btn primary" type="submit">Atualizar</button>
           {% if d.eh_id %}
-            <a class="btn info" href="{{ url_for('operacao.producao_relatorio', eh_id=d.eh_id, inicio=d.inicio, fim=d.fim) }}">Exportar Excel</a>
+            <a class="btn info" href="{{ url_for('operacao.producao_relatorio', eh_id=d.eh_id, inicio=d.inicio, fim=d.fim, data_parte_diaria=d.data_parte_diaria) }}">Exportar Excel</a>
           {% endif %}
         </div>
       </form>
@@ -198,6 +200,42 @@
           </tbody>
         </table>
       </div>
+    </div>
+  </section>
+
+  <section class="zone">
+    <header class="zone-head">
+      <div class="zone-left"><span class="zone-icon">🕒</span><div class="zone-title">Parte Diária · Renovadora P190-66001 <span class="section-note">tempos × movimentos em {{ d.data_parte_diaria }}</span></div></div>
+    </header>
+    <div class="zone-body">
+      <div class="grid-2">
+        <div class="panel">
+          <div class="panel-title">Sequência operacional da renovadora</div>
+          <div class="table-scroll">
+            <table class="table prod-table">
+              <thead><tr><th class="left">Movimento / atividade</th><th>Início</th><th>Fim</th><th>Duração</th><th class="left">Observação</th></tr></thead>
+              <tbody>
+              {% for item in d.parte_diaria %}
+                <tr>
+                  <td class="left"><strong>{{ item.atividade }}</strong></td>
+                  <td>{{ item.hora_inicio }}</td>
+                  <td>{{ item.hora_fim }}</td>
+                  <td>{{ item.duracao_minutos|int // 60 }}h {{ item.duracao_minutos|int % 60 }}min</td>
+                  <td class="left">{{ item.obs or '—' }}</td>
+                </tr>
+              {% else %}
+                <tr><td colspan="5" class="empty">Nenhum movimento registrado para a renovadora nesta data.</td></tr>
+              {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-title">Horas por movimento / atividade</div>
+          <div class="chart-box"><canvas id="chart-parte-diaria"></canvas></div>
+        </div>
+      </div>
+      <p class="hint">Os lançamentos continuam sendo cadastrados no módulo Equipamentos · Parte Diária. Esta seção consolida somente a renovadora P190-66001 no acompanhamento da produção.</p>
     </div>
   </section>
 
@@ -341,6 +379,11 @@
   new Chart(document.getElementById("chart-impactos"), {
     type:"bar",
     data:{labels:chartData.impacto_labels,datasets:[{label:"Horas perdidas",data:chartData.impacto_horas,backgroundColor:"#d17a22"}]},
+    options:{...baseOptions,indexAxis:"y"}
+  });
+  new Chart(document.getElementById("chart-parte-diaria"), {
+    type:"bar",
+    data:{labels:chartData.movimento_labels,datasets:[{label:"Horas",data:chartData.movimento_horas,backgroundColor:"#246b9e"}]},
     options:{...baseOptions,indexAxis:"y"}
   });
 </script>

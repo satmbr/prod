@@ -241,7 +241,7 @@ def _producao_diaria(conn, eh_id, inicio, fim, saldos):
     return resultado, estado
 
 
-def carregar_dashboard(conn, eh_id, inicio=None, fim=None):
+def carregar_dashboard(conn, eh_id, inicio=None, fim=None, data_parte_diaria=None):
     ehs = conn.execute(text("SELECT id, eh AS nome FROM entre_house ORDER BY eh")).mappings().all()
     frentes = conn.execute(
         text(
@@ -259,6 +259,7 @@ def carregar_dashboard(conn, eh_id, inicio=None, fim=None):
         return {"ehs": [], "eh_id": None, "frentes": frentes}
 
     inicio, fim = _periodo(conn, eh_id, inicio, fim)
+    data_parte_diaria = data_parte_diaria or fim
     config = _configuracao(conn, eh_id)
     saldos = _saldos_iniciais(conn, eh_id, inicio)
     diario, saldos_finais = _producao_diaria(conn, eh_id, inicio, fim, saldos)
@@ -291,6 +292,41 @@ def carregar_dashboard(conn, eh_id, inicio=None, fim=None):
         ),
         {"inicio": inicio, "fim": fim},
     ).mappings().all()
+
+    parte_diaria = conn.execute(
+        text(
+            """
+            SELECT
+                pd.id,
+                a.nome AS atividade,
+                m.tag,
+                pd.data,
+                to_char(pd.hora_inicio, 'HH24:MI') AS hora_inicio,
+                to_char(pd.hora_fim, 'HH24:MI') AS hora_fim,
+                pd.obs,
+                EXTRACT(
+                    EPOCH FROM (
+                        CASE
+                            WHEN pd.hora_fim >= pd.hora_inicio
+                                THEN pd.hora_fim - pd.hora_inicio
+                            ELSE pd.hora_fim - pd.hora_inicio + INTERVAL '24 hours'
+                        END
+                    )
+                ) / 60 AS duracao_minutos
+            FROM parte_diaria pd
+            JOIN maquina m ON m.id = pd.maquina_id
+            JOIN atividade a ON a.id = pd.atividade_id
+            WHERE pd.data = :data_ref
+              AND m.tag = 'P190-66001'
+            ORDER BY pd.hora_inicio, pd.id
+            """
+        ),
+        {"data_ref": data_parte_diaria},
+    ).mappings().all()
+
+    movimentos = defaultdict(float)
+    for item in parte_diaria:
+        movimentos[item["atividade"]] += _float(item["duracao_minutos"])
 
     finais = saldos_finais
     totais = conn.execute(
@@ -338,11 +374,13 @@ def carregar_dashboard(conn, eh_id, inicio=None, fim=None):
         "frentes": frentes,
         "inicio": inicio,
         "fim": fim,
+        "data_parte_diaria": data_parte_diaria,
         "config": config,
         "saldo_inicial": saldos,
         "diario": diario,
         "impactos": impactos,
         "patio": patio,
+        "parte_diaria": parte_diaria,
         "patio_totais": patio_totais,
         "categorias_impacto": CATEGORIAS_IMPACTO,
         "status_impacto": STATUS_IMPACTO,
@@ -373,6 +411,10 @@ def carregar_dashboard(conn, eh_id, inicio=None, fim=None):
             ],
             "impacto_horas": [
                 round(minutos / 60.0, 2) for minutos in impacto_por_categoria.values()
+            ],
+            "movimento_labels": list(movimentos.keys()),
+            "movimento_horas": [
+                round(minutos / 60.0, 2) for minutos in movimentos.values()
             ],
         },
     }
@@ -442,6 +484,20 @@ def gerar_relatorio_xlsx(dashboard, nome_eh):
                 _iso(item["data"]), item["frente"] or "", str(item["hora_inicio"] or ""),
                 str(item["hora_fim"] or ""), item["minutos_perdidos"], item["categoria"],
                 item["descricao"], item["responsavel"] or "", item["providencia"] or "", item["status"],
+            ]
+        )
+
+    parte_diaria = wb.create_sheet("Parte diária P190")
+    parte_diaria.append(["Data", "Movimento / atividade", "Início", "Fim", "Duração (min)", "Observação"])
+    for item in dashboard["parte_diaria"]:
+        parte_diaria.append(
+            [
+                _iso(item["data"]),
+                item["atividade"],
+                item["hora_inicio"],
+                item["hora_fim"],
+                round(_float(item["duracao_minutos"]), 2),
+                item["obs"] or "",
             ]
         )
 

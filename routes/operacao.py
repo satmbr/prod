@@ -129,6 +129,7 @@ def producao():
             eh_id,
             _data_iso_ou_none(request.args.get("inicio")),
             _data_iso_ou_none(request.args.get("fim")),
+            _data_iso_ou_none(request.args.get("data_parte_diaria")),
         )
 
     return render_template(
@@ -1207,6 +1208,7 @@ def producao_relatorio():
             eh_id,
             _data_iso_ou_none(request.args.get("inicio")),
             _data_iso_ou_none(request.args.get("fim")),
+            _data_iso_ou_none(request.args.get("data_parte_diaria")),
         )
     nome_eh = next(
         (item["nome"] for item in dashboard["ehs"] if int(item["id"]) == eh_id),
