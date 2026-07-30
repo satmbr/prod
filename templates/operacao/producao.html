@@ -121,37 +121,6 @@
       </div>
       <p class="hint">Base dos saldos: {{ d.saldo_inicial.data_referencia }}. Renovação consome novos dos vagões e frentes abertas; também gera dormentes velhos e pregação em aberto.</p>
 
-      {% if can_edit %}
-      <details class="editor">
-        <summary>Configurar meta, produtividade e período da EH</summary>
-        <form method="post" action="{{ url_for('operacao.producao_configuracao') }}">
-          <input type="hidden" name="eh_id" value="{{ d.eh_id }}">
-          <div class="form-grid">
-            <label class="field"><span>Meta total</span><input type="number" min="0" step="1" name="meta_total" value="{{ d.config.meta_total }}" required></label>
-            <label class="field"><span>Produtividade diária</span><input type="number" min="1" step="1" name="produtividade_dia" value="{{ d.config.produtividade_dia }}" required></label>
-            <label class="field"><span>Início planejado</span><input type="date" name="data_inicio" value="{{ d.config.data_inicio or '' }}"></label>
-            <label class="field"><span>Fim planejado</span><input type="date" name="data_fim_planejada" value="{{ d.config.data_fim_planejada or '' }}"></label>
-          </div>
-          <label class="field"><span>Observação</span><textarea name="observacao">{{ d.config.observacao }}</textarea></label>
-          <div class="form-actions"><button class="btn primary" type="submit">Salvar parâmetros</button></div>
-        </form>
-      </details>
-
-      <details class="editor">
-        <summary>Informar ou corrigir saldos iniciais</summary>
-        <form method="post" action="{{ url_for('operacao.producao_saldos_iniciais') }}">
-          <input type="hidden" name="eh_id" value="{{ d.eh_id }}">
-          <p class="hint">Use a posição física conhecida no início do acompanhamento. Os saldos seguintes serão recalculados automaticamente.</p>
-          <div class="form-grid">
-            <label class="field"><span>Data de referência</span><input type="date" name="data_referencia" value="{{ d.saldo_inicial.data_referencia }}" required></label>
-            {% for codigo, rotulo in d.saldos_definicao %}
-              <label class="field"><span>{{ rotulo }}</span><input type="number" min="0" step="1" name="{{ codigo }}" value="{{ d.saldo_inicial.valores[codigo] }}" required></label>
-            {% endfor %}
-          </div>
-          <div class="form-actions"><button class="btn primary" type="submit">Salvar e recalcular</button></div>
-        </form>
-      </details>
-      {% endif %}
     </div>
   </section>
 
@@ -249,7 +218,7 @@
           <div class="panel-title">Impactos registrados</div>
           <div class="table-scroll">
             <table class="table prod-table">
-              <thead><tr><th>Data</th><th class="left">Categoria / descrição</th><th>Tempo</th><th>Status</th>{% if can_delete %}<th></th>{% endif %}</tr></thead>
+              <thead><tr><th>Data</th><th class="left">Categoria / descrição</th><th>Tempo</th><th>Status</th></tr></thead>
               <tbody>
               {% for item in d.impactos %}
                 <tr>
@@ -257,10 +226,9 @@
                   <td class="left"><strong>{{ dict(d.categorias_impacto).get(item.categoria, item.categoria) }}</strong><br>{{ item.descricao }}{% if item.frente %}<br><small>{{ item.frente }}</small>{% endif %}</td>
                   <td>{{ item.minutos_perdidos }} min</td>
                   <td><span class="status-pill {{ 'status-done' if item.status == 'RESOLVIDO' else ('status-progress' if item.status == 'EM_TRATAMENTO' else 'status-open') }}">{{ dict(d.status_impacto).get(item.status, item.status) }}</span></td>
-                  {% if can_delete %}<td><form method="post" action="{{ url_for('operacao.producao_impacto_delete', impacto_id=item.id) }}" onsubmit="return confirm('Excluir este impacto?')"><input type="hidden" name="eh_id" value="{{ d.eh_id }}"><button class="btn danger" type="submit">Excluir</button></form></td>{% endif %}
                 </tr>
               {% else %}
-                <tr><td colspan="{{ 5 if can_delete else 4 }}" class="empty">Nenhum impacto registrado no período.</td></tr>
+                <tr><td colspan="4" class="empty">Nenhum impacto registrado no período.</td></tr>
               {% endfor %}
               </tbody>
             </table>
@@ -269,29 +237,6 @@
         <div class="panel"><div class="panel-title">Horas perdidas por categoria</div><div class="chart-box"><canvas id="chart-impactos"></canvas></div></div>
       </div>
 
-      {% if can_create %}
-      <details class="editor">
-        <summary>Registrar impacto do dia</summary>
-        <form method="post" action="{{ url_for('operacao.producao_impacto_create') }}">
-          <input type="hidden" name="eh_id" value="{{ d.eh_id }}">
-          <div class="form-grid">
-            <label class="field"><span>Data</span><input type="date" name="data" value="{{ d.fim }}" required></label>
-            <label class="field"><span>Frente afetada</span><select name="frente_id"><option value="">Geral da EH</option>{% for frente in d.frentes %}<option value="{{ frente.id }}">{{ frente.frente }}</option>{% endfor %}</select></label>
-            <label class="field"><span>Categoria</span><select name="categoria">{% for codigo, rotulo in d.categorias_impacto %}<option value="{{ codigo }}">{{ rotulo }}</option>{% endfor %}</select></label>
-            <label class="field"><span>Status</span><select name="status">{% for codigo, rotulo in d.status_impacto %}<option value="{{ codigo }}">{{ rotulo }}</option>{% endfor %}</select></label>
-            <label class="field"><span>Hora inicial</span><input type="time" name="hora_inicio"></label>
-            <label class="field"><span>Hora final</span><input type="time" name="hora_fim"></label>
-            <label class="field"><span>Minutos perdidos</span><input type="number" min="0" name="minutos_perdidos" required></label>
-            <label class="field"><span>Responsável</span><input type="text" maxlength="160" name="responsavel"></label>
-          </div>
-          <div class="form-grid" style="grid-template-columns:1fr 1fr">
-            <label class="field"><span>Descrição</span><textarea name="descricao" required></textarea></label>
-            <label class="field"><span>Providência / plano de ação</span><textarea name="providencia"></textarea></label>
-          </div>
-          <div class="form-actions"><button class="btn primary" type="submit">Registrar impacto</button></div>
-        </form>
-      </details>
-      {% endif %}
     </div>
   </section>
 
@@ -306,37 +251,20 @@
       </div>
       <div class="table-scroll" style="margin-top:10px">
         <table class="table prod-table">
-          <thead><tr><th>Data</th><th class="left">Pátio</th><th>Classificação</th><th>Quantidade</th><th class="left">Origem / observação</th>{% if can_delete %}<th></th>{% endif %}</tr></thead>
+          <thead><tr><th>Data</th><th class="left">Pátio</th><th>Classificação</th><th>Quantidade</th><th class="left">Origem / observação</th></tr></thead>
           <tbody>
           {% for item in d.patio %}
             <tr>
               <td>{{ item.data.strftime('%d/%m/%Y') }}</td><td class="left">{{ item.patio }}</td>
               <td class="{{ 'class-good' if item.classificacao == 'BOM' else 'class-bad' }}">{{ 'Bom (reaproveitável)' if item.classificacao == 'BOM' else 'Ruim (não aproveitável)' }}</td>
               <td>{{ item.quantidade|int }}</td><td class="left">{{ item.origem_eh or 'Sem origem informada' }}{% if item.observacao %}<br><small>{{ item.observacao }}</small>{% endif %}</td>
-              {% if can_delete %}<td><form method="post" action="{{ url_for('operacao.producao_patio_delete', registro_id=item.id) }}" onsubmit="return confirm('Excluir este registro de pátio?')"><input type="hidden" name="eh_id" value="{{ d.eh_id }}"><button class="btn danger" type="submit">Excluir</button></form></td>{% endif %}
             </tr>
           {% else %}
-            <tr><td colspan="{{ 6 if can_delete else 5 }}" class="empty">Nenhuma segregação registrada no período.</td></tr>
+            <tr><td colspan="5" class="empty">Nenhuma segregação registrada no período.</td></tr>
           {% endfor %}
           </tbody>
         </table>
       </div>
-      {% if can_create %}
-      <details class="editor">
-        <summary>Registrar segregação</summary>
-        <form method="post" action="{{ url_for('operacao.producao_patio_create') }}">
-          <input type="hidden" name="eh_id" value="{{ d.eh_id }}">
-          <div class="form-grid">
-            <label class="field"><span>Data</span><input type="date" name="data" value="{{ d.fim }}" required></label>
-            <label class="field"><span>Pátio</span><input type="text" name="patio" value="Pátio principal" maxlength="120"></label>
-            <label class="field"><span>Classificação</span><select name="classificacao"><option value="BOM">Bom (reaproveitável)</option><option value="RUIM">Ruim (não aproveitável)</option></select></label>
-            <label class="field"><span>Quantidade</span><input type="number" min="0" step="1" name="quantidade" required></label>
-          </div>
-          <label class="field"><span>Observação</span><input type="text" name="observacao"></label>
-          <div class="form-actions"><button class="btn primary" type="submit">Registrar segregação</button></div>
-        </form>
-      </details>
-      {% endif %}
     </div>
   </section>
   {% else %}

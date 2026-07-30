@@ -136,9 +136,6 @@ def producao():
         "operacao/producao.html",
         subnav_links=build_operacao_subnav("producao"),
         dashboard=dashboard,
-        can_create=user_can("operacao:criar"),
-        can_edit=user_can("operacao:editar"),
-        can_delete=user_can("operacao:excluir"),
     )
 
     with engine.connect() as conn:
@@ -711,6 +708,21 @@ def registro():
             .all()
         )
 
+        registro_eh_id = None
+        if feh and str(feh).isdigit():
+            registro_eh_id = int(feh)
+        elif eh_list:
+            registro_eh_id = int(eh_list[0]["id"])
+        dashboard_registro = carregar_dashboard(
+            conn,
+            registro_eh_id,
+            fim=date.today().isoformat(),
+            data_parte_diaria=_data_iso_ou_none(fdt) or date.today().isoformat(),
+        )
+        atividades_parte_diaria = conn.execute(
+            text("SELECT id, nome FROM atividade ORDER BY nome")
+        ).mappings().all()
+
     subnav = build_operacao_subnav("registro")
     return render_template(
         "operacao/registro.html",
@@ -725,6 +737,8 @@ def registro():
         today=date.today().isoformat(),
         keep_open=request.args.get("keep_open"),
         msg=request.args.get("msg"),
+        dashboard_registro=dashboard_registro,
+        atividades_parte_diaria=atividades_parte_diaria,
     )
 
 
@@ -970,21 +984,108 @@ def registro_planejada_delete():
         return _redirect_registro(f"Erro ao excluir planejado: {e}", "planejada")
 
 
+@bp.route("/registro/parte-diaria/create", methods=["POST"])
+@login_required
+@permission_required("operacao", "criar")
+def registro_parte_diaria_create():
+    data_registro = _data_iso_ou_none(request.form.get("data"))
+    atividade_id = request.form.get("atividade_id")
+    hora_inicio = request.form.get("hora_inicio")
+    hora_fim = request.form.get("hora_fim")
+    eh_id = request.form.get("eh_id")
+    if not data_registro or not atividade_id or not hora_inicio or not hora_fim:
+        return redirect(
+            url_for(
+                "operacao.registro",
+                feh=eh_id,
+                fdt=data_registro,
+                keep_open="controles",
+                msg="Preencha data, movimento, início e fim da Parte Diária.",
+            )
+        )
+
+    with get_engine().begin() as conn:
+        maquina_id = conn.execute(
+            text("SELECT id FROM maquina WHERE tag = 'P190-66001'")
+        ).scalar()
+        atividade_existe = conn.execute(
+            text("SELECT 1 FROM atividade WHERE id = :id"),
+            {"id": atividade_id},
+        ).scalar()
+        if not maquina_id or not atividade_existe:
+            flash("Renovadora ou movimento não encontrado no cadastro.", "warning")
+            return redirect(url_for("operacao.registro", feh=eh_id, keep_open="controles"))
+        conn.execute(
+            text(
+                """
+                INSERT INTO parte_diaria
+                    (data, maquina_id, atividade_id, hora_inicio, hora_fim, obs)
+                VALUES (:data, :maquina, :atividade, :inicio, :fim, :obs)
+                """
+            ),
+            {
+                "data": data_registro,
+                "maquina": maquina_id,
+                "atividade": atividade_id,
+                "inicio": hora_inicio,
+                "fim": hora_fim,
+                "obs": (request.form.get("obs") or "").strip() or None,
+            },
+        )
+    flash("Movimento da Parte Diária registrado.", "success")
+    return redirect(
+        url_for(
+            "operacao.registro",
+            feh=eh_id,
+            fdt=data_registro,
+            keep_open="controles",
+        )
+    )
+
+
+@bp.route("/registro/parte-diaria/<int:registro_id>/delete", methods=["POST"])
+@login_required
+@permission_required("operacao", "excluir")
+def registro_parte_diaria_delete(registro_id):
+    eh_id = request.form.get("eh_id")
+    data_registro = _data_iso_ou_none(request.form.get("data"))
+    with get_engine().begin() as conn:
+        conn.execute(
+            text(
+                """
+                DELETE FROM parte_diaria pd
+                USING maquina m
+                WHERE pd.id = :id
+                  AND m.id = pd.maquina_id
+                  AND m.tag = 'P190-66001'
+                """
+            ),
+            {"id": registro_id},
+        )
+    flash("Movimento da Parte Diária excluído.", "success")
+    return redirect(
+        url_for(
+            "operacao.registro",
+            feh=eh_id,
+            fdt=data_registro,
+            keep_open="controles",
+        )
+    )
+
+
 # -------------------------------------------------------------------
 # Produção: parâmetros, saldos, impactos, pátio e relatório
 # -------------------------------------------------------------------
-def _redirecionar_producao(eh_id, inicio=None, fim=None):
-    params = {}
+def _redirecionar_registro_controles(eh_id, data_referencia=None):
+    params = {"keep_open": "controles"}
     if eh_id:
-        params["eh_id"] = eh_id
-    if inicio:
-        params["inicio"] = inicio
-    if fim:
-        params["fim"] = fim
-    return redirect(url_for("operacao.producao", **params))
+        params["feh"] = eh_id
+    if data_referencia:
+        params["fdt"] = data_referencia
+    return redirect(url_for("operacao.registro", **params))
 
 
-@bp.route("/producao/configuracao", methods=["POST"])
+@bp.route("/registro/configuracao", methods=["POST"])
 @login_required
 @permission_required("operacao", "editar")
 def producao_configuracao():
@@ -995,10 +1096,10 @@ def producao_configuracao():
     data_fim = _data_iso_ou_none(request.form.get("data_fim_planejada"))
     if data_inicio and data_fim and data_inicio > data_fim:
         flash("O fim planejado não pode ser anterior ao início.", "warning")
-        return _redirecionar_producao(eh_id)
+        return _redirecionar_registro_controles(eh_id)
     if not eh_id or meta is None or not produtividade:
         flash("Informe a EH, a meta e uma produtividade diária maior que zero.", "warning")
-        return _redirecionar_producao(eh_id)
+        return _redirecionar_registro_controles(eh_id)
 
     with get_engine().begin() as conn:
         conn.execute(
@@ -1030,10 +1131,10 @@ def producao_configuracao():
             },
         )
     flash("Parâmetros da EH atualizados.", "success")
-    return _redirecionar_producao(eh_id)
+    return _redirecionar_registro_controles(eh_id)
 
 
-@bp.route("/producao/saldos-iniciais", methods=["POST"])
+@bp.route("/registro/saldos-iniciais", methods=["POST"])
 @login_required
 @permission_required("operacao", "editar")
 def producao_saldos_iniciais():
@@ -1050,7 +1151,7 @@ def producao_saldos_iniciais():
     valores = {codigo: _numero_positivo(request.form.get(codigo)) for codigo in codigos}
     if not eh_id or not data_referencia or any(valor is None for valor in valores.values()):
         flash("Informe a data e todos os saldos iniciais com valores não negativos.", "warning")
-        return _redirecionar_producao(eh_id)
+        return _redirecionar_registro_controles(eh_id)
 
     with get_engine().begin() as conn:
         for codigo, quantidade in valores.items():
@@ -1075,10 +1176,10 @@ def producao_saldos_iniciais():
                 },
             )
     flash("Saldos iniciais atualizados. Todo o fluxo foi recalculado.", "success")
-    return _redirecionar_producao(eh_id)
+    return _redirecionar_registro_controles(eh_id)
 
 
-@bp.route("/producao/impactos", methods=["POST"])
+@bp.route("/registro/impactos", methods=["POST"])
 @login_required
 @permission_required("operacao", "criar")
 def producao_impacto_create():
@@ -1099,7 +1200,7 @@ def producao_impacto_create():
         or status not in status_validos
     ):
         flash("Preencha data, minutos perdidos e descrição do impacto.", "warning")
-        return _redirecionar_producao(eh_id)
+        return _redirecionar_registro_controles(eh_id)
 
     with get_engine().begin() as conn:
         conn.execute(
@@ -1129,10 +1230,10 @@ def producao_impacto_create():
             },
         )
     flash("Impacto diário registrado.", "success")
-    return _redirecionar_producao(eh_id, data_impacto, data_impacto)
+    return _redirecionar_registro_controles(eh_id, data_impacto)
 
 
-@bp.route("/producao/impactos/<int:impacto_id>/excluir", methods=["POST"])
+@bp.route("/registro/impactos/<int:impacto_id>/excluir", methods=["POST"])
 @login_required
 @permission_required("operacao", "excluir")
 def producao_impacto_delete(impacto_id):
@@ -1140,10 +1241,10 @@ def producao_impacto_delete(impacto_id):
     with get_engine().begin() as conn:
         conn.execute(text("DELETE FROM operacao_impacto WHERE id = :id"), {"id": impacto_id})
     flash("Impacto excluído.", "success")
-    return _redirecionar_producao(eh_id)
+    return _redirecionar_registro_controles(eh_id)
 
 
-@bp.route("/producao/patio", methods=["POST"])
+@bp.route("/registro/patio", methods=["POST"])
 @login_required
 @permission_required("operacao", "criar")
 def producao_patio_create():
@@ -1156,7 +1257,7 @@ def producao_patio_create():
         or classificacao not in {"BOM", "RUIM"}
     ):
         flash("Informe a data e a quantidade segregada.", "warning")
-        return _redirecionar_producao(eh_id)
+        return _redirecionar_registro_controles(eh_id)
 
     with get_engine().begin() as conn:
         conn.execute(
@@ -1178,10 +1279,10 @@ def producao_patio_create():
             },
         )
     flash("Segregação de pátio registrada.", "success")
-    return _redirecionar_producao(eh_id)
+    return _redirecionar_registro_controles(eh_id)
 
 
-@bp.route("/producao/patio/<int:registro_id>/excluir", methods=["POST"])
+@bp.route("/registro/patio/<int:registro_id>/excluir", methods=["POST"])
 @login_required
 @permission_required("operacao", "excluir")
 def producao_patio_delete(registro_id):
@@ -1189,7 +1290,7 @@ def producao_patio_delete(registro_id):
     with get_engine().begin() as conn:
         conn.execute(text("DELETE FROM operacao_patio WHERE id = :id"), {"id": registro_id})
     flash("Registro de pátio excluído.", "success")
-    return _redirecionar_producao(eh_id)
+    return _redirecionar_registro_controles(eh_id)
 
 
 @bp.route("/producao/relatorio.xlsx")

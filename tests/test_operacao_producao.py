@@ -1,4 +1,5 @@
 import unittest
+from pathlib import Path
 
 from routes.operacao_producao import calcular_saldos
 
@@ -50,6 +51,24 @@ class SaldosProducaoTests(unittest.TestCase):
         inicial = dict(self.zero)
         calcular_saldos(inicial, self.producao(DESCARREGAMENTO_NOVO=200))
         self.assertEqual(inicial, self.zero)
+
+
+class SeparacaoTelasProducaoTests(unittest.TestCase):
+    def setUp(self):
+        raiz = Path(__file__).resolve().parents[1]
+        self.producao = (raiz / "templates" / "operacao" / "producao.html").read_text(encoding="utf-8")
+        self.registro = (raiz / "templates" / "operacao" / "registro.html").read_text(encoding="utf-8")
+
+    def test_producao_nao_possui_formularios_de_mutacao(self):
+        self.assertNotIn('method="post"', self.producao.lower())
+        self.assertNotIn("producao_impacto_create", self.producao)
+        self.assertNotIn("producao_patio_create", self.producao)
+
+    def test_registro_concentra_apontamentos_operacionais(self):
+        self.assertIn("registro_parte_diaria_create", self.registro)
+        self.assertIn("producao_impacto_create", self.registro)
+        self.assertIn("producao_patio_create", self.registro)
+        self.assertIn("producao_saldos_iniciais", self.registro)
 
 
 if __name__ == "__main__":
