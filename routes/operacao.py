@@ -627,6 +627,8 @@ def registro():
         feh = request.args.get("feh") or None
         ffr = request.args.get("ffr") or None
         fdt = request.args.get("fdt") or None
+        tentou_aplicar_filtros = request.args.get("aplicar") == "1"
+        filtros_aplicados = tentou_aplicar_filtros and bool(feh or ffr or fdt)
 
         where = []
         params = {}
@@ -643,7 +645,11 @@ def registro():
             where.append("r.data = :fdt")
             params["fdt"] = fdt
 
-        wh_rlz = "WHERE " + " AND ".join(where) if where else ""
+        wh_rlz = (
+            "WHERE " + " AND ".join(where)
+            if filtros_aplicados
+            else "WHERE 1 = 0"
+        )
 
         lista_rlz = (
             conn.execute(
@@ -683,7 +689,11 @@ def registro():
             where_pln.append("p.data = :fdt")
             params_pln["fdt"] = fdt
 
-        wh_pln = "WHERE " + " AND ".join(where_pln) if where_pln else ""
+        wh_pln = (
+            "WHERE " + " AND ".join(where_pln)
+            if filtros_aplicados
+            else "WHERE 1 = 0"
+        )
 
         lista_pln = (
             conn.execute(
@@ -709,10 +719,8 @@ def registro():
         )
 
         registro_eh_id = None
-        if feh and str(feh).isdigit():
+        if filtros_aplicados and feh and str(feh).isdigit():
             registro_eh_id = int(feh)
-        elif eh_list:
-            registro_eh_id = int(eh_list[0]["id"])
         dashboard_registro = carregar_dashboard(
             conn,
             registro_eh_id,
@@ -739,6 +747,8 @@ def registro():
         msg=request.args.get("msg"),
         dashboard_registro=dashboard_registro,
         atividades_parte_diaria=atividades_parte_diaria,
+        filtros_aplicados=filtros_aplicados,
+        tentou_aplicar_filtros=tentou_aplicar_filtros,
     )
 
 
@@ -999,6 +1009,7 @@ def registro_parte_diaria_create():
                 "operacao.registro",
                 feh=eh_id,
                 fdt=data_registro,
+                aplicar=1,
                 keep_open="controles",
                 msg="Preencha data, movimento, início e fim da Parte Diária.",
             )
@@ -1014,7 +1025,14 @@ def registro_parte_diaria_create():
         ).scalar()
         if not maquina_id or not atividade_existe:
             flash("Renovadora ou movimento não encontrado no cadastro.", "warning")
-            return redirect(url_for("operacao.registro", feh=eh_id, keep_open="controles"))
+            return redirect(
+                url_for(
+                    "operacao.registro",
+                    feh=eh_id,
+                    aplicar=1,
+                    keep_open="controles",
+                )
+            )
         conn.execute(
             text(
                 """
@@ -1038,6 +1056,7 @@ def registro_parte_diaria_create():
             "operacao.registro",
             feh=eh_id,
             fdt=data_registro,
+            aplicar=1,
             keep_open="controles",
         )
     )
@@ -1068,6 +1087,7 @@ def registro_parte_diaria_delete(registro_id):
             "operacao.registro",
             feh=eh_id,
             fdt=data_registro,
+            aplicar=1,
             keep_open="controles",
         )
     )
@@ -1077,7 +1097,7 @@ def registro_parte_diaria_delete(registro_id):
 # Produção: parâmetros, saldos, impactos, pátio e relatório
 # -------------------------------------------------------------------
 def _redirecionar_registro_controles(eh_id, data_referencia=None):
-    params = {"keep_open": "controles"}
+    params = {"keep_open": "controles", "aplicar": 1}
     if eh_id:
         params["feh"] = eh_id
     if data_referencia:

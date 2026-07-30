@@ -70,6 +70,16 @@ class SeparacaoTelasProducaoTests(unittest.TestCase):
         self.assertIn("producao_patio_create", self.registro)
         self.assertIn("producao_saldos_iniciais", self.registro)
 
+    def test_registro_exige_aplicacao_explicita_dos_filtros(self):
+        self.assertGreaterEqual(
+            self.registro.count('name="aplicar" value="1"'),
+            3,
+        )
+        self.assertIn(
+            "Aplique ao menos um filtro para visualizar os registros.",
+            self.registro,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -337,6 +337,7 @@
             <span>Data da Parte Diária</span>
             <input type="date" name="fdt" value="{{ d.data_parte_diaria or today }}">
           </label>
+          <input type="hidden" name="aplicar" value="1">
           <input type="hidden" name="keep_open" value="controles">
           <div class="toolbar-actions"><button class="btn info" type="submit">Carregar controles</button></div>
         </div>
@@ -570,6 +571,8 @@
       {% endif %}
 
       <form method="get" action="{{ url_for('operacao.registro') }}" class="{% if can_create %}subtle-filter{% endif %}">
+        <input type="hidden" name="aplicar" value="1">
+        <input type="hidden" name="keep_open" value="realizada">
         <div class="toolbar-row toolbar-4">
           <label class="field">
             <span>Filtrar EH</span>
@@ -635,8 +638,10 @@
                 {% endif %}
               </tr>
               {% endfor %}
+            {% elif filtros_aplicados %}
+              <tr><td colspan="{% if can_delete %}5{% else %}4{% endif %}">Nenhum registro encontrado para os filtros aplicados.</td></tr>
             {% else %}
-              <tr><td colspan="{% if can_delete %}5{% else %}4{% endif %}">Sem registros.</td></tr>
+              <tr><td colspan="{% if can_delete %}5{% else %}4{% endif %}">Aplique ao menos um filtro para visualizar os registros.</td></tr>
             {% endif %}
           </tbody>
         </table>
@@ -740,6 +745,8 @@
       {% endif %}
 
       <form method="get" action="{{ url_for('operacao.registro') }}" class="{% if can_create %}subtle-filter{% endif %}">
+        <input type="hidden" name="aplicar" value="1">
+        <input type="hidden" name="keep_open" value="planejada">
         <div class="toolbar-row toolbar-4">
           <label class="field">
             <span>Filtrar EH</span>
@@ -805,8 +812,10 @@
                 {% endif %}
               </tr>
               {% endfor %}
+            {% elif filtros_aplicados %}
+              <tr><td colspan="{% if can_delete %}5{% else %}4{% endif %}">Nenhum registro encontrado para os filtros aplicados.</td></tr>
             {% else %}
-              <tr><td colspan="{% if can_delete %}5{% else %}4{% endif %}">Sem registros.</td></tr>
+              <tr><td colspan="{% if can_delete %}5{% else %}4{% endif %}">Aplique ao menos um filtro para visualizar os registros.</td></tr>
             {% endif %}
           </tbody>
         </table>
