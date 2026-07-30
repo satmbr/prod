@@ -68,6 +68,11 @@ class SeparacaoTelasProducaoTests(unittest.TestCase):
         self.assertNotIn("producao_impacto_create", self.producao)
         self.assertNotIn("producao_patio_create", self.producao)
 
+    def test_producao_usa_periodo_completo_da_eh(self):
+        self.assertNotIn('name="inicio"', self.producao)
+        self.assertNotIn('name="fim"', self.producao)
+        self.assertIn("Período completo da EH", self.producao)
+
     def test_registro_concentra_apontamentos_operacionais(self):
         self.assertNotIn("registro_parte_diaria_create", self.registro)
         self.assertIn("equipamentos.partdiaria", self.registro)

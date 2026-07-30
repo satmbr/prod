@@ -8,7 +8,7 @@
     .production-page { --navy:#16324f; --blue:#246b9e; --teal:#0f8b8d; --green:#26845b; --red:#b42318; --amber:#b7791f; }
     .production-page .zone { margin-bottom:12px; }
     .production-page .zone-body { padding:12px; }
-    .prod-filter { display:grid; grid-template-columns:1.35fr repeat(3,minmax(150px,1fr)) auto; gap:10px; align-items:end; }
+    .prod-filter { display:grid; grid-template-columns:1.35fr minmax(180px,1fr) auto; gap:10px; align-items:end; }
     .form-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; align-items:end; }
     .prod-filter .actions { display:flex; gap:8px; flex-wrap:wrap; }
     .field span { display:block; margin-bottom:4px; color:#405267; font-weight:700; font-size:11px; }
@@ -74,24 +74,25 @@
             {% endfor %}
           </select>
         </label>
-        <label class="field"><span>Início do período</span><input type="date" name="inicio" value="{{ d.inicio or '' }}"></label>
-        <label class="field"><span>Fim do período</span><input type="date" name="fim" value="{{ d.fim or '' }}"></label>
         <label class="field"><span>Parte diária P190</span><input type="date" name="data_parte_diaria" value="{{ d.data_parte_diaria or '' }}"></label>
         <div class="actions">
           <button class="btn primary" type="submit">Atualizar</button>
           {% if d.eh_id %}
-            <a class="btn info" href="{{ url_for('operacao.producao_relatorio', eh_id=d.eh_id, inicio=d.inicio, fim=d.fim, data_parte_diaria=d.data_parte_diaria) }}">Exportar Excel</a>
+            <a class="btn info" href="{{ url_for('operacao.producao_relatorio', eh_id=d.eh_id, data_parte_diaria=d.data_parte_diaria) }}">Exportar Excel</a>
           {% endif %}
         </div>
       </form>
+      {% if d.eh_id %}
+        <p class="hint">Período completo da EH: {{ d.inicio[8:10] }}/{{ d.inicio[5:7] }}/{{ d.inicio[0:4] }} a {{ d.fim[8:10] }}/{{ d.fim[5:7] }}/{{ d.fim[0:4] }}.</p>
+      {% endif %}
 
       {% if d.eh_id %}
       <div class="kpi-grid">
-        <div class="kpi good"><div class="label">Renovado no período</div><div class="value">{{ '{:,.0f}'.format(d.kpis.renovado).replace(',', '.') }}</div><div class="sub">dormentes</div></div>
-        <div class="kpi"><div class="label">Planejado no período</div><div class="value">{{ '{:,.0f}'.format(d.kpis.planejado).replace(',', '.') }}</div><div class="sub">desvio {{ '{:+,.0f}'.format(d.kpis.desvio).replace(',', '.') }}</div></div>
+        <div class="kpi good"><div class="label">Renovado na EH</div><div class="value">{{ '{:,.0f}'.format(d.kpis.renovado).replace(',', '.') }}</div><div class="sub">dormentes</div></div>
+        <div class="kpi"><div class="label">Planejado acumulado</div><div class="value">{{ '{:,.0f}'.format(d.kpis.planejado).replace(',', '.') }}</div><div class="sub">desvio {{ '{:+,.0f}'.format(d.kpis.desvio).replace(',', '.') }}</div></div>
         <div class="kpi {{ 'warn' if d.kpis.atraso_dias > 0 else 'good' }}"><div class="label">Atraso estimado</div><div class="value">{{ '%.1f'|format(d.kpis.atraso_dias) }}</div><div class="sub">dias equivalentes da curva planejada</div></div>
         <div class="kpi"><div class="label">Meta da EH</div><div class="value">{{ '%.1f'|format(d.kpis.percentual) }}%</div><div class="sub">{{ '{:,.0f}'.format(d.kpis.meta).replace(',', '.') }} dormentes</div></div>
-        <div class="kpi {{ 'warn' if d.kpis.minutos_impacto else '' }}"><div class="label">Impactos</div><div class="value">{{ '%.1f'|format(d.kpis.minutos_impacto / 60) }} h</div><div class="sub">no período selecionado</div></div>
+        <div class="kpi {{ 'warn' if d.kpis.minutos_impacto else '' }}"><div class="label">Impactos</div><div class="value">{{ '%.1f'|format(d.kpis.minutos_impacto / 60) }} h</div><div class="sub">em todo o período da EH</div></div>
         <div class="kpi {{ 'danger' if d.kpis.alertas else 'good' }}"><div class="label">Inconsistências</div><div class="value">{{ d.kpis.alertas }}</div><div class="sub">saldos negativos nos dias</div></div>
       </div>
       {% if d.kpis.alertas %}
