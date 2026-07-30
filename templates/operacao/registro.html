@@ -316,7 +316,7 @@
     <header class="zone-head" data-target="#z-controles">
       <div class="zone-left">
         <span class="zone-icon">🧭</span>
-        <div class="zone-title">Controles da Produção · EH, impactos, Parte Diária e pátio</div>
+        <div class="zone-title">Controles da Produção · posição inicial, impactos e pátio</div>
       </div>
       <div class="zone-actions">
         <button type="button" class="icon-btn caret">▾</button>
@@ -333,10 +333,6 @@
               {% endfor %}
             </select>
           </label>
-          <label class="field">
-            <span>Data da Parte Diária</span>
-            <input type="date" name="fdt" value="{{ d.data_parte_diaria or today }}">
-          </label>
           <input type="hidden" name="aplicar" value="1">
           <input type="hidden" name="keep_open" value="controles">
           <div class="toolbar-actions"><button class="btn info" type="submit">Carregar controles</button></div>
@@ -346,23 +342,8 @@
       {% if d.eh_id %}
         {% if can_edit %}
         <div class="control-card">
-          <h3>Parâmetros e meta da EH</h3>
-          <form method="post" action="{{ url_for('operacao.producao_configuracao') }}">
-            <input type="hidden" name="eh_id" value="{{ d.eh_id }}">
-            <div class="control-grid">
-              <label class="field"><span>Meta total</span><input type="number" min="0" step="1" name="meta_total" value="{{ d.config.meta_total }}" required></label>
-              <label class="field"><span>Produtividade diária</span><input type="number" min="1" step="1" name="produtividade_dia" value="{{ d.config.produtividade_dia }}" required></label>
-              <label class="field"><span>Início planejado</span><input type="date" name="data_inicio" value="{{ d.config.data_inicio or '' }}"></label>
-              <label class="field"><span>Fim planejado</span><input type="date" name="data_fim_planejada" value="{{ d.config.data_fim_planejada or '' }}"></label>
-            </div>
-            <label class="field"><span>Observação</span><textarea name="observacao">{{ d.config.observacao }}</textarea></label>
-            <div class="toolbar-actions"><button class="btn primary" type="submit">Salvar parâmetros</button></div>
-          </form>
-        </div>
-
-        <div class="control-card">
-          <h3>Saldos iniciais do fluxo</h3>
-          <p class="section-note">Informe a posição física conhecida na data de referência. A página Produção recalculará os saldos seguintes.</p>
+          <h3>Posição física inicial da EH</h3>
+          <p class="section-note">Cadastro único para EHs que já começaram com estoques ou serviços abertos. Não é uma meta: informe a posição física conhecida na data de referência. Para uma EH iniciada integralmente no sistema, mantenha os valores zerados.</p>
           <form method="post" action="{{ url_for('operacao.producao_saldos_iniciais') }}">
             <input type="hidden" name="eh_id" value="{{ d.eh_id }}">
             <div class="control-grid">
@@ -371,42 +352,17 @@
                 <label class="field"><span>{{ rotulo }}</span><input type="number" min="0" step="1" name="{{ codigo }}" value="{{ d.saldo_inicial.valores[codigo] }}" required></label>
               {% endfor %}
             </div>
-            <div class="toolbar-actions"><button class="btn primary" type="submit">Salvar saldos</button></div>
+            <div class="toolbar-actions"><button class="btn primary" type="submit">Salvar posição inicial</button></div>
           </form>
         </div>
         {% endif %}
 
         <div class="control-card">
           <h3>Parte Diária · Renovadora P190-66001</h3>
-          {% if can_create %}
-          <form method="post" action="{{ url_for('operacao.registro_parte_diaria_create') }}">
-            <input type="hidden" name="eh_id" value="{{ d.eh_id }}">
-            <div class="control-grid">
-              <label class="field"><span>Data</span><input type="date" name="data" value="{{ d.data_parte_diaria or today }}" required></label>
-              <label class="field"><span>Movimento / atividade</span><select name="atividade_id" required><option value="">-- selecione --</option>{% for atividade in atividades_parte_diaria %}<option value="{{ atividade.id }}">{{ atividade.nome }}</option>{% endfor %}</select></label>
-              <label class="field"><span>Hora inicial</span><input type="time" name="hora_inicio" required></label>
-              <label class="field"><span>Hora final</span><input type="time" name="hora_fim" required></label>
-            </div>
-            <label class="field"><span>Observação</span><input type="text" name="obs"></label>
-            <div class="toolbar-actions"><button class="btn primary" type="submit">Registrar movimento</button></div>
-          </form>
+          <p class="section-note">O cadastro completo já existe em Equipamentos, com lançamento em lote, filtros, edição, exclusão e exportação. Operação utiliza esses mesmos dados apenas para apresentar os resultados.</p>
+          {% if 'equipamentos:visualizar' in current_user_permissions or 'auth:administrar' in current_user_permissions %}
+            <div class="toolbar-actions"><a class="btn info" href="{{ url_for('equipamentos.partdiaria') }}">Abrir Equipamentos · Parte Diária</a></div>
           {% endif %}
-          <div class="control-table-wrap">
-            <table class="table">
-              <thead><tr><th>Movimento</th><th>Início</th><th>Fim</th><th>Duração</th><th>Observação</th>{% if can_delete %}<th></th>{% endif %}</tr></thead>
-              <tbody>
-              {% for item in d.parte_diaria %}
-                <tr>
-                  <td>{{ item.atividade }}</td><td>{{ item.hora_inicio }}</td><td>{{ item.hora_fim }}</td>
-                  <td>{{ item.duracao_minutos|int // 60 }}h {{ item.duracao_minutos|int % 60 }}min</td><td>{{ item.obs or '—' }}</td>
-                  {% if can_delete %}<td><form method="post" action="{{ url_for('operacao.registro_parte_diaria_delete', registro_id=item.id) }}" onsubmit="return confirm('Excluir este movimento?')"><input type="hidden" name="eh_id" value="{{ d.eh_id }}"><input type="hidden" name="data" value="{{ d.data_parte_diaria }}"><button class="btn danger" type="submit">Excluir</button></form></td>{% endif %}
-                </tr>
-              {% else %}
-                <tr><td colspan="{{ 6 if can_delete else 5 }}">Sem movimentos nesta data.</td></tr>
-              {% endfor %}
-              </tbody>
-            </table>
-          </div>
         </div>
 
         <div class="control-card">

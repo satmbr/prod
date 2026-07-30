@@ -1,7 +1,7 @@
 import unittest
 from pathlib import Path
 
-from routes.operacao_producao import calcular_saldos
+from routes.operacao_producao import calcular_atraso_equivalente, calcular_saldos
 
 
 class SaldosProducaoTests(unittest.TestCase):
@@ -52,6 +52,10 @@ class SaldosProducaoTests(unittest.TestCase):
         calcular_saldos(inicial, self.producao(DESCARREGAMENTO_NOVO=200))
         self.assertEqual(inicial, self.zero)
 
+    def test_atraso_usa_a_curva_planejada_em_vez_de_meta_paralela(self):
+        atraso = calcular_atraso_equivalente(1000, [850, 500])
+        self.assertAlmostEqual(atraso, 1.3)
+
 
 class SeparacaoTelasProducaoTests(unittest.TestCase):
     def setUp(self):
@@ -65,10 +69,12 @@ class SeparacaoTelasProducaoTests(unittest.TestCase):
         self.assertNotIn("producao_patio_create", self.producao)
 
     def test_registro_concentra_apontamentos_operacionais(self):
-        self.assertIn("registro_parte_diaria_create", self.registro)
+        self.assertNotIn("registro_parte_diaria_create", self.registro)
+        self.assertIn("equipamentos.partdiaria", self.registro)
         self.assertIn("producao_impacto_create", self.registro)
         self.assertIn("producao_patio_create", self.registro)
         self.assertIn("producao_saldos_iniciais", self.registro)
+        self.assertNotIn("producao_configuracao", self.registro)
 
     def test_registro_exige_aplicacao_explicita_dos_filtros(self):
         self.assertGreaterEqual(

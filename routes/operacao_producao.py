@@ -64,6 +64,21 @@ def calcular_saldos(estado_anterior, producao_dia):
     return estado
 
 
+def calcular_atraso_equivalente(deficit, planejados_mais_recentes):
+    restante = max(0.0, float(deficit))
+    atraso = 0.0
+    for quantidade in planejados_mais_recentes:
+        planejado_dia = _float(quantidade)
+        if planejado_dia <= 0:
+            continue
+        consumido = min(restante, planejado_dia)
+        atraso += consumido / planejado_dia
+        restante -= consumido
+        if restante <= 0:
+            break
+    return atraso
+
+
 def _periodo(conn, eh_id, inicio, fim):
     limites = conn.execute(
         text(
@@ -91,28 +106,52 @@ def _configuracao(conn, eh_id):
     row = conn.execute(
         text(
             """
-            SELECT meta_total, produtividade_dia, data_inicio, data_fim_planejada, observacao
-            FROM operacao_eh_config
-            WHERE eh_id = :eh_id
+            SELECT
+                COALESCE(SUM(p.planejado), 0) AS meta_total,
+                COALESCE(AVG(NULLIF(p.planejado, 0)), 0) AS produtividade_dia,
+                MIN(p.data)::date AS data_inicio,
+                MAX(p.data)::date AS data_fim_planejada
+            FROM producao_planejada p
+            JOIN frente_equipe f ON f.id = p.frente_id
+            WHERE p.eh_id = :eh_id
+              AND f.codigo = 'RENOVACAO'
             """
         ),
         {"eh_id": eh_id},
     ).mappings().first()
-    if not row:
-        return {
-            "meta_total": 0.0,
-            "produtividade_dia": 850.0,
-            "data_inicio": None,
-            "data_fim_planejada": None,
-            "observacao": "",
-        }
     return {
         "meta_total": _float(row["meta_total"]),
-        "produtividade_dia": _float(row["produtividade_dia"]) or 850.0,
+        "produtividade_dia": _float(row["produtividade_dia"]),
         "data_inicio": _iso(row["data_inicio"]) if row["data_inicio"] else None,
         "data_fim_planejada": _iso(row["data_fim_planejada"]) if row["data_fim_planejada"] else None,
-        "observacao": row["observacao"] or "",
+        "observacao": "",
     }
+
+
+def _atraso_equivalente_planejado(conn, eh_id, fim, deficit):
+    """Converte o déficit em frações dos dias planejados, sem meta paralela."""
+    if deficit <= 0:
+        return 0.0
+    dias = conn.execute(
+        text(
+            """
+            SELECT p.data::date, SUM(p.planejado)::float AS planejado
+            FROM producao_planejada p
+            JOIN frente_equipe f ON f.id = p.frente_id
+            WHERE p.eh_id = :eh_id
+              AND p.data <= :fim
+              AND f.codigo = 'RENOVACAO'
+            GROUP BY p.data
+            HAVING SUM(p.planejado) > 0
+            ORDER BY p.data DESC
+            """
+        ),
+        {"eh_id": eh_id, "fim": fim},
+    ).mappings().all()
+    return calcular_atraso_equivalente(
+        deficit,
+        [dia["planejado"] for dia in dias],
+    )
 
 
 def _saldos_iniciais(conn, eh_id, inicio):
@@ -241,7 +280,14 @@ def _producao_diaria(conn, eh_id, inicio, fim, saldos):
     return resultado, estado
 
 
-def carregar_dashboard(conn, eh_id, inicio=None, fim=None, data_parte_diaria=None):
+def carregar_dashboard(
+    conn,
+    eh_id,
+    inicio=None,
+    fim=None,
+    data_parte_diaria=None,
+    incluir_parte_diaria=True,
+):
     ehs = conn.execute(text("SELECT id, eh AS nome FROM entre_house ORDER BY eh")).mappings().all()
     frentes = conn.execute(
         text(
@@ -293,36 +339,38 @@ def carregar_dashboard(conn, eh_id, inicio=None, fim=None, data_parte_diaria=Non
         {"inicio": inicio, "fim": fim},
     ).mappings().all()
 
-    parte_diaria = conn.execute(
-        text(
-            """
-            SELECT
-                pd.id,
-                a.nome AS atividade,
-                m.tag,
-                pd.data,
-                to_char(pd.hora_inicio, 'HH24:MI') AS hora_inicio,
-                to_char(pd.hora_fim, 'HH24:MI') AS hora_fim,
-                pd.obs,
-                EXTRACT(
-                    EPOCH FROM (
-                        CASE
-                            WHEN pd.hora_fim >= pd.hora_inicio
-                                THEN pd.hora_fim - pd.hora_inicio
-                            ELSE pd.hora_fim - pd.hora_inicio + INTERVAL '24 hours'
-                        END
-                    )
-                ) / 60 AS duracao_minutos
-            FROM parte_diaria pd
-            JOIN maquina m ON m.id = pd.maquina_id
-            JOIN atividade a ON a.id = pd.atividade_id
-            WHERE pd.data = :data_ref
-              AND m.tag = 'P190-66001'
-            ORDER BY pd.hora_inicio, pd.id
-            """
-        ),
-        {"data_ref": data_parte_diaria},
-    ).mappings().all()
+    parte_diaria = []
+    if incluir_parte_diaria:
+        parte_diaria = conn.execute(
+            text(
+                """
+                SELECT
+                    pd.id,
+                    a.nome AS atividade,
+                    m.tag,
+                    pd.data,
+                    to_char(pd.hora_inicio, 'HH24:MI') AS hora_inicio,
+                    to_char(pd.hora_fim, 'HH24:MI') AS hora_fim,
+                    pd.obs,
+                    EXTRACT(
+                        EPOCH FROM (
+                            CASE
+                                WHEN pd.hora_fim >= pd.hora_inicio
+                                    THEN pd.hora_fim - pd.hora_inicio
+                                ELSE pd.hora_fim - pd.hora_inicio + INTERVAL '24 hours'
+                            END
+                        )
+                    ) / 60 AS duracao_minutos
+                FROM parte_diaria pd
+                JOIN maquina m ON m.id = pd.maquina_id
+                JOIN atividade a ON a.id = pd.atividade_id
+                WHERE pd.data = :data_ref
+                  AND m.tag = 'P190-66001'
+                ORDER BY pd.hora_inicio, pd.id
+                """
+            ),
+            {"data_ref": data_parte_diaria},
+        ).mappings().all()
 
     movimentos = defaultdict(float)
     for item in parte_diaria:
@@ -353,8 +401,12 @@ def carregar_dashboard(conn, eh_id, inicio=None, fim=None, data_parte_diaria=Non
     ).mappings().one()
     renovado = _float(totais["renovado"])
     planejado = _float(totais["planejado"])
-    produtividade = config["produtividade_dia"]
-    atraso_dias = max(0.0, (planejado - renovado) / produtividade) if produtividade else 0.0
+    atraso_dias = _atraso_equivalente_planejado(
+        conn,
+        eh_id,
+        fim,
+        max(0.0, planejado - renovado),
+    )
     meta = config["meta_total"]
     percentual = min(100.0, renovado / meta * 100.0) if meta else 0.0
     alertas = sum(len(item["inconsistencias"]) for item in diario)

@@ -89,7 +89,7 @@
       <div class="kpi-grid">
         <div class="kpi good"><div class="label">Renovado no período</div><div class="value">{{ '{:,.0f}'.format(d.kpis.renovado).replace(',', '.') }}</div><div class="sub">dormentes</div></div>
         <div class="kpi"><div class="label">Planejado no período</div><div class="value">{{ '{:,.0f}'.format(d.kpis.planejado).replace(',', '.') }}</div><div class="sub">desvio {{ '{:+,.0f}'.format(d.kpis.desvio).replace(',', '.') }}</div></div>
-        <div class="kpi {{ 'warn' if d.kpis.atraso_dias > 0 else 'good' }}"><div class="label">Atraso estimado</div><div class="value">{{ '%.1f'|format(d.kpis.atraso_dias) }}</div><div class="sub">dias a {{ '{:,.0f}'.format(d.config.produtividade_dia).replace(',', '.') }}/dia</div></div>
+        <div class="kpi {{ 'warn' if d.kpis.atraso_dias > 0 else 'good' }}"><div class="label">Atraso estimado</div><div class="value">{{ '%.1f'|format(d.kpis.atraso_dias) }}</div><div class="sub">dias equivalentes da curva planejada</div></div>
         <div class="kpi"><div class="label">Meta da EH</div><div class="value">{{ '%.1f'|format(d.kpis.percentual) }}%</div><div class="sub">{{ '{:,.0f}'.format(d.kpis.meta).replace(',', '.') }} dormentes</div></div>
         <div class="kpi {{ 'warn' if d.kpis.minutos_impacto else '' }}"><div class="label">Impactos</div><div class="value">{{ '%.1f'|format(d.kpis.minutos_impacto / 60) }} h</div><div class="sub">no período selecionado</div></div>
         <div class="kpi {{ 'danger' if d.kpis.alertas else 'good' }}"><div class="label">Inconsistências</div><div class="value">{{ d.kpis.alertas }}</div><div class="sub">saldos negativos nos dias</div></div>
@@ -119,7 +119,7 @@
           </div>
         {% endfor %}
       </div>
-      <p class="hint">Base dos saldos: {{ d.saldo_inicial.data_referencia }}. Renovação consome novos dos vagões e frentes abertas; também gera dormentes velhos e pregação em aberto.</p>
+      <p class="hint">Posição física inicial em {{ d.saldo_inicial.data_referencia }}. Renovação consome novos dos vagões e frentes abertas; também gera dormentes velhos e pregação em aberto.</p>
 
     </div>
   </section>
