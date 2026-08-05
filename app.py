@@ -96,6 +96,9 @@ def create_app():
     from routes.financeiro_dois_routes import bp as financeiro_dois_bp
     app.register_blueprint(financeiro_dois_bp)
 
+    from routes.financeiro_novo import bp as financeiro_novo_bp
+    app.register_blueprint(financeiro_novo_bp)
+
     @app.get("/")
     def home():
         return render_template("home_publica.html")
@@ -146,6 +149,14 @@ def create_app():
                 "descricao": "Controle OM, RD, despesas, notas de débito, reembolsos e previsões financeiras.",
                 "href": url_for("financeiro_dois.index"),
                 "botao": "Acessar módulo"
+            })
+
+        if "financeiro_novo:visualizar" in permissoes or "auth:administrar" in permissoes:
+            cards.append({
+                "titulo": "Financeiro Novo · Homologação",
+                "descricao": "Novo módulo financeiro independente, iniciando vazio e sem acesso aos dados anteriores.",
+                "href": url_for("financeiro_novo.index"),
+                "botao": "Abrir homologação"
             })
 
         return render_template("index.html", cards=cards)

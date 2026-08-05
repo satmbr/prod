@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}Financeiro Novo · Homologação{% endblock %}
+
+{% block content %}
+<div class="page-wrap financeiro-novo-page">
+  <div class="homolog-banner">
+    <strong>NOVO FINANCEIRO · {{ configuracao.ambiente }}</strong>
+    <span>Base independente e vazia. Nenhum dado do Financeiro atual é consultado ou alterado.</span>
+  </div>
+
+  <section class="zone">
+    <header class="zone-head">
+      <div class="zone-left">
+        <span class="zone-icon">💼</span>
+        <div>
+          <div class="zone-title">{{ configuracao.nome_modulo }}</div>
+          <div class="muted">Fundação técnica ativa · schema versão {{ configuracao.versao_schema }}</div>
+        </div>
+      </div>
+      <span class="status-chip">FUNDAÇÃO</span>
+    </header>
+    <div class="zone-body">
+      <div class="foundation-grid">
+        <article class="foundation-card">
+          <div class="foundation-label">Registros financeiros</div>
+          <div class="foundation-value">0</div>
+          <p>Os domínios de despesas, OM, RD, reembolsos e ND ainda serão construídos.</p>
+        </article>
+        <article class="foundation-card">
+          <div class="foundation-label">Arquivos canônicos</div>
+          <div class="foundation-value">{{ totais.arquivos }}</div>
+          <p>Fotos e PDFs serão normalizados para PDF otimizado.</p>
+        </article>
+        <article class="foundation-card">
+          <div class="foundation-label">Anexos vinculados</div>
+          <div class="foundation-value">{{ totais.anexos }}</div>
+          <p>O banco guarda metadados; o conteúdo ficará no armazenamento privado.</p>
+        </article>
+        <article class="foundation-card">
+          <div class="foundation-label">Eventos auditados</div>
+          <div class="foundation-value">{{ totais.eventos_auditoria }}</div>
+          <p>As futuras alterações serão registradas na mesma transação.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="zone">
+    <header class="zone-head">
+      <div class="zone-left">
+        <span class="zone-icon">🧭</span>
+        <div class="zone-title">Próximas etapas</div>
+      </div>
+    </header>
+    <div class="zone-body">
+      <ol class="roadmap">
+        <li class="done"><strong>Fundação isolada</strong><span>Permissões, auditoria, arquivos e migrations.</span></li>
+        <li><strong>Cadastros</strong><span>Fornecedores, favorecidos, centros de custo, categorias, contas e moedas.</span></li>
+        <li><strong>Despesas</strong><span>Rascunho, itens, anexos, aprovação e pagamento.</span></li>
+        <li><strong>OM, RD e reembolsos</strong><span>Fluxos separados com transições controladas.</span></li>
+        <li><strong>Notas de débito e relatórios</strong><span>Vínculos, conferência, previsão e conciliação.</span></li>
+      </ol>
+    </div>
+  </section>
+</div>
+
+<style>
+  .financeiro-novo-page{--fn:#0f766e;--fn-dark:#164e63}
+  .homolog-banner{display:flex;justify-content:space-between;gap:18px;align-items:center;margin-bottom:14px;padding:13px 16px;border:1px solid #f4c86a;border-radius:10px;background:#fff8dc;color:#684b08}
+  .homolog-banner span{font-size:12px}
+  .status-chip{padding:5px 10px;border-radius:999px;background:#dff6f0;color:#116257;font-size:10px;font-weight:800;letter-spacing:.06em}
+  .foundation-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+  .foundation-card{padding:16px;border:1px solid #d8e3ea;border-radius:12px;background:#fff}
+  .foundation-label{color:#60758a;font-size:11px;font-weight:800;text-transform:uppercase}
+  .foundation-value{margin:7px 0;color:var(--fn-dark);font-size:28px;font-weight:800}
+  .foundation-card p{margin:0;color:#60758a;font-size:11px;line-height:1.45}
+  .roadmap{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin:0;padding:0;list-style:none;counter-reset:etapa}
+  .roadmap li{position:relative;min-height:105px;padding:38px 13px 13px;border:1px solid #d8e3ea;border-radius:10px;background:#f8fafc;counter-increment:etapa}
+  .roadmap li::before{content:counter(etapa);position:absolute;top:11px;left:13px;width:20px;height:20px;border-radius:50%;background:#dbe6ed;color:#41586b;text-align:center;font-size:11px;font-weight:800;line-height:20px}
+  .roadmap li.done{border-color:#9dd9cd;background:#eefbf7}
+  .roadmap li.done::before{background:var(--fn);color:#fff}
+  .roadmap strong,.roadmap span{display:block}
+  .roadmap strong{margin-bottom:5px;color:#173550;font-size:12px}
+  .roadmap span{color:#60758a;font-size:10px;line-height:1.4}
+  @media(max-width:1000px){.foundation-grid{grid-template-columns:repeat(2,1fr)}.roadmap{grid-template-columns:1fr}.homolog-banner{align-items:flex-start;flex-direction:column}}
+</style>
+{% endblock %}

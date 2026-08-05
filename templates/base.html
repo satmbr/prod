@@ -59,6 +59,14 @@
       </a>
       {% endif %}
 
+      {% if 'financeiro_novo:visualizar' in current_user_permissions or 'auth:administrar' in current_user_permissions %}
+      <a class="sidebar-link{% if request.blueprint == 'financeiro_novo' %} active{% endif %}"
+         href="{{ url_for('financeiro_novo.index') }}">
+        <svg class="si" viewBox="0 0 24 24"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm1 5v4h4v2h-6V7h2zm-5 8h8v2H8v-2z"/></svg>
+        Financeiro Novo
+      </a>
+      {% endif %}
+
       {% if 'auth:administrar' in current_user_permissions %}
       <div class="sidebar-section-label" style="margin-top:12px;">ADMINISTRAÇÃO</div>
       <a class="sidebar-link{% if request.endpoint and 'auth.usuarios' == request.endpoint %} active{% endif %}"
