@@ -19,6 +19,7 @@ from routes.financeiro_novo.services.anexos import (
 )
 from routes.financeiro_novo.cadastros import TIPOS, _normalizar
 from routes.financeiro_novo.services.valores import ValorInvalido, decimal_br
+from routes.financeiro_novo.homologacao import diagnosticar_armazenamento
 
 
 class FinanceiroNovoIsolamentoTests(unittest.TestCase):
@@ -197,6 +198,23 @@ class FinanceiroNovoIsolamentoTests(unittest.TestCase):
                 sessao["ultimo_acesso"] = 9999999999
             resposta = client.get("/financeiro-novo/conciliacao")
         self.assertEqual(resposta.status_code, 403)
+
+    def test_homologacao_exige_permissao_administrativa_do_modulo(self):
+        app = create_app(); app.config.update(TESTING=True, WTF_CSRF_ENABLED=False)
+        with app.test_client() as client:
+            with client.session_transaction() as sessao:
+                sessao["usuario_id"] = 1
+                sessao["permissoes"] = ["financeiro_novo:visualizar"]
+                sessao["ultimo_acesso"] = 9999999999
+            resposta = client.get("/financeiro-novo/homologacao")
+        self.assertEqual(resposta.status_code, 403)
+
+    def test_diagnostico_de_armazenamento_nao_cria_diretorios(self):
+        app = create_app(); app.config.update(TESTING=True, UPLOAD_ROOT=str(self.raiz / "diretorio-que-nao-existe"))
+        with app.app_context():
+            diagnostico = diagnosticar_armazenamento()
+        self.assertFalse(diagnostico["existe"])
+        self.assertFalse((self.raiz / "diretorio-que-nao-existe").exists())
 
 
 class FinanceiroNovoCadastrosTests(unittest.TestCase):

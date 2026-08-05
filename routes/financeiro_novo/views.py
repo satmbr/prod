@@ -46,6 +46,11 @@ def build_subnav(active: str | None):
             "href": url_for("financeiro_novo.conciliacao"),
             "active": active == "conciliacao",
         })
+        links.append({
+            "text": "Homologação",
+            "href": url_for("financeiro_novo.homologacao"),
+            "active": active == "homologacao",
+        })
     return links
 
 

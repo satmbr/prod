@@ -56,3 +56,8 @@ Notas de Débito, recebimentos e conciliações são criados pela migration
 somente movimentos do novo módulo, apresentam previsão pelos saldos e
 vencimentos e permitem exportação CSV. A conciliação é manual e exige uma
 referência do extrato para cada movimento interno.
+
+A rota administrativa `/financeiro-novo/homologacao` verifica em tempo real,
+sem alterar dados, a versão do schema, cadastros mínimos, atribuição das
+permissões e prontidão do armazenamento privado. No Railway, `UPLOAD_ROOT`
+deve estar dentro do caminho informado por `RAILWAY_VOLUME_MOUNT_PATH`.
