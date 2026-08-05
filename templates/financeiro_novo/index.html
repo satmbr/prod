@@ -42,6 +42,16 @@
           <p>Reembolsos ou devoluções aguardando liquidação.</p>
         </article>
         <article class="foundation-card">
+          <div class="foundation-label">Notas de Débito</div>
+          <div class="foundation-value">{{ totais.notas_debito }}</div>
+          <p>Documentos a receber emitidos para clientes.</p>
+        </article>
+        <article class="foundation-card">
+          <div class="foundation-label">Conciliações</div>
+          <div class="foundation-value">{{ totais.conciliacoes }}</div>
+          <p>Movimentos conferidos manualmente com o extrato.</p>
+        </article>
+        <article class="foundation-card">
           <div class="foundation-label">Arquivos canônicos</div>
           <div class="foundation-value">{{ totais.arquivos }}</div>
           <p>Fotos e PDFs serão normalizados para PDF otimizado.</p>
@@ -73,7 +83,7 @@
         <li class="done"><strong>Cadastros</strong><span>Fornecedores, favorecidos, centros de custo, categorias, contas e moedas.</span></li>
         <li class="done"><strong>Despesas</strong><span>Rascunho, itens, anexos, aprovação e pagamento.</span></li>
         <li class="done"><strong>OM, RD e reembolsos</strong><span>Ciclo integrado com acerto de reembolso ou devolução.</span></li>
-        <li><strong>Notas de débito e relatórios</strong><span>Vínculos, conferência, previsão e conciliação.</span></li>
+        <li class="done"><strong>Notas de débito e relatórios</strong><span>Vínculos, previsão, CSV e conciliação manual.</span></li>
       </ol>
     </div>
   </section>

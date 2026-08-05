@@ -59,6 +59,8 @@ class FinanceiroNovoIsolamentoTests(unittest.TestCase):
             "despesas": 0,
             "missoes": 0,
             "acertos_pendentes": 0,
+            "notas_debito": 0,
+            "conciliacoes": 0,
             "cadastros": 0,
             "arquivos": 0,
             "anexos": 0,
@@ -178,6 +180,23 @@ class FinanceiroNovoIsolamentoTests(unittest.TestCase):
                 client.post("/financeiro-novo/rds/1/liquidar"),
             )
         self.assertTrue(all(resposta.status_code == 403 for resposta in respostas))
+
+    def test_notas_relatorios_e_conciliacao_usam_modelo_novo(self):
+        migration = (self.raiz / "migrations" / "007_financeiro_novo_nd_relatorios.sql").read_text(encoding="utf-8")
+        for tabela in ("clientes", "notas_debito", "nd_itens", "nd_decisoes", "nd_recebimentos", "conciliacoes"):
+            self.assertIn(f"financeiro3_{tabela}", migration)
+        self.assertIn("financeiro3_atualizar_total_nd", migration)
+        self.assertIn("UNIQUE (origem_tipo,origem_id)", migration)
+
+    def test_conciliacao_exige_permissao_administrativa_do_modulo(self):
+        app = create_app(); app.config.update(TESTING=True, WTF_CSRF_ENABLED=False)
+        with app.test_client() as client:
+            with client.session_transaction() as sessao:
+                sessao["usuario_id"] = 1
+                sessao["permissoes"] = ["financeiro_novo:visualizar", "financeiro_novo:editar"]
+                sessao["ultimo_acesso"] = 9999999999
+            resposta = client.get("/financeiro-novo/conciliacao")
+        self.assertEqual(resposta.status_code, 403)
 
 
 class FinanceiroNovoCadastrosTests(unittest.TestCase):

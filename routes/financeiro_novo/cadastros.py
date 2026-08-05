@@ -12,6 +12,21 @@ from routes.financeiro_novo.views import build_subnav
 
 
 TIPOS = {
+    "clientes": {
+        "titulo": "Clientes", "singular": "Cliente",
+        "tabela": "financeiro3_clientes", "busca": ("nome_razao", "nome_fantasia", "documento"),
+        "colunas": ("nome_razao", "nome_fantasia", "documento", "email"),
+        "campos": (
+            {"nome": "tipo_pessoa", "rotulo": "Tipo", "tipo": "select", "obrigatorio": True,
+             "opcoes": (("JURIDICA", "Pessoa jurídica"), ("FISICA", "Pessoa física"))},
+            {"nome": "nome_razao", "rotulo": "Nome / razão social", "tipo": "text", "obrigatorio": True, "maximo": 180},
+            {"nome": "nome_fantasia", "rotulo": "Nome fantasia", "tipo": "text", "maximo": 180},
+            {"nome": "documento", "rotulo": "CPF / CNPJ", "tipo": "text", "maximo": 18},
+            {"nome": "email", "rotulo": "E-mail", "tipo": "email", "maximo": 180},
+            {"nome": "telefone", "rotulo": "Telefone", "tipo": "text", "maximo": 30},
+            {"nome": "endereco_cobranca", "rotulo": "Endereço de cobrança", "tipo": "text", "maximo": 500},
+        ),
+    },
     "pessoas": {
         "titulo": "Fornecedores e favorecidos",
         "singular": "Pessoa",
@@ -126,6 +141,10 @@ def _normalizar(config, formulario):
     if config["tabela"] == "financeiro3_pessoas":
         if not dados.get("fornecedor") and not dados.get("favorecido"):
             erros.append("Marque a pessoa como fornecedor e/ou favorecido.")
+        documento = dados.get("documento")
+        if documento and len(documento) not in (11, 14):
+            erros.append("CPF/CNPJ deve conter 11 ou 14 dígitos.")
+    if config["tabela"] == "financeiro3_clientes":
         documento = dados.get("documento")
         if documento and len(documento) not in (11, 14):
             erros.append("CPF/CNPJ deve conter 11 ou 14 dígitos.")

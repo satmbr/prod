@@ -50,3 +50,9 @@ O ciclo de missões é criado pela migration
 `migrations/006_financeiro_novo_om_rd.sql`. Cada OM pode originar uma única
 RD. Na aprovação da prestação, a diferença entre gastos e adiantamento gera
 um reembolso, uma devolução ou a liquidação imediata quando o saldo é zero.
+
+Notas de Débito, recebimentos e conciliações são criados pela migration
+`migrations/007_financeiro_novo_nd_relatorios.sql`. Os relatórios consolidam
+somente movimentos do novo módulo, apresentam previsão pelos saldos e
+vencimentos e permitem exportação CSV. A conciliação é manual e exige uma
+referência do extrato para cada movimento interno.

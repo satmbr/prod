@@ -19,6 +19,7 @@ EDITAVEIS = {"RASCUNHO", "REJEITADA"}
 DOCUMENTOS = {
     "om": ("financeiro3_oms", "OM"),
     "rd": ("financeiro3_rds", "RD"),
+    "nd": ("financeiro3_notas_debito", "ND"),
 }
 
 
@@ -559,8 +560,9 @@ def documento_anexo_novo(tipo, registro_id):
     finally:
         if temporario and temporario.exists():
             temporario.unlink(missing_ok=True)
-    endpoint = "financeiro_novo.om_detalhe" if tipo == "om" else "financeiro_novo.rd_detalhe"
-    return redirect(url_for(endpoint, **({"om_id": registro_id} if tipo == "om" else {"rd_id": registro_id})))
+    endpoints = {"om": ("financeiro_novo.om_detalhe", "om_id"), "rd": ("financeiro_novo.rd_detalhe", "rd_id"), "nd": ("financeiro_novo.nd_detalhe", "nd_id")}
+    endpoint, parametro = endpoints[tipo]
+    return redirect(url_for(endpoint, **{parametro: registro_id}))
 
 
 @bp.get("/documentos/<tipo>/<int:registro_id>/anexos/<uuid:arquivo_id>")
@@ -611,5 +613,6 @@ def documento_anexo_remover(tipo, registro_id, anexo_id):
         registrar_evento(conn, entidade=f"{entidade}_ANEXO", entidade_id=anexo_id,
                          evento="REMOVIDO", dados_anteriores=dict(anterior), dados_novos=dict(novo))
     flash("Documento removido do lançamento e preservado na auditoria.", "sucesso")
-    endpoint = "financeiro_novo.om_detalhe" if tipo == "om" else "financeiro_novo.rd_detalhe"
-    return redirect(url_for(endpoint, **({"om_id": registro_id} if tipo == "om" else {"rd_id": registro_id})))
+    endpoints = {"om": ("financeiro_novo.om_detalhe", "om_id"), "rd": ("financeiro_novo.rd_detalhe", "rd_id"), "nd": ("financeiro_novo.nd_detalhe", "nd_id")}
+    endpoint, parametro = endpoints[tipo]
+    return redirect(url_for(endpoint, **{parametro: registro_id}))
