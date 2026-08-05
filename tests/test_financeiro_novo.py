@@ -1,6 +1,7 @@
 import io
 import os
 import unittest
+from decimal import Decimal
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -17,6 +18,7 @@ from routes.financeiro_novo.services.anexos import (
     normalizar_anexo,
 )
 from routes.financeiro_novo.cadastros import TIPOS, _normalizar
+from routes.financeiro_novo.services.valores import ValorInvalido, decimal_br
 
 
 class FinanceiroNovoIsolamentoTests(unittest.TestCase):
@@ -54,6 +56,7 @@ class FinanceiroNovoIsolamentoTests(unittest.TestCase):
         }
         resultado_totais = MagicMock()
         resultado_totais.mappings.return_value.one.return_value = {
+            "despesas": 0,
             "cadastros": 0,
             "arquivos": 0,
             "anexos": 0,
@@ -129,6 +132,28 @@ class FinanceiroNovoIsolamentoTests(unittest.TestCase):
         self.assertIn("Este cadastro começa vazio", pagina)
         self.assertNotIn("Novo cadastro", pagina)
 
+    def test_despesas_usam_tabelas_novas_e_total_calculado_no_banco(self):
+        migration = (self.raiz / "migrations" / "005_financeiro_novo_despesas.sql").read_text(encoding="utf-8")
+        for tabela in ("despesas", "despesa_itens", "despesa_decisoes", "despesa_pagamentos"):
+            self.assertIn(f"financeiro3_{tabela}", migration)
+        self.assertIn("GENERATED ALWAYS AS", migration)
+        self.assertIn("financeiro3_atualizar_total_despesa", migration)
+        self.assertIn("NUMERIC(18, 2)", migration)
+        self.assertNotIn("FLOAT", migration.upper())
+
+    def test_permissao_de_edicao_nao_autoriza_aprovar_ou_pagar(self):
+        app = create_app()
+        app.config.update(TESTING=True, WTF_CSRF_ENABLED=False)
+        with app.test_client() as client:
+            with client.session_transaction() as sessao:
+                sessao["usuario_id"] = 1
+                sessao["permissoes"] = ["financeiro_novo:visualizar", "financeiro_novo:editar"]
+                sessao["ultimo_acesso"] = 9999999999
+            aprovacao = client.post("/financeiro-novo/despesas/1/aprovar")
+            pagamento = client.post("/financeiro-novo/despesas/1/pagar")
+        self.assertEqual(aprovacao.status_code, 403)
+        self.assertEqual(pagamento.status_code, 403)
+
 
 class FinanceiroNovoCadastrosTests(unittest.TestCase):
     def test_pessoa_exige_papel_e_normaliza_documento(self):
@@ -165,6 +190,16 @@ class FinanceiroNovoCadastrosTests(unittest.TestCase):
             {"nome": "Conta", "tipo": "CRIPTO", "moeda_id": "1"},
         )
         self.assertTrue(any("Tipo é inválido" in erro for erro in erros))
+
+
+class FinanceiroNovoValoresTests(unittest.TestCase):
+    def test_decimal_aceita_formato_brasileiro_sem_usar_float(self):
+        self.assertEqual(decimal_br("1.234,56"), Decimal("1234.56"))
+        self.assertEqual(decimal_br("10,999", casas=2), Decimal("11.00"))
+
+    def test_decimal_bloqueia_zero_em_pagamentos_e_itens(self):
+        with self.assertRaises(ValorInvalido):
+            decimal_br("0,00", positivo=True)
 
 
 class FinanceiroNovoAnexosTests(unittest.TestCase):

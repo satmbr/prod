@@ -39,3 +39,9 @@ Os cadastros-base são criados pela migration
 centros de custo, categorias, moedas e contas financeiras. Todos começam
 vazios, são preenchidos manualmente e usam inativação em vez de exclusão
 física, com alterações registradas na auditoria independente.
+
+O fluxo de despesas é criado pela migration
+`migrations/005_financeiro_novo_despesas.sql`. O total é sempre calculado a
+partir dos itens, e os estados de rascunho, aprovação, pagamento e
+cancelamento têm permissões independentes. O envio para aprovação exige item
+e comprovante; imagens e PDFs são armazenados como PDF canônico privado.

@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Despesas · Financeiro Novo{% endblock %}
+{% block content %}
+{% set pode_criar = 'financeiro_novo:criar' in current_user_permissions or 'auth:administrar' in current_user_permissions %}
+<div class="page-wrap dsp-page">
+  <div class="homolog-banner"><strong>NOVO FINANCEIRO · HOMOLOGAÇÃO</strong><span>Despesas lançadas somente nesta base independente.</span></div>
+  <section class="zone">
+    <header class="zone-head"><div class="zone-left"><div><div class="zone-title">Despesas</div><div class="muted">Rascunho, aprovação e pagamento em fluxo controlado</div></div></div>{% if pode_criar %}<a class="btn btn-primary" href="{{ url_for('financeiro_novo.despesa_nova') }}">Nova despesa</a>{% endif %}</header>
+    <div class="zone-body">
+      <form method="get" class="dsp-filter">
+        <input type="search" name="q" value="{{ busca }}" placeholder="Descrição, fornecedor ou documento">
+        <select name="status"><option value="">Todos os status</option>{% for valor, rotulo in [('RASCUNHO','Rascunho'),('EM_APROVACAO','Em aprovação'),('APROVADA','Aprovada'),('REJEITADA','Rejeitada'),('PAGAMENTO_PARCIAL','Pagamento parcial'),('PAGA','Paga'),('CANCELADA','Cancelada')] %}<option value="{{ valor }}" {% if status == valor %}selected{% endif %}>{{ rotulo }}</option>{% endfor %}</select>
+        <button class="btn btn-outline" type="submit">Aplicar</button><a class="btn btn-outline" href="{{ url_for('financeiro_novo.despesas') }}">Limpar</a>
+      </form>
+      <div class="dsp-table-wrap"><table class="dsp-table"><thead><tr><th>Número</th><th>Descrição</th><th>Fornecedor</th><th>Vencimento</th><th>Status</th><th class="right">Total</th><th class="right">Saldo</th></tr></thead><tbody>
+      {% for item in registros %}<tr><td><a class="dsp-number" href="{{ url_for('financeiro_novo.despesa_detalhe', despesa_id=item.id) }}">DSP-{{ '%06d'|format(item.id) }}</a></td><td>{{ item.descricao }}</td><td>{{ item.fornecedor }}</td><td>{{ item.data_vencimento.strftime('%d/%m/%Y') }}</td><td><span class="dsp-status {{ item.status|lower }}">{{ item.status|replace('_',' ') }}</span></td><td class="right">{{ item.moeda }} {{ '%.2f'|format(item.valor_total)|replace('.',',') }}</td><td class="right">{{ item.moeda }} {{ '%.2f'|format(item.valor_total-item.valor_pago)|replace('.',',') }}</td></tr>
+      {% else %}<tr><td colspan="7" class="dsp-empty">Nenhuma despesa encontrada. Os lançamentos começam vazios.</td></tr>{% endfor %}
+      </tbody></table></div>
+    </div>
+  </section>
+</div>
+{% include "financeiro_novo/_despesa_estilos.html" %}
+{% endblock %}

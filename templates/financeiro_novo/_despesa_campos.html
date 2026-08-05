@@ -1,0 +1,13 @@
+<div class="dsp-form-grid">
+  <label class="span-2"><span>Descrição *</span><input name="descricao" maxlength="220" required value="{{ despesa.descricao if despesa else '' }}"></label>
+  <label><span>Fornecedor *</span><select name="fornecedor_id" required><option value="">Selecione</option>{% for item in opcoes.fornecedores %}<option value="{{ item.id }}" {% if despesa and despesa.fornecedor_id == item.id %}selected{% endif %}>{{ item.nome_razao }}</option>{% endfor %}</select></label>
+  <label><span>Favorecido</span><select name="favorecido_id"><option value="">O próprio fornecedor</option>{% for item in opcoes.favorecidos %}<option value="{{ item.id }}" {% if despesa and despesa.favorecido_id == item.id %}selected{% endif %}>{{ item.nome_razao }}</option>{% endfor %}</select></label>
+  <label><span>Centro de custo *</span><select name="centro_custo_id" required><option value="">Selecione</option>{% for item in opcoes.centros %}<option value="{{ item.id }}" {% if despesa and despesa.centro_custo_id == item.id %}selected{% endif %}>{{ item.codigo }} · {{ item.nome }}</option>{% endfor %}</select></label>
+  <label><span>Categoria *</span><select name="categoria_id" required><option value="">Selecione</option>{% for item in opcoes.categorias %}<option value="{{ item.id }}" {% if despesa and despesa.categoria_id == item.id %}selected{% endif %}>{{ item.codigo }} · {{ item.nome }}</option>{% endfor %}</select></label>
+  <label><span>Moeda *</span><select name="moeda_id" required><option value="">Selecione</option>{% for item in opcoes.moedas %}<option value="{{ item.id }}" {% if despesa and despesa.moeda_id == item.id %}selected{% endif %}>{{ item.codigo }} · {{ item.nome }}</option>{% endfor %}</select></label>
+  <label><span>Número do documento</span><input name="numero_documento" maxlength="80" value="{{ despesa.numero_documento or '' if despesa else '' }}"></label>
+  <label><span>Emissão *</span><input type="date" name="data_emissao" required value="{{ despesa.data_emissao.isoformat() if despesa else '' }}"></label>
+  <label><span>Competência *</span><input type="date" name="data_competencia" required value="{{ despesa.data_competencia.isoformat() if despesa else '' }}"></label>
+  <label><span>Vencimento *</span><input type="date" name="data_vencimento" required value="{{ despesa.data_vencimento.isoformat() if despesa else '' }}"></label>
+  <label class="span-2"><span>Observações</span><textarea name="observacoes" rows="3">{{ despesa.observacoes or '' if despesa else '' }}</textarea></label>
+</div>

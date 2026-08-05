@@ -22,6 +22,11 @@
     <div class="zone-body">
       <div class="foundation-grid">
         <article class="foundation-card">
+          <div class="foundation-label">Despesas</div>
+          <div class="foundation-value">{{ totais.despesas }}</div>
+          <p>Rascunhos e lançamentos em aprovação, aprovados ou pagos.</p>
+        </article>
+        <article class="foundation-card">
           <div class="foundation-label">Cadastros-base</div>
           <div class="foundation-value">{{ totais.cadastros }}</div>
           <p>Pessoas, centros de custo, categorias, moedas e contas cadastrados manualmente.</p>
@@ -56,7 +61,7 @@
       <ol class="roadmap">
         <li class="done"><strong>Fundação isolada</strong><span>Permissões, auditoria, arquivos e migrations.</span></li>
         <li class="done"><strong>Cadastros</strong><span>Fornecedores, favorecidos, centros de custo, categorias, contas e moedas.</span></li>
-        <li><strong>Despesas</strong><span>Rascunho, itens, anexos, aprovação e pagamento.</span></li>
+        <li class="done"><strong>Despesas</strong><span>Rascunho, itens, anexos, aprovação e pagamento.</span></li>
         <li><strong>OM, RD e reembolsos</strong><span>Fluxos separados com transições controladas.</span></li>
         <li><strong>Notas de débito e relatórios</strong><span>Vínculos, conferência, previsão e conciliação.</span></li>
       </ol>
@@ -69,7 +74,7 @@
   .homolog-banner{display:flex;justify-content:space-between;gap:18px;align-items:center;margin-bottom:14px;padding:13px 16px;border:1px solid #f4c86a;border-radius:10px;background:#fff8dc;color:#684b08}
   .homolog-banner span{font-size:12px}
   .status-chip{padding:5px 10px;border-radius:999px;background:#dff6f0;color:#116257;font-size:10px;font-weight:800;letter-spacing:.06em}
-  .foundation-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+  .foundation-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
   .foundation-card{padding:16px;border:1px solid #d8e3ea;border-radius:12px;background:#fff}
   .foundation-label{color:#60758a;font-size:11px;font-weight:800;text-transform:uppercase}
   .foundation-value{margin:7px 0;color:var(--fn-dark);font-size:28px;font-weight:800}

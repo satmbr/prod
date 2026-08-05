@@ -18,6 +18,11 @@ def build_subnav(active: str | None):
             "href": url_for("financeiro_novo.cadastros"),
             "active": active == "cadastros",
         },
+        {
+            "text": "Despesas",
+            "href": url_for("financeiro_novo.despesas"),
+            "active": active == "despesas",
+        },
     ]
 
 
@@ -39,6 +44,7 @@ def index():
             text(
                 """
                 SELECT
+                    (SELECT COUNT(*) FROM financeiro3_despesas) AS despesas,
                     ((SELECT COUNT(*) FROM financeiro3_pessoas) +
                      (SELECT COUNT(*) FROM financeiro3_centros_custo) +
                      (SELECT COUNT(*) FROM financeiro3_categorias) +

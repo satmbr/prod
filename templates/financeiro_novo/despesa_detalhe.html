@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}DSP-{{ '%06d'|format(despesa.id) }} · Financeiro Novo{% endblock %}
+{% block content %}
+{% set admin = 'auth:administrar' in current_user_permissions %}
+{% set pode_editar = 'financeiro_novo:editar' in current_user_permissions or admin %}
+{% set pode_aprovar = 'financeiro_novo:aprovar' in current_user_permissions or admin %}
+{% set pode_pagar = 'financeiro_novo:pagar' in current_user_permissions or admin %}
+{% set pode_cancelar = 'financeiro_novo:cancelar' in current_user_permissions or admin %}
+<div class="page-wrap dsp-page">
+  <div class="homolog-banner"><strong>NOVO FINANCEIRO · HOMOLOGAÇÃO</strong><span>DSP-{{ '%06d'|format(despesa.id) }} · operação auditada</span></div>
+  <div class="dsp-summary">
+    <article class="dsp-kpi"><span>Status</span><strong><span class="dsp-status {{ despesa.status|lower }}">{{ despesa.status|replace('_',' ') }}</span></strong></article>
+    <article class="dsp-kpi"><span>Total</span><strong>{{ despesa.moeda }} {{ '%.2f'|format(despesa.valor_total)|replace('.',',') }}</strong></article>
+    <article class="dsp-kpi"><span>Pago</span><strong>{{ despesa.moeda }} {{ '%.2f'|format(valor_pago)|replace('.',',') }}</strong></article>
+    <article class="dsp-kpi"><span>Saldo</span><strong>{{ despesa.moeda }} {{ '%.2f'|format(saldo)|replace('.',',') }}</strong></article>
+  </div>
+
+  <div class="dsp-grid">
+    <div>
+      <section class="zone">
+        <header class="zone-head"><div class="zone-left"><div><div class="zone-title">Dados da despesa</div><div class="muted">{{ despesa.fornecedor }} · {{ despesa.centro_codigo }} · {{ despesa.categoria_nome }}</div></div></div></header>
+        <div class="zone-body">
+          {% if editavel and pode_editar %}
+          <form method="post" action="{{ url_for('financeiro_novo.despesa_editar', despesa_id=despesa.id) }}">{% include "financeiro_novo/_despesa_campos.html" %}<div class="dsp-actions"><button class="btn btn-outline" type="submit">Salvar cabeçalho</button></div></form>
+          {% else %}
+          <div class="dsp-form-grid">
+            <label class="span-2"><span>Descrição</span><b>{{ despesa.descricao }}</b></label><label><span>Fornecedor</span><b>{{ despesa.fornecedor }}</b></label><label><span>Favorecido</span><b>{{ despesa.favorecido or despesa.fornecedor }}</b></label><label><span>Centro de custo</span><b>{{ despesa.centro_codigo }} · {{ despesa.centro_nome }}</b></label><label><span>Categoria</span><b>{{ despesa.categoria_codigo }} · {{ despesa.categoria_nome }}</b></label><label><span>Documento</span><b>{{ despesa.numero_documento or '—' }}</b></label><label><span>Emissão / vencimento</span><b>{{ despesa.data_emissao.strftime('%d/%m/%Y') }} · {{ despesa.data_vencimento.strftime('%d/%m/%Y') }}</b></label>
+          </div>
+          {% endif %}
+        </div>
+      </section>
+
+      <section class="zone">
+        <header class="zone-head"><div class="zone-title">Itens</div></header><div class="zone-body">
+          {% if editavel and pode_editar %}<form method="post" action="{{ url_for('financeiro_novo.despesa_item_novo', despesa_id=despesa.id) }}" class="dsp-mini-form"><label class="full"><span>Descrição do item</span><input name="descricao_item" maxlength="220" required></label><label><span>Quantidade</span><input name="quantidade" inputmode="decimal" value="1" required></label><label><span>Valor unitário</span><input name="valor_unitario" inputmode="decimal" placeholder="0,00" required></label><div class="full"><button class="btn btn-outline" type="submit">Adicionar item</button></div></form>{% endif %}
+          <div class="dsp-table-wrap"><table class="dsp-table"><thead><tr><th>Descrição</th><th class="right">Quantidade</th><th class="right">Unitário</th><th class="right">Total</th>{% if editavel and pode_editar %}<th></th>{% endif %}</tr></thead><tbody>{% for item in itens %}<tr><td>{{ item.descricao }}</td><td class="right">{{ item.quantidade }}</td><td class="right">{{ despesa.moeda }} {{ '%.2f'|format(item.valor_unitario)|replace('.',',') }}</td><td class="right">{{ despesa.moeda }} {{ '%.2f'|format(item.valor_total)|replace('.',',') }}</td>{% if editavel and pode_editar %}<td><form method="post" action="{{ url_for('financeiro_novo.despesa_item_remover', despesa_id=despesa.id, item_id=item.id) }}"><button type="submit">Remover</button></form></td>{% endif %}</tr>{% else %}<tr><td colspan="5" class="dsp-empty">Inclua os itens que formam o valor da despesa.</td></tr>{% endfor %}</tbody></table></div>
+        </div>
+      </section>
+
+      <section class="zone"><header class="zone-head"><div class="zone-title">Comprovantes</div></header><div class="zone-body">
+        {% if editavel and pode_editar %}<form method="post" enctype="multipart/form-data" action="{{ url_for('financeiro_novo.despesa_anexo_novo', despesa_id=despesa.id) }}" class="dsp-mini-form"><label class="full"><span>Foto ou PDF · máximo 20 MB</span><input type="file" name="arquivo" accept="image/*,application/pdf" required></label><div class="full"><button class="btn btn-outline" type="submit">Converter e anexar</button></div></form>{% endif %}
+        {% for anexo in anexos %}<div class="dsp-file"><div><a href="{{ url_for('financeiro_novo.despesa_anexo_baixar', despesa_id=despesa.id, arquivo_id=anexo.arquivo_id) }}">{{ anexo.nome_original }}</a><small> · {{ anexo.paginas }} pág. · {{ (anexo.tamanho_canonico/1024)|round|int }} KB{% if anexo.assinatura_digital_detectada %} · assinatura preservada{% endif %}</small></div>{% if editavel and pode_editar %}<form method="post" action="{{ url_for('financeiro_novo.despesa_anexo_remover', despesa_id=despesa.id, anexo_id=anexo.id) }}"><button class="link-button" type="submit">Remover</button></form>{% endif %}</div>{% else %}<div class="dsp-empty">Nenhum comprovante anexado.</div>{% endfor %}
+      </div></section>
+    </div>
+
+    <aside>
+      <section class="zone"><header class="zone-head"><div class="zone-title">Ações</div></header><div class="zone-body">
+        {% if editavel and pode_editar %}<form method="post" action="{{ url_for('financeiro_novo.despesa_enviar', despesa_id=despesa.id) }}"><button class="btn btn-primary" type="submit">Enviar para aprovação</button></form>{% endif %}
+        {% if despesa.status == 'EM_APROVACAO' and pode_aprovar %}<form method="post" action="{{ url_for('financeiro_novo.despesa_aprovar', despesa_id=despesa.id) }}" class="dsp-actions"><button class="btn btn-primary" type="submit">Aprovar</button></form><form method="post" action="{{ url_for('financeiro_novo.despesa_rejeitar', despesa_id=despesa.id) }}" class="dsp-mini-form"><label class="full"><span>Justificativa para rejeição</span><textarea name="justificativa" required></textarea></label><button class="btn btn-outline" type="submit">Rejeitar</button></form>{% endif %}
+        {% if despesa.status in ['APROVADA','PAGAMENTO_PARCIAL'] and pode_pagar %}<h3 class="dsp-section-title">Registrar pagamento</h3><form method="post" action="{{ url_for('financeiro_novo.despesa_pagar', despesa_id=despesa.id) }}" class="dsp-mini-form"><label><span>Data</span><input type="date" name="data_pagamento" required></label><label><span>Valor</span><input name="valor" inputmode="decimal" value="{{ '%.2f'|format(saldo)|replace('.',',') }}" required></label><label class="full"><span>Conta na mesma moeda</span><select name="conta_id" required><option value="">Selecione</option>{% for conta in opcoes.contas %}{% if conta.moeda_id == despesa.moeda_id %}<option value="{{ conta.id }}">{{ conta.nome }} · {{ conta.moeda }}</option>{% endif %}{% endfor %}</select></label><label><span>Forma</span><select name="forma" required>{% for valor, rotulo in formas_pagamento %}<option value="{{ valor }}">{{ rotulo }}</option>{% endfor %}</select></label><label><span>Referência</span><input name="referencia" maxlength="120"></label><button class="btn btn-primary full" type="submit">Registrar pagamento</button></form>{% endif %}
+        {% if despesa.status not in ['PAGA','PAGAMENTO_PARCIAL','CANCELADA'] and pode_cancelar %}<h3 class="dsp-section-title">Cancelar</h3><form method="post" action="{{ url_for('financeiro_novo.despesa_cancelar', despesa_id=despesa.id) }}" class="dsp-mini-form"><label class="full"><span>Motivo obrigatório</span><textarea name="motivo" required></textarea></label><button class="btn btn-outline" type="submit">Cancelar despesa</button></form>{% endif %}
+      </div></section>
+      <section class="zone"><header class="zone-head"><div class="zone-title">Pagamentos</div></header><div class="zone-body">{% for pg in pagamentos %}<div class="dsp-file"><div><strong>{{ pg.data_pagamento.strftime('%d/%m/%Y') }}</strong><small> · {{ pg.conta }} · {{ pg.forma }}</small></div><b>{{ despesa.moeda }} {{ '%.2f'|format(pg.valor)|replace('.',',') }}</b></div>{% else %}<div class="dsp-empty">Nenhum pagamento.</div>{% endfor %}</div></section>
+      <section class="zone"><header class="zone-head"><div class="zone-title">Histórico de decisões</div></header><div class="zone-body"><ul class="dsp-history">{% for evento in decisoes %}<li><strong>{{ evento.acao|replace('_',' ') }}</strong><span>{{ evento.criado_em.strftime('%d/%m/%Y %H:%M') }} · {{ evento.status_anterior }} → {{ evento.status_novo }}</span>{% if evento.justificativa %}<span>{{ evento.justificativa }}</span>{% endif %}</li>{% else %}<li>Nenhuma decisão registrada.</li>{% endfor %}</ul></div></section>
+    </aside>
+  </div>
+</div>
+{% include "financeiro_novo/_despesa_estilos.html" %}
+{% endblock %}
