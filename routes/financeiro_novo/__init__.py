@@ -11,3 +11,4 @@ bp = Blueprint(
 from routes.financeiro_novo import views  # noqa: E402, F401
 from routes.financeiro_novo import cadastros  # noqa: E402, F401
 from routes.financeiro_novo import despesas  # noqa: E402, F401
+from routes.financeiro_novo import missoes  # noqa: E402, F401

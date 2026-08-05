@@ -45,3 +45,8 @@ O fluxo de despesas é criado pela migration
 partir dos itens, e os estados de rascunho, aprovação, pagamento e
 cancelamento têm permissões independentes. O envio para aprovação exige item
 e comprovante; imagens e PDFs são armazenados como PDF canônico privado.
+
+O ciclo de missões é criado pela migration
+`migrations/006_financeiro_novo_om_rd.sql`. Cada OM pode originar uma única
+RD. Na aprovação da prestação, a diferença entre gastos e adiantamento gera
+um reembolso, uma devolução ou a liquidação imediata quando o saldo é zero.

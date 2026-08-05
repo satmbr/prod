@@ -23,6 +23,11 @@ def build_subnav(active: str | None):
             "href": url_for("financeiro_novo.despesas"),
             "active": active == "despesas",
         },
+        {
+            "text": "OM e RD",
+            "href": url_for("financeiro_novo.missoes"),
+            "active": active == "missoes",
+        },
     ]
 
 
@@ -45,6 +50,9 @@ def index():
                 """
                 SELECT
                     (SELECT COUNT(*) FROM financeiro3_despesas) AS despesas,
+                    ((SELECT COUNT(*) FROM financeiro3_oms) +
+                     (SELECT COUNT(*) FROM financeiro3_rds)) AS missoes,
+                    (SELECT COUNT(*) FROM financeiro3_rd_acertos WHERE status='PENDENTE') AS acertos_pendentes,
                     ((SELECT COUNT(*) FROM financeiro3_pessoas) +
                      (SELECT COUNT(*) FROM financeiro3_centros_custo) +
                      (SELECT COUNT(*) FROM financeiro3_categorias) +

@@ -57,6 +57,8 @@ class FinanceiroNovoIsolamentoTests(unittest.TestCase):
         resultado_totais = MagicMock()
         resultado_totais.mappings.return_value.one.return_value = {
             "despesas": 0,
+            "missoes": 0,
+            "acertos_pendentes": 0,
             "cadastros": 0,
             "arquivos": 0,
             "anexos": 0,
@@ -153,6 +155,29 @@ class FinanceiroNovoIsolamentoTests(unittest.TestCase):
             pagamento = client.post("/financeiro-novo/despesas/1/pagar")
         self.assertEqual(aprovacao.status_code, 403)
         self.assertEqual(pagamento.status_code, 403)
+
+    def test_om_rd_e_acertos_tem_modelo_independente_e_total_derivado(self):
+        migration = (self.raiz / "migrations" / "006_financeiro_novo_om_rd.sql").read_text(encoding="utf-8")
+        for tabela in ("oms", "om_decisoes", "rds", "rd_itens", "rd_decisoes", "rd_acertos"):
+            self.assertIn(f"financeiro3_{tabela}", migration)
+        self.assertIn("om_id BIGINT NOT NULL UNIQUE", migration)
+        self.assertIn("financeiro3_atualizar_total_rd", migration)
+        self.assertIn("'REEMBOLSO','DEVOLUCAO'", migration)
+
+    def test_edicao_nao_autoriza_decidir_om_ou_rd(self):
+        app = create_app()
+        app.config.update(TESTING=True, WTF_CSRF_ENABLED=False)
+        with app.test_client() as client:
+            with client.session_transaction() as sessao:
+                sessao["usuario_id"] = 1
+                sessao["permissoes"] = ["financeiro_novo:visualizar", "financeiro_novo:editar"]
+                sessao["ultimo_acesso"] = 9999999999
+            respostas = (
+                client.post("/financeiro-novo/oms/1/aprovar"),
+                client.post("/financeiro-novo/rds/1/aprovar"),
+                client.post("/financeiro-novo/rds/1/liquidar"),
+            )
+        self.assertTrue(all(resposta.status_code == 403 for resposta in respostas))
 
 
 class FinanceiroNovoCadastrosTests(unittest.TestCase):
