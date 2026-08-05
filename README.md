@@ -33,3 +33,9 @@ PDF como formato canônico: fotos são redimensionadas e convertidas, enquanto
 PDFs são validados e otimizados. PDFs assinados são preservados para não
 invalidar a assinatura. O PostgreSQL armazena somente metadados e referências
 dos arquivos, nunca o conteúdo binário.
+
+Os cadastros-base são criados pela migration
+`migrations/004_financeiro_novo_cadastros.sql`: fornecedores/favorecidos,
+centros de custo, categorias, moedas e contas financeiras. Todos começam
+vazios, são preenchidos manualmente e usam inativação em vez de exclusão
+física, com alterações registradas na auditoria independente.

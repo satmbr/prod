@@ -12,7 +12,12 @@ def build_subnav(active: str | None):
             "text": "Início",
             "href": url_for("financeiro_novo.index"),
             "active": active == "index",
-        }
+        },
+        {
+            "text": "Cadastros",
+            "href": url_for("financeiro_novo.cadastros"),
+            "active": active == "cadastros",
+        },
     ]
 
 
@@ -34,6 +39,11 @@ def index():
             text(
                 """
                 SELECT
+                    ((SELECT COUNT(*) FROM financeiro3_pessoas) +
+                     (SELECT COUNT(*) FROM financeiro3_centros_custo) +
+                     (SELECT COUNT(*) FROM financeiro3_categorias) +
+                     (SELECT COUNT(*) FROM financeiro3_moedas) +
+                     (SELECT COUNT(*) FROM financeiro3_contas)) AS cadastros,
                     (SELECT COUNT(*) FROM financeiro3_arquivos) AS arquivos,
                     (SELECT COUNT(*) FROM financeiro3_anexos WHERE status = 'ATIVO') AS anexos,
                     (SELECT COUNT(*) FROM financeiro3_auditoria) AS eventos_auditoria

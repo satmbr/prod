@@ -16,6 +16,7 @@ from routes.financeiro_novo.services.anexos import (
     nome_objeto_pdf,
     normalizar_anexo,
 )
+from routes.financeiro_novo.cadastros import TIPOS, _normalizar
 
 
 class FinanceiroNovoIsolamentoTests(unittest.TestCase):
@@ -25,7 +26,7 @@ class FinanceiroNovoIsolamentoTests(unittest.TestCase):
 
     def test_fundacao_nao_referencia_tabelas_do_financeiro_anterior(self):
         arquivos = [
-            self.raiz / "migrations" / "003_financeiro_novo_fundacao.sql",
+            *list((self.raiz / "migrations").glob("*_financeiro_novo_*.sql")),
             *list((self.raiz / "routes" / "financeiro_novo").rglob("*.py")),
             *list((self.raiz / "templates" / "financeiro_novo").rglob("*.html")),
         ]
@@ -53,6 +54,7 @@ class FinanceiroNovoIsolamentoTests(unittest.TestCase):
         }
         resultado_totais = MagicMock()
         resultado_totais.mappings.return_value.one.return_value = {
+            "cadastros": 0,
             "arquivos": 0,
             "anexos": 0,
             "eventos_auditoria": 0,
@@ -78,6 +80,91 @@ class FinanceiroNovoIsolamentoTests(unittest.TestCase):
         self.assertIn("Base independente e vazia", resposta.get_data(as_text=True))
         sql_executado = " ".join(str(chamada.args[0]) for chamada in conexao.execute.call_args_list)
         self.assertNotIn("financeiro2_", sql_executado.lower())
+
+    def test_cadastros_exigem_permissoes_proprias_para_escrita(self):
+        app = create_app()
+        app.config.update(TESTING=True, WTF_CSRF_ENABLED=False)
+        with app.test_client() as client:
+            with client.session_transaction() as sessao:
+                sessao["usuario_id"] = 1
+                sessao["permissoes"] = ["financeiro_novo:visualizar"]
+                sessao["ultimo_acesso"] = 9999999999
+            resposta = client.post(
+                "/financeiro-novo/cadastros/moedas/novo",
+                data={"codigo": "BRL", "nome": "Real", "simbolo": "R$", "casas_decimais": "2"},
+            )
+        self.assertEqual(resposta.status_code, 403)
+
+    def test_migration_cria_tabelas_relacionais_sem_exclusao_fisica(self):
+        migration = (self.raiz / "migrations" / "004_financeiro_novo_cadastros.sql").read_text(encoding="utf-8")
+        for tabela in ("pessoas", "centros_custo", "categorias", "moedas", "contas"):
+            self.assertIn(f"financeiro3_{tabela}", migration)
+        cadastros = (self.raiz / "routes" / "financeiro_novo" / "cadastros.py").read_text(encoding="utf-8")
+        self.assertNotIn("DELETE FROM", cadastros.upper())
+
+    def test_tela_de_cadastros_inicia_vazia_e_renderiza(self):
+        resultado_registros = MagicMock()
+        resultado_registros.mappings.return_value.all.return_value = []
+        resultado_moedas = MagicMock()
+        resultado_moedas.mappings.return_value.all.return_value = []
+        conexao = MagicMock()
+        conexao.execute.side_effect = [resultado_registros, resultado_moedas]
+        contexto = MagicMock()
+        contexto.__enter__.return_value = conexao
+        engine = MagicMock()
+        engine.connect.return_value = contexto
+
+        app = create_app()
+        app.config.update(TESTING=True, WTF_CSRF_ENABLED=False)
+        with patch("routes.financeiro_novo.cadastros.get_engine", return_value=engine):
+            with app.test_client() as client:
+                with client.session_transaction() as sessao:
+                    sessao["usuario_id"] = 1
+                    sessao["permissoes"] = ["financeiro_novo:visualizar"]
+                    sessao["ultimo_acesso"] = 9999999999
+                resposta = client.get("/financeiro-novo/cadastros?tipo=pessoas")
+
+        self.assertEqual(resposta.status_code, 200)
+        pagina = resposta.get_data(as_text=True)
+        self.assertIn("Este cadastro começa vazio", pagina)
+        self.assertNotIn("Novo cadastro", pagina)
+
+
+class FinanceiroNovoCadastrosTests(unittest.TestCase):
+    def test_pessoa_exige_papel_e_normaliza_documento(self):
+        dados, erros = _normalizar(
+            TIPOS["pessoas"],
+            {
+                "tipo_pessoa": "JURIDICA",
+                "nome_razao": "Fornecedor Teste",
+                "documento": "12.345.678/0001-90",
+                "fornecedor": "on",
+            },
+        )
+        self.assertEqual(erros, [])
+        self.assertEqual(dados["documento"], "12345678000190")
+        self.assertTrue(dados["fornecedor"])
+
+        _, erros_sem_papel = _normalizar(
+            TIPOS["pessoas"],
+            {"tipo_pessoa": "FISICA", "nome_razao": "Favorecido"},
+        )
+        self.assertTrue(any("fornecedor" in erro.lower() for erro in erros_sem_papel))
+
+    def test_moeda_exige_codigo_iso_de_tres_letras(self):
+        dados, erros = _normalizar(
+            TIPOS["moedas"],
+            {"codigo": "br", "nome": "Real", "simbolo": "R$", "casas_decimais": "2"},
+        )
+        self.assertEqual(dados["codigo"], "BR")
+        self.assertTrue(any("3 letras" in erro for erro in erros))
+
+    def test_tipo_de_conta_fora_da_lista_e_rejeitado(self):
+        _, erros = _normalizar(
+            TIPOS["contas"],
+            {"nome": "Conta", "tipo": "CRIPTO", "moeda_id": "1"},
+        )
+        self.assertTrue(any("Tipo é inválido" in erro for erro in erros))
 
 
 class FinanceiroNovoAnexosTests(unittest.TestCase):

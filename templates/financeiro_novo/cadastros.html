@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block title %}Cadastros · Financeiro Novo{% endblock %}
+
+{% block content %}
+{% set pode_criar = 'financeiro_novo:criar' in current_user_permissions or 'auth:administrar' in current_user_permissions %}
+{% set pode_editar = 'financeiro_novo:editar' in current_user_permissions or 'auth:administrar' in current_user_permissions %}
+<div class="page-wrap fn-cadastros">
+  <div class="homolog-banner">
+    <strong>NOVO FINANCEIRO · HOMOLOGAÇÃO</strong>
+    <span>Cadastros manuais e independentes. Nenhum dado do financeiro atual é utilizado.</span>
+  </div>
+
+  <nav class="cad-tabs" aria-label="Tipos de cadastro">
+    {% for chave, item in tipos.items() %}
+      <a href="{{ url_for('financeiro_novo.cadastros', tipo=chave) }}" class="{% if chave == tipo %}active{% endif %}">{{ item.titulo }}</a>
+    {% endfor %}
+  </nav>
+
+  <div class="cad-layout {% if not ((edicao and pode_editar) or (not edicao and pode_criar)) %}single{% endif %}">
+    {% if (edicao and pode_editar) or (not edicao and pode_criar) %}
+    <section class="zone cad-form-zone">
+      <header class="zone-head">
+        <div class="zone-left"><div>
+          <div class="zone-title">{{ 'Editar' if edicao else 'Novo cadastro' }}</div>
+          <div class="muted">{{ config.singular }}</div>
+        </div></div>
+      </header>
+      <div class="zone-body">
+        {% if tipo == 'contas' and not moedas %}
+          <div class="cad-alert">Cadastre uma moeda antes de criar a primeira conta.</div>
+        {% endif %}
+        <form method="post" action="{{ url_for('financeiro_novo.cadastro_editar', tipo=tipo, registro_id=edicao.id) if edicao else url_for('financeiro_novo.cadastro_novo', tipo=tipo) }}">
+          <div class="cad-form-grid">
+            {% for campo in config.campos %}
+              {% set valor = edicao[campo.nome] if edicao else none %}
+              {% if campo.tipo == 'boolean' %}
+                <label class="cad-check">
+                  <input type="checkbox" name="{{ campo.nome }}" {% if valor %}checked{% endif %}>
+                  <span>{{ campo.rotulo }}</span>
+                </label>
+              {% else %}
+                <label class="cad-field">
+                  <span>{{ campo.rotulo }}{% if campo.obrigatorio %} <b>*</b>{% endif %}</span>
+                  {% if campo.tipo == 'select' %}
+                    <select name="{{ campo.nome }}" {% if campo.obrigatorio %}required{% endif %}>
+                      <option value="">Selecione</option>
+                      {% for opcao, rotulo in campo.opcoes %}
+                        <option value="{{ opcao }}" {% if valor == opcao %}selected{% endif %}>{{ rotulo }}</option>
+                      {% endfor %}
+                    </select>
+                  {% elif campo.tipo == 'moeda' %}
+                    <select name="{{ campo.nome }}" required>
+                      <option value="">Selecione</option>
+                      {% for moeda in moedas %}
+                        <option value="{{ moeda.id }}" {% if valor == moeda.id %}selected{% endif %} {% if not moeda.ativo and valor != moeda.id %}disabled{% endif %}>{{ moeda.codigo }} · {{ moeda.nome }}{% if not moeda.ativo %} (inativa){% endif %}</option>
+                      {% endfor %}
+                    </select>
+                  {% else %}
+                    <input type="{{ 'number' if campo.tipo == 'integer' else campo.tipo }}" name="{{ campo.nome }}"
+                           value="{{ valor if valor is not none else '' }}" {% if campo.obrigatorio %}required{% endif %}
+                           {% if campo.maximo %}max="{{ campo.maximo }}" maxlength="{{ campo.maximo }}"{% endif %}
+                           {% if campo.minimo is defined %}min="{{ campo.minimo }}"{% endif %}>
+                  {% endif %}
+                </label>
+              {% endif %}
+            {% endfor %}
+          </div>
+          <div class="cad-actions">
+            <button class="btn btn-primary" type="submit" {% if tipo == 'contas' and not moedas %}disabled{% endif %}>Salvar</button>
+            {% if edicao %}<a class="btn btn-outline" href="{{ url_for('financeiro_novo.cadastros', tipo=tipo) }}">Cancelar edição</a>{% endif %}
+          </div>
+        </form>
+      </div>
+    </section>
+    {% endif %}
+
+    <section class="zone cad-list-zone">
+      <header class="zone-head">
+        <div class="zone-left"><div>
+          <div class="zone-title">{{ config.titulo }}</div>
+          <div class="muted">{{ registros|length }} registro(s) exibido(s)</div>
+        </div></div>
+      </header>
+      <div class="zone-body">
+        <form method="get" class="cad-filters">
+          <input type="hidden" name="tipo" value="{{ tipo }}">
+          <input type="search" name="q" value="{{ busca }}" placeholder="Buscar neste cadastro">
+          <select name="status">
+            <option value="ativos" {% if status == 'ativos' %}selected{% endif %}>Ativos</option>
+            <option value="inativos" {% if status == 'inativos' %}selected{% endif %}>Inativos</option>
+            <option value="todos" {% if status == 'todos' %}selected{% endif %}>Todos</option>
+          </select>
+          <button class="btn btn-outline" type="submit">Aplicar</button>
+        </form>
+
+        <div class="cad-table-wrap">
+          <table class="cad-table">
+            <thead><tr>
+              {% for coluna in config.colunas %}<th>{{ coluna|replace('_', ' ')|title }}</th>{% endfor %}
+              <th>Status</th><th class="cad-right">Ações</th>
+            </tr></thead>
+            <tbody>
+              {% for registro in registros %}
+                <tr>
+                  {% for coluna in config.colunas %}
+                    {% set valor = registro[coluna] %}
+                    <td>
+                      {% if valor is sameas true %}<span class="yes">Sim</span>
+                      {% elif valor is sameas false %}<span class="no">Não</span>
+                      {% elif coluna == 'moeda_id' %}
+                        {% for moeda in moedas %}{% if moeda.id == valor %}{{ moeda.codigo }}{% endif %}{% endfor %}
+                      {% else %}{{ valor or '—' }}{% endif %}
+                    </td>
+                  {% endfor %}
+                  <td><span class="cad-status {{ 'on' if registro.ativo else 'off' }}">{{ 'Ativo' if registro.ativo else 'Inativo' }}</span></td>
+                  <td class="cad-right cad-row-actions">
+                    {% if pode_editar %}
+                    <a href="{{ url_for('financeiro_novo.cadastros', tipo=tipo, editar=registro.id, status=status, q=busca) }}">Editar</a>
+                    <form method="post" action="{{ url_for('financeiro_novo.cadastro_status', tipo=tipo, registro_id=registro.id) }}">
+                      <button type="submit">{{ 'Inativar' if registro.ativo else 'Reativar' }}</button>
+                    </form>
+                    {% else %}—{% endif %}
+                  </td>
+                </tr>
+              {% else %}
+                <tr><td colspan="{{ config.colunas|length + 2 }}" class="cad-empty">Nenhum registro encontrado. Este cadastro começa vazio.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<style>
+  .fn-cadastros{--fn:#0f766e;--ink:#173550}.homolog-banner{display:flex;justify-content:space-between;gap:16px;margin-bottom:12px;padding:12px 15px;border:1px solid #f4c86a;border-radius:10px;background:#fff8dc;color:#684b08;font-size:12px}.cad-tabs{display:flex;gap:7px;margin-bottom:12px;overflow:auto}.cad-tabs a{flex:0 0 auto;padding:9px 12px;border:1px solid #d8e3ea;border-radius:9px;background:#fff;color:#496174;font-size:11px;font-weight:700;text-decoration:none}.cad-tabs a.active{border-color:var(--fn);background:#e8f7f3;color:#0b6159}.cad-layout{display:grid;grid-template-columns:minmax(290px,360px) minmax(0,1fr);gap:12px}.cad-layout.single{grid-template-columns:minmax(0,1fr)}.zone-body{padding:16px}.cad-form-grid{display:grid;grid-template-columns:1fr;gap:12px}.cad-field>span{display:block;margin-bottom:5px;color:#41586b;font-size:11px;font-weight:700}.cad-field b{color:#b42318}.cad-field input,.cad-field select,.cad-filters input,.cad-filters select{width:100%;height:39px;padding:0 10px;border:1px solid #ccd9e2;border-radius:8px;background:#fff;color:#173550}.cad-check{display:flex;align-items:center;gap:8px;color:#41586b;font-size:12px;font-weight:700}.cad-actions{display:flex;gap:8px;margin-top:16px}.cad-alert{margin-bottom:12px;padding:10px;border:1px solid #f4c86a;border-radius:8px;background:#fff8dc;color:#684b08;font-size:11px}.cad-filters{display:grid;grid-template-columns:minmax(160px,1fr) 125px auto;gap:8px;margin-bottom:13px}.cad-table-wrap{overflow:auto;border:1px solid #e0e8ee;border-radius:9px}.cad-table{width:100%;border-collapse:collapse;font-size:11px}.cad-table th,.cad-table td{padding:10px;border-bottom:1px solid #e7edf2;text-align:left;white-space:nowrap}.cad-table th{background:#f6f9fb;color:#52697b;font-size:10px;text-transform:uppercase}.cad-right{text-align:right!important}.cad-row-actions{display:flex;justify-content:flex-end;gap:8px}.cad-row-actions form{display:inline}.cad-row-actions a,.cad-row-actions button{border:0;background:none;color:#0f766e;font:inherit;font-weight:700;cursor:pointer;text-decoration:none}.cad-status{padding:4px 7px;border-radius:999px;font-size:9px;font-weight:800}.cad-status.on{background:#e2f7ed;color:#147447}.cad-status.off{background:#f2f4f6;color:#697586}.yes{color:#147447}.no{color:#8b5a12}.cad-empty{padding:30px!important;text-align:center!important;color:#748696}.btn:disabled{cursor:not-allowed;opacity:.5}@media(max-width:1050px){.cad-layout{grid-template-columns:1fr}.homolog-banner{flex-direction:column}.cad-filters{grid-template-columns:1fr}}
+</style>
+{% endblock %}
