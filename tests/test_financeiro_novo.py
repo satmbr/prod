@@ -195,14 +195,32 @@ class FinanceiroNovoIsolamentoTests(unittest.TestCase):
         for tabela in ("reembolsos", "reembolso_itens", "reembolso_decisoes", "reembolso_pagamentos"):
             self.assertIn(f"financeiro3_{tabela}", migration)
         self.assertIn("financeiro3_atualizar_total_reembolso", migration)
-        self.assertIn("data_pagamento_adiantamento", migration)
         self.assertNotIn("FLOAT", migration.upper())
         previsao = (self.raiz / "routes" / "financeiro_novo" / "previsao.py").read_text(encoding="utf-8")
-        for origem in ("financeiro3_despesas", "financeiro3_reembolsos", "financeiro3_oms", "financeiro3_rd_acertos", "financeiro3_notas_debito"):
+        for origem in ("financeiro3_despesas", "financeiro3_reembolsos", "financeiro3_rd_acertos", "financeiro3_notas_debito"):
             self.assertIn(origem, previsao)
         relatorios = (self.raiz / "routes" / "financeiro_novo" / "relatorios.py").read_text(encoding="utf-8")
         self.assertIn("PAGAMENTO_REEMBOLSO", relatorios)
-        self.assertIn("ADIANTAMENTO_OM", relatorios)
+        self.assertNotIn("ADIANTAMENTO_OM", relatorios)
+
+    def test_om_tem_numero_matricula_linhas_e_total_derivado(self):
+        migration = (self.raiz / "migrations" / "009_financeiro_novo_om_linhas.sql").read_text(encoding="utf-8")
+        for campo in ("numero_om", "matricula_favorecido", "valor_total"):
+            self.assertIn(campo, migration)
+        self.assertIn("financeiro3_om_itens", migration)
+        self.assertIn("financeiro3_atualizar_total_om", migration)
+        self.assertIn("removido_em", migration)
+        self.assertNotIn("FLOAT", migration.upper())
+
+    def test_formulario_om_nao_exibe_campos_descontinuados(self):
+        campos = (self.raiz / "templates" / "financeiro_novo" / "_om_campos.html").read_text(encoding="utf-8")
+        self.assertIn('name="numero_om"', campos)
+        self.assertIn('name="matricula_favorecido"', campos)
+        for nome in ("objetivo", "valor_adiantamento", "origem", "destino", "data_inicio", "data_fim"):
+            self.assertNotIn(f'name="{nome}"', campos)
+        detalhe = (self.raiz / "templates" / "financeiro_novo" / "om_detalhe.html").read_text(encoding="utf-8")
+        self.assertIn("om_item_novo", detalhe)
+        self.assertIn("justificativa_sem_comprovante", detalhe)
 
     def test_reembolso_separa_edicao_aprovacao_e_pagamento(self):
         app = create_app(); app.config.update(TESTING=True, WTF_CSRF_ENABLED=False)

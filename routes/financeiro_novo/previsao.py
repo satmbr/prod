@@ -14,7 +14,7 @@ from routes.financeiro_novo.services.valores import ValorInvalido, data_iso
 from routes.financeiro_novo.views import build_subnav
 
 
-ORIGENS = ("DESPESA", "REEMBOLSO", "ADIANTAMENTO_OM", "ACERTO_RD", "NOTA_DEBITO")
+ORIGENS = ("DESPESA", "REEMBOLSO", "ACERTO_RD", "NOTA_DEBITO")
 
 
 def _filtros():
@@ -55,13 +55,6 @@ def _sql():
         FROM financeiro3_reembolsos r JOIN financeiro3_pessoas p ON p.id=r.favorecido_id
         JOIN financeiro3_centros_custo cc ON cc.id=r.centro_custo_id
         JOIN financeiro3_moedas m ON m.id=r.moeda_id WHERE r.status='APROVADO'
-        UNION ALL
-        SELECT 'SAIDA','ADIANTAMENTO_OM',o.id,o.data_inicio,o.objetivo,p.nome_razao,
-          cc.id,cc.codigo,m.codigo,o.valor_adiantamento,'PENDENTE'
-        FROM financeiro3_oms o JOIN financeiro3_pessoas p ON p.id=o.solicitante_id
-        JOIN financeiro3_centros_custo cc ON cc.id=o.centro_custo_id
-        JOIN financeiro3_moedas m ON m.id=o.moeda_id
-        WHERE o.status='APROVADA' AND o.valor_adiantamento>0 AND o.data_pagamento_adiantamento IS NULL
         UNION ALL
         SELECT CASE WHEN a.tipo='REEMBOLSO' THEN 'SAIDA' ELSE 'ENTRADA' END,'ACERTO_RD',r.id,
           a.criado_em::date,'Acerto da RD-'||LPAD(a.rd_id::text,6,'0'),p.nome_razao,

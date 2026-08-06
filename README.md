@@ -66,5 +66,9 @@ O complemento de reembolsos e previsão é criado pela migration
 `migrations/008_financeiro_novo_reembolsos_previsao.sql`. Reembolsos avulsos
 possuem itens, comprovantes normalizados, detecção de possível duplicidade,
 aprovação segregada e pagamento auditado. A previsão dedicada consolida,
-sem duplicar lançamentos, despesas, reembolsos, adiantamentos de OM, acertos
-de RD e Notas de Débito por dia, semana, mês ou período personalizado.
+sem duplicar lançamentos, despesas, reembolsos, acertos de RD e Notas de
+Débito por dia, semana, mês ou período personalizado.
+`migrations/009_financeiro_novo_om_linhas.sql` atualiza a Ordem de Missão com
+número informado, matrícula do favorecido, linhas de despesas, total derivado e
+remoção lógica auditável. Os campos antigos de objetivo, adiantamento, origem e
+destino deixam de fazer parte do fluxo da OM.

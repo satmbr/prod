@@ -45,11 +45,6 @@ def _movimentos_sql():
         FROM financeiro3_reembolso_pagamentos rp
         JOIN financeiro3_reembolsos r ON r.id=rp.reembolso_id
         JOIN financeiro3_moedas m ON m.id=r.moeda_id WHERE rp.status='ATIVO'
-        UNION ALL
-        SELECT o.data_pagamento_adiantamento, 'SAIDA', 'ADIANTAMENTO_OM', o.id,
-               o.objetivo, m.codigo, o.valor_adiantamento
-        FROM financeiro3_oms o JOIN financeiro3_moedas m ON m.id=o.moeda_id
-        WHERE o.data_pagamento_adiantamento IS NOT NULL AND o.valor_adiantamento>0
     """
 
 

@@ -1,7 +1,6 @@
 import os
 import uuid
 from pathlib import Path
-
 from flask import abort, current_app, flash, redirect, render_template, request, send_file, session, url_for
 from sqlalchemy import text
 
@@ -428,34 +427,3 @@ def reembolso_anexo_baixar(reembolso_id, arquivo_id):
     if not caminho.is_file(): abort(404)
     return send_file(caminho, mimetype="application/pdf", as_attachment=True,
                      download_name=f"{Path(arquivo['nome_original']).stem}.pdf")
-
-
-@bp.post("/oms/<int:om_id>/registrar-adiantamento")
-@login_required
-@permission_required("financeiro_novo", "pagar")
-def om_adiantamento_registrar(om_id):
-    preparado = None
-    try:
-        data_pagamento = data_iso(request.form.get("data_pagamento"), "Data do pagamento")
-        preparado = _preparar_anexo(request.files.get("arquivo"))
-        with get_engine().begin() as conn:
-            anterior = conn.execute(text("SELECT * FROM financeiro3_oms WHERE id=:id FOR UPDATE"), {"id": om_id}).mappings().first()
-            if not anterior: abort(404)
-            if anterior["status"] != "APROVADA" or anterior["valor_adiantamento"] <= 0: abort(409)
-            if anterior["data_pagamento_adiantamento"]: abort(409)
-            vinculo = _vincular_anexo(conn, preparado, "OM", om_id, "ADIANTAMENTO")
-            novo = conn.execute(text("""
-              UPDATE financeiro3_oms SET data_pagamento_adiantamento=:data,
-                adiantamento_registrado_por=:u,adiantamento_registrado_em=NOW(),
-                atualizado_por=:u,atualizado_em=NOW() WHERE id=:id RETURNING *
-            """), {"data": data_pagamento, "u": session.get("usuario_id"), "id": om_id}).mappings().one()
-            registrar_evento(conn, entidade="OM", entidade_id=om_id, evento="ADIANTAMENTO_REGISTRADO",
-                dados_anteriores=dict(anterior), dados_novos={**dict(novo), "anexo_id": vinculo})
-        flash("Pagamento do adiantamento registrado.", "sucesso")
-    except (ValorInvalido, AnexoInvalido) as exc:
-        if preparado: preparado[3].unlink(missing_ok=True)
-        flash(str(exc), "erro")
-    except Exception:
-        if preparado: preparado[3].unlink(missing_ok=True)
-        raise
-    return redirect(url_for("financeiro_novo.om_detalhe", om_id=om_id))
