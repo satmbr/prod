@@ -375,7 +375,7 @@ def om_item_novo(om_id):
                 if registros:
                     rotulos = [f"{item['tipo']} {item['numero']}" for item in registros]
                     duplicadas.append(f"linha {linha['numero']} ({', '.join(rotulos)})")
-            if duplicadas and request.form.get("confirmar_duplicidade") != "1":
+            if duplicadas and request.form.get("forcar_salvamento") != "1":
                 raise ValorInvalido("Possíveis duplicidades: " + "; ".join(duplicadas) + ". Confirme para salvar.")
             for linha, preparado in zip(linhas, preparados):
                 item = conn.execute(text("""

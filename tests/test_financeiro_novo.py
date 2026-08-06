@@ -246,6 +246,10 @@ class FinanceiroNovoIsolamentoTests(unittest.TestCase):
         detalhe = (self.raiz / "templates" / "financeiro_novo" / "om_detalhe.html").read_text(encoding="utf-8")
         for coluna in ("Origem", "Descrição", "Categoria", "Centro de custo", "Comprovante"):
             self.assertIn(coluna, detalhe)
+        self.assertIn('id="duplicate-dialog"', detalhe)
+        self.assertIn("Salvar mesmo assim", detalhe)
+        self.assertNotIn("Analisei os possíveis lançamentos duplicados", detalhe)
+        self.assertNotIn('type="checkbox" name="confirmar_duplicidade"', detalhe)
 
     def test_reembolso_separa_edicao_aprovacao_e_pagamento(self):
         app = create_app(); app.config.update(TESTING=True, WTF_CSRF_ENABLED=False)

@@ -24,9 +24,10 @@
       <form id="om-batch-form" method="post" enctype="multipart/form-data" action="{{ url_for('financeiro_novo.om_item_novo',om_id=om.id) }}">
         <div class="dsp-table-wrap"><table class="dsp-table om-batch-table"><thead><tr><th>#</th><th>Data *</th><th>Centro de custo *</th><th>Categoria *</th><th>Descrição *</th><th>Valor *</th><th>Recibo ou justificativa *</th><th></th></tr></thead><tbody id="om-batch-body"></tbody></table></div>
         <div id="duplicate-feedback" class="dsp-alert" hidden></div>
-        <label id="duplicate-confirm" class="check" hidden><input type="checkbox" name="confirmar_duplicidade" value="1"> Analisei os possíveis lançamentos duplicados e confirmo o salvamento.</label>
+        <input type="hidden" name="forcar_salvamento" value="0">
         <div class="dsp-actions"><button type="button" id="add-om-line" class="btn btn-outline">+ Adicionar linha</button><button class="btn btn-primary">Salvar todas as linhas</button></div>
       </form>
+      <dialog id="duplicate-dialog" class="duplicate-dialog"><div class="duplicate-dialog-head"><div><strong>Possíveis lançamentos duplicados</strong><span>Foram encontradas linhas com a mesma data e o mesmo valor.</span></div><button type="button" id="close-duplicate-dialog" class="link-button">Fechar</button></div><div id="duplicate-dialog-content"></div><div class="dsp-actions"><button type="button" id="review-duplicates" class="btn btn-outline">Voltar e revisar</button><button type="button" id="save-duplicates" class="btn btn-primary">Salvar mesmo assim</button></div></dialog>
       <template id="om-line-template"><tr>
         <td class="batch-number"></td>
         <td><input type="date" name="data_despesa" required></td>
@@ -58,7 +59,9 @@
   const body = document.getElementById('om-batch-body');
   const template = document.getElementById('om-line-template');
   const feedback = document.getElementById('duplicate-feedback');
-  const confirmation = document.getElementById('duplicate-confirm');
+  const forceInput = form.querySelector('[name="forcar_salvamento"]');
+  const dialog = document.getElementById('duplicate-dialog');
+  const dialogContent = document.getElementById('duplicate-dialog-content');
   const endpoint = {{ url_for('financeiro_novo.om_verificar_duplicidades',om_id=om.id)|tojson }};
   let timer;
   function renumber() { [...body.rows].forEach((row, index) => row.querySelector('.batch-number').textContent = index + 1); }
@@ -68,14 +71,14 @@
     row.querySelectorAll('input[name="data_despesa"],input[name="valor"]').forEach(input => input.addEventListener('input', scheduleCheck));
     body.appendChild(row); renumber();
   }
-  function scheduleCheck() { form.querySelector('[name="confirmar_duplicidade"]').checked=false; clearTimeout(timer); timer = setTimeout(checkDuplicates, 350); }
+  function scheduleCheck() { forceInput.value='0'; clearTimeout(timer); timer = setTimeout(checkDuplicates, 350); }
   function addCell(row, value) { const cell=document.createElement('td'); cell.textContent=value ?? '—'; row.appendChild(cell); return cell; }
-  function renderDuplicateTable(duplicidades) {
-    feedback.replaceChildren();
+  function renderDuplicateTable(target, duplicidades) {
+    target.replaceChildren();
     if (!duplicidades.length) return;
     const title=document.createElement('strong');
     title.textContent='Possíveis duplicidades encontradas pela mesma data e pelo mesmo valor';
-    feedback.appendChild(title);
+    target.appendChild(title);
     const wrap=document.createElement('div'); wrap.className='dsp-table-wrap duplicate-detail-wrap';
     const table=document.createElement('table'); table.className='dsp-table duplicate-detail-table';
     const head=document.createElement('thead'); const headRow=document.createElement('tr');
@@ -95,36 +98,42 @@
       else proof.textContent=registro.nome_arquivo || '—';
       tbody.appendChild(tr);
     }));
-    table.appendChild(tbody); wrap.appendChild(table); feedback.appendChild(wrap);
+    table.appendChild(tbody); wrap.appendChild(table); target.appendChild(wrap);
   }
   async function checkDuplicates() {
     const rows = [...body.rows];
     const linhas = rows.map(row => ({data: row.querySelector('[name="data_despesa"]').value, valor: row.querySelector('[name="valor"]').value}));
     rows.forEach(row => { row.classList.remove('possible-duplicate'); row.querySelector('.duplicate-row').textContent = ''; });
-    if (!linhas.some(item => item.data && item.valor)) { feedback.hidden = true; confirmation.hidden = true; return []; }
+    if (!linhas.some(item => item.data && item.valor)) { feedback.hidden = true; return {duplicidades:[],erro:false}; }
     try {
       const response = await fetch(endpoint, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({linhas})});
-      if (!response.ok) return [];
+      if (!response.ok) throw new Error('Falha na verificação');
       const duplicidades = (await response.json()).duplicidades || [];
       duplicidades.forEach(item => { const row=rows[item.linha-1]; if (row) { row.classList.add('possible-duplicate'); row.querySelector('.duplicate-row').textContent='Possível duplicidade: '+item.registros.map(registro => registro.tipo+' '+registro.numero).join(', '); } });
       feedback.hidden = !duplicidades.length;
-      confirmation.hidden = !duplicidades.length;
-      renderDuplicateTable(duplicidades);
-      return duplicidades;
-    } catch (_) { return []; }
+      renderDuplicateTable(feedback, duplicidades);
+      return {duplicidades,erro:false};
+    } catch (_) {
+      feedback.hidden=false; feedback.textContent='Não foi possível verificar duplicidades. O salvamento foi interrompido; tente novamente.';
+      return {duplicidades:[],erro:true};
+    }
   }
   document.getElementById('add-om-line').addEventListener('click', addLine);
   form.addEventListener('submit', async event => {
     event.preventDefault();
     if (!form.reportValidity()) return;
-    const duplicidades = await checkDuplicates();
-    const confirmado = form.querySelector('[name="confirmar_duplicidade"]').checked;
-    if (duplicidades.length && !confirmado) { feedback.scrollIntoView({behavior:'smooth',block:'center'}); return; }
+    const resultado = await checkDuplicates();
+    if (resultado.erro) { feedback.scrollIntoView({behavior:'smooth',block:'center'}); return; }
+    if (resultado.duplicidades.length && forceInput.value !== '1') { renderDuplicateTable(dialogContent,resultado.duplicidades); dialog.showModal(); return; }
     form.submit();
   });
+  function closeDialog() { dialog.close(); forceInput.value='0'; }
+  document.getElementById('close-duplicate-dialog').addEventListener('click',closeDialog);
+  document.getElementById('review-duplicates').addEventListener('click',closeDialog);
+  document.getElementById('save-duplicates').addEventListener('click',() => { forceInput.value='1'; dialog.close(); form.submit(); });
   addLine();
 })();
 </script>
-<style>.om-batch-table{min-width:1250px}.om-batch-table input,.om-batch-table select,.om-batch-table textarea{width:100%;min-width:120px;padding:7px;border:1px solid #ccd9e2;border-radius:7px}.om-batch-table td:nth-child(1){width:38px}.om-batch-table td:nth-child(4),.om-batch-table td:nth-child(5){min-width:180px}.possible-duplicate{background:#fff7dd}.duplicate-row{display:block;margin-top:4px;color:#9a5d00;font-weight:700}.duplicate-detail-wrap{margin-top:10px}.duplicate-detail-table{min-width:980px;background:#fff}.check{display:block;margin-top:10px;color:#41586b;font-size:11px;font-weight:700}.check input{margin-right:6px}</style>
+<style>.om-batch-table{min-width:1250px}.om-batch-table input,.om-batch-table select,.om-batch-table textarea{width:100%;min-width:120px;padding:7px;border:1px solid #ccd9e2;border-radius:7px}.om-batch-table td:nth-child(1){width:38px}.om-batch-table td:nth-child(4),.om-batch-table td:nth-child(5){min-width:180px}.possible-duplicate{background:#fff7dd}.duplicate-row{display:block;margin-top:4px;color:#9a5d00;font-weight:700}.duplicate-detail-wrap{margin-top:10px}.duplicate-detail-table{min-width:980px;background:#fff}.duplicate-dialog{width:min(1180px,94vw);max-height:88vh;padding:18px;border:0;border-radius:12px;box-shadow:0 24px 70px #102b3f55}.duplicate-dialog::backdrop{background:#102b3f88}.duplicate-dialog-head{display:flex;align-items:flex-start;justify-content:space-between;gap:20px}.duplicate-dialog-head strong,.duplicate-dialog-head span{display:block}.duplicate-dialog-head strong{font-size:18px;color:#173550}.duplicate-dialog-head span{margin-top:4px;color:#60758a;font-size:11px}</style>
 {% endif %}
 {% endblock %}
