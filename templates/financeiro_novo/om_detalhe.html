@@ -1,11 +1,102 @@
-{% extends "base.html" %}{% block title %}{{ om.numero_om }} · Financeiro Novo{% endblock %}{% block content %}
-{% set admin='auth:administrar' in current_user_permissions %}{% set editar='financeiro_novo:editar' in current_user_permissions or admin %}{% set aprovar='financeiro_novo:aprovar' in current_user_permissions or admin %}{% set cancelar='financeiro_novo:cancelar' in current_user_permissions or admin %}
-<div class="page-wrap dsp-page"><div class="homolog-banner"><strong>OM {{ om.numero_om }} · {{ om.status|replace('_',' ') }}</strong><span>{{ om.solicitante }} · matrícula {{ om.matricula_favorecido }}</span></div>
-<div class="dsp-summary"><article class="dsp-kpi"><span>Total das despesas</span><strong>{{ om.moeda }} {{ '%.2f'|format(om.valor_total)|replace('.',',') }}</strong></article><article class="dsp-kpi"><span>Linhas</span><strong>{{ itens|length }}</strong></article><article class="dsp-kpi"><span>Centro</span><strong>{{ om.centro_codigo }}</strong></article><article class="dsp-kpi"><span>Status</span><strong><span class="dsp-status {{ om.status|lower }}">{{ om.status|replace('_',' ') }}</span></strong></article></div>
-<div class="dsp-grid"><div>
-<section class="zone"><header class="zone-head"><div class="zone-title">Dados da OM</div></header><div class="zone-body">{% if editavel and editar %}<form method="post" action="{{ url_for('financeiro_novo.om_editar',om_id=om.id) }}">{% include "financeiro_novo/_om_campos.html" %}<div class="dsp-actions"><button class="btn btn-outline">Salvar alterações</button></div></form>{% else %}<div class="dsp-form-grid"><label><span>Número da OM</span><b>{{ om.numero_om }}</b></label><label><span>Matrícula</span><b>{{ om.matricula_favorecido }}</b></label><label><span>Favorecido</span><b>{{ om.solicitante }}</b></label><label><span>Centro</span><b>{{ om.centro_codigo }} · {{ om.centro_nome }}</b></label><label><span>Moeda</span><b>{{ om.moeda }}</b></label>{% if om.observacoes %}<label class="span-2"><span>Observações</span><b>{{ om.observacoes }}</b></label>{% endif %}</div>{% endif %}</div></section>
-<section class="zone"><header class="zone-head"><div><div class="zone-title">Linhas de despesas</div><div class="muted">Cada linha exige recibo ou justificativa.</div></div></header><div class="zone-body">{% if editavel and editar %}<form method="post" enctype="multipart/form-data" action="{{ url_for('financeiro_novo.om_item_novo',om_id=om.id) }}" class="dsp-mini-form"><label><span>Data *</span><input type="date" name="data_despesa" required></label><label><span>Categoria *</span><select name="categoria_id" required><option value="">Selecione</option>{% for c in opcoes.categorias %}<option value="{{ c.id }}">{{ c.codigo }} · {{ c.nome }}</option>{% endfor %}</select></label><label><span>Fornecedor</span><select name="fornecedor_id"><option value="">Não informado</option>{% for p in opcoes.fornecedores %}<option value="{{ p.id }}">{{ p.nome_razao }}</option>{% endfor %}</select></label><label><span>Número do documento</span><input name="numero_documento" maxlength="80"></label><label class="full"><span>Descrição *</span><input name="descricao" maxlength="220" required></label><label><span>Valor *</span><input name="valor" inputmode="decimal" required></label><label><span>Recibo (foto ou PDF)</span><input type="file" name="arquivo" accept="image/*,application/pdf"></label><label class="full"><span>Justificativa se não houver recibo</span><textarea name="justificativa_sem_comprovante"></textarea></label><label class="full check"><input type="checkbox" name="confirmar_duplicidade" value="1"> Confirmo o lançamento caso o sistema identifique possível duplicidade de data e valor.</label><button class="btn btn-outline">Adicionar despesa</button></form>{% endif %}
-<div class="dsp-table-wrap"><table class="dsp-table"><thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th>Fornecedor / documento</th><th>Comprovante</th><th class="right">Valor</th>{% if editavel and editar %}<th></th>{% endif %}</tr></thead><tbody>{% for i in itens %}<tr><td>{{ i.data_despesa.strftime('%d/%m/%Y') }}</td><td>{{ i.descricao }}{% if i.justificativa_sem_comprovante %}<small class="muted"> · {{ i.justificativa_sem_comprovante }}</small>{% endif %}</td><td>{{ i.categoria }}</td><td>{{ i.fornecedor or '—' }}{% if i.numero_documento %}<small class="muted"> · {{ i.numero_documento }}</small>{% endif %}</td><td>{% if i.arquivo_id %}<a href="{{ url_for('financeiro_novo.om_item_anexo_baixar',om_id=om.id,item_id=i.id,arquivo_id=i.arquivo_id) }}">{{ i.nome_original }}</a>{% else %}Justificado{% endif %}</td><td class="right">{{ om.moeda }} {{ '%.2f'|format(i.valor)|replace('.',',') }}</td>{% if editavel and editar %}<td><form method="post" action="{{ url_for('financeiro_novo.om_item_remover',om_id=om.id,item_id=i.id) }}"><button>Remover</button></form></td>{% endif %}</tr>{% else %}<tr><td colspan="7" class="dsp-empty">Nenhuma despesa adicionada.</td></tr>{% endfor %}</tbody></table></div></div></section>
-<section class="zone"><header class="zone-head"><div><div class="zone-title">Documentos gerais</div><div class="muted">Anexos complementares da OM, opcionais.</div></div></header><div class="zone-body">{% if editavel and editar %}<form method="post" enctype="multipart/form-data" action="{{ url_for('financeiro_novo.documento_anexo_novo',tipo='om',registro_id=om.id) }}" class="dsp-mini-form"><label class="full"><span>Foto ou PDF</span><input type="file" name="arquivo" accept="image/*,application/pdf" required></label><button class="btn btn-outline">Converter e anexar</button></form>{% endif %}{% for a in anexos %}<div class="dsp-file"><a href="{{ url_for('financeiro_novo.documento_anexo_baixar',tipo='om',registro_id=om.id,arquivo_id=a.arquivo_id) }}">{{ a.nome_original }}</a><small>{{ a.paginas }} pág.</small>{% if editavel and editar %}<form method="post" action="{{ url_for('financeiro_novo.documento_anexo_remover',tipo='om',registro_id=om.id,anexo_id=a.id) }}"><button class="link-button">Remover</button></form>{% endif %}</div>{% else %}<div class="dsp-empty">Nenhum documento geral.</div>{% endfor %}</div></section></div>
-<aside><section class="zone"><header class="zone-head"><div class="zone-title">Ações</div></header><div class="zone-body">{% if editavel and editar %}<form method="post" action="{{ url_for('financeiro_novo.om_enviar',om_id=om.id) }}"><button class="btn btn-primary">Enviar para aprovação</button></form>{% endif %}{% if om.status=='EM_APROVACAO' and aprovar %}<form class="dsp-actions" method="post" action="{{ url_for('financeiro_novo.om_aprovar',om_id=om.id) }}"><button class="btn btn-primary">Aprovar</button></form><form class="dsp-mini-form" method="post" action="{{ url_for('financeiro_novo.om_rejeitar',om_id=om.id) }}"><textarea class="full" name="justificativa" required placeholder="Motivo da rejeição"></textarea><button class="btn btn-outline">Rejeitar</button></form>{% endif %}{% if om.status=='APROVADA' and not om.rd_id %}<form class="dsp-actions" method="post" action="{{ url_for('financeiro_novo.rd_criar',om_id=om.id) }}"><button class="btn btn-outline">Gerar RD da OM</button></form>{% elif om.rd_id %}<a class="btn btn-outline" href="{{ url_for('financeiro_novo.rd_detalhe',rd_id=om.rd_id) }}">Abrir RD</a>{% endif %}{% if cancelar and om.status not in ['ENCERRADA','CANCELADA'] and not om.rd_id %}<form method="post" action="{{ url_for('financeiro_novo.om_cancelar',om_id=om.id) }}" class="dsp-mini-form"><textarea class="full" name="motivo" required placeholder="Motivo do cancelamento"></textarea><button class="btn btn-outline">Cancelar OM</button></form>{% endif %}</div></section>
-<section class="zone"><header class="zone-head"><div class="zone-title">Histórico</div></header><div class="zone-body"><ul class="dsp-history">{% for d in decisoes %}<li><strong>{{ d.acao }}</strong><span>{{ d.status_anterior }} → {{ d.status_novo }} · {{ d.criado_em.strftime('%d/%m/%Y %H:%M') }}</span>{% if d.justificativa %}<span>{{ d.justificativa }}</span>{% endif %}</li>{% else %}<li>Nenhuma decisão.</li>{% endfor %}</ul></div></section></aside></div></div>{% include "financeiro_novo/_despesa_estilos.html" %}{% endblock %}
+{% extends "base.html" %}
+{% block title %}{{ om.numero_om }} · Financeiro Novo{% endblock %}
+{% block content %}
+{% set admin='auth:administrar' in current_user_permissions %}
+{% set editar='financeiro_novo:editar' in current_user_permissions or admin %}
+{% set aprovar='financeiro_novo:aprovar' in current_user_permissions or admin %}
+{% set cancelar='financeiro_novo:cancelar' in current_user_permissions or admin %}
+<div class="page-wrap dsp-page">
+  <div class="homolog-banner"><strong>OM {{ om.numero_om }} · {{ om.status|replace('_',' ') }}</strong><span>{{ om.solicitante }} · matrícula {{ om.matricula_favorecido }}</span></div>
+  <div class="dsp-summary">
+    <article class="dsp-kpi"><span>Total das despesas</span><strong>{{ om.moeda }} {{ '%.2f'|format(om.valor_total)|replace('.',',') }}</strong></article>
+    <article class="dsp-kpi"><span>Linhas</span><strong>{{ itens|length }}</strong></article>
+    <article class="dsp-kpi"><span>Centro padrão</span><strong>{{ om.centro_codigo }}</strong></article>
+    <article class="dsp-kpi"><span>Status</span><strong><span class="dsp-status {{ om.status|lower }}">{{ om.status|replace('_',' ') }}</span></strong></article>
+  </div>
+  <div class="dsp-grid"><div>
+    <section class="zone"><header class="zone-head"><div class="zone-title">Dados da OM</div></header><div class="zone-body">
+      {% if editavel and editar %}<form method="post" action="{{ url_for('financeiro_novo.om_editar',om_id=om.id) }}">{% include "financeiro_novo/_om_campos.html" %}<div class="dsp-actions"><button class="btn btn-outline">Salvar alterações</button></div></form>
+      {% else %}<div class="dsp-form-grid"><label><span>Número da OM</span><b>{{ om.numero_om }}</b></label><label><span>Matrícula</span><b>{{ om.matricula_favorecido }}</b></label><label><span>Favorecido</span><b>{{ om.solicitante }}</b></label><label><span>Centro padrão</span><b>{{ om.centro_codigo }} · {{ om.centro_nome }}</b></label><label><span>Moeda</span><b>{{ om.moeda }}</b></label>{% if om.observacoes %}<label class="span-2"><span>Observações</span><b>{{ om.observacoes }}</b></label>{% endif %}</div>{% endif %}
+    </div></section>
+
+    <section class="zone"><header class="zone-head"><div><div class="zone-title">Novas linhas de despesas</div><div class="muted">Monte várias linhas e salve o lote de uma só vez.</div></div></header><div class="zone-body">
+      {% if editavel and editar %}
+      <form id="om-batch-form" method="post" enctype="multipart/form-data" action="{{ url_for('financeiro_novo.om_item_novo',om_id=om.id) }}">
+        <div class="dsp-table-wrap"><table class="dsp-table om-batch-table"><thead><tr><th>#</th><th>Data *</th><th>Centro de custo *</th><th>Categoria *</th><th>Descrição *</th><th>Valor *</th><th>Recibo ou justificativa *</th><th></th></tr></thead><tbody id="om-batch-body"></tbody></table></div>
+        <div id="duplicate-feedback" class="dsp-alert" hidden></div>
+        <label id="duplicate-confirm" class="check" hidden><input type="checkbox" name="confirmar_duplicidade" value="1"> Analisei os possíveis lançamentos duplicados e confirmo o salvamento.</label>
+        <div class="dsp-actions"><button type="button" id="add-om-line" class="btn btn-outline">+ Adicionar linha</button><button class="btn btn-primary">Salvar todas as linhas</button></div>
+      </form>
+      <template id="om-line-template"><tr>
+        <td class="batch-number"></td>
+        <td><input type="date" name="data_despesa" required></td>
+        <td><select name="centro_custo_id" required><option value="">Selecione</option>{% for c in opcoes.centros %}<option value="{{ c.id }}" {% if c.id==om.centro_custo_id %}selected{% endif %}>{{ c.codigo }} · {{ c.nome }}</option>{% endfor %}</select></td>
+        <td><select name="categoria_id" required><option value="">Selecione</option>{% for c in opcoes.categorias %}<option value="{{ c.id }}">{{ c.codigo }} · {{ c.nome }}</option>{% endfor %}</select></td>
+        <td><input name="descricao" maxlength="220" required></td>
+        <td><input name="valor" inputmode="decimal" required></td>
+        <td><input type="file" name="arquivo" accept="image/*,application/pdf"><textarea name="justificativa_sem_comprovante" rows="2" placeholder="Justificativa se não houver recibo"></textarea><small class="duplicate-row"></small></td>
+        <td><button type="button" class="link-button remove-om-line">Remover</button></td>
+      </tr></template>
+      {% endif %}
+    </div></section>
+
+    <section class="zone"><header class="zone-head"><div><div class="zone-title">Linhas salvas</div><div class="muted">Numeração sequencial das linhas ativas.</div></div></header><div class="zone-body"><div class="dsp-table-wrap"><table class="dsp-table"><thead><tr><th>#</th><th>Data</th><th>Centro de custo</th><th>Categoria</th><th>Descrição</th><th>Comprovante</th><th class="right">Valor</th>{% if editavel and editar %}<th></th>{% endif %}</tr></thead><tbody>
+      {% for i in itens %}<tr><td><strong>{{ i.numero_linha }}</strong></td><td>{{ i.data_despesa.strftime('%d/%m/%Y') }}</td><td>{{ i.centro_codigo }} · {{ i.centro_nome }}</td><td>{{ i.categoria }}</td><td>{{ i.descricao }}{% if i.justificativa_sem_comprovante %}<small class="muted"> · {{ i.justificativa_sem_comprovante }}</small>{% endif %}</td><td>{% if i.arquivo_id %}<a href="{{ url_for('financeiro_novo.om_item_anexo_baixar',om_id=om.id,item_id=i.id,arquivo_id=i.arquivo_id) }}">{{ i.nome_original }}</a>{% else %}Justificado{% endif %}</td><td class="right">{{ om.moeda }} {{ '%.2f'|format(i.valor)|replace('.',',') }}</td>{% if editavel and editar %}<td><form method="post" action="{{ url_for('financeiro_novo.om_item_remover',om_id=om.id,item_id=i.id) }}"><button>Remover</button></form></td>{% endif %}</tr>
+      {% else %}<tr><td colspan="8" class="dsp-empty">Nenhuma despesa adicionada.</td></tr>{% endfor %}
+    </tbody></table></div></div></section>
+
+    <section class="zone"><header class="zone-head"><div><div class="zone-title">Documentos gerais</div><div class="muted">Anexos complementares da OM, opcionais.</div></div></header><div class="zone-body">{% if editavel and editar %}<form method="post" enctype="multipart/form-data" action="{{ url_for('financeiro_novo.documento_anexo_novo',tipo='om',registro_id=om.id) }}" class="dsp-mini-form"><label class="full"><span>Foto ou PDF</span><input type="file" name="arquivo" accept="image/*,application/pdf" required></label><button class="btn btn-outline">Converter e anexar</button></form>{% endif %}{% for a in anexos %}<div class="dsp-file"><a href="{{ url_for('financeiro_novo.documento_anexo_baixar',tipo='om',registro_id=om.id,arquivo_id=a.arquivo_id) }}">{{ a.nome_original }}</a><small>{{ a.paginas }} pág.</small>{% if editavel and editar %}<form method="post" action="{{ url_for('financeiro_novo.documento_anexo_remover',tipo='om',registro_id=om.id,anexo_id=a.id) }}"><button class="link-button">Remover</button></form>{% endif %}</div>{% else %}<div class="dsp-empty">Nenhum documento geral.</div>{% endfor %}</div></section>
+  </div><aside>
+    <section class="zone"><header class="zone-head"><div class="zone-title">Ações</div></header><div class="zone-body">{% if editavel and editar %}<form method="post" action="{{ url_for('financeiro_novo.om_enviar',om_id=om.id) }}"><button class="btn btn-primary">Enviar para aprovação</button></form>{% endif %}{% if om.status=='EM_APROVACAO' and aprovar %}<form class="dsp-actions" method="post" action="{{ url_for('financeiro_novo.om_aprovar',om_id=om.id) }}"><button class="btn btn-primary">Aprovar</button></form><form class="dsp-mini-form" method="post" action="{{ url_for('financeiro_novo.om_rejeitar',om_id=om.id) }}"><textarea class="full" name="justificativa" required placeholder="Motivo da rejeição"></textarea><button class="btn btn-outline">Rejeitar</button></form>{% endif %}{% if om.status=='APROVADA' and not om.rd_id %}<form class="dsp-actions" method="post" action="{{ url_for('financeiro_novo.rd_criar',om_id=om.id) }}"><button class="btn btn-outline">Gerar RD vinculada</button></form>{% elif om.rd_id %}<a class="btn btn-outline" href="{{ url_for('financeiro_novo.rd_detalhe',rd_id=om.rd_id) }}">Abrir RD vinculada</a>{% endif %}{% if cancelar and om.status not in ['ENCERRADA','CANCELADA'] and not om.rd_id %}<form method="post" action="{{ url_for('financeiro_novo.om_cancelar',om_id=om.id) }}" class="dsp-mini-form"><textarea class="full" name="motivo" required placeholder="Motivo do cancelamento"></textarea><button class="btn btn-outline">Cancelar OM</button></form>{% endif %}</div></section>
+    <section class="zone"><header class="zone-head"><div class="zone-title">Histórico</div></header><div class="zone-body"><ul class="dsp-history">{% for d in decisoes %}<li><strong>{{ d.acao }}</strong><span>{{ d.status_anterior }} → {{ d.status_novo }} · {{ d.criado_em.strftime('%d/%m/%Y %H:%M') }}</span>{% if d.justificativa %}<span>{{ d.justificativa }}</span>{% endif %}</li>{% else %}<li>Nenhuma decisão.</li>{% endfor %}</ul></div></section>
+  </aside></div>
+</div>
+{% include "financeiro_novo/_despesa_estilos.html" %}
+{% if editavel and editar %}<script>
+(() => {
+  const form = document.getElementById('om-batch-form');
+  const body = document.getElementById('om-batch-body');
+  const template = document.getElementById('om-line-template');
+  const feedback = document.getElementById('duplicate-feedback');
+  const confirmation = document.getElementById('duplicate-confirm');
+  const endpoint = {{ url_for('financeiro_novo.om_verificar_duplicidades',om_id=om.id)|tojson }};
+  let timer;
+  function renumber() { [...body.rows].forEach((row, index) => row.querySelector('.batch-number').textContent = index + 1); }
+  function addLine() {
+    const row = template.content.firstElementChild.cloneNode(true);
+    row.querySelector('.remove-om-line').addEventListener('click', () => { if (body.rows.length > 1) row.remove(); renumber(); scheduleCheck(); });
+    row.querySelectorAll('input[name="data_despesa"],input[name="valor"]').forEach(input => input.addEventListener('input', scheduleCheck));
+    body.appendChild(row); renumber();
+  }
+  function scheduleCheck() { clearTimeout(timer); timer = setTimeout(checkDuplicates, 350); }
+  async function checkDuplicates() {
+    const rows = [...body.rows];
+    const linhas = rows.map(row => ({data: row.querySelector('[name="data_despesa"]').value, valor: row.querySelector('[name="valor"]').value}));
+    rows.forEach(row => { row.classList.remove('possible-duplicate'); row.querySelector('.duplicate-row').textContent = ''; });
+    if (!linhas.some(item => item.data && item.valor)) { feedback.hidden = true; confirmation.hidden = true; return []; }
+    try {
+      const response = await fetch(endpoint, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({linhas})});
+      if (!response.ok) return [];
+      const duplicidades = (await response.json()).duplicidades || [];
+      duplicidades.forEach(item => { const row=rows[item.linha-1]; if (row) { row.classList.add('possible-duplicate'); row.querySelector('.duplicate-row').textContent='Possível duplicidade: '+item.origens.join(', '); } });
+      feedback.hidden = !duplicidades.length;
+      confirmation.hidden = !duplicidades.length;
+      feedback.textContent = duplicidades.length ? 'Foram encontradas possíveis duplicidades por data e valor. Revise as linhas destacadas.' : '';
+      return duplicidades;
+    } catch (_) { return []; }
+  }
+  document.getElementById('add-om-line').addEventListener('click', addLine);
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+    if (!form.reportValidity()) return;
+    const duplicidades = await checkDuplicates();
+    const confirmado = form.querySelector('[name="confirmar_duplicidade"]').checked;
+    if (duplicidades.length && !confirmado) { feedback.scrollIntoView({behavior:'smooth',block:'center'}); return; }
+    form.submit();
+  });
+  addLine();
+})();
+</script>
+<style>.om-batch-table{min-width:1250px}.om-batch-table input,.om-batch-table select,.om-batch-table textarea{width:100%;min-width:120px;padding:7px;border:1px solid #ccd9e2;border-radius:7px}.om-batch-table td:nth-child(1){width:38px}.om-batch-table td:nth-child(4),.om-batch-table td:nth-child(5){min-width:180px}.possible-duplicate{background:#fff7dd}.duplicate-row{display:block;margin-top:4px;color:#9a5d00;font-weight:700}.check{display:block;margin-top:10px;color:#41586b;font-size:11px;font-weight:700}.check input{margin-right:6px}</style>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,12 @@
+{% extends "base.html" %}{% block title %}Nova RD · Financeiro Novo{% endblock %}{% block content %}
+<div class="page-wrap dsp-page narrow"><div class="homolog-banner"><strong>NOVO FINANCEIRO · HOMOLOGAÇÃO</strong><span>RD independente, com período e responsável próprios.</span></div><section class="zone"><header class="zone-head"><div><div class="zone-title">Nova RD</div><div class="muted">Estrutura recuperada do fluxo anterior com cadastros relacionais e auditoria.</div></div></header><div class="zone-body"><form method="post"><div class="dsp-form-grid">
+  <label><span>Número da RD *</span><input name="numero_rd" maxlength="80" required></label>
+  <label><span>Matrícula do responsável *</span><input name="matricula_responsavel" maxlength="40" required></label>
+  <label><span>Responsável *</span><select name="responsavel_id" required><option value="">Selecione</option>{% for p in opcoes.favorecidos %}<option value="{{ p.id }}">{{ p.nome_razao }}</option>{% endfor %}</select></label>
+  <label><span>Centro de custo *</span><select name="centro_custo_id" required><option value="">Selecione</option>{% for c in opcoes.centros %}<option value="{{ c.id }}">{{ c.codigo }} · {{ c.nome }}</option>{% endfor %}</select></label>
+  <label><span>Moeda *</span><select name="moeda_id" required><option value="">Selecione</option>{% for m in opcoes.moedas %}<option value="{{ m.id }}">{{ m.codigo }} · {{ m.nome }}</option>{% endfor %}</select></label>
+  <label><span>Adiantamento da RD</span><input name="valor_adiantamento" inputmode="decimal" value="0,00"></label>
+  <label><span>Início do período *</span><input type="date" name="periodo_inicio" required></label>
+  <label><span>Fim do período *</span><input type="date" name="periodo_fim" required></label>
+  <label class="span-2"><span>Observações</span><textarea name="observacoes" rows="3"></textarea></label>
+</div><div class="dsp-actions"><button class="btn btn-primary">Criar rascunho</button><a class="btn btn-outline" href="{{ url_for('financeiro_novo.missoes') }}">Voltar</a></div></form></div></section></div>{% include "financeiro_novo/_despesa_estilos.html" %}{% endblock %}

@@ -222,6 +222,22 @@ class FinanceiroNovoIsolamentoTests(unittest.TestCase):
         self.assertIn("om_item_novo", detalhe)
         self.assertIn("justificativa_sem_comprovante", detalhe)
 
+    def test_om_em_lote_e_rd_independente(self):
+        migration = (self.raiz / "migrations" / "010_financeiro_novo_om_lote_rd_independente.sql").read_text(encoding="utf-8")
+        self.assertIn("centro_custo_id", migration)
+        self.assertIn("numero_rd", migration)
+        self.assertIn("matricula_responsavel", migration)
+        self.assertIn("ALTER COLUMN om_id DROP NOT NULL", migration)
+        detalhe = (self.raiz / "templates" / "financeiro_novo" / "om_detalhe.html").read_text(encoding="utf-8")
+        self.assertIn("om-batch-form", detalhe)
+        self.assertIn("Adicionar linha", detalhe)
+        self.assertIn("om_verificar_duplicidades", detalhe)
+        self.assertNotIn('name="fornecedor_id"', detalhe)
+        self.assertNotIn('name="numero_documento"', detalhe)
+        rd_form = (self.raiz / "templates" / "financeiro_novo" / "rd_form.html").read_text(encoding="utf-8")
+        self.assertIn('name="numero_rd"', rd_form)
+        self.assertIn('name="matricula_responsavel"', rd_form)
+
     def test_reembolso_separa_edicao_aprovacao_e_pagamento(self):
         app = create_app(); app.config.update(TESTING=True, WTF_CSRF_ENABLED=False)
         with app.test_client() as client:

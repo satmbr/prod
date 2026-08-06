@@ -72,3 +72,9 @@ Débito por dia, semana, mês ou período personalizado.
 número informado, matrícula do favorecido, linhas de despesas, total derivado e
 remoção lógica auditável. Os campos antigos de objetivo, adiantamento, origem e
 destino deixam de fazer parte do fluxo da OM.
+
+`migrations/010_financeiro_novo_om_lote_rd_independente.sql` acrescenta o
+centro de custo por linha da OM e restaura a criação independente de RDs com
+número, matrícula, responsável e período próprios. A tela da OM permite montar
+e salvar várias linhas em uma transação e verifica possíveis duplicidades por
+data e valor antes da gravação.

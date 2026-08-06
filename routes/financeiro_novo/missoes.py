@@ -2,7 +2,7 @@ import os
 import uuid
 from pathlib import Path
 
-from flask import abort, current_app, flash, redirect, render_template, request, send_file, session, url_for
+from flask import abort, current_app, flash, jsonify, redirect, render_template, request, send_file, session, url_for
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
@@ -53,12 +53,22 @@ def missoes():
     with get_engine().connect() as conn:
         oms = conn.execute(text("""
             SELECT o.*, p.nome_razao AS solicitante, cc.codigo AS centro, m.codigo AS moeda,
-                   r.id AS rd_id, r.status AS rd_status
+                   r.id AS rd_id, r.numero_rd AS rd_numero, r.status AS rd_status
             FROM financeiro3_oms o JOIN financeiro3_pessoas p ON p.id=o.solicitante_id
             JOIN financeiro3_centros_custo cc ON cc.id=o.centro_custo_id
             JOIN financeiro3_moedas m ON m.id=o.moeda_id
             LEFT JOIN financeiro3_rds r ON r.om_id=o.id
             WHERE o.removido_em IS NULL ORDER BY o.id DESC LIMIT 500
+        """)).mappings().all()
+        rds = conn.execute(text("""
+            SELECT r.*,p.nome_razao AS responsavel,cc.codigo AS centro,m.codigo AS moeda,
+                   o.numero_om
+            FROM financeiro3_rds r
+            JOIN financeiro3_pessoas p ON p.id=r.responsavel_id
+            JOIN financeiro3_centros_custo cc ON cc.id=r.centro_custo_id
+            JOIN financeiro3_moedas m ON m.id=r.moeda_id
+            LEFT JOIN financeiro3_oms o ON o.id=r.om_id
+            ORDER BY r.id DESC LIMIT 500
         """)).mappings().all()
         acertos = conn.execute(text("""
             SELECT a.*, r.om_id, p.nome_razao AS responsavel, m.codigo AS moeda
@@ -68,7 +78,7 @@ def missoes():
             ORDER BY a.id DESC LIMIT 200
         """)).mappings().all()
     return render_template(
-        "financeiro_novo/missoes.html", oms=oms, acertos=acertos,
+        "financeiro_novo/missoes.html", oms=oms, rds=rds, acertos=acertos,
         subnav_links=build_subnav("missoes"),
     )
 
@@ -152,10 +162,11 @@ def om_detalhe(om_id):
         ), {"id": om_id}).mappings().all()
         anexos = _listar_anexos(conn, "OM", om_id)
         itens = conn.execute(text("""
-            SELECT i.*,c.nome AS categoria,p.nome_razao AS fornecedor,
+            SELECT i.*,ROW_NUMBER() OVER (ORDER BY i.id) AS numero_linha,
+              c.nome AS categoria,cc.codigo AS centro_codigo,cc.nome AS centro_nome,
               a.id AS anexo_id,ar.id AS arquivo_id,ar.nome_original,ar.paginas
             FROM financeiro3_om_itens i JOIN financeiro3_categorias c ON c.id=i.categoria_id
-            LEFT JOIN financeiro3_pessoas p ON p.id=i.fornecedor_id
+            JOIN financeiro3_centros_custo cc ON cc.id=i.centro_custo_id
             LEFT JOIN financeiro3_anexos a ON a.entidade='OM_ITEM' AND a.entidade_id=i.id AND a.status='ATIVO'
             LEFT JOIN financeiro3_arquivos ar ON ar.id=a.arquivo_id
             WHERE i.om_id=:id AND i.status='ATIVO' ORDER BY i.data_despesa,i.id
@@ -197,73 +208,143 @@ def om_editar(om_id):
     return redirect(url_for("financeiro_novo.om_detalhe", om_id=om_id))
 
 
+def _origens_duplicadas(conn, data, valor):
+    return list(conn.execute(text("""
+        SELECT DISTINCT origem FROM (
+          SELECT 'OM '||o.numero_om AS origem
+          FROM financeiro3_om_itens i JOIN financeiro3_oms o ON o.id=i.om_id
+          WHERE i.data_despesa=:data AND i.valor=:valor AND i.status='ATIVO'
+            AND o.removido_em IS NULL
+          UNION ALL
+          SELECT 'RD '||r.numero_rd FROM financeiro3_rd_itens i
+          JOIN financeiro3_rds r ON r.id=i.rd_id
+          WHERE i.data_despesa=:data AND i.valor=:valor AND i.status='ATIVO'
+          UNION ALL
+          SELECT 'REEMBOLSO-'||LPAD(x.id::text,6,'0') FROM financeiro3_reembolso_itens i
+          JOIN financeiro3_reembolsos x ON x.id=i.reembolso_id
+          WHERE i.data_despesa=:data AND i.valor=:valor AND i.status='ATIVO'
+        ) duplicadas ORDER BY origem
+    """), {"data": data, "valor": valor}).scalars().all())
+
+
+def _linhas_om_formulario():
+    datas = request.form.getlist("data_despesa")
+    centros = request.form.getlist("centro_custo_id")
+    categorias = request.form.getlist("categoria_id")
+    descricoes = request.form.getlist("descricao")
+    valores = request.form.getlist("valor")
+    justificativas = request.form.getlist("justificativa_sem_comprovante")
+    arquivos = request.files.getlist("arquivo")
+    quantidade = len(datas)
+    if not quantidade or any(len(lista) != quantidade for lista in (
+        centros, categorias, descricoes, valores, justificativas, arquivos,
+    )):
+        raise ValorInvalido("As linhas da OM estão incompletas. Revise e tente novamente.")
+    linhas = []
+    for indice in range(quantidade):
+        try:
+            centro = int(centros[indice] or 0)
+            categoria = int(categorias[indice] or 0)
+        except ValueError as exc:
+            raise ValorInvalido(f"Linha {indice + 1}: centro ou categoria inválido.") from exc
+        descricao = descricoes[indice].strip()
+        justificativa = justificativas[indice].strip() or None
+        arquivo = arquivos[indice]
+        if not descricao or len(descricao) > 220:
+            raise ValorInvalido(f"Linha {indice + 1}: informe uma descrição com até 220 caracteres.")
+        if (not arquivo or not arquivo.filename) and not justificativa:
+            raise ValorInvalido(f"Linha {indice + 1}: anexe o recibo ou justifique sua ausência.")
+        linhas.append({
+            "numero": indice + 1,
+            "data": data_iso(datas[indice], f"Data da linha {indice + 1}"),
+            "centro": centro,
+            "categoria": categoria,
+            "descricao": descricao,
+            "valor": decimal_br(valores[indice], positivo=True),
+            "justificativa": justificativa,
+            "arquivo": arquivo,
+        })
+    return linhas
+
+
+@bp.post("/oms/<int:om_id>/verificar-duplicidades")
+@login_required
+@permission_required("financeiro_novo", "editar")
+def om_verificar_duplicidades(om_id):
+    payload = request.get_json(silent=True) or {}
+    linhas = payload.get("linhas") or []
+    resultado, vistos = [], {}
+    with get_engine().connect() as conn:
+        if not _registro(conn, "financeiro3_oms", om_id):
+            abort(404)
+        for indice, linha in enumerate(linhas, 1):
+            try:
+                data = data_iso(linha.get("data"), f"Data da linha {indice}")
+                valor = decimal_br(linha.get("valor"), positivo=True)
+            except (ValorInvalido, AttributeError):
+                continue
+            chave = (data, valor)
+            origens = _origens_duplicadas(conn, data, valor)
+            if chave in vistos:
+                origens.append(f"linha {vistos[chave]} deste lote")
+            else:
+                vistos[chave] = indice
+            if origens:
+                resultado.append({"linha": indice, "origens": origens})
+    return jsonify({"duplicidades": resultado})
+
+
 @bp.post("/oms/<int:om_id>/itens")
 @login_required
 @permission_required("financeiro_novo", "editar")
 def om_item_novo(om_id):
     from routes.financeiro_novo.reembolsos import _preparar_anexo, _vincular_anexo
-    preparado = None
+    preparados = []
     try:
-        dados = {
-            "data": data_iso(request.form.get("data_despesa"), "Data da despesa"),
-            "categoria": int(request.form.get("categoria_id") or 0),
-            "fornecedor": int(request.form.get("fornecedor_id") or 0) or None,
-            "descricao": (request.form.get("descricao") or "").strip(),
-            "documento": (request.form.get("numero_documento") or "").strip() or None,
-            "valor": decimal_br(request.form.get("valor"), positivo=True),
-            "justificativa": (request.form.get("justificativa_sem_comprovante") or "").strip() or None,
-        }
-        if not dados["descricao"]:
-            raise ValorInvalido("Informe a descrição da despesa.")
-        if len(dados["descricao"]) > 220 or (dados["documento"] and len(dados["documento"]) > 80):
-            raise ValorInvalido("Descrição ou número do documento excede o tamanho permitido.")
-        arquivo = request.files.get("arquivo")
-        if (not arquivo or not arquivo.filename) and not dados["justificativa"]:
-            raise ValorInvalido("Anexe o recibo ou justifique sua ausência.")
-        preparado = _preparar_anexo(arquivo)
+        linhas = _linhas_om_formulario()
+        preparados = [_preparar_anexo(linha["arquivo"]) for linha in linhas]
         with get_engine().begin() as conn:
             om = _registro(conn, "financeiro3_oms", om_id, True)
             if not om: abort(404)
             if om["status"] not in EDITAVEIS: abort(409)
-            refs = conn.execute(text("""
-                SELECT EXISTS(SELECT 1 FROM financeiro3_categorias
-                    WHERE id=:categoria AND ativo AND natureza='DESPESA')
-                  AND (:fornecedor IS NULL OR EXISTS(SELECT 1 FROM financeiro3_pessoas
-                    WHERE id=:fornecedor AND ativo AND fornecedor))
-            """), dados).scalar()
-            if not refs:
-                raise ValorInvalido("Categoria ou fornecedor inválido.")
-            duplicado = conn.execute(text("""
-                SELECT EXISTS(
-                  SELECT 1 FROM financeiro3_om_itens i JOIN financeiro3_oms x ON x.id=i.om_id
-                    WHERE i.data_despesa=:data AND i.valor=:valor AND i.status='ATIVO'
-                      AND x.solicitante_id=:favorecido AND x.removido_em IS NULL
-                  UNION ALL SELECT 1 FROM financeiro3_rd_itens i JOIN financeiro3_rds x ON x.id=i.rd_id
-                    WHERE i.data_despesa=:data AND i.valor=:valor AND i.status='ATIVO'
-                      AND x.responsavel_id=:favorecido
-                  UNION ALL SELECT 1 FROM financeiro3_reembolso_itens i
-                    JOIN financeiro3_reembolsos x ON x.id=i.reembolso_id
-                    WHERE i.data_despesa=:data AND i.valor=:valor AND i.status='ATIVO'
-                      AND x.favorecido_id=:favorecido
-                )
-            """), {**dados, "favorecido": om["solicitante_id"]}).scalar()
-            if duplicado and request.form.get("confirmar_duplicidade") != "1":
-                raise ValorInvalido("Possível duplicidade encontrada. Marque a confirmação para salvar conscientemente.")
-            item = conn.execute(text("""
-                INSERT INTO financeiro3_om_itens(om_id,data_despesa,categoria_id,fornecedor_id,
-                  descricao,numero_documento,valor,justificativa_sem_comprovante,criado_por)
-                VALUES (:om,:data,:categoria,:fornecedor,:descricao,:documento,:valor,:justificativa,:usuario)
-                RETURNING *
-            """), {**dados, "om": om_id, "usuario": session.get("usuario_id")}).mappings().one()
-            vinculo = _vincular_anexo(conn, preparado, "OM_ITEM", item["id"], "COMPROVANTE")
-            registrar_evento(conn, entidade="OM_ITEM", entidade_id=item["id"], evento="CRIADO",
-                dados_novos={**dict(item), "anexo_id": vinculo})
-        flash("Linha de despesa incluída na OM.", "sucesso")
+            duplicadas, vistos = [], {}
+            for linha in linhas:
+                refs = conn.execute(text("""
+                    SELECT EXISTS(SELECT 1 FROM financeiro3_categorias
+                        WHERE id=:categoria AND ativo AND natureza='DESPESA')
+                      AND EXISTS(SELECT 1 FROM financeiro3_centros_custo
+                        WHERE id=:centro AND ativo)
+                """), linha).scalar()
+                if not refs:
+                    raise ValorInvalido(f"Linha {linha['numero']}: centro ou categoria inválido.")
+                chave = (linha["data"], linha["valor"])
+                origens = _origens_duplicadas(conn, *chave)
+                if chave in vistos:
+                    origens.append(f"linha {vistos[chave]} deste lote")
+                else:
+                    vistos[chave] = linha["numero"]
+                if origens:
+                    duplicadas.append(f"linha {linha['numero']} ({', '.join(origens)})")
+            if duplicadas and request.form.get("confirmar_duplicidade") != "1":
+                raise ValorInvalido("Possíveis duplicidades: " + "; ".join(duplicadas) + ". Confirme para salvar.")
+            for linha, preparado in zip(linhas, preparados):
+                item = conn.execute(text("""
+                    INSERT INTO financeiro3_om_itens(om_id,data_despesa,centro_custo_id,
+                      categoria_id,descricao,valor,justificativa_sem_comprovante,criado_por)
+                    VALUES (:om,:data,:centro,:categoria,:descricao,:valor,:justificativa,:usuario)
+                    RETURNING *
+                """), {**linha, "om": om_id, "usuario": session.get("usuario_id")}).mappings().one()
+                vinculo = _vincular_anexo(conn, preparado, "OM_ITEM", item["id"], "COMPROVANTE")
+                registrar_evento(conn, entidade="OM_ITEM", entidade_id=item["id"], evento="CRIADO",
+                    dados_novos={**dict(item), "anexo_id": vinculo})
+        flash(f"{len(linhas)} linha(s) de despesa incluída(s) na OM.", "sucesso")
     except (ValorInvalido, ValueError, AnexoInvalido) as exc:
-        if preparado: preparado[3].unlink(missing_ok=True)
+        for preparado in preparados:
+            if preparado: preparado[3].unlink(missing_ok=True)
         flash(str(exc), "erro")
     except Exception:
-        if preparado: preparado[3].unlink(missing_ok=True)
+        for preparado in preparados:
+            if preparado: preparado[3].unlink(missing_ok=True)
         raise
     return redirect(url_for("financeiro_novo.om_detalhe", om_id=om_id))
 
@@ -403,15 +484,80 @@ def rd_criar(om_id):
             flash("A OM precisa ter ao menos uma linha de despesa para gerar a RD.", "erro")
             return redirect(url_for("financeiro_novo.om_detalhe", om_id=om_id))
         rd = conn.execute(text("""
-            INSERT INTO financeiro3_rds(om_id,responsavel_id,centro_custo_id,moeda_id,
-                periodo_inicio,periodo_fim,valor_adiantamento,criado_por)
-            VALUES (:om,:responsavel,:centro,:moeda,:inicio,:fim,0,:usuario) RETURNING *
-        """), {"om": om_id, "responsavel": om["solicitante_id"], "centro": om["centro_custo_id"],
+            INSERT INTO financeiro3_rds(numero_rd,matricula_responsavel,om_id,responsavel_id,
+                centro_custo_id,moeda_id,periodo_inicio,periodo_fim,valor_adiantamento,criado_por)
+            VALUES (:numero,:matricula,:om,:responsavel,:centro,:moeda,:inicio,:fim,0,:usuario) RETURNING *
+        """), {"numero": f"RD-{om['numero_om']}", "matricula": om["matricula_favorecido"],
+                "om": om_id, "responsavel": om["solicitante_id"], "centro": om["centro_custo_id"],
                 "moeda": om["moeda_id"], "inicio": periodo["inicio"], "fim": periodo["fim"],
                 "usuario": session.get("usuario_id")}).mappings().one()
         registrar_evento(conn, entidade="RD", entidade_id=rd["id"], evento="CRIADA_DA_OM", dados_novos=dict(rd))
     flash("RD criada a partir da OM aprovada.", "sucesso")
     return redirect(url_for("financeiro_novo.rd_detalhe", rd_id=rd["id"]))
+
+
+def _dados_rd(form):
+    try:
+        dados = {
+            "responsavel": int(form.get("responsavel_id") or 0),
+            "centro": int(form.get("centro_custo_id") or 0),
+            "moeda": int(form.get("moeda_id") or 0),
+        }
+    except ValueError as exc:
+        raise ValorInvalido("Selecione responsável, centro e moeda válidos.") from exc
+    dados.update({
+        "numero": (form.get("numero_rd") or "").strip().upper(),
+        "matricula": (form.get("matricula_responsavel") or "").strip().upper(),
+        "inicio": data_iso(form.get("periodo_inicio"), "Início do período"),
+        "fim": data_iso(form.get("periodo_fim"), "Fim do período"),
+        "adiantamento": decimal_br(form.get("valor_adiantamento") or "0"),
+        "observacoes": (form.get("observacoes") or "").strip() or None,
+    })
+    if not dados["numero"] or not dados["matricula"]:
+        raise ValorInvalido("Informe o número da RD e a matrícula do responsável.")
+    if len(dados["numero"]) > 80 or len(dados["matricula"]) > 40:
+        raise ValorInvalido("Número da RD ou matrícula excede o tamanho permitido.")
+    if dados["fim"] < dados["inicio"]:
+        raise ValorInvalido("O fim do período não pode ser anterior ao início.")
+    return dados
+
+
+@bp.route("/rds/nova", methods=["GET", "POST"])
+@login_required
+@permission_required("financeiro_novo", "criar")
+def rd_nova():
+    with get_engine().connect() as conn:
+        opcoes = _opcoes(conn)
+    if request.method == "POST":
+        try:
+            dados = _dados_rd(request.form)
+            dados["usuario"] = session.get("usuario_id")
+            with get_engine().begin() as conn:
+                refs = conn.execute(text("""
+                    SELECT EXISTS(SELECT 1 FROM financeiro3_pessoas
+                        WHERE id=:responsavel AND ativo AND favorecido)
+                      AND EXISTS(SELECT 1 FROM financeiro3_centros_custo WHERE id=:centro AND ativo)
+                      AND EXISTS(SELECT 1 FROM financeiro3_moedas WHERE id=:moeda AND ativo)
+                """), dados).scalar()
+                if not refs:
+                    raise ValorInvalido("Responsável, centro ou moeda está inativo ou inválido.")
+                rd = conn.execute(text("""
+                    INSERT INTO financeiro3_rds(numero_rd,matricula_responsavel,responsavel_id,
+                      centro_custo_id,moeda_id,periodo_inicio,periodo_fim,valor_adiantamento,
+                      observacoes,criado_por)
+                    VALUES (:numero,:matricula,:responsavel,:centro,:moeda,:inicio,:fim,
+                      :adiantamento,:observacoes,:usuario) RETURNING *
+                """), dados).mappings().one()
+                registrar_evento(conn, entidade="RD", entidade_id=rd["id"], evento="CRIADA",
+                    dados_novos=dict(rd))
+            flash("RD criada em rascunho.", "sucesso")
+            return redirect(url_for("financeiro_novo.rd_detalhe", rd_id=rd["id"]))
+        except (ValorInvalido, IntegrityError) as exc:
+            if isinstance(exc, IntegrityError):
+                exc = ValorInvalido("Já existe uma RD com este número.")
+            flash(str(exc), "erro")
+    return render_template("financeiro_novo/rd_form.html", opcoes=opcoes,
+        subnav_links=build_subnav("missoes"))
 
 
 @bp.get("/rds/<int:rd_id>")
@@ -424,7 +570,7 @@ def rd_detalhe(rd_id):
                    cc.nome AS centro_nome, m.codigo AS moeda, o.numero_om
             FROM financeiro3_rds r JOIN financeiro3_pessoas p ON p.id=r.responsavel_id
             JOIN financeiro3_centros_custo cc ON cc.id=r.centro_custo_id
-            JOIN financeiro3_moedas m ON m.id=r.moeda_id JOIN financeiro3_oms o ON o.id=r.om_id
+            JOIN financeiro3_moedas m ON m.id=r.moeda_id LEFT JOIN financeiro3_oms o ON o.id=r.om_id
             WHERE r.id=:id
         """), {"id": rd_id}).mappings().first()
         if not rd:
@@ -546,7 +692,7 @@ def _decidir_rd(rd_id, aprovar):
                 VALUES (:rd,:tipo,:valor,:usuario)
             """), {"rd": rd_id, "tipo": "REEMBOLSO" if diferenca > 0 else "DEVOLUCAO",
                     "valor": abs(diferenca), "usuario": session.get("usuario_id")})
-        if status == "LIQUIDADA":
+        if status == "LIQUIDADA" and anterior["om_id"]:
             conn.execute(text("UPDATE financeiro3_oms SET status='ENCERRADA',atualizado_em=NOW() WHERE id=:id"), {"id": anterior["om_id"]})
             _decisao(conn, "om", anterior["om_id"], "ENCERRAMENTO", "APROVADA", "ENCERRADA")
         registrar_evento(conn, entidade="RD", entidade_id=rd_id, evento=acao, dados_anteriores=dict(anterior), dados_novos=dict(novo), justificativa=justificativa)
@@ -595,11 +741,12 @@ def rd_liquidar(rd_id):
                     "referencia": (request.form.get("referencia") or "").strip() or None,
                     "usuario": session.get("usuario_id"), "id": acerto["id"]})
             novo = conn.execute(text("UPDATE financeiro3_rds SET status='LIQUIDADA',atualizado_em=NOW() WHERE id=:id RETURNING *"), {"id": rd_id}).mappings().one()
-            conn.execute(text("UPDATE financeiro3_oms SET status='ENCERRADA',atualizado_em=NOW() WHERE id=:id"), {"id": rd["om_id"]})
-            _decisao(conn, "om", rd["om_id"], "ENCERRAMENTO", "APROVADA", "ENCERRADA")
+            if rd["om_id"]:
+                conn.execute(text("UPDATE financeiro3_oms SET status='ENCERRADA',atualizado_em=NOW() WHERE id=:id"), {"id": rd["om_id"]})
+                _decisao(conn, "om", rd["om_id"], "ENCERRAMENTO", "APROVADA", "ENCERRADA")
             _decisao(conn, "rd", rd_id, "LIQUIDACAO", "APROVADA", "LIQUIDADA")
             registrar_evento(conn, entidade="RD", entidade_id=rd_id, evento="ACERTO_LIQUIDADO", dados_anteriores=dict(rd), dados_novos=dict(novo))
-        flash("Acerto liquidado e OM encerrada.", "sucesso")
+        flash("Acerto da RD liquidado.", "sucesso")
     except (ValorInvalido, ValueError) as exc:
         flash(str(exc), "erro")
     return redirect(url_for("financeiro_novo.rd_detalhe", rd_id=rd_id))
