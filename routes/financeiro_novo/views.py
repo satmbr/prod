@@ -29,6 +29,16 @@ def build_subnav(active: str | None):
             "active": active == "missoes",
         },
         {
+            "text": "Reembolsos",
+            "href": url_for("financeiro_novo.reembolsos"),
+            "active": active == "reembolsos",
+        },
+        {
+            "text": "Previsão",
+            "href": url_for("financeiro_novo.previsao"),
+            "active": active == "previsao",
+        },
+        {
             "text": "Notas de Débito",
             "href": url_for("financeiro_novo.notas_debito"),
             "active": active == "nd",
@@ -77,6 +87,7 @@ def index():
                      (SELECT COUNT(*) FROM financeiro3_rds)) AS missoes,
                     (SELECT COUNT(*) FROM financeiro3_rd_acertos WHERE status='PENDENTE') AS acertos_pendentes,
                     (SELECT COUNT(*) FROM financeiro3_notas_debito) AS notas_debito,
+                    (SELECT COUNT(*) FROM financeiro3_reembolsos) AS reembolsos,
                     (SELECT COUNT(*) FROM financeiro3_conciliacoes) AS conciliacoes,
                     ((SELECT COUNT(*) FROM financeiro3_pessoas) +
                      (SELECT COUNT(*) FROM financeiro3_clientes) +

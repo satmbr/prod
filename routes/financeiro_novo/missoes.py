@@ -498,7 +498,7 @@ def rd_liquidar(rd_id):
 
 def _listar_anexos(conn, entidade, registro_id):
     return conn.execute(text("""
-        SELECT a.id, ar.id AS arquivo_id, ar.nome_original, ar.tamanho_canonico, ar.paginas
+        SELECT a.id, a.categoria, ar.id AS arquivo_id, ar.nome_original, ar.tamanho_canonico, ar.paginas
         FROM financeiro3_anexos a JOIN financeiro3_arquivos ar ON ar.id=a.arquivo_id
         WHERE a.entidade=:entidade AND a.entidade_id=:id AND a.status='ATIVO' ORDER BY a.id DESC
     """), {"entidade": entidade, "id": registro_id}).mappings().all()

@@ -61,3 +61,10 @@ A rota administrativa `/financeiro-novo/homologacao` verifica em tempo real,
 sem alterar dados, a versão do schema, cadastros mínimos, atribuição das
 permissões e prontidão do armazenamento privado. No Railway, `UPLOAD_ROOT`
 deve estar dentro do caminho informado por `RAILWAY_VOLUME_MOUNT_PATH`.
+
+O complemento de reembolsos e previsão é criado pela migration
+`migrations/008_financeiro_novo_reembolsos_previsao.sql`. Reembolsos avulsos
+possuem itens, comprovantes normalizados, detecção de possível duplicidade,
+aprovação segregada e pagamento auditado. A previsão dedicada consolida,
+sem duplicar lançamentos, despesas, reembolsos, adiantamentos de OM, acertos
+de RD e Notas de Débito por dia, semana, mês ou período personalizado.

@@ -47,6 +47,11 @@
           <p>Documentos a receber emitidos para clientes.</p>
         </article>
         <article class="foundation-card">
+          <div class="foundation-label">Reembolsos</div>
+          <div class="foundation-value">{{ totais.reembolsos }}</div>
+          <p>Solicitações avulsas com despesas, recibos, aprovação e pagamento.</p>
+        </article>
+        <article class="foundation-card">
           <div class="foundation-label">Conciliações</div>
           <div class="foundation-value">{{ totais.conciliacoes }}</div>
           <p>Movimentos conferidos manualmente com o extrato.</p>
@@ -84,6 +89,7 @@
         <li class="done"><strong>Despesas</strong><span>Rascunho, itens, anexos, aprovação e pagamento.</span></li>
         <li class="done"><strong>OM, RD e reembolsos</strong><span>Ciclo integrado com acerto de reembolso ou devolução.</span></li>
         <li class="done"><strong>Notas de débito e relatórios</strong><span>Vínculos, previsão, CSV e conciliação manual.</span></li>
+        <li class="done"><strong>Reembolsos e previsão</strong><span>Fluxo avulso auditado e visão diária, semanal ou mensal.</span></li>
       </ol>
     </div>
   </section>
@@ -99,7 +105,7 @@
   .foundation-label{color:#60758a;font-size:11px;font-weight:800;text-transform:uppercase}
   .foundation-value{margin:7px 0;color:var(--fn-dark);font-size:28px;font-weight:800}
   .foundation-card p{margin:0;color:#60758a;font-size:11px;line-height:1.45}
-  .roadmap{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin:0;padding:0;list-style:none;counter-reset:etapa}
+  .roadmap{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:0;padding:0;list-style:none;counter-reset:etapa}
   .roadmap li{position:relative;min-height:105px;padding:38px 13px 13px;border:1px solid #d8e3ea;border-radius:10px;background:#f8fafc;counter-increment:etapa}
   .roadmap li::before{content:counter(etapa);position:absolute;top:11px;left:13px;width:20px;height:20px;border-radius:50%;background:#dbe6ed;color:#41586b;text-align:center;font-size:11px;font-weight:800;line-height:20px}
   .roadmap li.done{border-color:#9dd9cd;background:#eefbf7}

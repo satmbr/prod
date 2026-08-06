@@ -1,0 +1,12 @@
+<div class="dsp-form-grid">
+  <label><span>Favorecido *</span><select name="favorecido_id" required><option value="">Selecione</option>{% for p in opcoes.favorecidos %}<option value="{{ p.id }}" {% if registro and registro.favorecido_id==p.id %}selected{% endif %}>{{ p.nome_razao }}</option>{% endfor %}</select></label>
+  <label><span>Matrícula</span><input name="matricula" maxlength="40" value="{{ registro.matricula or '' if registro else '' }}"></label>
+  <label><span>Centro de custo *</span><select name="centro_custo_id" required><option value="">Selecione</option>{% for c in opcoes.centros %}<option value="{{ c.id }}" {% if registro and registro.centro_custo_id==c.id %}selected{% endif %}>{{ c.codigo }} · {{ c.nome }}</option>{% endfor %}</select></label>
+  <label><span>Moeda *</span><select name="moeda_id" required><option value="">Selecione</option>{% for m in opcoes.moedas %}<option value="{{ m.id }}" {% if registro and registro.moeda_id==m.id %}selected{% endif %}>{{ m.codigo }} · {{ m.nome }}</option>{% endfor %}</select></label>
+  <label><span>Tipo da chave PIX</span><select name="tipo_chave_pix"><option value="">Não informado</option>{% for valor,rotulo in tipos_pix %}<option value="{{ valor }}" {% if registro and registro.tipo_chave_pix==valor %}selected{% endif %}>{{ rotulo }}</option>{% endfor %}</select></label>
+  <label><span>Chave PIX</span><input name="chave_pix" maxlength="180" value="{{ registro.chave_pix or '' if registro else '' }}"></label>
+  <label><span>Data da solicitação *</span><input type="date" name="data_solicitacao" required value="{{ registro.data_solicitacao.isoformat() if registro else '' }}"></label>
+  <label><span>Pagamento previsto *</span><input type="date" name="data_prevista_pagamento" required value="{{ registro.data_prevista_pagamento.isoformat() if registro else '' }}"></label>
+  <label class="span-2"><span>Objetivo *</span><input name="objetivo" maxlength="250" required value="{{ registro.objetivo if registro else '' }}"></label>
+  <label class="span-2"><span>Observações</span><textarea name="observacoes" rows="3">{{ registro.observacoes or '' if registro else '' }}</textarea></label>
+</div>

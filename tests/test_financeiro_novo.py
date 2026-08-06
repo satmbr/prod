@@ -61,6 +61,7 @@ class FinanceiroNovoIsolamentoTests(unittest.TestCase):
             "missoes": 0,
             "acertos_pendentes": 0,
             "notas_debito": 0,
+            "reembolsos": 0,
             "conciliacoes": 0,
             "cadastros": 0,
             "arquivos": 0,
@@ -188,6 +189,32 @@ class FinanceiroNovoIsolamentoTests(unittest.TestCase):
             self.assertIn(f"financeiro3_{tabela}", migration)
         self.assertIn("financeiro3_atualizar_total_nd", migration)
         self.assertIn("UNIQUE (origem_tipo,origem_id)", migration)
+
+    def test_reembolsos_e_previsao_usam_apenas_modelo_novo(self):
+        migration = (self.raiz / "migrations" / "008_financeiro_novo_reembolsos_previsao.sql").read_text(encoding="utf-8")
+        for tabela in ("reembolsos", "reembolso_itens", "reembolso_decisoes", "reembolso_pagamentos"):
+            self.assertIn(f"financeiro3_{tabela}", migration)
+        self.assertIn("financeiro3_atualizar_total_reembolso", migration)
+        self.assertIn("data_pagamento_adiantamento", migration)
+        self.assertNotIn("FLOAT", migration.upper())
+        previsao = (self.raiz / "routes" / "financeiro_novo" / "previsao.py").read_text(encoding="utf-8")
+        for origem in ("financeiro3_despesas", "financeiro3_reembolsos", "financeiro3_oms", "financeiro3_rd_acertos", "financeiro3_notas_debito"):
+            self.assertIn(origem, previsao)
+        relatorios = (self.raiz / "routes" / "financeiro_novo" / "relatorios.py").read_text(encoding="utf-8")
+        self.assertIn("PAGAMENTO_REEMBOLSO", relatorios)
+        self.assertIn("ADIANTAMENTO_OM", relatorios)
+
+    def test_reembolso_separa_edicao_aprovacao_e_pagamento(self):
+        app = create_app(); app.config.update(TESTING=True, WTF_CSRF_ENABLED=False)
+        with app.test_client() as client:
+            with client.session_transaction() as sessao:
+                sessao["usuario_id"] = 1
+                sessao["permissoes"] = ["financeiro_novo:visualizar", "financeiro_novo:editar"]
+                sessao["ultimo_acesso"] = 9999999999
+            aprovacao = client.post("/financeiro-novo/reembolsos/1/aprovar")
+            pagamento = client.post("/financeiro-novo/reembolsos/1/pagar")
+        self.assertEqual(aprovacao.status_code, 403)
+        self.assertEqual(pagamento.status_code, 403)
 
     def test_conciliacao_exige_permissao_administrativa_do_modulo(self):
         app = create_app(); app.config.update(TESTING=True, WTF_CSRF_ENABLED=False)
