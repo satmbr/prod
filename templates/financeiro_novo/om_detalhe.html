@@ -106,8 +106,8 @@
     rows.forEach(row => { row.classList.remove('possible-duplicate'); row.querySelector('.duplicate-row').textContent = ''; });
     if (!linhas.some(item => item.data && item.valor)) { feedback.hidden = true; return {duplicidades:[],erro:false}; }
     try {
-      const body=new URLSearchParams(); linhas.forEach(item => { body.append('data',item.data); body.append('valor',item.valor); });
-      const response = await fetch(endpoint, {method:'POST', credentials:'same-origin', headers:{'Accept':'application/json','Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'}, body});
+      const query=new URLSearchParams(); linhas.forEach(item => { query.append('data',item.data); query.append('valor',item.valor); });
+      const response = await fetch(endpoint+'?'+query.toString(), {method:'GET', credentials:'same-origin', cache:'no-store', headers:{'Accept':'application/json'}});
       if (!response.ok) throw new Error('HTTP '+response.status);
       if (!(response.headers.get('content-type') || '').includes('application/json')) throw new Error('sessão inválida ou resposta não reconhecida');
       const duplicidades = (await response.json()).duplicidades || [];

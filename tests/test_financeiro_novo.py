@@ -249,9 +249,41 @@ class FinanceiroNovoIsolamentoTests(unittest.TestCase):
         self.assertIn('id="duplicate-dialog"', detalhe)
         self.assertIn("Salvar mesmo assim", detalhe)
         self.assertIn("URLSearchParams", detalhe)
+        self.assertIn("method:'GET'", detalhe)
+        self.assertIn("cache:'no-store'", detalhe)
         self.assertIn("credentials:'same-origin'", detalhe)
+        self.assertIn('@bp.get("/oms/<int:om_id>/verificar-duplicidades")', rotas)
+        self.assertIn('request.args.getlist("data")', rotas)
         self.assertNotIn("Analisei os possíveis lançamentos duplicados", detalhe)
         self.assertNotIn('type="checkbox" name="confirmar_duplicidade"', detalhe)
+
+    def test_verificacao_duplicidades_funciona_com_csrf_ativado(self):
+        resultado_om = MagicMock()
+        resultado_om.mappings.return_value.first.return_value = {"id": 1}
+        resultado_duplicidades = MagicMock()
+        resultado_duplicidades.mappings.return_value.all.return_value = []
+        conexao = MagicMock()
+        conexao.execute.side_effect = [resultado_om, resultado_duplicidades]
+        contexto = MagicMock()
+        contexto.__enter__.return_value = conexao
+        engine = MagicMock()
+        engine.connect.return_value = contexto
+
+        app = create_app()
+        app.config.update(TESTING=True)
+        with patch("routes.financeiro_novo.missoes.get_engine", return_value=engine):
+            with app.test_client() as client:
+                with client.session_transaction() as sessao:
+                    sessao["usuario_id"] = 1
+                    sessao["permissoes"] = ["financeiro_novo:editar"]
+                    sessao["ultimo_acesso"] = 9999999999
+                resposta = client.get(
+                    "/financeiro-novo/oms/1/verificar-duplicidades"
+                    "?data=2026-08-06&valor=123%2C45"
+                )
+
+        self.assertEqual(resposta.status_code, 200)
+        self.assertEqual(resposta.get_json(), {"duplicidades": []})
 
     def test_reembolso_separa_edicao_aprovacao_e_pagamento(self):
         app = create_app(); app.config.update(TESTING=True, WTF_CSRF_ENABLED=False)
