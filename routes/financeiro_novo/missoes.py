@@ -315,8 +315,13 @@ def _linhas_om_formulario():
 @login_required
 @permission_required("financeiro_novo", "editar")
 def om_verificar_duplicidades(om_id):
-    payload = request.get_json(silent=True) or {}
-    linhas = payload.get("linhas") or []
+    if request.is_json:
+        payload = request.get_json(silent=True) or {}
+        linhas = payload.get("linhas") or []
+    else:
+        datas = request.form.getlist("data")
+        valores = request.form.getlist("valor")
+        linhas = [{"data": data, "valor": valor} for data, valor in zip(datas, valores)]
     resultado, vistos = [], {}
     with get_engine().connect() as conn:
         if not _registro(conn, "financeiro3_oms", om_id):

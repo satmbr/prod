@@ -248,6 +248,8 @@ class FinanceiroNovoIsolamentoTests(unittest.TestCase):
             self.assertIn(coluna, detalhe)
         self.assertIn('id="duplicate-dialog"', detalhe)
         self.assertIn("Salvar mesmo assim", detalhe)
+        self.assertIn("URLSearchParams", detalhe)
+        self.assertIn("credentials:'same-origin'", detalhe)
         self.assertNotIn("Analisei os possíveis lançamentos duplicados", detalhe)
         self.assertNotIn('type="checkbox" name="confirmar_duplicidade"', detalhe)
 

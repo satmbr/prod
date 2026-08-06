@@ -106,15 +106,17 @@
     rows.forEach(row => { row.classList.remove('possible-duplicate'); row.querySelector('.duplicate-row').textContent = ''; });
     if (!linhas.some(item => item.data && item.valor)) { feedback.hidden = true; return {duplicidades:[],erro:false}; }
     try {
-      const response = await fetch(endpoint, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({linhas})});
-      if (!response.ok) throw new Error('Falha na verificação');
+      const body=new URLSearchParams(); linhas.forEach(item => { body.append('data',item.data); body.append('valor',item.valor); });
+      const response = await fetch(endpoint, {method:'POST', credentials:'same-origin', headers:{'Accept':'application/json','Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'}, body});
+      if (!response.ok) throw new Error('HTTP '+response.status);
+      if (!(response.headers.get('content-type') || '').includes('application/json')) throw new Error('sessão inválida ou resposta não reconhecida');
       const duplicidades = (await response.json()).duplicidades || [];
       duplicidades.forEach(item => { const row=rows[item.linha-1]; if (row) { row.classList.add('possible-duplicate'); row.querySelector('.duplicate-row').textContent='Possível duplicidade: '+item.registros.map(registro => registro.tipo+' '+registro.numero).join(', '); } });
       feedback.hidden = !duplicidades.length;
       renderDuplicateTable(feedback, duplicidades);
       return {duplicidades,erro:false};
-    } catch (_) {
-      feedback.hidden=false; feedback.textContent='Não foi possível verificar duplicidades. O salvamento foi interrompido; tente novamente.';
+    } catch (error) {
+      feedback.hidden=false; feedback.textContent='Não foi possível verificar duplicidades ('+error.message+'). O salvamento foi interrompido; atualize a página e tente novamente.';
       return {duplicidades:[],erro:true};
     }
   }
