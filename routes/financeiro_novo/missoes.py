@@ -209,22 +209,66 @@ def om_editar(om_id):
 
 
 def _origens_duplicadas(conn, data, valor):
-    return list(conn.execute(text("""
-        SELECT DISTINCT origem FROM (
-          SELECT 'OM '||o.numero_om AS origem
+    registros = conn.execute(text("""
+        SELECT * FROM (
+          SELECT 'OM'::text AS tipo,o.id AS origem_id,i.id AS item_id,o.numero_om AS numero,
+            i.data_despesa AS data,i.descricao,c.nome AS categoria,
+            cc.codigo||' · '||cc.nome AS centro,i.valor,m.codigo AS moeda,
+            ar.id AS arquivo_id,ar.nome_original AS nome_arquivo
           FROM financeiro3_om_itens i JOIN financeiro3_oms o ON o.id=i.om_id
+          JOIN financeiro3_categorias c ON c.id=i.categoria_id
+          JOIN financeiro3_centros_custo cc ON cc.id=i.centro_custo_id
+          JOIN financeiro3_moedas m ON m.id=o.moeda_id
+          LEFT JOIN financeiro3_anexos a ON a.entidade='OM_ITEM' AND a.entidade_id=i.id AND a.status='ATIVO'
+          LEFT JOIN financeiro3_arquivos ar ON ar.id=a.arquivo_id AND ar.status='ATIVO'
           WHERE i.data_despesa=:data AND i.valor=:valor AND i.status='ATIVO'
             AND o.removido_em IS NULL
           UNION ALL
-          SELECT 'RD '||r.numero_rd FROM financeiro3_rd_itens i
+          SELECT 'RD',r.id,i.id,r.numero_rd,i.data_despesa,i.descricao,c.nome,
+            cc.codigo||' · '||cc.nome,i.valor,m.codigo,NULL::uuid,NULL::varchar
+          FROM financeiro3_rd_itens i
           JOIN financeiro3_rds r ON r.id=i.rd_id
+          JOIN financeiro3_categorias c ON c.id=i.categoria_id
+          JOIN financeiro3_centros_custo cc ON cc.id=r.centro_custo_id
+          JOIN financeiro3_moedas m ON m.id=r.moeda_id
           WHERE i.data_despesa=:data AND i.valor=:valor AND i.status='ATIVO'
           UNION ALL
-          SELECT 'REEMBOLSO-'||LPAD(x.id::text,6,'0') FROM financeiro3_reembolso_itens i
+          SELECT 'REEMBOLSO',x.id,i.id,'REEMBOLSO-'||LPAD(x.id::text,6,'0'),
+            i.data_despesa,i.descricao,c.nome,cc.codigo||' · '||cc.nome,i.valor,m.codigo,
+            ar.id,ar.nome_original
+          FROM financeiro3_reembolso_itens i
           JOIN financeiro3_reembolsos x ON x.id=i.reembolso_id
+          JOIN financeiro3_categorias c ON c.id=i.categoria_id
+          JOIN financeiro3_centros_custo cc ON cc.id=x.centro_custo_id
+          JOIN financeiro3_moedas m ON m.id=x.moeda_id
+          LEFT JOIN financeiro3_anexos a ON a.entidade='REEMBOLSO_ITEM' AND a.entidade_id=i.id AND a.status='ATIVO'
+          LEFT JOIN financeiro3_arquivos ar ON ar.id=a.arquivo_id AND ar.status='ATIVO'
           WHERE i.data_despesa=:data AND i.valor=:valor AND i.status='ATIVO'
-        ) duplicadas ORDER BY origem
-    """), {"data": data, "valor": valor}).scalars().all())
+        ) duplicadas ORDER BY tipo,numero,item_id
+    """), {"data": data, "valor": valor}).mappings().all()
+    resultado = []
+    for registro in registros:
+        item = {
+            "tipo": registro["tipo"], "numero": registro["numero"],
+            "data": registro["data"].isoformat(), "descricao": registro["descricao"],
+            "categoria": registro["categoria"], "centro": registro["centro"],
+            "valor": str(registro["valor"]), "moeda": registro["moeda"],
+            "nome_arquivo": registro["nome_arquivo"],
+        }
+        if registro["tipo"] == "OM":
+            item["documento_url"] = url_for("financeiro_novo.om_detalhe", om_id=registro["origem_id"])
+            if registro["arquivo_id"]:
+                item["comprovante_url"] = url_for("financeiro_novo.om_item_anexo_baixar",
+                    om_id=registro["origem_id"], item_id=registro["item_id"], arquivo_id=registro["arquivo_id"])
+        elif registro["tipo"] == "RD":
+            item["documento_url"] = url_for("financeiro_novo.rd_detalhe", rd_id=registro["origem_id"])
+        else:
+            item["documento_url"] = url_for("financeiro_novo.reembolso_detalhe", reembolso_id=registro["origem_id"])
+            if registro["arquivo_id"]:
+                item["comprovante_url"] = url_for("financeiro_novo.reembolso_anexo_baixar",
+                    reembolso_id=registro["origem_id"], arquivo_id=registro["arquivo_id"])
+        resultado.append(item)
+    return resultado
 
 
 def _linhas_om_formulario():
@@ -284,13 +328,18 @@ def om_verificar_duplicidades(om_id):
             except (ValorInvalido, AttributeError):
                 continue
             chave = (data, valor)
-            origens = _origens_duplicadas(conn, data, valor)
+            registros = _origens_duplicadas(conn, data, valor)
             if chave in vistos:
-                origens.append(f"linha {vistos[chave]} deste lote")
+                registros.append({
+                    "tipo": "LOTE", "numero": f"Linha {vistos[chave]}",
+                    "data": data.isoformat(), "descricao": "Outra linha deste lote",
+                    "categoria": "—", "centro": "—", "valor": str(valor), "moeda": None,
+                    "nome_arquivo": None,
+                })
             else:
                 vistos[chave] = indice
-            if origens:
-                resultado.append({"linha": indice, "origens": origens})
+            if registros:
+                resultado.append({"linha": indice, "registros": registros})
     return jsonify({"duplicidades": resultado})
 
 
@@ -318,13 +367,14 @@ def om_item_novo(om_id):
                 if not refs:
                     raise ValorInvalido(f"Linha {linha['numero']}: centro ou categoria inválido.")
                 chave = (linha["data"], linha["valor"])
-                origens = _origens_duplicadas(conn, *chave)
+                registros = _origens_duplicadas(conn, *chave)
                 if chave in vistos:
-                    origens.append(f"linha {vistos[chave]} deste lote")
+                    registros.append({"tipo": "LOTE", "numero": f"linha {vistos[chave]} deste lote"})
                 else:
                     vistos[chave] = linha["numero"]
-                if origens:
-                    duplicadas.append(f"linha {linha['numero']} ({', '.join(origens)})")
+                if registros:
+                    rotulos = [f"{item['tipo']} {item['numero']}" for item in registros]
+                    duplicadas.append(f"linha {linha['numero']} ({', '.join(rotulos)})")
             if duplicadas and request.form.get("confirmar_duplicidade") != "1":
                 raise ValorInvalido("Possíveis duplicidades: " + "; ".join(duplicadas) + ". Confirme para salvar.")
             for linha, preparado in zip(linhas, preparados):

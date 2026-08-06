@@ -68,7 +68,35 @@
     row.querySelectorAll('input[name="data_despesa"],input[name="valor"]').forEach(input => input.addEventListener('input', scheduleCheck));
     body.appendChild(row); renumber();
   }
-  function scheduleCheck() { clearTimeout(timer); timer = setTimeout(checkDuplicates, 350); }
+  function scheduleCheck() { form.querySelector('[name="confirmar_duplicidade"]').checked=false; clearTimeout(timer); timer = setTimeout(checkDuplicates, 350); }
+  function addCell(row, value) { const cell=document.createElement('td'); cell.textContent=value ?? '—'; row.appendChild(cell); return cell; }
+  function renderDuplicateTable(duplicidades) {
+    feedback.replaceChildren();
+    if (!duplicidades.length) return;
+    const title=document.createElement('strong');
+    title.textContent='Possíveis duplicidades encontradas pela mesma data e pelo mesmo valor';
+    feedback.appendChild(title);
+    const wrap=document.createElement('div'); wrap.className='dsp-table-wrap duplicate-detail-wrap';
+    const table=document.createElement('table'); table.className='dsp-table duplicate-detail-table';
+    const head=document.createElement('thead'); const headRow=document.createElement('tr');
+    ['Linha nova','Origem','Data','Descrição','Categoria','Centro de custo','Valor','Comprovante'].forEach(label => { const th=document.createElement('th'); th.textContent=label; headRow.appendChild(th); });
+    head.appendChild(headRow); table.appendChild(head);
+    const tbody=document.createElement('tbody');
+    duplicidades.forEach(item => item.registros.forEach(registro => {
+      const tr=document.createElement('tr'); addCell(tr,item.linha);
+      const origin=addCell(tr,'');
+      if (registro.documento_url) { const link=document.createElement('a'); link.href=registro.documento_url; link.target='_blank'; link.rel='noopener'; link.textContent=registro.tipo+' '+registro.numero; origin.appendChild(link); }
+      else origin.textContent=registro.tipo+' '+registro.numero;
+      addCell(tr,registro.data ? registro.data.split('-').reverse().join('/') : '—');
+      addCell(tr,registro.descricao); addCell(tr,registro.categoria); addCell(tr,registro.centro);
+      const numeric=Number(String(registro.valor).replace(',','.')); addCell(tr,Number.isFinite(numeric) ? (registro.moeda ? registro.moeda+' ' : '')+numeric.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}) : registro.valor);
+      const proof=addCell(tr,'');
+      if (registro.comprovante_url) { const link=document.createElement('a'); link.href=registro.comprovante_url; link.target='_blank'; link.rel='noopener'; link.textContent=registro.nome_arquivo || 'Abrir'; proof.appendChild(link); }
+      else proof.textContent=registro.nome_arquivo || '—';
+      tbody.appendChild(tr);
+    }));
+    table.appendChild(tbody); wrap.appendChild(table); feedback.appendChild(wrap);
+  }
   async function checkDuplicates() {
     const rows = [...body.rows];
     const linhas = rows.map(row => ({data: row.querySelector('[name="data_despesa"]').value, valor: row.querySelector('[name="valor"]').value}));
@@ -78,10 +106,10 @@
       const response = await fetch(endpoint, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({linhas})});
       if (!response.ok) return [];
       const duplicidades = (await response.json()).duplicidades || [];
-      duplicidades.forEach(item => { const row=rows[item.linha-1]; if (row) { row.classList.add('possible-duplicate'); row.querySelector('.duplicate-row').textContent='Possível duplicidade: '+item.origens.join(', '); } });
+      duplicidades.forEach(item => { const row=rows[item.linha-1]; if (row) { row.classList.add('possible-duplicate'); row.querySelector('.duplicate-row').textContent='Possível duplicidade: '+item.registros.map(registro => registro.tipo+' '+registro.numero).join(', '); } });
       feedback.hidden = !duplicidades.length;
       confirmation.hidden = !duplicidades.length;
-      feedback.textContent = duplicidades.length ? 'Foram encontradas possíveis duplicidades por data e valor. Revise as linhas destacadas.' : '';
+      renderDuplicateTable(duplicidades);
       return duplicidades;
     } catch (_) { return []; }
   }
@@ -97,6 +125,6 @@
   addLine();
 })();
 </script>
-<style>.om-batch-table{min-width:1250px}.om-batch-table input,.om-batch-table select,.om-batch-table textarea{width:100%;min-width:120px;padding:7px;border:1px solid #ccd9e2;border-radius:7px}.om-batch-table td:nth-child(1){width:38px}.om-batch-table td:nth-child(4),.om-batch-table td:nth-child(5){min-width:180px}.possible-duplicate{background:#fff7dd}.duplicate-row{display:block;margin-top:4px;color:#9a5d00;font-weight:700}.check{display:block;margin-top:10px;color:#41586b;font-size:11px;font-weight:700}.check input{margin-right:6px}</style>
+<style>.om-batch-table{min-width:1250px}.om-batch-table input,.om-batch-table select,.om-batch-table textarea{width:100%;min-width:120px;padding:7px;border:1px solid #ccd9e2;border-radius:7px}.om-batch-table td:nth-child(1){width:38px}.om-batch-table td:nth-child(4),.om-batch-table td:nth-child(5){min-width:180px}.possible-duplicate{background:#fff7dd}.duplicate-row{display:block;margin-top:4px;color:#9a5d00;font-weight:700}.duplicate-detail-wrap{margin-top:10px}.duplicate-detail-table{min-width:980px;background:#fff}.check{display:block;margin-top:10px;color:#41586b;font-size:11px;font-weight:700}.check input{margin-right:6px}</style>
 {% endif %}
 {% endblock %}

@@ -238,6 +238,15 @@ class FinanceiroNovoIsolamentoTests(unittest.TestCase):
         self.assertIn('name="numero_rd"', rd_form)
         self.assertIn('name="matricula_responsavel"', rd_form)
 
+    def test_alerta_duplicidade_mantem_data_valor_e_exibe_detalhes(self):
+        rotas = (self.raiz / "routes" / "financeiro_novo" / "missoes.py").read_text(encoding="utf-8")
+        self.assertGreaterEqual(rotas.count("i.data_despesa=:data AND i.valor=:valor"), 3)
+        for campo in ("descricao", "categoria", "centro", "moeda", "comprovante_url", "documento_url"):
+            self.assertIn(f'"{campo}"', rotas)
+        detalhe = (self.raiz / "templates" / "financeiro_novo" / "om_detalhe.html").read_text(encoding="utf-8")
+        for coluna in ("Origem", "Descrição", "Categoria", "Centro de custo", "Comprovante"):
+            self.assertIn(coluna, detalhe)
+
     def test_reembolso_separa_edicao_aprovacao_e_pagamento(self):
         app = create_app(); app.config.update(TESTING=True, WTF_CSRF_ENABLED=False)
         with app.test_client() as client:
