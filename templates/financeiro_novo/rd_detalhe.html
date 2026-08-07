@@ -3,9 +3,104 @@
 <div class="page-wrap dsp-page"><div class="homolog-banner"><strong>RD {{ rd.numero_rd }} · {{ rd.status|replace('_',' ') }}</strong><span>{{ rd.responsavel }} · matrícula {{ rd.matricula_responsavel }}{% if rd.numero_om %} · vinculada à OM {{ rd.numero_om }}{% else %} · independente{% endif %}</span></div>
 <div class="dsp-summary"><article class="dsp-kpi"><span>Total comprovado</span><strong>{{ rd.moeda }} {{ '%.2f'|format(rd.valor_total)|replace('.',',') }}</strong></article><article class="dsp-kpi"><span>Adiantamento</span><strong>{{ rd.moeda }} {{ '%.2f'|format(rd.valor_adiantamento)|replace('.',',') }}</strong></article><article class="dsp-kpi"><span>Período</span><strong>{{ rd.periodo_inicio.strftime('%d/%m') }}–{{ rd.periodo_fim.strftime('%d/%m/%Y') }}</strong></article><article class="dsp-kpi"><span>Status</span><strong><span class="dsp-status {{ rd.status|lower }}">{{ rd.status|replace('_',' ') }}</span></strong></article></div>
 <div class="dsp-grid"><div><section class="zone"><header class="zone-head"><div><div class="zone-title">Gastos da prestação</div><div class="muted">Período {{ rd.periodo_inicio.strftime('%d/%m/%Y') }}–{{ rd.periodo_fim.strftime('%d/%m/%Y') }}</div></div></header><div class="zone-body">
-{% if editavel and editar %}<form method="post" action="{{ url_for('financeiro_novo.rd_item_novo',rd_id=rd.id) }}" class="dsp-mini-form"><label><span>Data *</span><input type="date" name="data_despesa" min="{{ rd.periodo_inicio.isoformat() }}" max="{{ rd.periodo_fim.isoformat() }}" required></label><label><span>Categoria *</span><select name="categoria_id" required><option value="">Selecione</option>{% for c in opcoes.categorias %}<option value="{{ c.id }}">{{ c.codigo }} · {{ c.nome }}</option>{% endfor %}</select></label><label><span>Fornecedor</span><select name="fornecedor_id"><option value="">Sem cadastro</option>{% for p in opcoes.fornecedores %}<option value="{{ p.id }}">{{ p.nome_razao }}</option>{% endfor %}</select></label><label><span>Documento</span><input name="numero_documento" maxlength="80"></label><label class="full"><span>Descrição *</span><input name="descricao" maxlength="220" required></label><label><span>Valor *</span><input name="valor" inputmode="decimal" required></label><div><button class="btn btn-outline">Adicionar gasto</button></div></form>{% endif %}
+{% if editavel and editar %}
+<form id="rd-item-form" method="post" action="{{ url_for('financeiro_novo.rd_item_novo',rd_id=rd.id) }}" class="dsp-mini-form">
+  <label><span>Data *</span><input type="date" name="data_despesa" min="{{ rd.periodo_inicio.isoformat() }}" max="{{ rd.periodo_fim.isoformat() }}" required></label>
+  <label><span>Categoria *</span><select name="categoria_id" required><option value="">Selecione</option>{% for c in opcoes.categorias %}<option value="{{ c.id }}">{{ c.codigo }} · {{ c.nome }}</option>{% endfor %}</select></label>
+  <label><span>Fornecedor</span><select name="fornecedor_id"><option value="">Sem cadastro</option>{% for p in opcoes.fornecedores %}<option value="{{ p.id }}">{{ p.nome_razao }}</option>{% endfor %}</select></label>
+  <label><span>Documento</span><input name="numero_documento" maxlength="80"></label>
+  <label class="full"><span>Descrição *</span><input name="descricao" maxlength="220" required></label>
+  <label><span>Valor *</span><input name="valor" inputmode="decimal" required><small id="rd-duplicate-row" class="duplicate-row"></small></label>
+  <input type="hidden" name="forcar_salvamento" value="0">
+  <div id="rd-duplicate-feedback" class="dsp-alert full" hidden></div>
+  <div><button class="btn btn-outline">Adicionar gasto</button></div>
+</form>
+<dialog id="rd-duplicate-dialog" class="duplicate-dialog">
+  <div class="duplicate-dialog-head"><div><strong>Possível lançamento duplicado</strong><span>Foi encontrado um lançamento com a mesma data e o mesmo valor.</span></div><button type="button" id="rd-close-duplicate-dialog" class="link-button">Fechar</button></div>
+  <div id="rd-duplicate-dialog-content"></div>
+  <div class="dsp-actions"><button type="button" id="rd-review-duplicates" class="btn btn-outline">Voltar e revisar</button><button type="button" id="rd-save-duplicates" class="btn btn-primary">Salvar mesmo assim</button></div>
+</dialog>
+{% endif %}
 <div class="dsp-table-wrap"><table class="dsp-table"><thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th>Fornecedor</th><th class="right">Valor</th>{% if editavel and editar %}<th></th>{% endif %}</tr></thead><tbody>{% for i in itens %}<tr><td>{{ i.data_despesa.strftime('%d/%m/%Y') }}</td><td>{{ i.descricao }}</td><td>{{ i.categoria }}</td><td>{{ i.fornecedor or '—' }}</td><td class="right">{{ rd.moeda }} {{ '%.2f'|format(i.valor)|replace('.',',') }}</td>{% if editavel and editar %}<td><form method="post" action="{{ url_for('financeiro_novo.rd_item_remover',rd_id=rd.id,item_id=i.id) }}"><button>Remover</button></form></td>{% endif %}</tr>{% else %}<tr><td colspan="6" class="dsp-empty">Nenhum gasto lançado.</td></tr>{% endfor %}</tbody></table></div></div></section>
 <section class="zone"><header class="zone-head"><div class="zone-title">Comprovantes da RD</div></header><div class="zone-body">{% if editavel and editar %}<form method="post" enctype="multipart/form-data" action="{{ url_for('financeiro_novo.documento_anexo_novo',tipo='rd',registro_id=rd.id) }}" class="dsp-mini-form"><label class="full"><span>Foto ou PDF</span><input type="file" name="arquivo" accept="image/*,application/pdf" required></label><button class="btn btn-outline">Converter e anexar</button></form>{% endif %}{% for a in anexos %}<div class="dsp-file"><a href="{{ url_for('financeiro_novo.documento_anexo_baixar',tipo='rd',registro_id=rd.id,arquivo_id=a.arquivo_id) }}">{{ a.nome_original }}</a><small>{{ a.paginas }} pág.</small>{% if editavel and editar %}<form method="post" action="{{ url_for('financeiro_novo.documento_anexo_remover',tipo='rd',registro_id=rd.id,anexo_id=a.id) }}"><button class="link-button">Remover</button></form>{% endif %}</div>{% else %}<div class="dsp-empty">Nenhum comprovante.</div>{% endfor %}</div></section></div>
 <aside><section class="zone"><header class="zone-head"><div class="zone-title">Ações</div></header><div class="zone-body">{% if editavel and editar %}<form method="post" action="{{ url_for('financeiro_novo.rd_enviar',rd_id=rd.id) }}"><button class="btn btn-primary">Enviar para aprovação</button></form>{% endif %}{% if rd.status=='EM_APROVACAO' and aprovar %}<form class="dsp-actions" method="post" action="{{ url_for('financeiro_novo.rd_aprovar',rd_id=rd.id) }}"><button class="btn btn-primary">Aprovar e calcular acerto</button></form><form method="post" action="{{ url_for('financeiro_novo.rd_rejeitar',rd_id=rd.id) }}" class="dsp-mini-form"><label class="full"><span>Justificativa</span><textarea name="justificativa" required></textarea></label><button class="btn btn-outline">Rejeitar</button></form>{% endif %}
 {% if acerto %}<h3 class="dsp-section-title">{{ acerto.tipo }}</h3><div class="dsp-kpi"><span>{{ acerto.status }}</span><strong>{{ rd.moeda }} {{ '%.2f'|format(acerto.valor)|replace('.',',') }}</strong></div>{% if acerto.status=='PENDENTE' and pagar %}<form method="post" action="{{ url_for('financeiro_novo.rd_liquidar',rd_id=rd.id) }}" class="dsp-mini-form"><label><span>Data *</span><input type="date" name="data_liquidacao" required></label><label><span>Forma *</span><select name="forma">{% for v,r in formas %}<option value="{{ v }}">{{ r }}</option>{% endfor %}</select></label><label class="full"><span>Conta na mesma moeda *</span><select name="conta_id" required><option value="">Selecione</option>{% for c in opcoes.contas %}{% if c.moeda_id==rd.moeda_id %}<option value="{{ c.id }}">{{ c.nome }} · {{ c.moeda }}</option>{% endif %}{% endfor %}</select></label><label class="full"><span>Referência</span><input name="referencia" maxlength="120"></label><button class="btn btn-primary full">Liquidar acerto</button></form>{% endif %}{% endif %}</div></section>
-<section class="zone"><header class="zone-head"><div class="zone-title">Histórico</div></header><div class="zone-body"><ul class="dsp-history">{% for d in decisoes %}<li><strong>{{ d.acao }}</strong><span>{{ d.status_anterior }} → {{ d.status_novo }} · {{ d.criado_em.strftime('%d/%m/%Y %H:%M') }}</span>{% if d.justificativa %}<span>{{ d.justificativa }}</span>{% endif %}</li>{% else %}<li>Nenhuma decisão.</li>{% endfor %}</ul></div></section>{% if rd.om_id %}<a class="btn btn-outline" href="{{ url_for('financeiro_novo.om_detalhe',om_id=rd.om_id) }}">Voltar à OM</a>{% else %}<a class="btn btn-outline" href="{{ url_for('financeiro_novo.missoes') }}">Voltar à lista</a>{% endif %}</aside></div></div>{% include "financeiro_novo/_despesa_estilos.html" %}{% endblock %}
+<section class="zone"><header class="zone-head"><div class="zone-title">Histórico</div></header><div class="zone-body"><ul class="dsp-history">{% for d in decisoes %}<li><strong>{{ d.acao }}</strong><span>{{ d.status_anterior }} → {{ d.status_novo }} · {{ d.criado_em.strftime('%d/%m/%Y %H:%M') }}</span>{% if d.justificativa %}<span>{{ d.justificativa }}</span>{% endif %}</li>{% else %}<li>Nenhuma decisão.</li>{% endfor %}</ul></div></section>{% if rd.om_id %}<a class="btn btn-outline" href="{{ url_for('financeiro_novo.om_detalhe',om_id=rd.om_id) }}">Voltar à OM</a>{% else %}<a class="btn btn-outline" href="{{ url_for('financeiro_novo.missoes') }}">Voltar à lista</a>{% endif %}</aside></div></div>
+{% include "financeiro_novo/_despesa_estilos.html" %}
+{% if editavel and editar %}
+<script>
+(() => {
+  const form=document.getElementById('rd-item-form');
+  const feedback=document.getElementById('rd-duplicate-feedback');
+  const rowMessage=document.getElementById('rd-duplicate-row');
+  const forceInput=form.querySelector('[name="forcar_salvamento"]');
+  const dialog=document.getElementById('rd-duplicate-dialog');
+  const dialogContent=document.getElementById('rd-duplicate-dialog-content');
+  const endpoint={{ url_for('financeiro_novo.rd_verificar_duplicidades',rd_id=rd.id)|tojson }};
+  let timer;
+
+  function addCell(row,value) { const cell=document.createElement('td'); cell.textContent=value ?? '—'; row.appendChild(cell); return cell; }
+  function renderDuplicateTable(target,duplicidades) {
+    target.replaceChildren();
+    if (!duplicidades.length) return;
+    const title=document.createElement('strong'); title.textContent='Possíveis duplicidades encontradas pela mesma data e pelo mesmo valor'; target.appendChild(title);
+    const wrap=document.createElement('div'); wrap.className='dsp-table-wrap duplicate-detail-wrap';
+    const table=document.createElement('table'); table.className='dsp-table duplicate-detail-table';
+    const head=document.createElement('thead'); const headRow=document.createElement('tr');
+    ['Origem','Data','Descrição','Categoria','Centro de custo','Valor','Comprovante'].forEach(label => { const th=document.createElement('th'); th.textContent=label; headRow.appendChild(th); });
+    head.appendChild(headRow); table.appendChild(head);
+    const tbody=document.createElement('tbody');
+    duplicidades.forEach(item => item.registros.forEach(registro => {
+      const tr=document.createElement('tr'); const origin=addCell(tr,'');
+      if (registro.documento_url) { const link=document.createElement('a'); link.href=registro.documento_url; link.target='_blank'; link.rel='noopener'; link.textContent=registro.tipo+' '+registro.numero; origin.appendChild(link); }
+      else origin.textContent=registro.tipo+' '+registro.numero;
+      addCell(tr,registro.data ? registro.data.split('-').reverse().join('/') : '—');
+      addCell(tr,registro.descricao); addCell(tr,registro.categoria); addCell(tr,registro.centro);
+      const numeric=Number(String(registro.valor).replace(',','.')); addCell(tr,Number.isFinite(numeric) ? (registro.moeda ? registro.moeda+' ' : '')+numeric.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}) : registro.valor);
+      const proof=addCell(tr,'');
+      if (registro.comprovante_url) { const link=document.createElement('a'); link.href=registro.comprovante_url; link.target='_blank'; link.rel='noopener'; link.textContent=registro.nome_arquivo || 'Abrir'; proof.appendChild(link); }
+      else proof.textContent=registro.nome_arquivo || '—';
+      tbody.appendChild(tr);
+    }));
+    table.appendChild(tbody); wrap.appendChild(table); target.appendChild(wrap);
+  }
+
+  async function checkDuplicates() {
+    const data=form.querySelector('[name="data_despesa"]').value;
+    const valor=form.querySelector('[name="valor"]').value;
+    rowMessage.textContent='';
+    if (!data || !valor) { feedback.hidden=true; return {duplicidades:[],erro:false}; }
+    try {
+      const query=new URLSearchParams({data,valor});
+      const response=await fetch(endpoint+'?'+query.toString(),{method:'GET',credentials:'same-origin',cache:'no-store',headers:{'Accept':'application/json'}});
+      if (!response.ok) throw new Error('HTTP '+response.status);
+      if (!(response.headers.get('content-type') || '').includes('application/json')) throw new Error('sessão inválida ou resposta não reconhecida');
+      const duplicidades=(await response.json()).duplicidades || [];
+      if (duplicidades.length) rowMessage.textContent='Possível duplicidade: '+duplicidades[0].registros.map(registro => registro.tipo+' '+registro.numero).join(', ');
+      feedback.hidden=!duplicidades.length; renderDuplicateTable(feedback,duplicidades);
+      return {duplicidades,erro:false};
+    } catch (error) {
+      feedback.hidden=false; feedback.textContent='Não foi possível verificar duplicidades ('+error.message+'). O salvamento foi interrompido; atualize a página e tente novamente.';
+      return {duplicidades:[],erro:true};
+    }
+  }
+
+  function scheduleCheck() { forceInput.value='0'; clearTimeout(timer); timer=setTimeout(checkDuplicates,350); }
+  form.querySelectorAll('[name="data_despesa"],[name="valor"]').forEach(input => input.addEventListener('input',scheduleCheck));
+  form.addEventListener('submit',async event => {
+    event.preventDefault();
+    if (!form.reportValidity()) return;
+    const resultado=await checkDuplicates();
+    if (resultado.erro) { feedback.scrollIntoView({behavior:'smooth',block:'center'}); return; }
+    if (resultado.duplicidades.length && forceInput.value !== '1') { renderDuplicateTable(dialogContent,resultado.duplicidades); dialog.showModal(); return; }
+    form.submit();
+  });
+  function closeDialog() { dialog.close(); forceInput.value='0'; }
+  document.getElementById('rd-close-duplicate-dialog').addEventListener('click',closeDialog);
+  document.getElementById('rd-review-duplicates').addEventListener('click',closeDialog);
+  document.getElementById('rd-save-duplicates').addEventListener('click',() => { forceInput.value='1'; dialog.close(); form.submit(); });
+})();
+</script>
+<style>.duplicate-row{display:block;margin-top:4px;color:#9a5d00;font-weight:700}.duplicate-detail-wrap{margin-top:10px}.duplicate-detail-table{min-width:900px;background:#fff}.duplicate-dialog{width:min(1120px,94vw);max-height:88vh;padding:18px;border:0;border-radius:12px;box-shadow:0 24px 70px #102b3f55}.duplicate-dialog::backdrop{background:#102b3f88}.duplicate-dialog-head{display:flex;align-items:flex-start;justify-content:space-between;gap:20px}.duplicate-dialog-head strong,.duplicate-dialog-head span{display:block}.duplicate-dialog-head strong{font-size:18px;color:#173550}.duplicate-dialog-head span{margin-top:4px;color:#60758a;font-size:11px}</style>
+{% endif %}
+{% endblock %}

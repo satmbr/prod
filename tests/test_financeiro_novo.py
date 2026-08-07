@@ -285,6 +285,43 @@ class FinanceiroNovoIsolamentoTests(unittest.TestCase):
         self.assertEqual(resposta.status_code, 200)
         self.assertEqual(resposta.get_json(), {"duplicidades": []})
 
+    def test_rd_aplica_a_mesma_verificacao_de_duplicidades(self):
+        rotas = (self.raiz / "routes" / "financeiro_novo" / "missoes.py").read_text(encoding="utf-8")
+        detalhe = (self.raiz / "templates" / "financeiro_novo" / "rd_detalhe.html").read_text(encoding="utf-8")
+        self.assertIn('@bp.get("/rds/<int:rd_id>/verificar-duplicidades")', rotas)
+        self.assertIn('request.form.get("forcar_salvamento") != "1"', rotas)
+        self.assertIn('id="rd-duplicate-dialog"', detalhe)
+        self.assertIn("rd_verificar_duplicidades", detalhe)
+        self.assertIn("Salvar mesmo assim", detalhe)
+        self.assertIn("mesma data e o mesmo valor", detalhe)
+
+        resultado_rd = MagicMock()
+        resultado_rd.mappings.return_value.first.return_value = {"id": 1}
+        resultado_duplicidades = MagicMock()
+        resultado_duplicidades.mappings.return_value.all.return_value = []
+        conexao = MagicMock()
+        conexao.execute.side_effect = [resultado_rd, resultado_duplicidades]
+        contexto = MagicMock()
+        contexto.__enter__.return_value = conexao
+        engine = MagicMock()
+        engine.connect.return_value = contexto
+
+        app = create_app()
+        app.config.update(TESTING=True)
+        with patch("routes.financeiro_novo.missoes.get_engine", return_value=engine):
+            with app.test_client() as client:
+                with client.session_transaction() as sessao:
+                    sessao["usuario_id"] = 1
+                    sessao["permissoes"] = ["financeiro_novo:editar"]
+                    sessao["ultimo_acesso"] = 9999999999
+                resposta = client.get(
+                    "/financeiro-novo/rds/1/verificar-duplicidades"
+                    "?data=2026-08-06&valor=123%2C45"
+                )
+
+        self.assertEqual(resposta.status_code, 200)
+        self.assertEqual(resposta.get_json(), {"duplicidades": []})
+
     def test_reembolso_separa_edicao_aprovacao_e_pagamento(self):
         app = create_app(); app.config.update(TESTING=True, WTF_CSRF_ENABLED=False)
         with app.test_client() as client:

@@ -643,6 +643,25 @@ def rd_detalhe(rd_id):
     )
 
 
+@bp.get("/rds/<int:rd_id>/verificar-duplicidades")
+@login_required
+@permission_required("financeiro_novo", "editar")
+def rd_verificar_duplicidades(rd_id):
+    resultado = []
+    with get_engine().connect() as conn:
+        if not _registro(conn, "financeiro3_rds", rd_id):
+            abort(404)
+        try:
+            data = data_iso(request.args.get("data"), "Data da despesa")
+            valor = decimal_br(request.args.get("valor"), positivo=True)
+        except ValorInvalido:
+            return jsonify({"duplicidades": []})
+        registros = _origens_duplicadas(conn, data, valor)
+        if registros:
+            resultado.append({"linha": 1, "registros": registros})
+    return jsonify({"duplicidades": resultado})
+
+
 @bp.post("/rds/<int:rd_id>/itens")
 @login_required
 @permission_required("financeiro_novo", "editar")
@@ -672,6 +691,12 @@ def rd_item_novo(rd_id):
             """), dados).scalar()
             if not referencia_ok:
                 raise ValorInvalido("Categoria ou fornecedor está inativo ou inválido para a RD.")
+            duplicidades = _origens_duplicadas(conn, dados["data"], dados["valor"])
+            if duplicidades and request.form.get("forcar_salvamento") != "1":
+                rotulos = ", ".join(f"{item['tipo']} {item['numero']}" for item in duplicidades)
+                raise ValorInvalido(
+                    f"Possível lançamento duplicado ({rotulos}). Confirme para salvar."
+                )
             item = conn.execute(text("""
                 INSERT INTO financeiro3_rd_itens(rd_id,data_despesa,categoria_id,fornecedor_id,
                     descricao,numero_documento,valor,criado_por)
