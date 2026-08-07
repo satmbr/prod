@@ -61,6 +61,12 @@ def _opcoes(conn):
             "SELECT c.id, c.nome, c.tipo, c.moeda_id, m.codigo AS moeda FROM financeiro3_contas c "
             "JOIN financeiro3_moedas m ON m.id = c.moeda_id WHERE c.ativo ORDER BY c.nome"
         )).mappings().all(),
+        "oms": conn.execute(text(
+            "SELECT id,numero_om FROM financeiro3_oms WHERE removido_em IS NULL AND status NOT IN ('CANCELADA','ENCERRADA') ORDER BY numero_om"
+        )).mappings().all(),
+        "rds": conn.execute(text(
+            "SELECT id,numero_rd FROM financeiro3_rds WHERE status NOT IN ('CANCELADA','LIQUIDADA') ORDER BY numero_rd"
+        )).mappings().all(),
     }
 
 
@@ -124,8 +130,9 @@ def despesas():
         registros = conn.execute(text(f"""
             SELECT d.*, p.nome_razao AS fornecedor, cc.codigo AS centro_codigo,
                    cat.nome AS categoria, m.codigo AS moeda,
-                   COALESCE((SELECT SUM(pg.valor) FROM financeiro3_despesa_pagamentos pg
-                             WHERE pg.despesa_id=d.id AND pg.status='ATIVO'), 0) AS valor_pago
+                   CASE WHEN d.paga_na_origem THEN d.valor_total ELSE
+                     COALESCE((SELECT SUM(pg.valor) FROM financeiro3_despesa_pagamentos pg
+                               WHERE pg.despesa_id=d.id AND pg.status='ATIVO'), 0) END AS valor_pago
             FROM financeiro3_despesas d
             JOIN financeiro3_pessoas p ON p.id=d.fornecedor_id
             JOIN financeiro3_centros_custo cc ON cc.id=d.centro_custo_id
@@ -138,6 +145,126 @@ def despesas():
         "financeiro_novo/despesas.html", registros=registros, busca=busca, status=status,
         subnav_links=build_subnav("despesas"),
     )
+
+
+def _importar_origem(tipo, origem_id):
+    configuracoes = {
+        "OM": {
+            "tabela": "financeiro3_oms", "fk": "origem_om_id", "pessoa": "solicitante_id",
+            "itens": "financeiro3_om_itens", "item_fk": "om_id", "item_origem": "om_item_id",
+            "centro_item": "i.centro_custo_id", "categoria_item": "i.categoria_id",
+            "data_item": "i.data_despesa", "valor_item": "i.valor", "numero": "numero_om",
+            "detalhe_endpoint": "om_detalhe", "detalhe_param": "om_id",
+        },
+        "RD": {
+            "tabela": "financeiro3_rds", "fk": "origem_rd_id", "pessoa": "responsavel_id",
+            "itens": "financeiro3_rd_itens", "item_fk": "rd_id", "item_origem": "rd_item_id",
+            "centro_item": "d.centro_custo_id", "categoria_item": "i.categoria_id",
+            "data_item": "i.data_despesa", "valor_item": "i.valor", "numero": "numero_rd",
+            "detalhe_endpoint": "rd_detalhe", "detalhe_param": "rd_id",
+        },
+        "REEMBOLSO": {
+            "tabela": "financeiro3_reembolsos", "fk": "origem_reembolso_id", "pessoa": "favorecido_id",
+            "itens": "financeiro3_reembolso_itens", "item_fk": "reembolso_id", "item_origem": "reembolso_item_id",
+            "centro_item": "d.centro_custo_id", "categoria_item": "i.categoria_id",
+            "data_item": "i.data_despesa", "valor_item": "i.valor", "numero": "id",
+            "detalhe_endpoint": "reembolso_detalhe", "detalhe_param": "reembolso_id",
+        },
+    }
+    cfg = configuracoes[tipo]
+    try:
+        with get_engine().begin() as conn:
+            documento = conn.execute(text(f"SELECT * FROM {cfg['tabela']} WHERE id=:id FOR UPDATE"),
+                {"id": origem_id}).mappings().first()
+            if not documento:
+                abort(404)
+            if tipo == "OM":
+                total_pago = conn.execute(text("SELECT COALESCE(SUM(valor),0) FROM financeiro3_om_pagamentos WHERE om_id=:id AND status='PAGO'"), {"id": origem_id}).scalar()
+                if documento["status"] != "APROVADA":
+                    raise ValorInvalido("A OM precisa estar aprovada antes da importação.")
+            elif tipo == "RD" and documento["status"] != "LIQUIDADA":
+                raise ValorInvalido("A RD precisa estar liquidada antes da importação.")
+            elif tipo == "REEMBOLSO" and (documento["status"] != "PAGO" or documento["forma_liquidacao"] != "DIRETO"):
+                raise ValorInvalido("Somente reembolso direto e pago pode ser importado separadamente.")
+            itens = [dict(item) for item in conn.execute(text(f"""
+                SELECT i.id,i.descricao,{cfg['data_item']} AS data_despesa,
+                  {cfg['valor_item']} AS valor,{cfg['centro_item']} AS centro_custo_id,
+                  {cfg['categoria_item']} AS categoria_id
+                FROM {cfg['itens']} i JOIN {cfg['tabela']} d ON d.id=i.{cfg['item_fk']}
+                WHERE i.{cfg['item_fk']}=:id AND i.status='ATIVO' ORDER BY i.id
+            """), {"id": origem_id}).mappings().all()]
+            for item in itens:
+                item["origem_coluna"] = cfg["item_origem"]
+            if tipo in {"OM", "RD"}:
+                campo_pagador = "om_pagadora_id" if tipo == "OM" else "rd_pagadora_id"
+                vinculados = conn.execute(text(f"""
+                    SELECT i.id,i.descricao,i.data_despesa,i.valor,r.centro_custo_id,i.categoria_id
+                    FROM financeiro3_reembolso_itens i JOIN financeiro3_reembolsos r ON r.id=i.reembolso_id
+                    WHERE r.{campo_pagador}=:id AND r.forma_liquidacao=:tipo
+                      AND r.status='APROVADO' AND i.status='ATIVO' ORDER BY i.id
+                """), {"id": origem_id, "tipo": tipo}).mappings().all()
+                for item in vinculados:
+                    novo_item = dict(item); novo_item["origem_coluna"] = "reembolso_item_id"; itens.append(novo_item)
+            if not itens:
+                raise ValorInvalido("O documento não possui linhas ativas para importar.")
+            if tipo == "OM" and total_pago < sum(item["valor"] for item in itens):
+                raise ValorInvalido("A OM precisa estar totalmente paga, incluindo reembolsos vinculados, antes da importação.")
+            primeira, ultima = min(i["data_despesa"] for i in itens), max(i["data_despesa"] for i in itens)
+            numero = documento[cfg["numero"]]
+            despesa = conn.execute(text(f"""
+                INSERT INTO financeiro3_despesas(descricao,fornecedor_id,favorecido_id,
+                  centro_custo_id,categoria_id,moeda_id,numero_documento,data_emissao,
+                  data_competencia,data_vencimento,status,pago_em,origem_tipo,{cfg['fk']},
+                  paga_na_origem,importada_em,importada_por,criado_por)
+                VALUES (:descricao,:pessoa,:pessoa,:centro,:categoria,:moeda,:numero,:emissao,
+                  :competencia,:vencimento,'PAGA',NOW(),:tipo,:origem,TRUE,NOW(),:usuario,:usuario)
+                RETURNING *
+            """), {"descricao": f"Importação {tipo} {numero}", "pessoa": documento[cfg["pessoa"]],
+                    "centro": itens[0]["centro_custo_id"], "categoria": itens[0]["categoria_id"],
+                    "moeda": documento["moeda_id"], "numero": str(numero), "emissao": primeira,
+                    "competencia": ultima, "vencimento": ultima, "tipo": tipo, "origem": origem_id,
+                    "usuario": session.get("usuario_id")}).mappings().one()
+            for item in itens:
+                origens = {"om_item_id": None, "rd_item_id": None, "reembolso_item_id": None}
+                origens[item["origem_coluna"]] = item["id"]
+                conn.execute(text("""
+                    INSERT INTO financeiro3_despesa_itens(despesa_id,descricao,quantidade,valor_unitario,
+                      centro_custo_id,categoria_id,om_item_id,rd_item_id,reembolso_item_id,criado_por)
+                    VALUES (:despesa,:descricao,1,:valor,:centro,:categoria,:om_item,:rd_item,:reembolso_item,:usuario)
+                """), {"despesa": despesa["id"], "descricao": item["descricao"], "valor": item["valor"],
+                        "centro": item["centro_custo_id"], "categoria": item["categoria_id"],
+                        "om_item": origens["om_item_id"], "rd_item": origens["rd_item_id"],
+                        "reembolso_item": origens["reembolso_item_id"], "usuario": session.get("usuario_id")})
+            registrar_evento(conn, entidade="DESPESA", entidade_id=despesa["id"], evento="IMPORTADA",
+                dados_novos={"origem_tipo": tipo, "origem_id": origem_id, "linhas": len(itens)})
+        flash(f"{tipo.title()} importada para Despesas sem duplicar o pagamento.", "sucesso")
+        return redirect(url_for("financeiro_novo.despesa_detalhe", despesa_id=despesa["id"]))
+    except (ValorInvalido, IntegrityError) as exc:
+        if isinstance(exc, IntegrityError):
+            exc = ValorInvalido("Este documento já foi importado para Despesas.")
+        flash(str(exc), "erro")
+        return redirect(url_for(f"financeiro_novo.{cfg['detalhe_endpoint']}", **{cfg["detalhe_param"]: origem_id}))
+
+
+@bp.post("/oms/<int:om_id>/importar-despesa")
+@login_required
+@permission_required("financeiro_novo", "editar")
+def om_importar_despesa(om_id):
+    return _importar_origem("OM", om_id)
+
+
+@bp.post("/rds/<int:rd_id>/importar-despesa")
+@login_required
+@permission_required("financeiro_novo", "editar")
+def rd_importar_despesa(rd_id):
+    return _importar_origem("RD", rd_id)
+
+
+@bp.post("/reembolsos/<int:reembolso_id>/importar-despesa")
+@login_required
+@permission_required("financeiro_novo", "editar")
+def reembolso_importar_despesa(reembolso_id):
+    return _importar_origem("REEMBOLSO", reembolso_id)
 
 
 @bp.route("/despesas/nova", methods=["GET", "POST"])
@@ -215,7 +342,7 @@ def despesa_detalhe(despesa_id):
             WHERE pg.despesa_id=:id AND pg.status='ATIVO' ORDER BY pg.id DESC
         """), {"id": despesa_id}).mappings().all()
         opcoes = _opcoes(conn)
-    valor_pago = sum((item["valor"] for item in pagamentos), start=0)
+    valor_pago = despesa["valor_total"] if despesa["paga_na_origem"] else sum((item["valor"] for item in pagamentos), start=0)
     return render_template(
         "financeiro_novo/despesa_detalhe.html", despesa=despesa, itens=itens,
         anexos=anexos, decisoes=decisoes, pagamentos=pagamentos,
@@ -275,10 +402,11 @@ def despesa_item_novo(despesa_id):
                 abort(409)
             item = conn.execute(text("""
                 INSERT INTO financeiro3_despesa_itens
-                    (despesa_id, descricao, quantidade, valor_unitario, criado_por)
-                VALUES (:id, :descricao, :quantidade, :valor_unitario, :usuario_id) RETURNING *
+                    (despesa_id, descricao, quantidade, valor_unitario,centro_custo_id,categoria_id, criado_por)
+                VALUES (:id, :descricao, :quantidade, :valor_unitario,:centro,:categoria, :usuario_id) RETURNING *
             """), {"id": despesa_id, "descricao": descricao, "quantidade": quantidade,
-                    "valor_unitario": valor_unitario, "usuario_id": session.get("usuario_id")}).mappings().one()
+                    "valor_unitario": valor_unitario, "centro": despesa["centro_custo_id"],
+                    "categoria": despesa["categoria_id"], "usuario_id": session.get("usuario_id")}).mappings().one()
             registrar_evento(conn, entidade="DESPESA_ITEM", entidade_id=item["id"], evento="CRIADO", dados_novos=dict(item))
         flash("Item adicionado.", "sucesso")
     except ValorInvalido as exc:

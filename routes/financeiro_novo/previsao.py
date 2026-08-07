@@ -14,7 +14,7 @@ from routes.financeiro_novo.services.valores import ValorInvalido, data_iso
 from routes.financeiro_novo.views import build_subnav
 
 
-ORIGENS = ("DESPESA", "REEMBOLSO", "ACERTO_RD", "NOTA_DEBITO")
+ORIGENS = ("OM", "RD", "DESPESA", "REEMBOLSO", "ACERTO_RD", "NOTA_DEBITO")
 
 
 def _filtros():
@@ -34,43 +34,89 @@ def _filtros():
     centro = request.args.get("centro_custo_id", type=int)
     moeda = (request.args.get("moeda") or "").upper()
     busca = (request.args.get("q") or "").strip()
+    situacao = (request.args.get("situacao") or "").upper()
     return {"inicio": inicio, "fim": fim, "agrupar": agrupamento, "fluxo": fluxo,
-            "origem": origem, "centro": centro, "moeda": moeda, "q": busca}
+            "origem": origem, "centro": centro, "moeda": moeda, "q": busca,
+            "situacao": situacao}
 
 
 def _sql():
     return """
       SELECT * FROM (
-        SELECT 'SAIDA'::text fluxo,'DESPESA'::text origem,d.id,d.data_vencimento data,
+        SELECT 'SAIDA'::text fluxo,'OM'::text origem,o.id,
+          CASE WHEN pg.status='PAGO' THEN pg.data_pagamento ELSE pg.data_prevista_pagamento END data,
+          pg.data_prevista_pagamento data_prevista,pg.data_pagamento,
+          pg.tipo||' da OM '||o.numero_om descricao,p.nome_razao parte,
+          cc.id centro_custo_id,cc.codigo centro,m.codigo moeda,pg.valor,o.status,
+          CASE WHEN pg.status='PAGO' THEN 'REALIZADO' ELSE 'PREVISTO' END situacao
+        FROM financeiro3_om_pagamentos pg JOIN financeiro3_oms o ON o.id=pg.om_id
+        JOIN financeiro3_pessoas p ON p.id=o.solicitante_id
+        JOIN financeiro3_centros_custo cc ON cc.id=o.centro_custo_id
+        JOIN financeiro3_moedas m ON m.id=o.moeda_id WHERE pg.status IN ('PREVISTO','PAGO')
+        UNION ALL
+        SELECT 'SAIDA','RD',r.id,
+          CASE WHEN pg.status='PAGO' THEN pg.data_pagamento ELSE pg.data_prevista_pagamento END,
+          pg.data_prevista_pagamento,pg.data_pagamento,pg.tipo||' da RD '||r.numero_rd,
+          p.nome_razao,cc.id,cc.codigo,m.codigo,pg.valor,r.status,
+          CASE WHEN pg.status='PAGO' THEN 'REALIZADO' ELSE 'PREVISTO' END
+        FROM financeiro3_rd_pagamentos pg JOIN financeiro3_rds r ON r.id=pg.rd_id
+        JOIN financeiro3_pessoas p ON p.id=r.responsavel_id
+        JOIN financeiro3_centros_custo cc ON cc.id=r.centro_custo_id
+        JOIN financeiro3_moedas m ON m.id=r.moeda_id WHERE pg.status IN ('PREVISTO','PAGO')
+        UNION ALL
+        SELECT 'SAIDA','DESPESA',d.id,d.data_vencimento,d.data_vencimento,NULL::date,
           d.descricao,p.nome_razao parte,cc.id centro_custo_id,cc.codigo centro,m.codigo moeda,
           d.valor_total-COALESCE((SELECT SUM(pg.valor) FROM financeiro3_despesa_pagamentos pg
-            WHERE pg.despesa_id=d.id AND pg.status='ATIVO'),0) valor,d.status
+            WHERE pg.despesa_id=d.id AND pg.status='ATIVO'),0) valor,d.status,'PREVISTO'
         FROM financeiro3_despesas d JOIN financeiro3_pessoas p ON p.id=d.fornecedor_id
         JOIN financeiro3_centros_custo cc ON cc.id=d.centro_custo_id
         JOIN financeiro3_moedas m ON m.id=d.moeda_id
-        WHERE d.status IN ('APROVADA','PAGAMENTO_PARCIAL')
+        WHERE d.status IN ('APROVADA','PAGAMENTO_PARCIAL') AND NOT d.paga_na_origem
         UNION ALL
-        SELECT 'SAIDA','REEMBOLSO',r.id,r.data_prevista_pagamento,r.objetivo,p.nome_razao,
-          cc.id,cc.codigo,m.codigo,r.valor_total,r.status
+        SELECT 'SAIDA','DESPESA',d.id,pg.data_pagamento,d.data_vencimento,pg.data_pagamento,
+          d.descricao,p.nome_razao,cc.id,cc.codigo,m.codigo,pg.valor,d.status,'REALIZADO'
+        FROM financeiro3_despesa_pagamentos pg JOIN financeiro3_despesas d ON d.id=pg.despesa_id
+        JOIN financeiro3_pessoas p ON p.id=d.fornecedor_id
+        JOIN financeiro3_centros_custo cc ON cc.id=d.centro_custo_id
+        JOIN financeiro3_moedas m ON m.id=d.moeda_id WHERE pg.status='ATIVO' AND NOT d.paga_na_origem
+        UNION ALL
+        SELECT 'SAIDA','REEMBOLSO',r.id,r.data_prevista_pagamento,r.data_prevista_pagamento,NULL::date,
+          r.objetivo,p.nome_razao,cc.id,cc.codigo,m.codigo,r.valor_total,r.status,'PREVISTO'
         FROM financeiro3_reembolsos r JOIN financeiro3_pessoas p ON p.id=r.favorecido_id
         JOIN financeiro3_centros_custo cc ON cc.id=r.centro_custo_id
-        JOIN financeiro3_moedas m ON m.id=r.moeda_id WHERE r.status='APROVADO'
+        JOIN financeiro3_moedas m ON m.id=r.moeda_id WHERE r.status='APROVADO' AND r.forma_liquidacao='DIRETO'
+        UNION ALL
+        SELECT 'SAIDA','REEMBOLSO',r.id,pg.data_pagamento,r.data_prevista_pagamento,pg.data_pagamento,
+          r.objetivo,p.nome_razao,cc.id,cc.codigo,m.codigo,pg.valor,r.status,'REALIZADO'
+        FROM financeiro3_reembolso_pagamentos pg JOIN financeiro3_reembolsos r ON r.id=pg.reembolso_id
+        JOIN financeiro3_pessoas p ON p.id=r.favorecido_id
+        JOIN financeiro3_centros_custo cc ON cc.id=r.centro_custo_id
+        JOIN financeiro3_moedas m ON m.id=r.moeda_id WHERE pg.status='ATIVO' AND r.forma_liquidacao='DIRETO'
         UNION ALL
         SELECT CASE WHEN a.tipo='REEMBOLSO' THEN 'SAIDA' ELSE 'ENTRADA' END,'ACERTO_RD',r.id,
-          a.criado_em::date,'Acerto da RD-'||LPAD(a.rd_id::text,6,'0'),p.nome_razao,
-          cc.id,cc.codigo,m.codigo,a.valor,a.status
+          CASE WHEN a.status='LIQUIDADO' THEN a.data_liquidacao ELSE a.data_prevista_liquidacao END,
+          a.data_prevista_liquidacao,a.data_liquidacao,'Acerto da RD '||r.numero_rd,p.nome_razao,
+          cc.id,cc.codigo,m.codigo,a.valor,a.status,
+          CASE WHEN a.status='LIQUIDADO' THEN 'REALIZADO' ELSE 'PREVISTO' END
         FROM financeiro3_rd_acertos a JOIN financeiro3_rds r ON r.id=a.rd_id
         JOIN financeiro3_pessoas p ON p.id=r.responsavel_id
         JOIN financeiro3_centros_custo cc ON cc.id=r.centro_custo_id
-        JOIN financeiro3_moedas m ON m.id=r.moeda_id WHERE a.status='PENDENTE'
+        JOIN financeiro3_moedas m ON m.id=r.moeda_id WHERE a.status IN ('PENDENTE','LIQUIDADO')
         UNION ALL
-        SELECT 'ENTRADA','NOTA_DEBITO',n.id,n.data_vencimento,n.descricao,c.nome_razao,
+        SELECT 'ENTRADA','NOTA_DEBITO',n.id,n.data_vencimento,n.data_vencimento,NULL::date,n.descricao,c.nome_razao,
           cc.id,cc.codigo,m.codigo,n.valor_total-COALESCE((SELECT SUM(rec.valor)
-            FROM financeiro3_nd_recebimentos rec WHERE rec.nota_debito_id=n.id AND rec.status='ATIVO'),0),n.status
+            FROM financeiro3_nd_recebimentos rec WHERE rec.nota_debito_id=n.id AND rec.status='ATIVO'),0),n.status,'PREVISTO'
         FROM financeiro3_notas_debito n JOIN financeiro3_clientes c ON c.id=n.cliente_id
         JOIN financeiro3_centros_custo cc ON cc.id=n.centro_custo_id
         JOIN financeiro3_moedas m ON m.id=n.moeda_id
         WHERE n.status IN ('EMITIDA','RECEBIMENTO_PARCIAL')
+        UNION ALL
+        SELECT 'ENTRADA','NOTA_DEBITO',n.id,rec.data_recebimento,n.data_vencimento,rec.data_recebimento,
+          n.descricao,c.nome_razao,cc.id,cc.codigo,m.codigo,rec.valor,n.status,'REALIZADO'
+        FROM financeiro3_nd_recebimentos rec JOIN financeiro3_notas_debito n ON n.id=rec.nota_debito_id
+        JOIN financeiro3_clientes c ON c.id=n.cliente_id
+        JOIN financeiro3_centros_custo cc ON cc.id=n.centro_custo_id
+        JOIN financeiro3_moedas m ON m.id=n.moeda_id WHERE rec.status='ATIVO'
       ) x WHERE x.valor>0 AND x.data BETWEEN :inicio AND :fim
     """
 
@@ -87,6 +133,8 @@ def _consultar(conn, filtros):
         condicoes.append("x.moeda=:moeda"); params["moeda"] = filtros["moeda"]
     if filtros["q"]:
         condicoes.append("(LOWER(x.descricao) LIKE :q OR LOWER(x.parte) LIKE :q)"); params["q"] = f"%{filtros['q'].lower()}%"
+    if filtros["situacao"] in {"PREVISTO", "REALIZADO"}:
+        condicoes.append("x.situacao=:situacao"); params["situacao"] = filtros["situacao"]
     complemento = (" AND " + " AND ".join(condicoes)) if condicoes else ""
     return conn.execute(text(_sql() + complemento + " ORDER BY x.data,x.fluxo,x.origem,x.id"), params).mappings().all()
 
@@ -143,7 +191,7 @@ def previsao_csv():
     filtros = _filtros()
     with get_engine().connect() as conn: registros = _consultar(conn, filtros)
     out = io.StringIO(); writer = csv.writer(out, delimiter=";")
-    writer.writerow(["Data","Fluxo","Origem","Número","Descrição","Parte","Centro","Moeda","Valor","Status"])
-    for r in registros: writer.writerow([r["data"],r["fluxo"],r["origem"],r["id"],r["descricao"],r["parte"],r["centro"],r["moeda"],r["valor"],r["status"]])
+    writer.writerow(["Data do período","Data prevista","Data realizada","Situação","Fluxo","Origem","Número","Descrição","Parte","Centro","Moeda","Valor","Status"])
+    for r in registros: writer.writerow([r["data"],r["data_prevista"],r["data_pagamento"],r["situacao"],r["fluxo"],r["origem"],r["id"],r["descricao"],r["parte"],r["centro"],r["moeda"],r["valor"],r["status"]])
     return Response("\ufeff"+out.getvalue(), mimetype="text/csv; charset=utf-8",
         headers={"Content-Disposition": f"attachment; filename=previsao_{filtros['inicio']}_{filtros['fim']}.csv"})

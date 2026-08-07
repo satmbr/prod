@@ -322,6 +322,38 @@ class FinanceiroNovoIsolamentoTests(unittest.TestCase):
         self.assertEqual(resposta.status_code, 200)
         self.assertEqual(resposta.get_json(), {"duplicidades": []})
 
+    def test_fluxo_documental_novo_elimina_conversao_om_rd(self):
+        migration = (self.raiz / "migrations" / "011_financeiro_novo_fluxo_documentos_previsao.sql").read_text(encoding="utf-8")
+        rotas = (self.raiz / "routes" / "financeiro_novo" / "missoes.py").read_text(encoding="utf-8")
+        self.assertIn("financeiro3_rds_independente_ck", migration)
+        self.assertIn("CHECK (om_id IS NULL)", migration)
+        self.assertNotIn("def rd_criar", rotas)
+        self.assertIn("financeiro3_om_pagamentos", migration)
+        self.assertIn("financeiro3_rd_pagamentos", migration)
+
+    def test_previsao_distingue_data_prevista_e_data_realizada(self):
+        previsao = (self.raiz / "routes" / "financeiro_novo" / "previsao.py").read_text(encoding="utf-8")
+        for trecho in ("pg.data_prevista_pagamento", "pg.data_pagamento", "'REALIZADO'", "'PREVISTO'"):
+            self.assertIn(trecho, previsao)
+        self.assertIn("NOT d.paga_na_origem", previsao)
+        self.assertIn("r.forma_liquidacao='DIRETO'", previsao)
+
+    def test_nota_debito_nasce_de_linha_de_despesa_e_nao_de_rd(self):
+        migration = (self.raiz / "migrations" / "011_financeiro_novo_fluxo_documentos_previsao.sql").read_text(encoding="utf-8")
+        rotas = (self.raiz / "routes" / "financeiro_novo" / "notas_debito.py").read_text(encoding="utf-8")
+        self.assertIn("despesa_item_id", migration)
+        self.assertIn("CHECK (rd_id IS NULL)", migration)
+        self.assertIn('origem not in {"MANUAL","DESPESA_ITEM"}', rotas)
+        self.assertNotIn('origem == "RD"', rotas)
+
+    def test_reembolso_vinculado_nao_duplica_pagamento(self):
+        migration = (self.raiz / "migrations" / "011_financeiro_novo_fluxo_documentos_previsao.sql").read_text(encoding="utf-8")
+        despesas = (self.raiz / "routes" / "financeiro_novo" / "despesas.py").read_text(encoding="utf-8")
+        self.assertIn("forma_liquidacao", migration)
+        self.assertIn("paga_na_origem", migration)
+        self.assertIn("incluindo reembolsos vinculados", despesas)
+        self.assertIn("sem duplicar o pagamento", despesas)
+
     def test_reembolso_separa_edicao_aprovacao_e_pagamento(self):
         app = create_app(); app.config.update(TESTING=True, WTF_CSRF_ENABLED=False)
         with app.test_client() as client:

@@ -42,13 +42,29 @@ def _dados(form):
         "data_solicitacao": data_iso(form.get("data_solicitacao"), "Data da solicitação"),
         "data_prevista_pagamento": data_iso(form.get("data_prevista_pagamento"), "Data prevista"),
         "observacoes": (form.get("observacoes") or "").strip() or None,
+        "forma_liquidacao": (form.get("forma_liquidacao") or "DIRETO").upper(),
     })
+    try:
+        dados["om_pagadora_id"] = int(form.get("om_pagadora_id") or 0) or None
+        dados["rd_pagadora_id"] = int(form.get("rd_pagadora_id") or 0) or None
+    except ValueError as exc:
+        raise ValorInvalido("Documento pagador inválido.") from exc
     if not dados["objetivo"]:
         raise ValorInvalido("Informe o objetivo do reembolso.")
     if dados["data_prevista_pagamento"] < dados["data_solicitacao"]:
         raise ValorInvalido("A data prevista não pode ser anterior à solicitação.")
     if dados["tipo_chave_pix"] not in {item[0] for item in TIPOS_PIX} | {None}:
         raise ValorInvalido("Tipo de chave PIX inválido.")
+    if dados["forma_liquidacao"] not in {"DIRETO", "OM", "RD"}:
+        raise ValorInvalido("Forma de liquidação inválida.")
+    if dados["forma_liquidacao"] == "DIRETO":
+        dados["om_pagadora_id"] = dados["rd_pagadora_id"] = None
+    elif dados["forma_liquidacao"] == "OM":
+        dados["rd_pagadora_id"] = None
+        if not dados["om_pagadora_id"]: raise ValorInvalido("Selecione a OM pagadora.")
+    else:
+        dados["om_pagadora_id"] = None
+        if not dados["rd_pagadora_id"]: raise ValorInvalido("Selecione a RD pagadora.")
     return dados
 
 
@@ -57,6 +73,8 @@ def _validar_refs(conn, dados):
         SELECT EXISTS(SELECT 1 FROM financeiro3_pessoas WHERE id=:favorecido_id AND ativo AND favorecido)
           AND EXISTS(SELECT 1 FROM financeiro3_centros_custo WHERE id=:centro_custo_id AND ativo)
           AND EXISTS(SELECT 1 FROM financeiro3_moedas WHERE id=:moeda_id AND ativo)
+          AND (:om_pagadora_id IS NULL OR EXISTS(SELECT 1 FROM financeiro3_oms WHERE id=:om_pagadora_id AND removido_em IS NULL AND status NOT IN ('CANCELADA','ENCERRADA')))
+          AND (:rd_pagadora_id IS NULL OR EXISTS(SELECT 1 FROM financeiro3_rds WHERE id=:rd_pagadora_id AND status NOT IN ('CANCELADA','LIQUIDADA')))
     """), dados).scalar()
     if not ok:
         raise ValorInvalido("Favorecido, centro de custo ou moeda está inativo ou inválido.")
@@ -162,10 +180,10 @@ def reembolso_novo():
                 novo = conn.execute(text("""
                     INSERT INTO financeiro3_reembolsos(favorecido_id,centro_custo_id,moeda_id,
                       matricula,chave_pix,tipo_chave_pix,objetivo,data_solicitacao,
-                      data_prevista_pagamento,observacoes,criado_por)
+                      data_prevista_pagamento,observacoes,forma_liquidacao,om_pagadora_id,rd_pagadora_id,criado_por)
                     VALUES (:favorecido_id,:centro_custo_id,:moeda_id,:matricula,:chave_pix,
                       :tipo_chave_pix,:objetivo,:data_solicitacao,:data_prevista_pagamento,
-                      :observacoes,:usuario) RETURNING *
+                      :observacoes,:forma_liquidacao,:om_pagadora_id,:rd_pagadora_id,:usuario) RETURNING *
                 """), dados).mappings().one()
                 registrar_evento(conn, entidade="REEMBOLSO", entidade_id=novo["id"], evento="CRIADO", dados_novos=dict(novo))
             flash("Reembolso criado em rascunho.", "sucesso")
@@ -205,10 +223,14 @@ def reembolso_detalhe(reembolso_id):
             JOIN financeiro3_arquivos ar ON ar.id=a.arquivo_id
             WHERE a.entidade='REEMBOLSO' AND a.entidade_id=:id AND a.categoria='PAGAMENTO' AND a.status='ATIVO'
         """), {"id": reembolso_id}).mappings().first()
+        despesa_importada = conn.execute(text(
+            "SELECT id FROM financeiro3_despesas WHERE origem_reembolso_id=:id"
+        ), {"id": reembolso_id}).scalar()
         opcoes = _opcoes(conn)
     return render_template("financeiro_novo/reembolso_detalhe.html", registro=registro,
         itens=itens, decisoes=decisoes, pagamento=pagamento,
-        comprovante_pagamento=comprovante_pagamento, opcoes=opcoes, tipos_pix=TIPOS_PIX,
+        comprovante_pagamento=comprovante_pagamento, despesa_importada=despesa_importada,
+        opcoes=opcoes, tipos_pix=TIPOS_PIX,
         editavel=registro["status"] in EDITAVEIS, subnav_links=build_subnav("reembolsos"))
 
 
@@ -228,6 +250,7 @@ def reembolso_editar(reembolso_id):
                   centro_custo_id=:centro_custo_id,moeda_id=:moeda_id,matricula=:matricula,
                   chave_pix=:chave_pix,tipo_chave_pix=:tipo_chave_pix,objetivo=:objetivo,
                   data_solicitacao=:data_solicitacao,data_prevista_pagamento=:data_prevista_pagamento,
+                  forma_liquidacao=:forma_liquidacao,om_pagadora_id=:om_pagadora_id,rd_pagadora_id=:rd_pagadora_id,
                   observacoes=:observacoes,atualizado_por=:usuario,atualizado_em=NOW()
                 WHERE id=:id RETURNING *
             """), dados).mappings().one()
@@ -371,6 +394,8 @@ def reembolso_pagar(reembolso_id):
             anterior = _reembolso(conn, reembolso_id, True)
             if not anterior: abort(404)
             if anterior["status"] != "APROVADO": abort(409)
+            if anterior["forma_liquidacao"] != "DIRETO":
+                raise ValorInvalido("Este reembolso será liquidado pelo documento pagador selecionado.")
             pagamento = conn.execute(text("""
               INSERT INTO financeiro3_reembolso_pagamentos(reembolso_id,data_pagamento,valor,observacoes,criado_por)
               VALUES (:id,:data,:valor,:obs,:u) RETURNING *

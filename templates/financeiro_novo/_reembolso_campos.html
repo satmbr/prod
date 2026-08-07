@@ -7,6 +7,9 @@
   <label><span>Chave PIX</span><input name="chave_pix" maxlength="180" value="{{ registro.chave_pix or '' if registro else '' }}"></label>
   <label><span>Data da solicitação *</span><input type="date" name="data_solicitacao" required value="{{ registro.data_solicitacao.isoformat() if registro else '' }}"></label>
   <label><span>Pagamento previsto *</span><input type="date" name="data_prevista_pagamento" required value="{{ registro.data_prevista_pagamento.isoformat() if registro else '' }}"></label>
+  <label><span>Forma de liquidação *</span><select name="forma_liquidacao" required><option value="DIRETO" {% if not registro or registro.forma_liquidacao=='DIRETO' %}selected{% endif %}>Pagamento direto</option><option value="OM" {% if registro and registro.forma_liquidacao=='OM' %}selected{% endif %}>Via OM</option><option value="RD" {% if registro and registro.forma_liquidacao=='RD' %}selected{% endif %}>Via RD</option></select></label>
+  <label><span>OM pagadora, se aplicável</span><select name="om_pagadora_id"><option value="">Não se aplica</option>{% for om in opcoes.oms %}<option value="{{ om.id }}" {% if registro and registro.om_pagadora_id==om.id %}selected{% endif %}>{{ om.numero_om }}</option>{% endfor %}</select></label>
+  <label><span>RD pagadora, se aplicável</span><select name="rd_pagadora_id"><option value="">Não se aplica</option>{% for rd in opcoes.rds %}<option value="{{ rd.id }}" {% if registro and registro.rd_pagadora_id==rd.id %}selected{% endif %}>{{ rd.numero_rd }}</option>{% endfor %}</select></label>
   <label class="span-2"><span>Objetivo *</span><input name="objetivo" maxlength="250" required value="{{ registro.objetivo if registro else '' }}"></label>
   <label class="span-2"><span>Observações</span><textarea name="observacoes" rows="3">{{ registro.observacoes or '' if registro else '' }}</textarea></label>
 </div>

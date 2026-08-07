@@ -53,25 +53,35 @@ def missoes():
     with get_engine().connect() as conn:
         oms = conn.execute(text("""
             SELECT o.*, p.nome_razao AS solicitante, cc.codigo AS centro, m.codigo AS moeda,
-                   r.id AS rd_id, r.numero_rd AS rd_numero, r.status AS rd_status
+              COALESCE((SELECT SUM(pg.valor) FROM financeiro3_om_pagamentos pg
+                WHERE pg.om_id=o.id AND pg.status='PAGO'),0) AS valor_pago,
+              COALESCE((SELECT SUM(pg.valor) FROM financeiro3_om_pagamentos pg
+                WHERE pg.om_id=o.id AND pg.status='PREVISTO'),0) AS valor_previsto,
+              COALESCE((SELECT SUM(i.valor) FROM financeiro3_reembolso_itens i
+                JOIN financeiro3_reembolsos rb ON rb.id=i.reembolso_id
+                WHERE rb.om_pagadora_id=o.id AND rb.forma_liquidacao='OM'
+                  AND rb.status='APROVADO' AND i.status='ATIVO'),0) AS valor_reembolsos
             FROM financeiro3_oms o JOIN financeiro3_pessoas p ON p.id=o.solicitante_id
             JOIN financeiro3_centros_custo cc ON cc.id=o.centro_custo_id
             JOIN financeiro3_moedas m ON m.id=o.moeda_id
-            LEFT JOIN financeiro3_rds r ON r.om_id=o.id
             WHERE o.removido_em IS NULL ORDER BY o.id DESC LIMIT 500
         """)).mappings().all()
         rds = conn.execute(text("""
             SELECT r.*,p.nome_razao AS responsavel,cc.codigo AS centro,m.codigo AS moeda,
-                   o.numero_om
+              COALESCE((SELECT SUM(pg.valor) FROM financeiro3_rd_pagamentos pg
+                WHERE pg.rd_id=r.id AND pg.status='PAGO'),0) AS valor_pago,
+              COALESCE((SELECT SUM(i.valor) FROM financeiro3_reembolso_itens i
+                JOIN financeiro3_reembolsos rb ON rb.id=i.reembolso_id
+                WHERE rb.rd_pagadora_id=r.id AND rb.forma_liquidacao='RD'
+                  AND rb.status='APROVADO' AND i.status='ATIVO'),0) AS valor_reembolsos
             FROM financeiro3_rds r
             JOIN financeiro3_pessoas p ON p.id=r.responsavel_id
             JOIN financeiro3_centros_custo cc ON cc.id=r.centro_custo_id
             JOIN financeiro3_moedas m ON m.id=r.moeda_id
-            LEFT JOIN financeiro3_oms o ON o.id=r.om_id
             ORDER BY r.id DESC LIMIT 500
         """)).mappings().all()
         acertos = conn.execute(text("""
-            SELECT a.*, r.om_id, p.nome_razao AS responsavel, m.codigo AS moeda
+            SELECT a.*, p.nome_razao AS responsavel, m.codigo AS moeda
             FROM financeiro3_rd_acertos a JOIN financeiro3_rds r ON r.id=a.rd_id
             JOIN financeiro3_pessoas p ON p.id=r.responsavel_id
             JOIN financeiro3_moedas m ON m.id=r.moeda_id
@@ -149,11 +159,15 @@ def om_detalhe(om_id):
     with get_engine().connect() as conn:
         om = conn.execute(text("""
             SELECT o.*, p.nome_razao AS solicitante, cc.codigo AS centro_codigo,
-                   cc.nome AS centro_nome, m.codigo AS moeda, r.id AS rd_id, r.status AS rd_status
+                   cc.nome AS centro_nome, m.codigo AS moeda,
+              COALESCE((SELECT SUM(i.valor) FROM financeiro3_reembolso_itens i
+                JOIN financeiro3_reembolsos rb ON rb.id=i.reembolso_id
+                WHERE rb.om_pagadora_id=o.id AND rb.forma_liquidacao='OM'
+                  AND rb.status='APROVADO' AND i.status='ATIVO'),0) AS valor_reembolsos
             FROM financeiro3_oms o JOIN financeiro3_pessoas p ON p.id=o.solicitante_id
             JOIN financeiro3_centros_custo cc ON cc.id=o.centro_custo_id
             JOIN financeiro3_moedas m ON m.id=o.moeda_id
-            LEFT JOIN financeiro3_rds r ON r.om_id=o.id WHERE o.id=:id AND o.removido_em IS NULL
+            WHERE o.id=:id AND o.removido_em IS NULL
         """), {"id": om_id}).mappings().first()
         if not om:
             abort(404)
@@ -171,9 +185,23 @@ def om_detalhe(om_id):
             LEFT JOIN financeiro3_arquivos ar ON ar.id=a.arquivo_id
             WHERE i.om_id=:id AND i.status='ATIVO' ORDER BY i.data_despesa,i.id
         """), {"id": om_id}).mappings().all()
+        pagamentos = conn.execute(text("""
+            SELECT pg.*,a.id AS anexo_id,ar.id AS arquivo_id,ar.nome_original
+            FROM financeiro3_om_pagamentos pg
+            LEFT JOIN financeiro3_anexos a ON a.entidade='OM_PAGAMENTO' AND a.entidade_id=pg.id AND a.status='ATIVO'
+            LEFT JOIN financeiro3_arquivos ar ON ar.id=a.arquivo_id AND ar.status='ATIVO'
+            WHERE pg.om_id=:id ORDER BY pg.data_prevista_pagamento,pg.id
+        """), {"id": om_id}).mappings().all()
+        despesa_importada = conn.execute(text(
+            "SELECT id FROM financeiro3_despesas WHERE origem_om_id=:id"
+        ), {"id": om_id}).scalar()
         opcoes = _opcoes(conn)
+    valor_pago = sum((pg["valor"] for pg in pagamentos if pg["status"] == "PAGO"), start=0)
+    valor_previsto = sum((pg["valor"] for pg in pagamentos if pg["status"] == "PREVISTO"), start=0)
     return render_template(
         "financeiro_novo/om_detalhe.html", om=om, itens=itens, decisoes=decisoes, anexos=anexos,
+        pagamentos=pagamentos, valor_pago=valor_pago, valor_previsto=valor_previsto,
+        despesa_importada=despesa_importada,
         opcoes=opcoes, editavel=om["status"] in EDITAVEIS,
         subnav_links=build_subnav("missoes"),
     )
@@ -422,6 +450,150 @@ def om_item_remover(om_id, item_id):
     return redirect(url_for("financeiro_novo.om_detalhe", om_id=om_id))
 
 
+def _pagamento_config(tipo):
+    if tipo == "om":
+        return "financeiro3_oms", "financeiro3_om_pagamentos", "om_id", "OM", "om_detalhe", "om_id"
+    return "financeiro3_rds", "financeiro3_rd_pagamentos", "rd_id", "RD", "rd_detalhe", "rd_id"
+
+
+def _redirecionar_documento(tipo, registro_id):
+    _, _, _, _, endpoint, parametro = _pagamento_config(tipo)
+    return redirect(url_for(f"financeiro_novo.{endpoint}", **{parametro: registro_id}))
+
+
+def _programar_pagamento(tipo, registro_id):
+    tabela_documento, tabela, fk, entidade, _, _ = _pagamento_config(tipo)
+    try:
+        tipo_pagamento = (request.form.get("tipo_pagamento") or "").upper()
+        if tipo_pagamento not in {"ADIANTAMENTO", "QUITACAO"}:
+            raise ValorInvalido("Tipo de pagamento inválido.")
+        dados = {
+            "documento": registro_id,
+            "tipo": tipo_pagamento,
+            "data": data_iso(request.form.get("data_prevista_pagamento"), "Data prevista"),
+            "valor": decimal_br(request.form.get("valor"), positivo=True),
+            "observacoes": (request.form.get("observacoes") or "").strip() or None,
+            "usuario": session.get("usuario_id"),
+        }
+        with get_engine().begin() as conn:
+            documento = _registro(conn, tabela_documento, registro_id, True)
+            if not documento:
+                abort(404)
+            if documento["status"] in {"CANCELADA", "ENCERRADA", "LIQUIDADA"}:
+                abort(409)
+            pagamento = conn.execute(text(f"""
+                INSERT INTO {tabela}({fk},tipo,data_prevista_pagamento,valor,observacoes,criado_por)
+                VALUES (:documento,:tipo,:data,:valor,:observacoes,:usuario) RETURNING *
+            """), dados).mappings().one()
+            registrar_evento(conn, entidade=f"{entidade}_PAGAMENTO", entidade_id=pagamento["id"],
+                evento="PROGRAMADO", dados_novos=dict(pagamento))
+        flash("Pagamento incluído na previsão.", "sucesso")
+    except ValorInvalido as exc:
+        flash(str(exc), "erro")
+    return _redirecionar_documento(tipo, registro_id)
+
+
+def _registrar_pagamento(tipo, registro_id, pagamento_id):
+    from routes.financeiro_novo.reembolsos import _preparar_anexo, _vincular_anexo
+    tabela_documento, tabela, fk, entidade, _, _ = _pagamento_config(tipo)
+    preparado = None
+    try:
+        data_pagamento = data_iso(request.form.get("data_pagamento"), "Data do pagamento")
+        preparado = _preparar_anexo(request.files.get("arquivo"))
+        with get_engine().begin() as conn:
+            if not _registro(conn, tabela_documento, registro_id, True):
+                abort(404)
+            anterior = conn.execute(text(f"""
+                SELECT * FROM {tabela} WHERE id=:pagamento AND {fk}=:documento FOR UPDATE
+            """), {"pagamento": pagamento_id, "documento": registro_id}).mappings().first()
+            if not anterior:
+                abort(404)
+            if anterior["status"] != "PREVISTO":
+                abort(409)
+            novo = conn.execute(text(f"""
+                UPDATE {tabela} SET status='PAGO',data_pagamento=:data,pago_por=:usuario,pago_em=NOW()
+                WHERE id=:id RETURNING *
+            """), {"data": data_pagamento, "usuario": session.get("usuario_id"), "id": pagamento_id}).mappings().one()
+            vinculo = _vincular_anexo(conn, preparado, f"{entidade}_PAGAMENTO", pagamento_id, "COMPROVANTE")
+            registrar_evento(conn, entidade=f"{entidade}_PAGAMENTO", entidade_id=pagamento_id,
+                evento="PAGO", dados_anteriores=dict(anterior), dados_novos={**dict(novo), "anexo_id": vinculo})
+        flash("Pagamento realizado e movido da previsão para o realizado.", "sucesso")
+    except (ValorInvalido, AnexoInvalido) as exc:
+        if preparado:
+            preparado[3].unlink(missing_ok=True)
+        flash(str(exc), "erro")
+    except Exception:
+        if preparado:
+            preparado[3].unlink(missing_ok=True)
+        raise
+    return _redirecionar_documento(tipo, registro_id)
+
+
+def _cancelar_pagamento(tipo, registro_id, pagamento_id):
+    _, tabela, fk, entidade, _, _ = _pagamento_config(tipo)
+    motivo = (request.form.get("motivo") or "").strip()
+    if not motivo:
+        flash("Informe o motivo do cancelamento.", "erro")
+        return _redirecionar_documento(tipo, registro_id)
+    with get_engine().begin() as conn:
+        anterior = conn.execute(text(f"SELECT * FROM {tabela} WHERE id=:id AND {fk}=:doc FOR UPDATE"),
+            {"id": pagamento_id, "doc": registro_id}).mappings().first()
+        if not anterior:
+            abort(404)
+        if anterior["status"] != "PREVISTO":
+            abort(409)
+        novo = conn.execute(text(f"""
+            UPDATE {tabela} SET status='CANCELADO',cancelado_por=:usuario,cancelado_em=NOW(),motivo_cancelamento=:motivo
+            WHERE id=:id RETURNING *
+        """), {"usuario": session.get("usuario_id"), "motivo": motivo, "id": pagamento_id}).mappings().one()
+        registrar_evento(conn, entidade=f"{entidade}_PAGAMENTO", entidade_id=pagamento_id,
+            evento="CANCELADO", dados_anteriores=dict(anterior), dados_novos=dict(novo), justificativa=motivo)
+    flash("Previsão de pagamento cancelada.", "sucesso")
+    return _redirecionar_documento(tipo, registro_id)
+
+
+@bp.post("/oms/<int:om_id>/pagamentos")
+@login_required
+@permission_required("financeiro_novo", "editar")
+def om_pagamento_programar(om_id):
+    return _programar_pagamento("om", om_id)
+
+
+@bp.post("/oms/<int:om_id>/pagamentos/<int:pagamento_id>/pagar")
+@login_required
+@permission_required("financeiro_novo", "pagar")
+def om_pagamento_pagar(om_id, pagamento_id):
+    return _registrar_pagamento("om", om_id, pagamento_id)
+
+
+@bp.post("/oms/<int:om_id>/pagamentos/<int:pagamento_id>/cancelar")
+@login_required
+@permission_required("financeiro_novo", "cancelar")
+def om_pagamento_cancelar(om_id, pagamento_id):
+    return _cancelar_pagamento("om", om_id, pagamento_id)
+
+
+@bp.post("/rds/<int:rd_id>/pagamentos")
+@login_required
+@permission_required("financeiro_novo", "editar")
+def rd_pagamento_programar(rd_id):
+    return _programar_pagamento("rd", rd_id)
+
+
+@bp.post("/rds/<int:rd_id>/pagamentos/<int:pagamento_id>/pagar")
+@login_required
+@permission_required("financeiro_novo", "pagar")
+def rd_pagamento_pagar(rd_id, pagamento_id):
+    return _registrar_pagamento("rd", rd_id, pagamento_id)
+
+
+@bp.post("/rds/<int:rd_id>/pagamentos/<int:pagamento_id>/cancelar")
+@login_required
+@permission_required("financeiro_novo", "cancelar")
+def rd_pagamento_cancelar(rd_id, pagamento_id):
+    return _cancelar_pagamento("rd", rd_id, pagamento_id)
+
+
 @bp.post("/oms/<int:om_id>/enviar")
 @login_required
 @permission_required("financeiro_novo", "editar")
@@ -504,47 +676,22 @@ def om_cancelar(om_id):
             abort(404)
         if anterior["status"] in {"ENCERRADA", "CANCELADA"}:
             abort(409)
-        if conn.execute(text("SELECT EXISTS(SELECT 1 FROM financeiro3_rds WHERE om_id=:id)"), {"id": om_id}).scalar():
-            flash("Uma OM com RD vinculada não pode ser cancelada.", "erro")
+        if conn.execute(text("""
+            SELECT EXISTS(SELECT 1 FROM financeiro3_om_pagamentos
+              WHERE om_id=:id AND status='PAGO')
+        """), {"id": om_id}).scalar():
+            flash("A OM possui pagamento realizado e não pode ser cancelada.", "erro")
             return redirect(url_for("financeiro_novo.om_detalhe", om_id=om_id))
+        conn.execute(text("""
+            UPDATE financeiro3_om_pagamentos SET status='CANCELADO',cancelado_por=:usuario,
+              cancelado_em=NOW(),motivo_cancelamento=:motivo
+            WHERE om_id=:id AND status='PREVISTO'
+        """), {"usuario": session.get("usuario_id"), "motivo": motivo, "id": om_id})
         novo = conn.execute(text("UPDATE financeiro3_oms SET status='CANCELADA',atualizado_em=NOW() WHERE id=:id RETURNING *"), {"id": om_id}).mappings().one()
         _decisao(conn, "om", om_id, "CANCELAMENTO", anterior["status"], "CANCELADA", motivo)
         registrar_evento(conn, entidade="OM", entidade_id=om_id, evento="CANCELADA", dados_anteriores=dict(anterior), dados_novos=dict(novo), justificativa=motivo)
     flash("OM cancelada.", "sucesso")
     return redirect(url_for("financeiro_novo.om_detalhe", om_id=om_id))
-
-
-@bp.post("/oms/<int:om_id>/criar-rd")
-@login_required
-@permission_required("financeiro_novo", "criar")
-def rd_criar(om_id):
-    with get_engine().begin() as conn:
-        om = _registro(conn, "financeiro3_oms", om_id, True)
-        if not om:
-            abort(404)
-        if om["status"] != "APROVADA":
-            abort(409)
-        existente = conn.execute(text("SELECT id FROM financeiro3_rds WHERE om_id=:id"), {"id": om_id}).scalar()
-        if existente:
-            return redirect(url_for("financeiro_novo.rd_detalhe", rd_id=existente))
-        periodo = conn.execute(text("""
-            SELECT MIN(data_despesa) AS inicio, MAX(data_despesa) AS fim
-            FROM financeiro3_om_itens WHERE om_id=:id AND status='ATIVO'
-        """), {"id": om_id}).mappings().one()
-        if not periodo["inicio"]:
-            flash("A OM precisa ter ao menos uma linha de despesa para gerar a RD.", "erro")
-            return redirect(url_for("financeiro_novo.om_detalhe", om_id=om_id))
-        rd = conn.execute(text("""
-            INSERT INTO financeiro3_rds(numero_rd,matricula_responsavel,om_id,responsavel_id,
-                centro_custo_id,moeda_id,periodo_inicio,periodo_fim,valor_adiantamento,criado_por)
-            VALUES (:numero,:matricula,:om,:responsavel,:centro,:moeda,:inicio,:fim,0,:usuario) RETURNING *
-        """), {"numero": f"RD-{om['numero_om']}", "matricula": om["matricula_favorecido"],
-                "om": om_id, "responsavel": om["solicitante_id"], "centro": om["centro_custo_id"],
-                "moeda": om["moeda_id"], "inicio": periodo["inicio"], "fim": periodo["fim"],
-                "usuario": session.get("usuario_id")}).mappings().one()
-        registrar_evento(conn, entidade="RD", entidade_id=rd["id"], evento="CRIADA_DA_OM", dados_novos=dict(rd))
-    flash("RD criada a partir da OM aprovada.", "sucesso")
-    return redirect(url_for("financeiro_novo.rd_detalhe", rd_id=rd["id"]))
 
 
 def _dados_rd(form):
@@ -561,7 +708,6 @@ def _dados_rd(form):
         "matricula": (form.get("matricula_responsavel") or "").strip().upper(),
         "inicio": data_iso(form.get("periodo_inicio"), "Início do período"),
         "fim": data_iso(form.get("periodo_fim"), "Fim do período"),
-        "adiantamento": decimal_br(form.get("valor_adiantamento") or "0"),
         "observacoes": (form.get("observacoes") or "").strip() or None,
     })
     if not dados["numero"] or not dados["matricula"]:
@@ -597,7 +743,7 @@ def rd_nova():
                       centro_custo_id,moeda_id,periodo_inicio,periodo_fim,valor_adiantamento,
                       observacoes,criado_por)
                     VALUES (:numero,:matricula,:responsavel,:centro,:moeda,:inicio,:fim,
-                      :adiantamento,:observacoes,:usuario) RETURNING *
+                      0,:observacoes,:usuario) RETURNING *
                 """), dados).mappings().one()
                 registrar_evento(conn, entidade="RD", entidade_id=rd["id"], evento="CRIADA",
                     dados_novos=dict(rd))
@@ -618,10 +764,14 @@ def rd_detalhe(rd_id):
     with get_engine().connect() as conn:
         rd = conn.execute(text("""
             SELECT r.*, p.nome_razao AS responsavel, cc.codigo AS centro_codigo,
-                   cc.nome AS centro_nome, m.codigo AS moeda, o.numero_om
+                   cc.nome AS centro_nome, m.codigo AS moeda,
+              COALESCE((SELECT SUM(i.valor) FROM financeiro3_reembolso_itens i
+                JOIN financeiro3_reembolsos rb ON rb.id=i.reembolso_id
+                WHERE rb.rd_pagadora_id=r.id AND rb.forma_liquidacao='RD'
+                  AND rb.status='APROVADO' AND i.status='ATIVO'),0) AS valor_reembolsos
             FROM financeiro3_rds r JOIN financeiro3_pessoas p ON p.id=r.responsavel_id
             JOIN financeiro3_centros_custo cc ON cc.id=r.centro_custo_id
-            JOIN financeiro3_moedas m ON m.id=r.moeda_id LEFT JOIN financeiro3_oms o ON o.id=r.om_id
+            JOIN financeiro3_moedas m ON m.id=r.moeda_id
             WHERE r.id=:id
         """), {"id": rd_id}).mappings().first()
         if not rd:
@@ -635,10 +785,24 @@ def rd_detalhe(rd_id):
         anexos = _listar_anexos(conn, "RD", rd_id)
         decisoes = conn.execute(text("SELECT * FROM financeiro3_rd_decisoes WHERE rd_id=:id ORDER BY id DESC"), {"id": rd_id}).mappings().all()
         acerto = conn.execute(text("SELECT * FROM financeiro3_rd_acertos WHERE rd_id=:id"), {"id": rd_id}).mappings().first()
+        pagamentos = conn.execute(text("""
+            SELECT pg.*,a.id AS anexo_id,ar.id AS arquivo_id,ar.nome_original
+            FROM financeiro3_rd_pagamentos pg
+            LEFT JOIN financeiro3_anexos a ON a.entidade='RD_PAGAMENTO' AND a.entidade_id=pg.id AND a.status='ATIVO'
+            LEFT JOIN financeiro3_arquivos ar ON ar.id=a.arquivo_id AND ar.status='ATIVO'
+            WHERE pg.rd_id=:id ORDER BY pg.data_prevista_pagamento,pg.id
+        """), {"id": rd_id}).mappings().all()
+        despesa_importada = conn.execute(text(
+            "SELECT id FROM financeiro3_despesas WHERE origem_rd_id=:id"
+        ), {"id": rd_id}).scalar()
         opcoes = _opcoes(conn)
+    valor_pago = sum((pg["valor"] for pg in pagamentos if pg["status"] == "PAGO"), start=0)
+    valor_previsto = sum((pg["valor"] for pg in pagamentos if pg["status"] == "PREVISTO"), start=0)
     return render_template(
         "financeiro_novo/rd_detalhe.html", rd=rd, itens=itens, anexos=anexos,
-        decisoes=decisoes, acerto=acerto, opcoes=opcoes, formas=FORMAS_PAGAMENTO,
+        decisoes=decisoes, acerto=acerto, pagamentos=pagamentos,
+        valor_pago=valor_pago, valor_previsto=valor_previsto,
+        despesa_importada=despesa_importada, opcoes=opcoes, formas=FORMAS_PAGAMENTO,
         editavel=rd["status"] in EDITAVEIS, subnav_links=build_subnav("missoes"),
     )
 
@@ -756,21 +920,36 @@ def _decidir_rd(rd_id, aprovar):
             flash("O responsável pelo lançamento não pode decidir a própria RD.", "erro")
             return
         status = "APROVADA" if aprovar else "REJEITADA"
-        diferenca = anterior["valor_total"] - anterior["valor_adiantamento"]
+        total_pago = conn.execute(text("""
+            SELECT COALESCE(SUM(valor),0) FROM financeiro3_rd_pagamentos
+            WHERE rd_id=:id AND status='PAGO'
+        """), {"id": rd_id}).scalar()
+        reembolsos_vinculados = conn.execute(text("""
+            SELECT COALESCE(SUM(i.valor),0) FROM financeiro3_reembolso_itens i
+            JOIN financeiro3_reembolsos r ON r.id=i.reembolso_id
+            WHERE r.forma_liquidacao='RD' AND r.rd_pagadora_id=:id
+              AND r.status='APROVADO' AND i.status='ATIVO'
+        """), {"id": rd_id}).scalar()
+        diferenca = anterior["valor_total"] + reembolsos_vinculados - total_pago
+        data_prevista = None
+        if aprovar and diferenca != 0:
+            try:
+                data_prevista = data_iso(request.form.get("data_prevista_liquidacao"), "Data prevista do acerto")
+            except ValorInvalido as exc:
+                flash(str(exc), "erro")
+                return
         if aprovar and diferenca == 0:
             status = "LIQUIDADA"
-        novo = conn.execute(text("UPDATE financeiro3_rds SET status=:status,atualizado_em=NOW() WHERE id=:id RETURNING *"), {"status": status, "id": rd_id}).mappings().one()
+        novo = conn.execute(text("UPDATE financeiro3_rds SET status=:status,valor_adiantamento=:pago,atualizado_em=NOW() WHERE id=:id RETURNING *"), {"status": status, "pago": total_pago, "id": rd_id}).mappings().one()
         acao = "APROVACAO" if aprovar else "REJEICAO"
         _decisao(conn, "rd", rd_id, acao, "EM_APROVACAO", status, justificativa or None)
         if aprovar and diferenca != 0:
             conn.execute(text("""
-                INSERT INTO financeiro3_rd_acertos(rd_id,tipo,valor,criado_por)
-                VALUES (:rd,:tipo,:valor,:usuario)
+                INSERT INTO financeiro3_rd_acertos(rd_id,tipo,valor,data_prevista_liquidacao,criado_por)
+                VALUES (:rd,:tipo,:valor,:data,:usuario)
             """), {"rd": rd_id, "tipo": "REEMBOLSO" if diferenca > 0 else "DEVOLUCAO",
-                    "valor": abs(diferenca), "usuario": session.get("usuario_id")})
-        if status == "LIQUIDADA" and anterior["om_id"]:
-            conn.execute(text("UPDATE financeiro3_oms SET status='ENCERRADA',atualizado_em=NOW() WHERE id=:id"), {"id": anterior["om_id"]})
-            _decisao(conn, "om", anterior["om_id"], "ENCERRAMENTO", "APROVADA", "ENCERRADA")
+                    "valor": abs(diferenca), "data": data_prevista,
+                    "usuario": session.get("usuario_id")})
         registrar_evento(conn, entidade="RD", entidade_id=rd_id, evento=acao, dados_anteriores=dict(anterior), dados_novos=dict(novo), justificativa=justificativa)
     flash("RD aprovada e acerto calculado." if aprovar else "RD rejeitada para correção.", "sucesso")
 
@@ -817,9 +996,6 @@ def rd_liquidar(rd_id):
                     "referencia": (request.form.get("referencia") or "").strip() or None,
                     "usuario": session.get("usuario_id"), "id": acerto["id"]})
             novo = conn.execute(text("UPDATE financeiro3_rds SET status='LIQUIDADA',atualizado_em=NOW() WHERE id=:id RETURNING *"), {"id": rd_id}).mappings().one()
-            if rd["om_id"]:
-                conn.execute(text("UPDATE financeiro3_oms SET status='ENCERRADA',atualizado_em=NOW() WHERE id=:id"), {"id": rd["om_id"]})
-                _decisao(conn, "om", rd["om_id"], "ENCERRAMENTO", "APROVADA", "ENCERRADA")
             _decisao(conn, "rd", rd_id, "LIQUIDACAO", "APROVADA", "LIQUIDADA")
             registrar_evento(conn, entidade="RD", entidade_id=rd_id, evento="ACERTO_LIQUIDADO", dados_anteriores=dict(rd), dados_novos=dict(novo))
         flash("Acerto da RD liquidado.", "sucesso")
@@ -930,6 +1106,41 @@ def documento_anexo_baixar(tipo, registro_id, arquivo_id):
             WHERE a.entidade=:entidade AND a.entidade_id=:registro AND a.arquivo_id=:arquivo
               AND a.status='ATIVO' AND ar.status='ATIVO'
         """), {"entidade": entidade, "registro": registro_id, "arquivo": arquivo_id}).mappings().first()
+        if not arquivo and tipo in {"om", "rd"}:
+            _, tabela_pagamento, fk, _, _, _ = _pagamento_config(tipo)
+            arquivo = conn.execute(text(f"""
+                SELECT ar.object_key,ar.nome_original FROM {tabela_pagamento} pg
+                JOIN financeiro3_anexos a ON a.entidade=:entidade_pagamento
+                  AND a.entidade_id=pg.id AND a.status='ATIVO'
+                JOIN financeiro3_arquivos ar ON ar.id=a.arquivo_id AND ar.status='ATIVO'
+                WHERE pg.{fk}=:registro AND a.arquivo_id=:arquivo
+            """), {"entidade_pagamento": f"{entidade}_PAGAMENTO",
+                     "registro": registro_id, "arquivo": arquivo_id}).mappings().first()
+    if not arquivo:
+        abort(404)
+    caminho = _caminho(arquivo["object_key"])
+    if not caminho.is_file():
+        abort(404)
+    return send_file(caminho, mimetype="application/pdf", as_attachment=True,
+                     download_name=f"{Path(arquivo['nome_original']).stem}.pdf")
+
+
+@bp.get("/documentos/<tipo>/<int:registro_id>/pagamentos/<int:pagamento_id>/anexos/<uuid:arquivo_id>")
+@login_required
+@permission_required("financeiro_novo", "visualizar")
+def pagamento_anexo_baixar(tipo, registro_id, pagamento_id, arquivo_id):
+    if tipo not in {"om", "rd"}:
+        abort(404)
+    _, tabela, fk, entidade, _, _ = _pagamento_config(tipo)
+    with get_engine().connect() as conn:
+        arquivo = conn.execute(text(f"""
+            SELECT ar.object_key,ar.nome_original FROM {tabela} pg
+            JOIN financeiro3_anexos a ON a.entidade=:entidade
+              AND a.entidade_id=pg.id AND a.status='ATIVO'
+            JOIN financeiro3_arquivos ar ON ar.id=a.arquivo_id AND ar.status='ATIVO'
+            WHERE pg.id=:pagamento AND pg.{fk}=:registro AND a.arquivo_id=:arquivo
+        """), {"entidade": f"{entidade}_PAGAMENTO", "pagamento": pagamento_id,
+                 "registro": registro_id, "arquivo": arquivo_id}).mappings().first()
     if not arquivo:
         abort(404)
     caminho = _caminho(arquivo["object_key"])

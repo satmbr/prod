@@ -25,8 +25,16 @@ def _opcoes(conn):
         "centros": conn.execute(text("SELECT id,codigo,nome FROM financeiro3_centros_custo WHERE ativo ORDER BY codigo,nome")).mappings().all(),
         "moedas": conn.execute(text("SELECT id,codigo,nome FROM financeiro3_moedas WHERE ativo ORDER BY codigo")).mappings().all(),
         "contas": conn.execute(text("SELECT c.id,c.nome,c.moeda_id,m.codigo AS moeda FROM financeiro3_contas c JOIN financeiro3_moedas m ON m.id=c.moeda_id WHERE c.ativo ORDER BY c.nome")).mappings().all(),
-        "despesas": conn.execute(text("SELECT id,descricao,valor_total FROM financeiro3_despesas WHERE status IN ('APROVADA','PAGAMENTO_PARCIAL','PAGA') ORDER BY id DESC LIMIT 300")).mappings().all(),
-        "rds": conn.execute(text("SELECT id,valor_total FROM financeiro3_rds WHERE status IN ('APROVADA','LIQUIDADA') ORDER BY id DESC LIMIT 300")).mappings().all(),
+        "despesa_itens": conn.execute(text("""
+            SELECT i.id,d.id AS despesa_id,i.descricao,i.valor_total,cc.codigo AS centro,m.codigo AS moeda
+            FROM financeiro3_despesa_itens i JOIN financeiro3_despesas d ON d.id=i.despesa_id
+            JOIN financeiro3_centros_custo cc ON cc.id=i.centro_custo_id
+            JOIN financeiro3_moedas m ON m.id=d.moeda_id
+            WHERE i.status='ATIVO' AND d.status<>'CANCELADA'
+              AND NOT EXISTS(SELECT 1 FROM financeiro3_nd_itens ni
+                WHERE ni.despesa_item_id=i.id AND ni.status='ATIVO')
+            ORDER BY d.id DESC,i.id LIMIT 500
+        """)).mappings().all(),
     }
 
 
@@ -151,27 +159,37 @@ def nd_detalhe(nd_id):
 def nd_item_novo(nd_id):
     try:
         descricao = (request.form.get("descricao") or "").strip()
-        valor = decimal_br(request.form.get("valor"), positivo=True)
         origem = (request.form.get("origem_tipo") or "MANUAL").upper()
         origem_id = int(request.form.get("origem_id") or 0) or None
-        if not descricao:
-            raise ValorInvalido("Informe a descrição do item.")
-        if origem not in {"MANUAL","DESPESA","RD"}:
+        if origem not in {"MANUAL","DESPESA_ITEM"}:
             raise ValorInvalido("Origem do item inválida.")
+        valor = decimal_br(request.form.get("valor"), positivo=True) if origem == "MANUAL" else None
+        if origem == "MANUAL" and not descricao:
+            raise ValorInvalido("Informe a descrição do item.")
         with get_engine().begin() as conn:
             nd = _nd(conn, nd_id, True)
             if not nd or nd["status"] not in EDITAVEIS:
                 abort(409 if nd else 404)
-            despesa_id = origem_id if origem == "DESPESA" else None
-            rd_id = origem_id if origem == "RD" else None
-            if despesa_id and not conn.execute(text("SELECT EXISTS(SELECT 1 FROM financeiro3_despesas WHERE id=:id)"), {"id": despesa_id}).scalar():
-                raise ValorInvalido("Despesa vinculada não encontrada.")
-            if rd_id and not conn.execute(text("SELECT EXISTS(SELECT 1 FROM financeiro3_rds WHERE id=:id)"), {"id": rd_id}).scalar():
-                raise ValorInvalido("RD vinculada não encontrada.")
+            despesa_id = despesa_item_id = None
+            if origem == "DESPESA_ITEM":
+                origem_item = conn.execute(text("""
+                    SELECT i.id,i.despesa_id,i.descricao,i.valor_total,d.moeda_id,i.centro_custo_id
+                    FROM financeiro3_despesa_itens i JOIN financeiro3_despesas d ON d.id=i.despesa_id
+                    WHERE i.id=:id AND i.status='ATIVO' AND d.status<>'CANCELADA'
+                      AND NOT EXISTS(SELECT 1 FROM financeiro3_nd_itens ni
+                        WHERE ni.despesa_item_id=i.id AND ni.status='ATIVO') FOR UPDATE OF i
+                """), {"id": origem_id}).mappings().first()
+                if not origem_item:
+                    raise ValorInvalido("Linha de Despesa indisponível ou já vinculada.")
+                if origem_item["moeda_id"] != nd["moeda_id"] or origem_item["centro_custo_id"] != nd["centro_custo_id"]:
+                    raise ValorInvalido("A linha precisa ter a mesma moeda e centro de custo da Nota de Débito.")
+                despesa_id, despesa_item_id = origem_item["despesa_id"], origem_item["id"]
+                descricao, valor = origem_item["descricao"], origem_item["valor_total"]
             item = conn.execute(text("""
-                INSERT INTO financeiro3_nd_itens(nota_debito_id,descricao,valor,despesa_id,rd_id,criado_por)
-                VALUES (:nd,:descricao,:valor,:despesa,:rd,:usuario) RETURNING *
-            """), {"nd": nd_id,"descricao":descricao,"valor":valor,"despesa":despesa_id,"rd":rd_id,"usuario":session.get("usuario_id")}).mappings().one()
+                INSERT INTO financeiro3_nd_itens(nota_debito_id,descricao,valor,despesa_id,despesa_item_id,criado_por)
+                VALUES (:nd,:descricao,:valor,:despesa,:despesa_item,:usuario) RETURNING *
+            """), {"nd": nd_id,"descricao":descricao,"valor":valor,"despesa":despesa_id,
+                    "despesa_item":despesa_item_id,"usuario":session.get("usuario_id")}).mappings().one()
             registrar_evento(conn, entidade="ND_ITEM", entidade_id=item["id"], evento="CRIADO", dados_novos=dict(item))
         flash("Item incluído.", "sucesso")
     except (ValorInvalido, ValueError) as exc:

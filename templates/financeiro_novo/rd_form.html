@@ -5,7 +5,6 @@
   <label><span>Responsável *</span><select name="responsavel_id" required><option value="">Selecione</option>{% for p in opcoes.favorecidos %}<option value="{{ p.id }}">{{ p.nome_razao }}</option>{% endfor %}</select></label>
   <label><span>Centro de custo *</span><select name="centro_custo_id" required><option value="">Selecione</option>{% for c in opcoes.centros %}<option value="{{ c.id }}">{{ c.codigo }} · {{ c.nome }}</option>{% endfor %}</select></label>
   <label><span>Moeda *</span><select name="moeda_id" required><option value="">Selecione</option>{% for m in opcoes.moedas %}<option value="{{ m.id }}">{{ m.codigo }} · {{ m.nome }}</option>{% endfor %}</select></label>
-  <label><span>Adiantamento da RD</span><input name="valor_adiantamento" inputmode="decimal" value="0,00"></label>
   <label><span>Início do período *</span><input type="date" name="periodo_inicio" required></label>
   <label><span>Fim do período *</span><input type="date" name="periodo_fim" required></label>
   <label class="span-2"><span>Observações</span><textarea name="observacoes" rows="3"></textarea></label>

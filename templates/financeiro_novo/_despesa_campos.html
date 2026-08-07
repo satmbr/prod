@@ -8,6 +8,6 @@
   <label><span>Número do documento</span><input name="numero_documento" maxlength="80" value="{{ despesa.numero_documento or '' if despesa else '' }}"></label>
   <label><span>Emissão *</span><input type="date" name="data_emissao" required value="{{ despesa.data_emissao.isoformat() if despesa else '' }}"></label>
   <label><span>Competência *</span><input type="date" name="data_competencia" required value="{{ despesa.data_competencia.isoformat() if despesa else '' }}"></label>
-  <label><span>Vencimento *</span><input type="date" name="data_vencimento" required value="{{ despesa.data_vencimento.isoformat() if despesa else '' }}"></label>
+  <label><span>Data prevista de pagamento *</span><input type="date" name="data_vencimento" required value="{{ despesa.data_vencimento.isoformat() if despesa else '' }}"></label>
   <label class="span-2"><span>Observações</span><textarea name="observacoes" rows="3">{{ despesa.observacoes or '' if despesa else '' }}</textarea></label>
 </div>
