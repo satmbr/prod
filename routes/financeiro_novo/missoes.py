@@ -641,6 +641,46 @@ def _programar_pagamento(tipo, registro_id):
     return _redirecionar_documento(tipo, registro_id)
 
 
+def _registrar_pagamento_om_direto(om_id):
+    from routes.financeiro_novo.reembolsos import _preparar_anexo, _vincular_anexo
+    preparado = None
+    try:
+        tipo_pagamento = (request.form.get("tipo_pagamento") or "").upper()
+        if tipo_pagamento not in {"ADIANTAMENTO", "QUITACAO"}:
+            raise ValorInvalido("Tipo de pagamento inválido.")
+        data_pagamento = data_iso(request.form.get("data_pagamento"), "Data do pagamento")
+        valor = decimal_br(request.form.get("valor"), positivo=True)
+        observacoes = (request.form.get("observacoes") or "").strip() or None
+        preparado = _preparar_anexo(request.files.get("arquivo"))
+        with get_engine().begin() as conn:
+            om = _registro(conn, "financeiro3_oms", om_id, True)
+            if not om:
+                abort(404)
+            if om["status"] in {"CANCELADA", "ENCERRADA"}:
+                abort(409)
+            pagamento = conn.execute(text("""
+                INSERT INTO financeiro3_om_pagamentos(om_id,tipo,data_prevista_pagamento,
+                  data_pagamento,valor,status,observacoes,criado_por,pago_por,pago_em)
+                VALUES (:om,:tipo,:data,:data,:valor,'PAGO',:observacoes,:usuario,:usuario,NOW())
+                RETURNING *
+            """), {"om": om_id, "tipo": tipo_pagamento, "data": data_pagamento,
+                    "valor": valor, "observacoes": observacoes,
+                    "usuario": session.get("usuario_id")}).mappings().one()
+            vinculo = _vincular_anexo(conn, preparado, "OM_PAGAMENTO", pagamento["id"], "COMPROVANTE")
+            registrar_evento(conn, entidade="OM_PAGAMENTO", entidade_id=pagamento["id"],
+                evento="REGISTRADO", dados_novos={**dict(pagamento), "anexo_id": vinculo})
+        flash("Adiantamento registrado." if tipo_pagamento == "ADIANTAMENTO" else "Quitação registrada.", "sucesso")
+    except (ValorInvalido, AnexoInvalido) as exc:
+        if preparado:
+            preparado[3].unlink(missing_ok=True)
+        flash(str(exc), "erro")
+    except Exception:
+        if preparado:
+            preparado[3].unlink(missing_ok=True)
+        raise
+    return redirect(url_for("financeiro_novo.om_detalhe", om_id=om_id))
+
+
 def _registrar_pagamento(tipo, registro_id, pagamento_id):
     from routes.financeiro_novo.reembolsos import _preparar_anexo, _vincular_anexo
     tabela_documento, tabela, fk, entidade, _, _ = _pagamento_config(tipo)
@@ -702,9 +742,9 @@ def _cancelar_pagamento(tipo, registro_id, pagamento_id):
 
 @bp.post("/oms/<int:om_id>/pagamentos")
 @login_required
-@permission_required("financeiro_novo", "editar")
+@permission_required("financeiro_novo", "pagar")
 def om_pagamento_programar(om_id):
-    return _programar_pagamento("om", om_id)
+    return _registrar_pagamento_om_direto(om_id)
 
 
 @bp.post("/oms/<int:om_id>/pagamentos/<int:pagamento_id>/pagar")

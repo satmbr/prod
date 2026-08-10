@@ -427,8 +427,50 @@ class FinanceiroNovoIsolamentoTests(unittest.TestCase):
 
     def test_pagamento_om_tem_botao_de_salvar_destacado(self):
         detalhe = (self.raiz / "templates" / "financeiro_novo" / "om_detalhe.html").read_text(encoding="utf-8")
-        self.assertIn('type="submit" class="btn btn-primary full">Salvar adiantamento ou quitação', detalhe)
+        self.assertIn('type="submit" class="btn btn-primary full">Registrar adiantamento ou quitação', detalhe)
+        self.assertIn('name="data_pagamento"', detalhe)
+        self.assertNotIn('name="data_prevista_pagamento"', detalhe)
         self.assertIn("om_pagamento_programar", detalhe)
+
+    def test_pagamento_om_e_registrado_diretamente_com_data_real(self):
+        resultado_om = MagicMock()
+        resultado_om.mappings.return_value.first.return_value = {"id": 1, "status": "RASCUNHO"}
+        resultado_pagamento = MagicMock()
+        resultado_pagamento.mappings.return_value.one.return_value = {
+            "id": 9, "om_id": 1, "tipo": "ADIANTAMENTO", "status": "PAGO",
+            "data_pagamento": "2026-08-10", "valor": Decimal("100.00"),
+        }
+        conexao = MagicMock()
+        conexao.execute.side_effect = [resultado_om, resultado_pagamento, MagicMock()]
+        contexto = MagicMock(); contexto.__enter__.return_value = conexao
+        engine = MagicMock(); engine.begin.return_value = contexto
+
+        app = create_app(); app.config.update(TESTING=True, WTF_CSRF_ENABLED=False)
+        with patch("routes.financeiro_novo.missoes.get_engine", return_value=engine):
+            with app.test_client() as client:
+                with client.session_transaction() as sessao:
+                    sessao["usuario_id"] = 1
+                    sessao["permissoes"] = ["financeiro_novo:pagar"]
+                    sessao["ultimo_acesso"] = 9999999999
+                resposta = client.post("/financeiro-novo/oms/1/pagamentos", data={
+                    "tipo_pagamento": "ADIANTAMENTO", "data_pagamento": "2026-08-10",
+                    "valor": "100,00", "observacoes": "Teste",
+                })
+
+        self.assertEqual(resposta.status_code, 302)
+        sql_executado = " ".join(str(chamada.args[0]) for chamada in conexao.execute.call_args_list)
+        self.assertIn("'PAGO'", sql_executado)
+        self.assertIn("data_pagamento", sql_executado)
+
+    def test_edicao_nao_autoriza_registrar_pagamento_da_om(self):
+        app = create_app(); app.config.update(TESTING=True, WTF_CSRF_ENABLED=False)
+        with app.test_client() as client:
+            with client.session_transaction() as sessao:
+                sessao["usuario_id"] = 1
+                sessao["permissoes"] = ["financeiro_novo:editar"]
+                sessao["ultimo_acesso"] = 9999999999
+            resposta = client.post("/financeiro-novo/oms/1/pagamentos")
+        self.assertEqual(resposta.status_code, 403)
 
     def test_reembolso_separa_edicao_aprovacao_e_pagamento(self):
         app = create_app(); app.config.update(TESTING=True, WTF_CSRF_ENABLED=False)
