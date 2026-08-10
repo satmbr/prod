@@ -7,6 +7,7 @@
 {% set pagar='financeiro_novo:pagar' in current_user_permissions or admin %}
 {% set cancelar='financeiro_novo:cancelar' in current_user_permissions or admin %}
 <div class="page-wrap dsp-page">
+  {% if not armazenamento.persistente %}<div class="dsp-alert"><strong>Armazenamento não persistente.</strong> Antes de reenviar recibos, anexe um volume ao serviço no Railway. Sem o volume, os arquivos serão perdidos no próximo deploy.</div>{% endif %}
   <div class="homolog-banner"><strong>OM {{ om.numero_om }} · {{ om.status|replace('_',' ') }}</strong><span>{{ om.solicitante }} · matrícula {{ om.matricula_favorecido }}</span></div>
   <div class="dsp-summary">
     <article class="dsp-kpi"><span>Total das despesas</span><strong>{{ om.moeda }} {{ '%.2f'|format(om.valor_total+om.valor_reembolsos)|replace('.',',') }}</strong></article>
@@ -45,7 +46,7 @@
     </div></section>
 
     <section class="zone"><header class="zone-head"><div><div class="zone-title">Linhas salvas</div><div class="muted">Numeração sequencial das linhas ativas.</div></div></header><div class="zone-body"><div class="dsp-table-wrap"><table class="dsp-table"><thead><tr><th>#</th><th>Data</th><th>Centro de custo</th><th>Categoria</th><th>Descrição</th><th>Comprovante</th><th class="right">Valor</th>{% if editavel and editar %}<th></th>{% endif %}</tr></thead><tbody>
-      {% for i in itens %}<tr><td><strong>{{ i.numero_linha }}</strong></td><td>{{ i.data_despesa.strftime('%d/%m/%Y') }}</td><td>{{ i.centro_codigo }} · {{ i.centro_nome }}</td><td>{{ i.categoria }}</td><td>{{ i.descricao }}{% if i.justificativa_sem_comprovante %}<small class="muted"> · {{ i.justificativa_sem_comprovante }}</small>{% endif %}</td><td>{% if i.arquivo_id %}<a href="{{ url_for('financeiro_novo.om_item_anexo_baixar',om_id=om.id,item_id=i.id,arquivo_id=i.arquivo_id) }}">{{ i.nome_original }}</a>{% else %}Justificado{% endif %}</td><td class="right">{{ om.moeda }} {{ '%.2f'|format(i.valor)|replace('.',',') }}</td>{% if editavel and editar %}<td><form method="post" action="{{ url_for('financeiro_novo.om_item_remover',om_id=om.id,item_id=i.id) }}"><button>Remover</button></form></td>{% endif %}</tr>
+      {% for i in itens %}<tr><td><strong>{{ i.numero_linha }}</strong></td><td>{{ i.data_despesa.strftime('%d/%m/%Y') }}</td><td>{{ i.centro_codigo }} · {{ i.centro_nome }}</td><td>{{ i.categoria }}</td><td>{{ i.descricao }}{% if i.justificativa_sem_comprovante %}<small class="muted"> · {{ i.justificativa_sem_comprovante }}</small>{% endif %}</td><td>{% if i.arquivo_id %}<a href="{{ url_for('financeiro_novo.om_item_anexo_baixar',om_id=om.id,item_id=i.id,arquivo_id=i.arquivo_id) }}">{{ i.nome_original }}</a>{% else %}Sem recibo{% endif %}{% if editavel and editar %}<form method="post" enctype="multipart/form-data" action="{{ url_for('financeiro_novo.om_item_recibo_substituir',om_id=om.id,item_id=i.id) }}" class="receipt-replace"><input type="file" name="arquivo" accept="image/*,application/pdf" required><button type="submit">{{ 'Substituir' if i.arquivo_id else 'Enviar recibo' }}</button></form>{% endif %}</td><td class="right">{{ om.moeda }} {{ '%.2f'|format(i.valor)|replace('.',',') }}</td>{% if editavel and editar %}<td><form method="post" action="{{ url_for('financeiro_novo.om_item_remover',om_id=om.id,item_id=i.id) }}"><button>Remover</button></form></td>{% endif %}</tr>
       {% else %}<tr><td colspan="8" class="dsp-empty">Nenhuma despesa adicionada.</td></tr>{% endfor %}
     </tbody></table></div></div></section>
 
@@ -186,6 +187,7 @@
 })();
 </script>
 <style>.excel-import-input{display:none}</style>
+<style>.receipt-replace{display:flex;gap:5px;align-items:center;margin-top:6px}.receipt-replace input{max-width:190px;font-size:10px}</style>
 <style>.om-batch-table{min-width:1250px}.om-batch-table input,.om-batch-table select,.om-batch-table textarea{width:100%;min-width:120px;padding:7px;border:1px solid #ccd9e2;border-radius:7px}.om-batch-table td:nth-child(1){width:38px}.om-batch-table td:nth-child(4),.om-batch-table td:nth-child(5){min-width:180px}.possible-duplicate{background:#fff7dd}.duplicate-row{display:block;margin-top:4px;color:#9a5d00;font-weight:700}.duplicate-detail-wrap{margin-top:10px}.duplicate-detail-table{min-width:980px;background:#fff}.duplicate-dialog{width:min(1180px,94vw);max-height:88vh;padding:18px;border:0;border-radius:12px;box-shadow:0 24px 70px #102b3f55}.duplicate-dialog::backdrop{background:#102b3f88}.duplicate-dialog-head{display:flex;align-items:flex-start;justify-content:space-between;gap:20px}.duplicate-dialog-head strong,.duplicate-dialog-head span{display:block}.duplicate-dialog-head strong{font-size:18px;color:#173550}.duplicate-dialog-head span{margin-top:4px;color:#60758a;font-size:11px}.payment-inline{display:flex;gap:5px;align-items:center;margin:3px 0}.payment-inline input{max-width:145px}</style>
 {% endif %}
 {% endblock %}

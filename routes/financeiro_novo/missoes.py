@@ -163,6 +163,7 @@ def om_nova():
 @login_required
 @permission_required("financeiro_novo", "visualizar")
 def om_detalhe(om_id):
+    from routes.financeiro_novo.homologacao import diagnosticar_armazenamento
     with get_engine().connect() as conn:
         om = conn.execute(text("""
             SELECT o.*, p.nome_razao AS solicitante, cc.codigo AS centro_codigo,
@@ -209,6 +210,7 @@ def om_detalhe(om_id):
         "financeiro_novo/om_detalhe.html", om=om, itens=itens, decisoes=decisoes, anexos=anexos,
         pagamentos=pagamentos, valor_pago=valor_pago, valor_previsto=valor_previsto,
         despesa_importada=despesa_importada,
+        armazenamento=diagnosticar_armazenamento(),
         opcoes=opcoes, editavel=om["status"] in EDITAVEIS,
         subnav_links=build_subnav("missoes"),
     )
@@ -595,6 +597,50 @@ def om_item_remover(om_id, item_id):
         registrar_evento(conn, entidade="OM_ITEM", entidade_id=item_id, evento="REMOVIDO",
             dados_anteriores=dict(anterior), dados_novos=dict(novo))
     flash("Linha removida e preservada na auditoria.", "sucesso")
+    return redirect(url_for("financeiro_novo.om_detalhe", om_id=om_id))
+
+
+@bp.post("/oms/<int:om_id>/itens/<int:item_id>/recibo")
+@login_required
+@permission_required("financeiro_novo", "editar")
+def om_item_recibo_substituir(om_id, item_id):
+    from routes.financeiro_novo.reembolsos import _preparar_anexo, _vincular_anexo
+    preparado = None
+    try:
+        preparado = _preparar_anexo(request.files.get("arquivo"))
+        if not preparado:
+            raise ValorInvalido("Selecione uma foto ou PDF do recibo.")
+        with get_engine().begin() as conn:
+            om = _registro(conn, "financeiro3_oms", om_id, True)
+            if not om:
+                abort(404)
+            if om["status"] not in EDITAVEIS:
+                abort(409)
+            item = conn.execute(text("""
+                SELECT * FROM financeiro3_om_itens
+                WHERE id=:item AND om_id=:om AND status='ATIVO' FOR UPDATE
+            """), {"item": item_id, "om": om_id}).mappings().first()
+            if not item:
+                abort(404)
+            anteriores = conn.execute(text("""
+                UPDATE financeiro3_anexos SET status='REMOVIDO',removido_por=:usuario,
+                  removido_em=NOW(),motivo_remocao='Recibo substituído pelo usuário'
+                WHERE entidade='OM_ITEM' AND entidade_id=:item AND status='ATIVO'
+                RETURNING id,arquivo_id
+            """), {"usuario": session.get("usuario_id"), "item": item_id}).mappings().all()
+            vinculo = _vincular_anexo(conn, preparado, "OM_ITEM", item_id, "COMPROVANTE")
+            registrar_evento(conn, entidade="OM_ITEM", entidade_id=item_id, evento="RECIBO_SUBSTITUIDO",
+                dados_anteriores={"anexos": [dict(anexo) for anexo in anteriores]},
+                dados_novos={"anexo_id": vinculo})
+        flash("Recibo convertido para PDF e vinculado novamente.", "sucesso")
+    except (ValorInvalido, AnexoInvalido) as exc:
+        if preparado:
+            preparado[3].unlink(missing_ok=True)
+        flash(str(exc), "erro")
+    except Exception:
+        if preparado:
+            preparado[3].unlink(missing_ok=True)
+        raise
     return redirect(url_for("financeiro_novo.om_detalhe", om_id=om_id))
 
 
@@ -1222,7 +1268,9 @@ def om_item_anexo_baixar(om_id, item_id, arquivo_id):
         """), {"item": item_id, "om": om_id, "arquivo": arquivo_id}).mappings().first()
     if not arquivo: abort(404)
     caminho = _caminho(arquivo["object_key"])
-    if not caminho.is_file(): abort(404)
+    if not caminho.is_file():
+        flash("O recibo não está mais disponível no armazenamento. Configure o volume persistente e use Substituir para reenviá-lo.", "erro")
+        return redirect(url_for("financeiro_novo.om_detalhe", om_id=om_id))
     return send_file(caminho, mimetype="application/pdf", as_attachment=True,
         download_name=f"{Path(arquivo['nome_original']).stem}.pdf")
 

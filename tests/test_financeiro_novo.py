@@ -1,5 +1,6 @@
 import io
 import os
+import tempfile
 import unittest
 from decimal import Decimal
 from pathlib import Path
@@ -431,6 +432,40 @@ class FinanceiroNovoIsolamentoTests(unittest.TestCase):
         self.assertIn('name="data_pagamento"', detalhe)
         self.assertNotIn('name="data_prevista_pagamento"', detalhe)
         self.assertIn("om_pagamento_programar", detalhe)
+
+    def test_railway_volume_define_automaticamente_diretorio_de_upload(self):
+        with tempfile.TemporaryDirectory() as volume:
+            with patch.dict(os.environ, {"RAILWAY_VOLUME_MOUNT_PATH": volume, "UPLOAD_ROOT": ""}):
+                app = create_app()
+        self.assertEqual(app.config["UPLOAD_ROOT"], os.path.abspath(os.path.join(volume, "uploads")))
+
+    def test_om_permite_substituir_recibo_sem_alterar_linha(self):
+        detalhe = (self.raiz / "templates" / "financeiro_novo" / "om_detalhe.html").read_text(encoding="utf-8")
+        self.assertIn("om_item_recibo_substituir", detalhe)
+        self.assertIn("Substituir", detalhe)
+        rotas = (self.raiz / "routes" / "financeiro_novo" / "missoes.py").read_text(encoding="utf-8")
+        self.assertIn("RECIBO_SUBSTITUIDO", rotas)
+
+    def test_recibo_ausente_redireciona_com_aviso_em_vez_de_404(self):
+        arquivo_id = "47d668e8-0877-4fde-8230-5c20a653d5a4"
+        resultado = MagicMock()
+        resultado.mappings.return_value.first.return_value = {
+            "object_key": f"financeiro_novo/47/{arquivo_id}.pdf", "nome_original": "recibo.pdf",
+        }
+        conexao = MagicMock(); conexao.execute.return_value = resultado
+        contexto = MagicMock(); contexto.__enter__.return_value = conexao
+        engine = MagicMock(); engine.connect.return_value = contexto
+        with tempfile.TemporaryDirectory() as upload_root:
+            app = create_app(); app.config.update(TESTING=True, UPLOAD_ROOT=upload_root)
+            with patch("routes.financeiro_novo.missoes.get_engine", return_value=engine):
+                with app.test_client() as client:
+                    with client.session_transaction() as sessao:
+                        sessao["usuario_id"] = 1
+                        sessao["permissoes"] = ["financeiro_novo:visualizar"]
+                        sessao["ultimo_acesso"] = 9999999999
+                    resposta = client.get(f"/financeiro-novo/oms/1/itens/1/anexos/{arquivo_id}")
+        self.assertEqual(resposta.status_code, 302)
+        self.assertIn("/financeiro-novo/oms/1", resposta.location)
 
     def test_pagamento_om_e_registrado_diretamente_com_data_real(self):
         resultado_om = MagicMock()

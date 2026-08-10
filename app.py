@@ -24,9 +24,10 @@ def create_app():
         else em_railway
     )
     app.config["MAX_CONTENT_LENGTH"] = int(os.getenv("MAX_CONTENT_LENGTH", 20 * 1024 * 1024))
-    app.config["UPLOAD_ROOT"] = os.path.abspath(
-        os.getenv("UPLOAD_ROOT") or os.path.join(app.instance_path, "uploads")
-    )
+    upload_root = os.getenv("UPLOAD_ROOT")
+    if not upload_root and os.getenv("RAILWAY_VOLUME_MOUNT_PATH"):
+        upload_root = os.path.join(os.getenv("RAILWAY_VOLUME_MOUNT_PATH"), "uploads")
+    app.config["UPLOAD_ROOT"] = os.path.abspath(upload_root or os.path.join(app.instance_path, "uploads"))
 
     csrf.init_app(app)
 
