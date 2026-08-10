@@ -2,12 +2,15 @@ import io
 import os
 import tempfile
 import unittest
+import uuid
 from decimal import Decimal
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from PIL import Image
 from openpyxl import Workbook
+from pypdf import PdfReader
+from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
 from werkzeug.datastructures import FileStorage
 
@@ -23,6 +26,7 @@ from routes.financeiro_novo.cadastros import TIPOS, _normalizar
 from routes.financeiro_novo.services.valores import ValorInvalido, decimal_br
 from routes.financeiro_novo.homologacao import diagnosticar_armazenamento
 from routes.financeiro_novo.missoes import _ler_linhas_om_excel
+from routes.financeiro_novo.reembolsos import _vincular_anexo
 
 
 class FinanceiroNovoIsolamentoTests(unittest.TestCase):
@@ -628,6 +632,62 @@ class FinanceiroNovoAnexosTests(unittest.TestCase):
 
         self.assertTrue(anexo.conteudo.startswith(b"%PDF-"))
         self.assertEqual(anexo.paginas, 1)
+
+    def test_pdf_de_scanner_tem_imagens_internas_compactadas(self):
+        imagem = Image.effect_noise((1600, 1200), 80).convert("RGB")
+        imagem_png = io.BytesIO(); imagem.save(imagem_png, format="PNG")
+        origem = io.BytesIO()
+        documento = canvas.Canvas(origem, pagesize=(1600, 1200), pageCompression=1)
+        documento.drawImage(ImageReader(io.BytesIO(imagem_png.getvalue())), 0, 0, 1600, 1200)
+        documento.save(); origem.seek(0)
+        arquivo = FileStorage(stream=origem, filename="scanner.pdf", content_type="application/pdf")
+
+        anexo = normalizar_anexo(arquivo)
+
+        self.assertTrue(anexo.compressao_aplicada)
+        self.assertLess(anexo.tamanho_canonico, anexo.tamanho_original * 0.6)
+        self.assertEqual(len(PdfReader(io.BytesIO(anexo.conteudo)).pages), 1)
+
+    def test_otimizacao_nunca_aumenta_pdf_original(self):
+        origem = io.BytesIO()
+        documento = canvas.Canvas(origem)
+        documento.drawString(50, 800, "PDF pequeno já otimizado")
+        documento.save(); origem.seek(0)
+        original = origem.getvalue()
+
+        anexo = normalizar_anexo(FileStorage(
+            stream=io.BytesIO(original), filename="pequeno.pdf", content_type="application/pdf"
+        ))
+
+        self.assertLessEqual(anexo.tamanho_canonico, len(original))
+
+    def test_arquivo_canonico_identico_reutiliza_copia_fisica(self):
+        origem = io.BytesIO(); Image.new("RGB", (800, 600), "white").save(origem, format="JPEG"); origem.seek(0)
+        anexo = normalizar_anexo(FileStorage(
+            stream=origem, filename="duplicado.jpg", content_type="image/jpeg"
+        ))
+        with tempfile.TemporaryDirectory() as upload_root:
+            raiz = Path(upload_root)
+            existente = raiz / "financeiro_novo" / "aa" / "existente.pdf"
+            novo = raiz / "financeiro_novo" / "bb" / "novo.pdf"
+            existente.parent.mkdir(parents=True); novo.parent.mkdir(parents=True)
+            existente.write_bytes(anexo.conteudo); novo.write_bytes(anexo.conteudo)
+            resultado_existente = MagicMock()
+            resultado_existente.mappings.return_value.first.return_value = {
+                "id": uuid.UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+                "object_key": "financeiro_novo/aa/existente.pdf",
+            }
+            resultado_vinculo = MagicMock(); resultado_vinculo.scalar.return_value = 77
+            conexao = MagicMock(); conexao.execute.side_effect = [resultado_existente, resultado_vinculo]
+            app = create_app(); app.config.update(TESTING=True, UPLOAD_ROOT=upload_root)
+            with app.test_request_context("/"):
+                vinculo = _vincular_anexo(conexao,
+                    (anexo, uuid.uuid4(), "financeiro_novo/bb/novo.pdf", novo), "OM_ITEM", 1, "COMPROVANTE")
+
+            self.assertEqual(vinculo, 77)
+            self.assertFalse(novo.exists())
+            sql = " ".join(str(chamada.args[0]) for chamada in conexao.execute.call_args_list)
+            self.assertNotIn("INSERT INTO financeiro3_arquivos", sql)
 
     def test_arquivo_que_nao_e_foto_nem_pdf_e_rejeitado(self):
         arquivo = FileStorage(

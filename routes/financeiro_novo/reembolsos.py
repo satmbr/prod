@@ -114,20 +114,28 @@ def _preparar_anexo(file_storage):
 def _vincular_anexo(conn, preparado, entidade, entidade_id, categoria):
     if not preparado:
         return None
-    anexo, arquivo_id, object_key, _ = preparado
-    conn.execute(text("""
-        INSERT INTO financeiro3_arquivos(id,storage_backend,object_key,nome_original,mime_original,
-          sha256_original,sha256_canonico,tamanho_original,tamanho_canonico,paginas,
-          compressao_aplicada,assinatura_digital_detectada,criado_por)
-        VALUES (:id,'VOLUME',:key,:nome,:mime,:sha_o,:sha_c,:tam_o,:tam_c,:paginas,
-          :compressao,:assinatura,:usuario)
-    """), {"id": arquivo_id, "key": object_key, "nome": anexo.nome_original,
-            "mime": anexo.mime_original, "sha_o": anexo.sha256_original,
-            "sha_c": anexo.sha256_canonico, "tam_o": anexo.tamanho_original,
-            "tam_c": anexo.tamanho_canonico, "paginas": anexo.paginas,
-            "compressao": anexo.compressao_aplicada,
-            "assinatura": anexo.assinatura_digital_detectada,
-            "usuario": session.get("usuario_id")})
+    anexo, arquivo_id, object_key, destino_novo = preparado
+    existente = conn.execute(text("""
+        SELECT id,object_key FROM financeiro3_arquivos
+        WHERE sha256_canonico=:sha AND status='ATIVO' ORDER BY criado_em LIMIT 1
+    """), {"sha": anexo.sha256_canonico}).mappings().first()
+    if existente and _caminho(existente["object_key"]).is_file():
+        destino_novo.unlink(missing_ok=True)
+        arquivo_id = existente["id"]
+    else:
+        conn.execute(text("""
+            INSERT INTO financeiro3_arquivos(id,storage_backend,object_key,nome_original,mime_original,
+              sha256_original,sha256_canonico,tamanho_original,tamanho_canonico,paginas,
+              compressao_aplicada,assinatura_digital_detectada,criado_por)
+            VALUES (:id,'VOLUME',:key,:nome,:mime,:sha_o,:sha_c,:tam_o,:tam_c,:paginas,
+              :compressao,:assinatura,:usuario)
+        """), {"id": arquivo_id, "key": object_key, "nome": anexo.nome_original,
+                "mime": anexo.mime_original, "sha_o": anexo.sha256_original,
+                "sha_c": anexo.sha256_canonico, "tam_o": anexo.tamanho_original,
+                "tam_c": anexo.tamanho_canonico, "paginas": anexo.paginas,
+                "compressao": anexo.compressao_aplicada,
+                "assinatura": anexo.assinatura_digital_detectada,
+                "usuario": session.get("usuario_id")})
     return conn.execute(text("""
         INSERT INTO financeiro3_anexos(arquivo_id,entidade,entidade_id,categoria,criado_por)
         VALUES (:arquivo,:entidade,:entidade_id,:categoria,:usuario) RETURNING id

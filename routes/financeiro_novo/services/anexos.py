@@ -15,8 +15,10 @@ from werkzeug.utils import secure_filename
 MIME_PDF = "application/pdf"
 TAMANHO_MAXIMO_ENTRADA = 20 * 1024 * 1024
 MAXIMO_PAGINAS = 100
-MAXIMO_LADO_IMAGEM = 2400
-QUALIDADE_JPEG = 78
+MAXIMO_LADO_IMAGEM = 1800
+QUALIDADE_JPEG = 68
+MAXIMO_LADO_IMAGEM_PDF = 1800
+QUALIDADE_JPEG_PDF = 65
 
 
 class AnexoInvalido(ValueError):
@@ -41,9 +43,9 @@ class AnexoCanonico:
         return MIME_PDF
 
 
-def _imagem_para_jpeg(imagem: Image.Image) -> bytes:
+def _imagem_rgb_otimizada(imagem: Image.Image, maximo_lado: int) -> Image.Image:
     imagem = ImageOps.exif_transpose(imagem)
-    imagem.thumbnail((MAXIMO_LADO_IMAGEM, MAXIMO_LADO_IMAGEM), Image.Resampling.LANCZOS)
+    imagem.thumbnail((maximo_lado, maximo_lado), Image.Resampling.LANCZOS)
     if imagem.mode not in {"RGB", "L"}:
         fundo = Image.new("RGB", imagem.size, "white")
         if "A" in imagem.getbands():
@@ -53,6 +55,11 @@ def _imagem_para_jpeg(imagem: Image.Image) -> bytes:
         imagem = fundo
     else:
         imagem = imagem.convert("RGB")
+    return imagem
+
+
+def _imagem_para_jpeg(imagem: Image.Image) -> bytes:
+    imagem = _imagem_rgb_otimizada(imagem, MAXIMO_LADO_IMAGEM)
 
     saida = BytesIO()
     imagem.save(
@@ -106,7 +113,26 @@ def _imagens_para_pdf(conteudo: bytes) -> tuple[bytes, int]:
     return pdf.getvalue(), quadros
 
 
-def _pdf_otimizado(conteudo: bytes) -> tuple[bytes, int, bool]:
+def _otimizar_imagens_pdf(escritor: PdfWriter) -> int:
+    substituidas = 0
+    for pagina in escritor.pages:
+        try:
+            imagens = list(pagina.images)
+        except Exception:
+            continue
+        for imagem_pdf in imagens:
+            try:
+                imagem = _imagem_rgb_otimizada(imagem_pdf.image, MAXIMO_LADO_IMAGEM_PDF)
+                imagem_pdf.replace(imagem, quality=QUALIDADE_JPEG_PDF, optimize=True)
+                substituidas += 1
+            except Exception:
+                # Imagens inline ou formatos incomuns permanecem intactos; o
+                # restante do PDF ainda passa pela compactação estrutural.
+                continue
+    return substituidas
+
+
+def _pdf_otimizado(conteudo: bytes) -> tuple[bytes, int, bool, bool]:
     try:
         leitor = PdfReader(BytesIO(conteudo), strict=True)
     except Exception as exc:
@@ -135,7 +161,7 @@ def _pdf_otimizado(conteudo: bytes) -> tuple[bytes, int, bool]:
     # Regravar um PDF assinado invalida sua assinatura. Nesse caso, o próprio
     # PDF original já é o formato canônico e deve ser preservado sem alteração.
     if assinatura:
-        return conteudo, len(leitor.pages), True
+        return conteudo, len(leitor.pages), True, False
 
     escritor = PdfWriter()
     for pagina in leitor.pages:
@@ -144,11 +170,15 @@ def _pdf_otimizado(conteudo: bytes) -> tuple[bytes, int, bool]:
             escritor.pages[-1].compress_content_streams()
         except Exception:
             pass
+    _otimizar_imagens_pdf(escritor)
     escritor.compress_identical_objects(remove_duplicates=True, remove_unreferenced=True)
     escritor.add_metadata({"/Producer": "PRUMAT Financeiro Novo"})
     saida = BytesIO()
     escritor.write(saida)
-    return saida.getvalue(), len(leitor.pages), assinatura
+    otimizado = saida.getvalue()
+    if len(otimizado) >= len(conteudo):
+        return conteudo, len(leitor.pages), assinatura, False
+    return otimizado, len(leitor.pages), assinatura, True
 
 
 def normalizar_anexo(arquivo: FileStorage) -> AnexoCanonico:
@@ -166,8 +196,9 @@ def normalizar_anexo(arquivo: FileStorage) -> AnexoCanonico:
 
     mime_original = (arquivo.mimetype or "application/octet-stream").lower()
     assinatura_digital = False
+    compressao_aplicada = True
     if conteudo.startswith(b"%PDF-"):
-        canonico, paginas, assinatura_digital = _pdf_otimizado(conteudo)
+        canonico, paginas, assinatura_digital, compressao_aplicada = _pdf_otimizado(conteudo)
     else:
         canonico, paginas = _imagens_para_pdf(conteudo)
 
@@ -190,7 +221,7 @@ def normalizar_anexo(arquivo: FileStorage) -> AnexoCanonico:
         tamanho_original=len(conteudo),
         tamanho_canonico=len(canonico),
         paginas=paginas,
-        compressao_aplicada=not assinatura_digital,
+        compressao_aplicada=compressao_aplicada,
         assinatura_digital_detectada=assinatura_digital,
     )
 
