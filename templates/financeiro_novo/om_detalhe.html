@@ -24,9 +24,11 @@
       {% if editavel and editar %}
       <form id="om-batch-form" method="post" enctype="multipart/form-data" action="{{ url_for('financeiro_novo.om_item_novo',om_id=om.id) }}">
         <div class="dsp-table-wrap"><table class="dsp-table om-batch-table"><thead><tr><th>#</th><th>Data *</th><th>Centro de custo *</th><th>Categoria *</th><th>Descrição *</th><th>Valor *</th><th>Recibo ou justificativa *</th><th></th></tr></thead><tbody id="om-batch-body"></tbody></table></div>
+        <div id="excel-feedback" class="dsp-alert" hidden></div>
         <div id="duplicate-feedback" class="dsp-alert" hidden></div>
         <input type="hidden" name="forcar_salvamento" value="0">
-        <div class="dsp-actions"><button type="button" id="add-om-line" class="btn btn-outline">+ Adicionar linha</button><button class="btn btn-primary">Salvar todas as linhas</button></div>
+        <input type="file" id="om-excel-file" name="arquivo_excel" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="excel-import-input">
+        <div class="dsp-actions"><button type="button" id="add-om-line" class="btn btn-outline">+ Adicionar linha</button><button type="button" id="load-om-excel" class="btn btn-outline">Carregar Excel</button><button class="btn btn-primary">Salvar todas as linhas</button></div>
       </form>
       <dialog id="duplicate-dialog" class="duplicate-dialog"><div class="duplicate-dialog-head"><div><strong>Possíveis lançamentos duplicados</strong><span>Foram encontradas linhas com a mesma data e o mesmo valor.</span></div><button type="button" id="close-duplicate-dialog" class="link-button">Fechar</button></div><div id="duplicate-dialog-content"></div><div class="dsp-actions"><button type="button" id="review-duplicates" class="btn btn-outline">Voltar e revisar</button><button type="button" id="save-duplicates" class="btn btn-primary">Salvar mesmo assim</button></div></dialog>
       <template id="om-line-template"><tr>
@@ -64,18 +66,55 @@
   const form = document.getElementById('om-batch-form');
   const body = document.getElementById('om-batch-body');
   const template = document.getElementById('om-line-template');
+  const excelInput = document.getElementById('om-excel-file');
+  const excelButton = document.getElementById('load-om-excel');
+  const excelFeedback = document.getElementById('excel-feedback');
   const feedback = document.getElementById('duplicate-feedback');
   const forceInput = form.querySelector('[name="forcar_salvamento"]');
   const dialog = document.getElementById('duplicate-dialog');
   const dialogContent = document.getElementById('duplicate-dialog-content');
   const endpoint = {{ url_for('financeiro_novo.om_verificar_duplicidades',om_id=om.id)|tojson }};
+  const excelEndpoint = {{ url_for('financeiro_novo.om_itens_carregar_excel',om_id=om.id)|tojson }};
   let timer;
   function renumber() { [...body.rows].forEach((row, index) => row.querySelector('.batch-number').textContent = index + 1); }
-  function addLine() {
+  function addLine(dados={}) {
     const row = template.content.firstElementChild.cloneNode(true);
-    row.querySelector('.remove-om-line').addEventListener('click', () => { if (body.rows.length > 1) row.remove(); renumber(); scheduleCheck(); });
+    row.querySelector('[name="data_despesa"]').value = dados.data || '';
+    if (dados.centro_custo_id) row.querySelector('[name="centro_custo_id"]').value = String(dados.centro_custo_id);
+    if (dados.categoria_id) row.querySelector('[name="categoria_id"]').value = String(dados.categoria_id);
+    row.querySelector('[name="descricao"]').value = dados.descricao || '';
+    row.querySelector('[name="valor"]').value = dados.valor || '';
+    row.querySelector('.remove-om-line').addEventListener('click', () => { row.remove(); if (!body.rows.length) addLine(); renumber(); scheduleCheck(); });
     row.querySelectorAll('input[name="data_despesa"],input[name="valor"]').forEach(input => input.addEventListener('input', scheduleCheck));
     body.appendChild(row); renumber();
+  }
+  function rowIsBlank(row) {
+    return !row.querySelector('[name="data_despesa"]').value && !row.querySelector('[name="descricao"]').value.trim() && !row.querySelector('[name="valor"]').value.trim() && !row.querySelector('[name="arquivo"]').files.length;
+  }
+  async function loadExcel() {
+    const file = excelInput.files[0];
+    if (!file) return;
+    excelButton.disabled = true;
+    excelButton.textContent = 'Carregando...';
+    excelFeedback.hidden = false;
+    excelFeedback.textContent = 'Validando o Excel. Nenhuma informação foi salva ainda.';
+    try {
+      const data = new FormData(); data.append('arquivo_excel', file);
+      const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
+      const response = await fetch(excelEndpoint, {method:'POST',body:data,credentials:'same-origin',headers:{'Accept':'application/json','X-CSRFToken':csrf}});
+      const payload = await response.json().catch(() => ({erro:'Resposta inválida do servidor.'}));
+      if (!response.ok) throw new Error(payload.erro || 'Não foi possível carregar o Excel.');
+      if (body.rows.length===1 && rowIsBlank(body.rows[0])) body.replaceChildren();
+      payload.linhas.forEach(addLine);
+      excelFeedback.textContent = payload.quantidade+' linha(s) carregada(s). Anexe os recibos, revise e depois salve todas as linhas.';
+      scheduleCheck();
+    } catch (error) {
+      excelFeedback.textContent = error.message;
+    } finally {
+      excelInput.value = '';
+      excelButton.disabled = false;
+      excelButton.textContent = 'Carregar Excel';
+    }
   }
   function scheduleCheck() { forceInput.value='0'; clearTimeout(timer); timer = setTimeout(checkDuplicates, 350); }
   function addCell(row, value) { const cell=document.createElement('td'); cell.textContent=value ?? '—'; row.appendChild(cell); return cell; }
@@ -127,9 +166,13 @@
     }
   }
   document.getElementById('add-om-line').addEventListener('click', addLine);
+  excelButton.addEventListener('click',() => excelInput.click());
+  excelInput.addEventListener('change',loadExcel);
   form.addEventListener('submit', async event => {
     event.preventDefault();
     if (!form.reportValidity()) return;
+    const semRecibo=[...body.rows].map((row,index) => ({row,index})).filter(item => !item.row.querySelector('[name="arquivo"]').files.length && !item.row.querySelector('[name="justificativa_sem_comprovante"]').value.trim());
+    if (semRecibo.length) { excelFeedback.hidden=false; excelFeedback.textContent='Anexe o recibo ou informe a justificativa nas linhas: '+semRecibo.map(item=>item.index+1).join(', ')+'.'; semRecibo[0].row.scrollIntoView({behavior:'smooth',block:'center'}); return; }
     const resultado = await checkDuplicates();
     if (resultado.erro) { feedback.scrollIntoView({behavior:'smooth',block:'center'}); return; }
     if (resultado.duplicidades.length && forceInput.value !== '1') { renderDuplicateTable(dialogContent,resultado.duplicidades); dialog.showModal(); return; }
@@ -142,6 +185,7 @@
   addLine();
 })();
 </script>
+<style>.excel-import-input{display:none}</style>
 <style>.om-batch-table{min-width:1250px}.om-batch-table input,.om-batch-table select,.om-batch-table textarea{width:100%;min-width:120px;padding:7px;border:1px solid #ccd9e2;border-radius:7px}.om-batch-table td:nth-child(1){width:38px}.om-batch-table td:nth-child(4),.om-batch-table td:nth-child(5){min-width:180px}.possible-duplicate{background:#fff7dd}.duplicate-row{display:block;margin-top:4px;color:#9a5d00;font-weight:700}.duplicate-detail-wrap{margin-top:10px}.duplicate-detail-table{min-width:980px;background:#fff}.duplicate-dialog{width:min(1180px,94vw);max-height:88vh;padding:18px;border:0;border-radius:12px;box-shadow:0 24px 70px #102b3f55}.duplicate-dialog::backdrop{background:#102b3f88}.duplicate-dialog-head{display:flex;align-items:flex-start;justify-content:space-between;gap:20px}.duplicate-dialog-head strong,.duplicate-dialog-head span{display:block}.duplicate-dialog-head strong{font-size:18px;color:#173550}.duplicate-dialog-head span{margin-top:4px;color:#60758a;font-size:11px}.payment-inline{display:flex;gap:5px;align-items:center;margin:3px 0}.payment-inline input{max-width:145px}</style>
 {% endif %}
 {% endblock %}

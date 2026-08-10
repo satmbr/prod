@@ -1,8 +1,15 @@
 import os
+import re
+import unicodedata
 import uuid
+from datetime import date, datetime
+from io import BytesIO
 from pathlib import Path
+from zipfile import BadZipFile
 
 from flask import abort, current_app, flash, jsonify, redirect, render_template, request, send_file, session, url_for
+from openpyxl import load_workbook
+from openpyxl.utils.exceptions import InvalidFileException
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
@@ -337,6 +344,147 @@ def _linhas_om_formulario():
             "arquivo": arquivo,
         })
     return linhas
+
+
+COLUNAS_EXCEL_OM = ("data", "centro de custo", "categoria", "descricao", "valor")
+LIMITE_LINHAS_EXCEL_OM = 1000
+LIMITE_BYTES_EXCEL_OM = 10 * 1024 * 1024
+
+
+def _chave_excel(valor):
+    texto = unicodedata.normalize("NFKD", str(valor or "").strip())
+    texto = "".join(caractere for caractere in texto if not unicodedata.combining(caractere))
+    return re.sub(r"[^a-z0-9]+", " ", texto.casefold()).strip()
+
+
+def _indice_cadastro_excel(registros):
+    indice, ambiguos = {}, set()
+    for registro in registros:
+        rotulos = {
+            _chave_excel(registro["codigo"]),
+            _chave_excel(registro["nome"]),
+            _chave_excel(f"{registro['codigo']} {registro['nome']}"),
+        }
+        codigo = str(registro["codigo"] or "").strip()
+        if codigo.isdigit():
+            rotulos.add(str(int(codigo)))
+        for rotulo in rotulos - {""}:
+            if rotulo in indice and indice[rotulo] != registro["id"]:
+                ambiguos.add(rotulo)
+            else:
+                indice[rotulo] = registro["id"]
+    for rotulo in ambiguos:
+        indice.pop(rotulo, None)
+    return indice
+
+
+def _data_excel(valor, linha):
+    if isinstance(valor, datetime):
+        return valor.date()
+    if isinstance(valor, date):
+        return valor
+    texto_data = str(valor or "").strip()
+    for formato in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y"):
+        try:
+            return datetime.strptime(texto_data, formato).date()
+        except ValueError:
+            continue
+    raise ValorInvalido(f"Linha {linha}: Data inválida. Use DD/MM/AAAA.")
+
+
+def _ler_linhas_om_excel(conteudo, centros, categorias):
+    try:
+        planilha = load_workbook(BytesIO(conteudo), read_only=True, data_only=True)
+    except (InvalidFileException, BadZipFile, OSError, ValueError, KeyError) as exc:
+        raise ValorInvalido("O arquivo não é um Excel .xlsx válido.") from exc
+    try:
+        aba = planilha.active
+        cabecalho = next(aba.iter_rows(min_row=1, max_row=1, values_only=True), None)
+        if not cabecalho:
+            raise ValorInvalido("O Excel está vazio.")
+        posicoes = {}
+        for indice, valor in enumerate(cabecalho):
+            chave = _chave_excel(valor)
+            if chave and chave not in posicoes:
+                posicoes[chave] = indice
+        ausentes = [coluna for coluna in COLUNAS_EXCEL_OM if coluna not in posicoes]
+        if ausentes:
+            nomes = ", ".join(coluna.title() for coluna in ausentes)
+            raise ValorInvalido(f"Colunas obrigatórias não encontradas: {nomes}.")
+
+        centros_por_nome = _indice_cadastro_excel(centros)
+        categorias_por_nome = _indice_cadastro_excel(categorias)
+        linhas, erros, linhas_lidas = [], [], 0
+        for numero_excel, valores in enumerate(aba.iter_rows(min_row=2, values_only=True), 2):
+            dados = {coluna: valores[posicoes[coluna]] if posicoes[coluna] < len(valores) else None
+                     for coluna in COLUNAS_EXCEL_OM}
+            if all(valor is None or str(valor).strip() == "" for valor in dados.values()):
+                continue
+            linhas_lidas += 1
+            if linhas_lidas > LIMITE_LINHAS_EXCEL_OM:
+                raise ValorInvalido(f"O Excel excede o limite de {LIMITE_LINHAS_EXCEL_OM} linhas.")
+            try:
+                centro = centros_por_nome.get(_chave_excel(dados["centro de custo"]))
+                categoria = categorias_por_nome.get(_chave_excel(dados["categoria"]))
+                if not centro:
+                    raise ValorInvalido(f"Centro de custo '{dados['centro de custo']}' não encontrado ou ambíguo.")
+                if not categoria:
+                    raise ValorInvalido(f"Categoria '{dados['categoria']}' não encontrada ou ambígua.")
+                descricao = str(dados["descricao"] or "").strip()
+                if not descricao or len(descricao) > 220:
+                    raise ValorInvalido("Descrição obrigatória com no máximo 220 caracteres.")
+                valor = decimal_br(dados["valor"], positivo=True)
+                linhas.append({
+                    "data": _data_excel(dados["data"], numero_excel).isoformat(),
+                    "centro_custo_id": centro,
+                    "categoria_id": categoria,
+                    "descricao": descricao,
+                    "valor": f"{valor:.2f}".replace(".", ","),
+                })
+            except ValorInvalido as exc:
+                erros.append(f"Linha {numero_excel}: {str(exc).removeprefix(f'Linha {numero_excel}: ')}")
+        if erros:
+            resumo = " ".join(erros[:20])
+            if len(erros) > 20:
+                resumo += f" Mais {len(erros) - 20} erro(s)."
+            raise ValorInvalido(resumo)
+        if not linhas:
+            raise ValorInvalido("O Excel não possui linhas de despesas preenchidas.")
+        return linhas
+    finally:
+        planilha.close()
+
+
+@bp.post("/oms/<int:om_id>/itens/carregar-excel")
+@login_required
+@permission_required("financeiro_novo", "editar")
+def om_itens_carregar_excel(om_id):
+    arquivo = request.files.get("arquivo_excel")
+    if not arquivo or not arquivo.filename:
+        return jsonify({"erro": "Selecione um arquivo Excel .xlsx."}), 400
+    if not arquivo.filename.lower().endswith(".xlsx"):
+        return jsonify({"erro": "Formato inválido. Envie um arquivo .xlsx."}), 400
+    conteudo = arquivo.read(LIMITE_BYTES_EXCEL_OM + 1)
+    if len(conteudo) > LIMITE_BYTES_EXCEL_OM:
+        return jsonify({"erro": "O Excel excede o limite de 10 MB."}), 413
+    try:
+        with get_engine().connect() as conn:
+            om = _registro(conn, "financeiro3_oms", om_id)
+            if not om:
+                abort(404)
+            if om["status"] not in EDITAVEIS:
+                return jsonify({"erro": "Esta OM não aceita novas linhas."}), 409
+            centros = conn.execute(text("""
+                SELECT id,codigo,nome FROM financeiro3_centros_custo WHERE ativo ORDER BY codigo,nome
+            """)).mappings().all()
+            categorias = conn.execute(text("""
+                SELECT id,codigo,nome FROM financeiro3_categorias
+                WHERE ativo AND natureza='DESPESA' ORDER BY codigo,nome
+            """)).mappings().all()
+        linhas = _ler_linhas_om_excel(conteudo, centros, categorias)
+        return jsonify({"linhas": linhas, "quantidade": len(linhas)})
+    except ValorInvalido as exc:
+        return jsonify({"erro": str(exc)}), 422
 
 
 @bp.get("/oms/<int:om_id>/verificar-duplicidades")

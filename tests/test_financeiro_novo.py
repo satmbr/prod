@@ -6,6 +6,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from PIL import Image
+from openpyxl import Workbook
 from reportlab.pdfgen import canvas
 from werkzeug.datastructures import FileStorage
 
@@ -20,6 +21,7 @@ from routes.financeiro_novo.services.anexos import (
 from routes.financeiro_novo.cadastros import TIPOS, _normalizar
 from routes.financeiro_novo.services.valores import ValorInvalido, decimal_br
 from routes.financeiro_novo.homologacao import diagnosticar_armazenamento
+from routes.financeiro_novo.missoes import _ler_linhas_om_excel
 
 
 class FinanceiroNovoIsolamentoTests(unittest.TestCase):
@@ -353,6 +355,75 @@ class FinanceiroNovoIsolamentoTests(unittest.TestCase):
         self.assertIn("paga_na_origem", migration)
         self.assertIn("incluindo reembolsos vinculados", despesas)
         self.assertIn("sem duplicar o pagamento", despesas)
+
+    def test_excel_da_om_e_convertido_em_linhas_editaveis_sem_salvar(self):
+        arquivo = io.BytesIO()
+        pasta = Workbook()
+        aba = pasta.active
+        aba.append(["Data", "Centro de custo", "Categoria", "Descrição", "Valor"])
+        aba.append(["10/08/2026", "02 - PRUMAT", "MAT - Material", "Dormentes", 1234.56])
+        pasta.save(arquivo)
+
+        linhas = _ler_linhas_om_excel(
+            arquivo.getvalue(),
+            [{"id": 2, "codigo": "02", "nome": "PRUMAT"}],
+            [{"id": 7, "codigo": "MAT", "nome": "Material"}],
+        )
+
+        self.assertEqual(linhas, [{
+            "data": "2026-08-10", "centro_custo_id": 2, "categoria_id": 7,
+            "descricao": "Dormentes", "valor": "1234,56",
+        }])
+
+    def test_excel_da_om_rejeita_cadastro_desconhecido(self):
+        arquivo = io.BytesIO()
+        pasta = Workbook()
+        aba = pasta.active
+        aba.append(["Data", "Centro de custo", "Categoria", "Descrição", "Valor"])
+        aba.append(["10/08/2026", "Centro inexistente", "MAT", "Teste", 10])
+        pasta.save(arquivo)
+        with self.assertRaisesRegex(ValorInvalido, "Centro inexistente"):
+            _ler_linhas_om_excel(
+                arquivo.getvalue(),
+                [{"id": 2, "codigo": "02", "nome": "PRUMAT"}],
+                [{"id": 7, "codigo": "MAT", "nome": "Material"}],
+            )
+
+    def test_upload_excel_da_om_retorna_previa_sem_gravar(self):
+        arquivo = io.BytesIO()
+        pasta = Workbook()
+        aba = pasta.active
+        aba.append(["Data", "Centro de custo", "Categoria", "Descrição", "Valor"])
+        aba.append(["10/08/2026", "2", "MAT", "Teste", 50])
+        pasta.save(arquivo)
+
+        resultado_om = MagicMock(); resultado_om.mappings.return_value.first.return_value = {"id": 1, "status": "RASCUNHO"}
+        resultado_centros = MagicMock(); resultado_centros.mappings.return_value.all.return_value = [{"id": 2, "codigo": "02", "nome": "PRUMAT"}]
+        resultado_categorias = MagicMock(); resultado_categorias.mappings.return_value.all.return_value = [{"id": 7, "codigo": "MAT", "nome": "Material"}]
+        conexao = MagicMock(); conexao.execute.side_effect = [resultado_om, resultado_centros, resultado_categorias]
+        contexto = MagicMock(); contexto.__enter__.return_value = conexao
+        engine = MagicMock(); engine.connect.return_value = contexto
+
+        app = create_app(); app.config.update(TESTING=True, WTF_CSRF_ENABLED=False)
+        with patch("routes.financeiro_novo.missoes.get_engine", return_value=engine):
+            with app.test_client() as client:
+                with client.session_transaction() as sessao:
+                    sessao["usuario_id"] = 1
+                    sessao["permissoes"] = ["financeiro_novo:editar"]
+                    sessao["ultimo_acesso"] = 9999999999
+                resposta = client.post("/financeiro-novo/oms/1/itens/carregar-excel",
+                    data={"arquivo_excel": (io.BytesIO(arquivo.getvalue()), "linhas.xlsx")})
+
+        self.assertEqual(resposta.status_code, 200)
+        self.assertEqual(resposta.get_json()["quantidade"], 1)
+        sql_executado = " ".join(str(chamada.args[0]) for chamada in conexao.execute.call_args_list)
+        self.assertNotIn("INSERT", sql_executado.upper())
+
+    def test_botao_carregar_excel_fica_entre_adicionar_e_salvar(self):
+        detalhe = (self.raiz / "templates" / "financeiro_novo" / "om_detalhe.html").read_text(encoding="utf-8")
+        self.assertLess(detalhe.index("+ Adicionar linha"), detalhe.index("Carregar Excel"))
+        self.assertLess(detalhe.index("Carregar Excel"), detalhe.index("Salvar todas as linhas"))
+        self.assertIn("om_itens_carregar_excel", detalhe)
 
     def test_reembolso_separa_edicao_aprovacao_e_pagamento(self):
         app = create_app(); app.config.update(TESTING=True, WTF_CSRF_ENABLED=False)
