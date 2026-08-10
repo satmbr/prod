@@ -425,6 +425,11 @@ class FinanceiroNovoIsolamentoTests(unittest.TestCase):
         self.assertLess(detalhe.index("Carregar Excel"), detalhe.index("Salvar todas as linhas"))
         self.assertIn("om_itens_carregar_excel", detalhe)
 
+    def test_pagamento_om_tem_botao_de_salvar_destacado(self):
+        detalhe = (self.raiz / "templates" / "financeiro_novo" / "om_detalhe.html").read_text(encoding="utf-8")
+        self.assertIn('type="submit" class="btn btn-primary full">Salvar adiantamento ou quitação', detalhe)
+        self.assertIn("om_pagamento_programar", detalhe)
+
     def test_reembolso_separa_edicao_aprovacao_e_pagamento(self):
         app = create_app(); app.config.update(TESTING=True, WTF_CSRF_ENABLED=False)
         with app.test_client() as client:
