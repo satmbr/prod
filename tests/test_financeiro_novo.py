@@ -447,6 +447,12 @@ class FinanceiroNovoIsolamentoTests(unittest.TestCase):
         self.assertNotIn("<span>Previsto</span>", detalhe)
         self.assertIn('diferenca = om["valor_total"] + om["valor_reembolsos"] - valor_pago', rotas)
 
+    def test_listagem_om_mostra_diferenca_entre_despesas_e_pago(self):
+        listagem = (self.raiz / "templates" / "financeiro_novo" / "missoes.html").read_text(encoding="utf-8")
+        self.assertIn('<th class="right">Diferença</th>', listagem)
+        self.assertIn("format(om.valor_total+om.valor_reembolsos-om.valor_pago)", listagem)
+        self.assertNotIn('<th class="right">Previsto</th>', listagem)
+
     def test_railway_volume_define_automaticamente_diretorio_de_upload(self):
         with tempfile.TemporaryDirectory() as volume:
             with patch.dict(os.environ, {"RAILWAY_VOLUME_MOUNT_PATH": volume, "UPLOAD_ROOT": ""}):

@@ -63,8 +63,6 @@ def missoes():
             SELECT o.*, p.nome_razao AS solicitante, cc.codigo AS centro, m.codigo AS moeda,
               COALESCE((SELECT SUM(pg.valor) FROM financeiro3_om_pagamentos pg
                 WHERE pg.om_id=o.id AND pg.status='PAGO'),0) AS valor_pago,
-              COALESCE((SELECT SUM(pg.valor) FROM financeiro3_om_pagamentos pg
-                WHERE pg.om_id=o.id AND pg.status='PREVISTO'),0) AS valor_previsto,
               COALESCE((SELECT SUM(i.valor) FROM financeiro3_reembolso_itens i
                 JOIN financeiro3_reembolsos rb ON rb.id=i.reembolso_id
                 WHERE rb.om_pagadora_id=o.id AND rb.forma_liquidacao='OM'
