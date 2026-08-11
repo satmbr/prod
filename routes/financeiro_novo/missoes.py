@@ -1,3 +1,4 @@
+import json
 import os
 import re
 import unicodedata
@@ -365,28 +366,83 @@ def _origens_duplicadas(conn, data, valor):
           WHERE i.data_despesa=:data AND i.valor=:valor AND i.status='ATIVO'
         ) duplicadas ORDER BY tipo,numero,item_id
     """), {"data": data, "valor": valor}).mappings().all()
-    resultado = []
+    return [_formatar_origem_duplicada(registro) for registro in registros]
+
+
+def _formatar_origem_duplicada(registro):
+    item = {
+        "tipo": registro["tipo"], "numero": registro["numero"],
+        "data": registro["data"].isoformat(), "descricao": registro["descricao"],
+        "categoria": registro["categoria"], "centro": registro["centro"],
+        "valor": str(registro["valor"]), "moeda": registro["moeda"],
+        "nome_arquivo": registro["nome_arquivo"],
+    }
+    if registro["tipo"] == "OM":
+        item["documento_url"] = url_for("financeiro_novo.om_detalhe", om_id=registro["origem_id"])
+        if registro["arquivo_id"]:
+            item["comprovante_url"] = url_for("financeiro_novo.om_item_anexo_baixar",
+                om_id=registro["origem_id"], item_id=registro["item_id"], arquivo_id=registro["arquivo_id"])
+    elif registro["tipo"] == "RD":
+        item["documento_url"] = url_for("financeiro_novo.rd_detalhe", rd_id=registro["origem_id"])
+    else:
+        item["documento_url"] = url_for("financeiro_novo.reembolso_detalhe", reembolso_id=registro["origem_id"])
+        if registro["arquivo_id"]:
+            item["comprovante_url"] = url_for("financeiro_novo.reembolso_anexo_baixar",
+                reembolso_id=registro["origem_id"], arquivo_id=registro["arquivo_id"])
+    return item
+
+
+def _origens_duplicadas_lote(conn, linhas):
+    if not linhas:
+        return {}
+    registros = conn.execute(text("""
+        WITH entrada AS (
+          SELECT linha,data,valor
+          FROM jsonb_to_recordset(CAST(:linhas AS jsonb))
+            AS x(linha integer,data date,valor numeric)
+        ), duplicadas AS (
+          SELECT e.linha,'OM'::text AS tipo,o.id AS origem_id,i.id AS item_id,
+            o.numero_om AS numero,i.data_despesa AS data,i.descricao,c.nome AS categoria,
+            cc.codigo||' · '||cc.nome AS centro,i.valor,m.codigo AS moeda,
+            ar.id AS arquivo_id,ar.nome_original AS nome_arquivo
+          FROM entrada e
+          JOIN financeiro3_om_itens i ON i.data_despesa=e.data AND i.valor=e.valor AND i.status='ATIVO'
+          JOIN financeiro3_oms o ON o.id=i.om_id AND o.removido_em IS NULL
+          JOIN financeiro3_categorias c ON c.id=i.categoria_id
+          JOIN financeiro3_centros_custo cc ON cc.id=i.centro_custo_id
+          JOIN financeiro3_moedas m ON m.id=o.moeda_id
+          LEFT JOIN financeiro3_anexos a ON a.entidade='OM_ITEM' AND a.entidade_id=i.id AND a.status='ATIVO'
+          LEFT JOIN financeiro3_arquivos ar ON ar.id=a.arquivo_id AND ar.status='ATIVO'
+          UNION ALL
+          SELECT e.linha,'RD',r.id,i.id,r.numero_rd,i.data_despesa,i.descricao,c.nome,
+            cc.codigo||' · '||cc.nome,i.valor,m.codigo,NULL::uuid,NULL::varchar
+          FROM entrada e
+          JOIN financeiro3_rd_itens i ON i.data_despesa=e.data AND i.valor=e.valor AND i.status='ATIVO'
+          JOIN financeiro3_rds r ON r.id=i.rd_id
+          JOIN financeiro3_categorias c ON c.id=i.categoria_id
+          JOIN financeiro3_centros_custo cc ON cc.id=r.centro_custo_id
+          JOIN financeiro3_moedas m ON m.id=r.moeda_id
+          UNION ALL
+          SELECT e.linha,'REEMBOLSO',x.id,i.id,'REEMBOLSO-'||LPAD(x.id::text,6,'0'),
+            i.data_despesa,i.descricao,c.nome,cc.codigo||' · '||cc.nome,i.valor,m.codigo,
+            ar.id,ar.nome_original
+          FROM entrada e
+          JOIN financeiro3_reembolso_itens i ON i.data_despesa=e.data AND i.valor=e.valor AND i.status='ATIVO'
+          JOIN financeiro3_reembolsos x ON x.id=i.reembolso_id
+          JOIN financeiro3_categorias c ON c.id=i.categoria_id
+          JOIN financeiro3_centros_custo cc ON cc.id=x.centro_custo_id
+          JOIN financeiro3_moedas m ON m.id=x.moeda_id
+          LEFT JOIN financeiro3_anexos a ON a.entidade='REEMBOLSO_ITEM' AND a.entidade_id=i.id AND a.status='ATIVO'
+          LEFT JOIN financeiro3_arquivos ar ON ar.id=a.arquivo_id AND ar.status='ATIVO'
+        )
+        SELECT * FROM duplicadas ORDER BY linha,tipo,numero,item_id
+    """), {"linhas": json.dumps([
+        {"linha": linha["linha"], "data": linha["data"].isoformat(), "valor": str(linha["valor"])}
+        for linha in linhas
+    ])}).mappings().all()
+    resultado = {}
     for registro in registros:
-        item = {
-            "tipo": registro["tipo"], "numero": registro["numero"],
-            "data": registro["data"].isoformat(), "descricao": registro["descricao"],
-            "categoria": registro["categoria"], "centro": registro["centro"],
-            "valor": str(registro["valor"]), "moeda": registro["moeda"],
-            "nome_arquivo": registro["nome_arquivo"],
-        }
-        if registro["tipo"] == "OM":
-            item["documento_url"] = url_for("financeiro_novo.om_detalhe", om_id=registro["origem_id"])
-            if registro["arquivo_id"]:
-                item["comprovante_url"] = url_for("financeiro_novo.om_item_anexo_baixar",
-                    om_id=registro["origem_id"], item_id=registro["item_id"], arquivo_id=registro["arquivo_id"])
-        elif registro["tipo"] == "RD":
-            item["documento_url"] = url_for("financeiro_novo.rd_detalhe", rd_id=registro["origem_id"])
-        else:
-            item["documento_url"] = url_for("financeiro_novo.reembolso_detalhe", reembolso_id=registro["origem_id"])
-            if registro["arquivo_id"]:
-                item["comprovante_url"] = url_for("financeiro_novo.reembolso_anexo_baixar",
-                    reembolso_id=registro["origem_id"], arquivo_id=registro["arquivo_id"])
-        resultado.append(item)
+        resultado.setdefault(registro["linha"], []).append(_formatar_origem_duplicada(registro))
     return resultado
 
 
@@ -566,25 +622,37 @@ def om_itens_carregar_excel(om_id):
         return jsonify({"erro": str(exc)}), 422
 
 
-@bp.get("/oms/<int:om_id>/verificar-duplicidades")
+@bp.post("/oms/<int:om_id>/verificar-duplicidades")
 @login_required
 @permission_required("financeiro_novo", "editar")
 def om_verificar_duplicidades(om_id):
-    datas = request.args.getlist("data")
-    valores = request.args.getlist("valor")
-    linhas = [{"data": data, "valor": valor} for data, valor in zip(datas, valores)]
+    corpo = request.get_json(silent=True)
+    linhas = corpo.get("linhas") if isinstance(corpo, dict) else None
+    if not isinstance(linhas, list):
+        return jsonify({"erro": "Envie as linhas para verificar duplicidades."}), 400
+    if len(linhas) > LIMITE_LINHAS_EXCEL_OM:
+        return jsonify({"erro": f"O lote excede o limite de {LIMITE_LINHAS_EXCEL_OM} linhas."}), 413
+    validas = []
+    for indice, linha in enumerate(linhas, 1):
+        if not isinstance(linha, dict):
+            continue
+        try:
+            validas.append({
+                "linha": indice,
+                "data": data_iso(linha.get("data"), f"Data da linha {indice}"),
+                "valor": decimal_br(linha.get("valor"), positivo=True),
+            })
+        except (ValorInvalido, AttributeError):
+            continue
     resultado, vistos = [], {}
     with get_engine().connect() as conn:
         if not _registro(conn, "financeiro3_oms", om_id):
             abort(404)
-        for indice, linha in enumerate(linhas, 1):
-            try:
-                data = data_iso(linha.get("data"), f"Data da linha {indice}")
-                valor = decimal_br(linha.get("valor"), positivo=True)
-            except (ValorInvalido, AttributeError):
-                continue
+        origens_por_linha = _origens_duplicadas_lote(conn, validas)
+        for linha in validas:
+            indice, data, valor = linha["linha"], linha["data"], linha["valor"]
             chave = (data, valor)
-            registros = _origens_duplicadas(conn, data, valor)
+            registros = list(origens_por_linha.get(indice, []))
             if chave in vistos:
                 registros.append({
                     "tipo": "LOTE", "numero": f"Linha {vistos[chave]}",
@@ -612,18 +680,27 @@ def om_item_novo(om_id):
             om = _registro(conn, "financeiro3_oms", om_id, True)
             if not om: abort(404)
             if om["status"] not in EDITAVEIS: abort(409)
+            refs_validas = conn.execute(text("""
+                SELECT COALESCE(BOOL_AND(
+                  EXISTS(SELECT 1 FROM financeiro3_categorias
+                    WHERE id=x.categoria AND ativo AND natureza='DESPESA')
+                  AND EXISTS(SELECT 1 FROM financeiro3_centros_custo
+                    WHERE id=x.centro AND ativo)
+                ),FALSE)
+                FROM jsonb_to_recordset(CAST(:refs AS jsonb)) AS x(centro integer,categoria integer)
+            """), {"refs": json.dumps([
+                {"centro": linha["centro"], "categoria": linha["categoria"]} for linha in linhas
+            ])}).scalar()
+            if not refs_validas:
+                raise ValorInvalido("Há linhas com centro de custo ou categoria inválidos.")
+            origens_por_linha = _origens_duplicadas_lote(conn, [
+                {"linha": linha["numero"], "data": linha["data"], "valor": linha["valor"]}
+                for linha in linhas
+            ])
             duplicadas, vistos = [], {}
             for linha in linhas:
-                refs = conn.execute(text("""
-                    SELECT EXISTS(SELECT 1 FROM financeiro3_categorias
-                        WHERE id=:categoria AND ativo AND natureza='DESPESA')
-                      AND EXISTS(SELECT 1 FROM financeiro3_centros_custo
-                        WHERE id=:centro AND ativo)
-                """), linha).scalar()
-                if not refs:
-                    raise ValorInvalido(f"Linha {linha['numero']}: centro ou categoria inválido.")
                 chave = (linha["data"], linha["valor"])
-                registros = _origens_duplicadas(conn, *chave)
+                registros = list(origens_por_linha.get(linha["numero"], []))
                 if chave in vistos:
                     registros.append({"tipo": "LOTE", "numero": f"linha {vistos[chave]} deste lote"})
                 else:

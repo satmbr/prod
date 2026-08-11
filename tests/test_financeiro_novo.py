@@ -1,5 +1,6 @@
 import io
 import os
+import re
 import tempfile
 import unittest
 import uuid
@@ -273,12 +274,15 @@ class FinanceiroNovoIsolamentoTests(unittest.TestCase):
             self.assertIn(coluna, detalhe)
         self.assertIn('id="duplicate-dialog"', detalhe)
         self.assertIn("Salvar mesmo assim", detalhe)
-        self.assertIn("URLSearchParams", detalhe)
-        self.assertIn("method:'GET'", detalhe)
+        self.assertNotIn("URLSearchParams", detalhe)
+        self.assertIn("method:'POST'", detalhe)
+        self.assertIn("JSON.stringify({linhas})", detalhe)
+        self.assertIn("'Content-Type':'application/json'", detalhe)
         self.assertIn("cache:'no-store'", detalhe)
         self.assertIn("credentials:'same-origin'", detalhe)
-        self.assertIn('@bp.get("/oms/<int:om_id>/verificar-duplicidades")', rotas)
-        self.assertIn('request.args.getlist("data")', rotas)
+        self.assertIn('@bp.post("/oms/<int:om_id>/verificar-duplicidades")', rotas)
+        self.assertIn("request.get_json(silent=True)", rotas)
+        self.assertIn("jsonb_to_recordset", rotas)
         self.assertNotIn("Analisei os possíveis lançamentos duplicados", detalhe)
         self.assertNotIn('type="checkbox" name="confirmar_duplicidade"', detalhe)
 
@@ -298,17 +302,52 @@ class FinanceiroNovoIsolamentoTests(unittest.TestCase):
         app.config.update(TESTING=True)
         with patch("routes.financeiro_novo.missoes.get_engine", return_value=engine):
             with app.test_client() as client:
+                token = re.search(r'<meta name="csrf-token" content="([^"]+)"',
+                                  client.get("/auth/login").get_data(as_text=True)).group(1)
                 with client.session_transaction() as sessao:
                     sessao["usuario_id"] = 1
                     sessao["permissoes"] = ["financeiro_novo:editar"]
                     sessao["ultimo_acesso"] = 9999999999
-                resposta = client.get(
-                    "/financeiro-novo/oms/1/verificar-duplicidades"
-                    "?data=2026-08-06&valor=123%2C45"
+                resposta = client.post(
+                    "/financeiro-novo/oms/1/verificar-duplicidades",
+                    json={"linhas": [{"data": "2026-08-06", "valor": "123,45"}]},
+                    headers={"X-CSRFToken": token},
                 )
 
         self.assertEqual(resposta.status_code, 200)
         self.assertEqual(resposta.get_json(), {"duplicidades": []})
+
+    def test_verificacao_duplicidades_aceita_lote_grande_em_json(self):
+        resultado_om = MagicMock()
+        resultado_om.mappings.return_value.first.return_value = {"id": 1}
+        resultado_duplicidades = MagicMock()
+        resultado_duplicidades.mappings.return_value.all.return_value = []
+        conexao = MagicMock()
+        conexao.execute.side_effect = [resultado_om, resultado_duplicidades]
+        contexto = MagicMock(); contexto.__enter__.return_value = conexao
+        engine = MagicMock(); engine.connect.return_value = contexto
+        linhas = [
+            {"data": "2026-08-06", "valor": f"{indice},00"}
+            for indice in range(1, 249)
+        ]
+
+        app = create_app(); app.config.update(TESTING=True)
+        with patch("routes.financeiro_novo.missoes.get_engine", return_value=engine):
+            with app.test_client() as client:
+                token = re.search(r'<meta name="csrf-token" content="([^"]+)"',
+                                  client.get("/auth/login").get_data(as_text=True)).group(1)
+                with client.session_transaction() as sessao:
+                    sessao["usuario_id"] = 1
+                    sessao["permissoes"] = ["financeiro_novo:editar"]
+                    sessao["ultimo_acesso"] = 9999999999
+                resposta = client.post(
+                    "/financeiro-novo/oms/1/verificar-duplicidades", json={"linhas": linhas},
+                    headers={"X-CSRFToken": token},
+                )
+
+        self.assertEqual(resposta.status_code, 200)
+        self.assertEqual(resposta.get_json(), {"duplicidades": []})
+        self.assertEqual(conexao.execute.call_count, 2)
 
     def test_rd_aplica_a_mesma_verificacao_de_duplicidades(self):
         rotas = (self.raiz / "routes" / "financeiro_novo" / "missoes.py").read_text(encoding="utf-8")
