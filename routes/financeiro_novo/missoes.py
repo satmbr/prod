@@ -206,10 +206,10 @@ def om_detalhe(om_id):
         ), {"id": om_id}).scalar()
         opcoes = _opcoes(conn)
     valor_pago = sum((pg["valor"] for pg in pagamentos if pg["status"] == "PAGO"), start=0)
-    valor_previsto = sum((pg["valor"] for pg in pagamentos if pg["status"] == "PREVISTO"), start=0)
+    diferenca = om["valor_total"] + om["valor_reembolsos"] - valor_pago
     return render_template(
         "financeiro_novo/om_detalhe.html", om=om, itens=itens, decisoes=decisoes, anexos=anexos,
-        pagamentos=pagamentos, valor_pago=valor_pago, valor_previsto=valor_previsto,
+        pagamentos=pagamentos, valor_pago=valor_pago, diferenca=diferenca,
         despesa_importada=despesa_importada,
         armazenamento=diagnosticar_armazenamento(),
         opcoes=opcoes, editavel=om["status"] in EDITAVEIS,

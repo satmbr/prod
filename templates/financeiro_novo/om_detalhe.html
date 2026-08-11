@@ -12,7 +12,7 @@
   <div class="dsp-summary">
     <article class="dsp-kpi"><span>Total das despesas</span><strong>{{ om.moeda }} {{ '%.2f'|format(om.valor_total+om.valor_reembolsos)|replace('.',',') }}</strong></article>
     <article class="dsp-kpi"><span>Pago</span><strong>{{ om.moeda }} {{ '%.2f'|format(valor_pago)|replace('.',',') }}</strong></article>
-    <article class="dsp-kpi"><span>Previsto</span><strong>{{ om.moeda }} {{ '%.2f'|format(valor_previsto)|replace('.',',') }}</strong></article>
+    <article class="dsp-kpi"><span>Diferença</span><strong>{{ om.moeda }} {{ '%.2f'|format(diferenca)|replace('.',',') }}</strong></article>
     <article class="dsp-kpi"><span>Status</span><strong><span class="dsp-status {{ om.status|lower }}">{{ om.status|replace('_',' ') }}</span></strong></article>
   </div>
   <div class="dsp-grid"><div>
