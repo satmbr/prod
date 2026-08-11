@@ -3,12 +3,13 @@ import os
 import tempfile
 import unittest
 import uuid
+from datetime import date
 from decimal import Decimal
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from PIL import Image
-from openpyxl import Workbook
+from openpyxl import Workbook, load_workbook
 from pypdf import PdfReader
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
@@ -24,6 +25,7 @@ from routes.financeiro_novo.services.anexos import (
 )
 from routes.financeiro_novo.cadastros import TIPOS, _normalizar
 from routes.financeiro_novo.services.valores import ValorInvalido, decimal_br
+from routes.financeiro_novo.services.exportacao_om import gerar_excel_om, gerar_pdf_om
 from routes.financeiro_novo.homologacao import diagnosticar_armazenamento
 from routes.financeiro_novo.missoes import _ler_linhas_om_excel
 from routes.financeiro_novo.reembolsos import _vincular_anexo
@@ -697,6 +699,73 @@ class FinanceiroNovoAnexosTests(unittest.TestCase):
         )
         with self.assertRaises(AnexoInvalido):
             normalizar_anexo(arquivo)
+
+
+class FinanceiroNovoExportacaoOmTests(unittest.TestCase):
+    def setUp(self):
+        self.om = {
+            "numero_om": "OM/2026-001", "solicitante": "Favorecido Teste",
+            "matricula_favorecido": "12345", "centro_codigo": "02",
+            "centro_nome": "PRUMAT", "status": "APROVADA", "moeda": "BRL",
+            "observacoes": "Relatório de teste", "valor_reembolsos": Decimal("25.00"),
+        }
+
+    def _item(self, numero, descricao, valor, arquivo_id=None, caminho=None):
+        return {
+            "numero_linha": numero, "data_despesa": date(2026, 8, numero),
+            "centro_codigo": f"0{numero}", "centro_nome": f"Centro {numero}",
+            "categoria": "Material", "descricao": descricao, "valor": Decimal(valor),
+            "arquivo_id": arquivo_id, "nome_original": f"recibo-{numero}.pdf" if arquivo_id else None,
+            "caminho_recibo": caminho, "justificativa_sem_comprovante": None,
+        }
+
+    def test_excel_mantem_ordem_das_linhas_e_total_por_formula(self):
+        itens = [self._item(1, "Primeira", "100.50"), self._item(2, "Segunda", "20.00")]
+        arquivo = gerar_excel_om(self.om, itens, [])
+        pasta = load_workbook(arquivo, data_only=False)
+        resumo = pasta["Resumo OM"]
+
+        self.assertEqual(pasta.sheetnames, ["Resumo OM", "Pagamentos"])
+        self.assertEqual(resumo["A11"].value, 1)
+        self.assertEqual(resumo["E11"].value, "Primeira")
+        self.assertEqual(resumo["A12"].value, 2)
+        self.assertEqual(resumo["E12"].value, "Segunda")
+        self.assertEqual(resumo["G13"].value, "=SUM(G11:G12)")
+        self.assertEqual(resumo.freeze_panes, "A11")
+
+    def test_pdf_apresenta_resumo_e_recibos_na_mesma_ordem(self):
+        with tempfile.TemporaryDirectory() as pasta:
+            caminhos = []
+            for numero in (1, 2):
+                caminho = Path(pasta) / f"recibo-{numero}.pdf"
+                pdf = canvas.Canvas(str(caminho))
+                pdf.drawString(50, 750, f"RECIBO ORDEM {numero}")
+                pdf.save()
+                caminhos.append(caminho)
+            itens = [
+                self._item(1, "Primeira", "10", "a", caminhos[0]),
+                self._item(2, "Segunda", "20", "b", caminhos[1]),
+            ]
+            leitor = PdfReader(gerar_pdf_om(self.om, itens))
+
+        textos = [pagina.extract_text() for pagina in leitor.pages]
+        self.assertIn("Resumo das despesas", textos[0])
+        self.assertEqual(textos[1].strip(), "RECIBO ORDEM 1")
+        self.assertEqual(textos[2].strip(), "RECIBO ORDEM 2")
+
+    def test_pdf_sinaliza_recibo_vinculado_ausente_sem_interromper_exportacao(self):
+        item = self._item(1, "Arquivo perdido", "10", "a", None)
+        leitor = PdfReader(gerar_pdf_om(self.om, [item]))
+        self.assertEqual(len(leitor.pages), 2)
+        self.assertIn("Arquivo indisponível", leitor.pages[1].extract_text())
+
+    def test_tela_expoe_as_duas_acoes_de_exportacao(self):
+        raiz = Path(__file__).resolve().parents[1]
+        detalhe = (raiz / "templates" / "financeiro_novo" / "om_detalhe.html").read_text(encoding="utf-8")
+        self.assertIn("Exportar Excel", detalhe)
+        self.assertIn("Exportar OM", detalhe)
+        self.assertIn("om_exportar_excel", detalhe)
+        self.assertIn("om_exportar_pdf", detalhe)
 
 
 if __name__ == "__main__":

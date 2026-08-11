@@ -19,6 +19,7 @@ from routes.financeiro_novo import bp
 from routes.financeiro_novo.despesas import FORMAS_PAGAMENTO, _opcoes
 from routes.financeiro_novo.services.anexos import AnexoInvalido, nome_objeto_pdf, normalizar_anexo
 from routes.financeiro_novo.services.auditoria import registrar_evento
+from routes.financeiro_novo.services.exportacao_om import gerar_excel_om, gerar_pdf_om, nome_base_om
 from routes.financeiro_novo.services.valores import ValorInvalido, data_iso, decimal_br
 from routes.financeiro_novo.views import build_subnav
 
@@ -191,7 +192,7 @@ def om_detalhe(om_id):
             JOIN financeiro3_centros_custo cc ON cc.id=i.centro_custo_id
             LEFT JOIN financeiro3_anexos a ON a.entidade='OM_ITEM' AND a.entidade_id=i.id AND a.status='ATIVO'
             LEFT JOIN financeiro3_arquivos ar ON ar.id=a.arquivo_id
-            WHERE i.om_id=:id AND i.status='ATIVO' ORDER BY i.data_despesa,i.id
+            WHERE i.om_id=:id AND i.status='ATIVO' ORDER BY i.id
         """), {"id": om_id}).mappings().all()
         pagamentos = conn.execute(text("""
             SELECT pg.*,a.id AS anexo_id,ar.id AS arquivo_id,ar.nome_original
@@ -213,6 +214,89 @@ def om_detalhe(om_id):
         armazenamento=diagnosticar_armazenamento(),
         opcoes=opcoes, editavel=om["status"] in EDITAVEIS,
         subnav_links=build_subnav("missoes"),
+    )
+
+
+def _dados_exportacao_om(om_id):
+    with get_engine().connect() as conn:
+        om = conn.execute(text("""
+            SELECT o.*, p.nome_razao AS solicitante, cc.codigo AS centro_codigo,
+                   cc.nome AS centro_nome, m.codigo AS moeda,
+              COALESCE((SELECT SUM(i.valor) FROM financeiro3_reembolso_itens i
+                JOIN financeiro3_reembolsos rb ON rb.id=i.reembolso_id
+                WHERE rb.om_pagadora_id=o.id AND rb.forma_liquidacao='OM'
+                  AND rb.status='APROVADO' AND i.status='ATIVO'),0) AS valor_reembolsos
+            FROM financeiro3_oms o
+            JOIN financeiro3_pessoas p ON p.id=o.solicitante_id
+            JOIN financeiro3_centros_custo cc ON cc.id=o.centro_custo_id
+            JOIN financeiro3_moedas m ON m.id=o.moeda_id
+            WHERE o.id=:id AND o.removido_em IS NULL
+        """), {"id": om_id}).mappings().first()
+        if not om:
+            abort(404)
+        itens = conn.execute(text("""
+            SELECT i.*, ROW_NUMBER() OVER (ORDER BY i.id) AS numero_linha,
+              c.nome AS categoria, cc.codigo AS centro_codigo, cc.nome AS centro_nome,
+              ar.id AS arquivo_id, ar.nome_original, ar.object_key
+            FROM financeiro3_om_itens i
+            JOIN financeiro3_categorias c ON c.id=i.categoria_id
+            JOIN financeiro3_centros_custo cc ON cc.id=i.centro_custo_id
+            LEFT JOIN LATERAL (
+              SELECT arq.id, arq.nome_original, arq.object_key
+              FROM financeiro3_anexos a
+              JOIN financeiro3_arquivos arq ON arq.id=a.arquivo_id AND arq.status='ATIVO'
+              WHERE a.entidade='OM_ITEM' AND a.entidade_id=i.id AND a.status='ATIVO'
+              ORDER BY a.id DESC LIMIT 1
+            ) ar ON TRUE
+            WHERE i.om_id=:id AND i.status='ATIVO'
+            ORDER BY i.id
+        """), {"id": om_id}).mappings().all()
+        pagamentos = conn.execute(text("""
+            SELECT pg.*, ar.id AS arquivo_id, ar.nome_original
+            FROM financeiro3_om_pagamentos pg
+            LEFT JOIN LATERAL (
+              SELECT arq.id, arq.nome_original
+              FROM financeiro3_anexos a
+              JOIN financeiro3_arquivos arq ON arq.id=a.arquivo_id AND arq.status='ATIVO'
+              WHERE a.entidade='OM_PAGAMENTO' AND a.entidade_id=pg.id AND a.status='ATIVO'
+              ORDER BY a.id DESC LIMIT 1
+            ) ar ON TRUE
+            WHERE pg.om_id=:id
+            ORDER BY COALESCE(pg.data_pagamento,pg.data_prevista_pagamento),pg.id
+        """), {"id": om_id}).mappings().all()
+
+    itens_exportacao = []
+    for item in itens:
+        dados = dict(item)
+        caminho = _caminho(item["object_key"]) if item.get("object_key") else None
+        dados["caminho_recibo"] = caminho if caminho and caminho.is_file() else None
+        itens_exportacao.append(dados)
+    return dict(om), itens_exportacao, [dict(pg) for pg in pagamentos]
+
+
+@bp.get("/oms/<int:om_id>/exportar/excel")
+@login_required
+@permission_required("financeiro_novo", "visualizar")
+def om_exportar_excel(om_id):
+    om, itens, pagamentos = _dados_exportacao_om(om_id)
+    return send_file(
+        gerar_excel_om(om, itens, pagamentos),
+        as_attachment=True,
+        download_name=f"{nome_base_om(om['numero_om'])}.xlsx",
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+
+
+@bp.get("/oms/<int:om_id>/exportar/om")
+@login_required
+@permission_required("financeiro_novo", "visualizar")
+def om_exportar_pdf(om_id):
+    om, itens, _ = _dados_exportacao_om(om_id)
+    return send_file(
+        gerar_pdf_om(om, itens),
+        as_attachment=True,
+        download_name=f"{nome_base_om(om['numero_om'])}.pdf",
+        mimetype="application/pdf",
     )
 
 
