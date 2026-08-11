@@ -27,7 +27,7 @@ from routes.financeiro_novo.cadastros import TIPOS, _normalizar
 from routes.financeiro_novo.services.valores import ValorInvalido, decimal_br
 from routes.financeiro_novo.services.exportacao_om import gerar_excel_om, gerar_pdf_om
 from routes.financeiro_novo.homologacao import diagnosticar_armazenamento
-from routes.financeiro_novo.missoes import _ler_linhas_om_excel
+from routes.financeiro_novo.missoes import _ler_linhas_om_excel, _linhas_om_formulario
 from routes.financeiro_novo.reembolsos import _vincular_anexo
 
 
@@ -229,7 +229,23 @@ class FinanceiroNovoIsolamentoTests(unittest.TestCase):
             self.assertNotIn(f'name="{nome}"', campos)
         detalhe = (self.raiz / "templates" / "financeiro_novo" / "om_detalhe.html").read_text(encoding="utf-8")
         self.assertIn("om_item_novo", detalhe)
-        self.assertIn("justificativa_sem_comprovante", detalhe)
+        self.assertNotIn("justificativa_sem_comprovante", detalhe)
+        self.assertNotIn("Recibo ou justificativa", detalhe)
+        self.assertIn("<th>Recibo</th>", detalhe)
+
+    def test_linha_om_pode_ser_salva_sem_recibo(self):
+        app = create_app()
+        with app.test_request_context("/", method="POST", data={
+            "data_despesa": "2026-08-11",
+            "centro_custo_id": "2",
+            "categoria_id": "7",
+            "descricao": "Despesa sem recibo",
+            "valor": "50,00",
+            "arquivo": (io.BytesIO(b""), ""),
+        }):
+            linhas = _linhas_om_formulario()
+        self.assertEqual(len(linhas), 1)
+        self.assertFalse(linhas[0]["arquivo"].filename)
 
     def test_om_em_lote_e_rd_independente(self):
         migration = (self.raiz / "migrations" / "010_financeiro_novo_om_lote_rd_independente.sql").read_text(encoding="utf-8")
@@ -730,7 +746,7 @@ class FinanceiroNovoExportacaoOmTests(unittest.TestCase):
             "centro_codigo": f"0{numero}", "centro_nome": f"Centro {numero}",
             "categoria": "Material", "descricao": descricao, "valor": Decimal(valor),
             "arquivo_id": arquivo_id, "nome_original": f"recibo-{numero}.pdf" if arquivo_id else None,
-            "caminho_recibo": caminho, "justificativa_sem_comprovante": None,
+            "caminho_recibo": caminho,
         }
 
     def test_excel_mantem_ordem_das_linhas_e_total_por_formula(self):

@@ -24,7 +24,7 @@
     <section class="zone"><header class="zone-head"><div><div class="zone-title">Novas linhas de despesas</div><div class="muted">Monte várias linhas e salve o lote de uma só vez.</div></div></header><div class="zone-body">
       {% if editavel and editar %}
       <form id="om-batch-form" method="post" enctype="multipart/form-data" action="{{ url_for('financeiro_novo.om_item_novo',om_id=om.id) }}">
-        <div class="dsp-table-wrap"><table class="dsp-table om-batch-table"><thead><tr><th>#</th><th>Data *</th><th>Centro de custo *</th><th>Categoria *</th><th>Descrição *</th><th>Valor *</th><th>Recibo ou justificativa *</th><th></th></tr></thead><tbody id="om-batch-body"></tbody></table></div>
+        <div class="dsp-table-wrap"><table class="dsp-table om-batch-table"><thead><tr><th>#</th><th>Data *</th><th>Centro de custo *</th><th>Categoria *</th><th>Descrição *</th><th>Valor *</th><th>Recibo</th><th></th></tr></thead><tbody id="om-batch-body"></tbody></table></div>
         <div id="excel-feedback" class="dsp-alert" hidden></div>
         <div id="duplicate-feedback" class="dsp-alert" hidden></div>
         <input type="hidden" name="forcar_salvamento" value="0">
@@ -39,14 +39,14 @@
         <td><select name="categoria_id" required><option value="">Selecione</option>{% for c in opcoes.categorias %}<option value="{{ c.id }}">{{ c.codigo }} · {{ c.nome }}</option>{% endfor %}</select></td>
         <td><input name="descricao" maxlength="220" required></td>
         <td><input name="valor" inputmode="decimal" required></td>
-        <td><input type="file" name="arquivo" accept="image/*,application/pdf"><textarea name="justificativa_sem_comprovante" rows="2" placeholder="Justificativa se não houver recibo"></textarea><small class="duplicate-row"></small></td>
+        <td><input type="file" name="arquivo" accept="image/*,application/pdf"><small class="duplicate-row"></small></td>
         <td><button type="button" class="link-button remove-om-line">Remover</button></td>
       </tr></template>
       {% endif %}
     </div></section>
 
     <section class="zone"><header class="zone-head"><div><div class="zone-title">Linhas salvas</div><div class="muted">Numeração sequencial das linhas ativas.</div></div></header><div class="zone-body"><div class="dsp-table-wrap"><table class="dsp-table"><thead><tr><th>#</th><th>Data</th><th>Centro de custo</th><th>Categoria</th><th>Descrição</th><th>Comprovante</th><th class="right">Valor</th>{% if editavel and editar %}<th></th>{% endif %}</tr></thead><tbody>
-      {% for i in itens %}<tr><td><strong>{{ i.numero_linha }}</strong></td><td>{{ i.data_despesa.strftime('%d/%m/%Y') }}</td><td>{{ i.centro_codigo }} · {{ i.centro_nome }}</td><td>{{ i.categoria }}</td><td>{{ i.descricao }}{% if i.justificativa_sem_comprovante %}<small class="muted"> · {{ i.justificativa_sem_comprovante }}</small>{% endif %}</td><td>{% if i.arquivo_id %}<a href="{{ url_for('financeiro_novo.om_item_anexo_baixar',om_id=om.id,item_id=i.id,arquivo_id=i.arquivo_id) }}">{{ i.nome_original }}</a>{% else %}Sem recibo{% endif %}{% if editavel and editar %}<form method="post" enctype="multipart/form-data" action="{{ url_for('financeiro_novo.om_item_recibo_substituir',om_id=om.id,item_id=i.id) }}" class="receipt-replace"><input type="file" name="arquivo" accept="image/*,application/pdf" required><button type="submit">{{ 'Substituir' if i.arquivo_id else 'Enviar recibo' }}</button></form>{% endif %}</td><td class="right">{{ om.moeda }} {{ '%.2f'|format(i.valor)|replace('.',',') }}</td>{% if editavel and editar %}<td><form method="post" action="{{ url_for('financeiro_novo.om_item_remover',om_id=om.id,item_id=i.id) }}"><button>Remover</button></form></td>{% endif %}</tr>
+      {% for i in itens %}<tr><td><strong>{{ i.numero_linha }}</strong></td><td>{{ i.data_despesa.strftime('%d/%m/%Y') }}</td><td>{{ i.centro_codigo }} · {{ i.centro_nome }}</td><td>{{ i.categoria }}</td><td>{{ i.descricao }}</td><td>{% if i.arquivo_id %}<a href="{{ url_for('financeiro_novo.om_item_anexo_baixar',om_id=om.id,item_id=i.id,arquivo_id=i.arquivo_id) }}">{{ i.nome_original }}</a>{% else %}Sem recibo{% endif %}{% if editavel and editar %}<form method="post" enctype="multipart/form-data" action="{{ url_for('financeiro_novo.om_item_recibo_substituir',om_id=om.id,item_id=i.id) }}" class="receipt-replace"><input type="file" name="arquivo" accept="image/*,application/pdf" required><button type="submit">{{ 'Substituir' if i.arquivo_id else 'Enviar recibo' }}</button></form>{% endif %}</td><td class="right">{{ om.moeda }} {{ '%.2f'|format(i.valor)|replace('.',',') }}</td>{% if editavel and editar %}<td><form method="post" action="{{ url_for('financeiro_novo.om_item_remover',om_id=om.id,item_id=i.id) }}"><button>Remover</button></form></td>{% endif %}</tr>
       {% else %}<tr><td colspan="8" class="dsp-empty">Nenhuma despesa adicionada.</td></tr>{% endfor %}
     </tbody></table></div></div></section>
 
@@ -172,8 +172,6 @@
   form.addEventListener('submit', async event => {
     event.preventDefault();
     if (!form.reportValidity()) return;
-    const semRecibo=[...body.rows].map((row,index) => ({row,index})).filter(item => !item.row.querySelector('[name="arquivo"]').files.length && !item.row.querySelector('[name="justificativa_sem_comprovante"]').value.trim());
-    if (semRecibo.length) { excelFeedback.hidden=false; excelFeedback.textContent='Anexe o recibo ou informe a justificativa nas linhas: '+semRecibo.map(item=>item.index+1).join(', ')+'.'; semRecibo[0].row.scrollIntoView({behavior:'smooth',block:'center'}); return; }
     const resultado = await checkDuplicates();
     if (resultado.erro) { feedback.scrollIntoView({behavior:'smooth',block:'center'}); return; }
     if (resultado.duplicidades.length && forceInput.value !== '1') { renderDuplicateTable(dialogContent,resultado.duplicidades); dialog.showModal(); return; }

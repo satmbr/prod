@@ -119,10 +119,7 @@ def gerar_excel_om(om: Mapping, itens: Iterable[Mapping], pagamentos: Iterable[M
 
     primeira = cabecalho_linha + 1
     for linha, item in enumerate(itens, start=primeira):
-        recibo = item.get("nome_original") if item.get("arquivo_id") else (
-            f"Sem recibo · {item.get('justificativa_sem_comprovante')}"
-            if item.get("justificativa_sem_comprovante") else "Sem recibo"
-        )
+        recibo = item.get("nome_original") if item.get("arquivo_id") else "Sem recibo"
         ws.append([
             int(item.get("numero_linha") or linha - cabecalho_linha),
             item.get("data_despesa"),
@@ -280,8 +277,6 @@ def _resumo_pdf(om: Mapping, itens: list[Mapping]) -> BytesIO:
                 recibo = f"{recibo} · indisponível"
         else:
             recibo = "Sem recibo"
-            if item.get("justificativa_sem_comprovante"):
-                recibo += f" · {item.get('justificativa_sem_comprovante')}"
         linhas.append([
             Paragraph(_texto(item.get("numero_linha")), tabela_centro),
             Paragraph(_data(item.get("data_despesa")), tabela_centro),

@@ -396,11 +396,10 @@ def _linhas_om_formulario():
     categorias = request.form.getlist("categoria_id")
     descricoes = request.form.getlist("descricao")
     valores = request.form.getlist("valor")
-    justificativas = request.form.getlist("justificativa_sem_comprovante")
     arquivos = request.files.getlist("arquivo")
     quantidade = len(datas)
     if not quantidade or any(len(lista) != quantidade for lista in (
-        centros, categorias, descricoes, valores, justificativas, arquivos,
+        centros, categorias, descricoes, valores, arquivos,
     )):
         raise ValorInvalido("As linhas da OM estão incompletas. Revise e tente novamente.")
     linhas = []
@@ -411,12 +410,9 @@ def _linhas_om_formulario():
         except ValueError as exc:
             raise ValorInvalido(f"Linha {indice + 1}: centro ou categoria inválido.") from exc
         descricao = descricoes[indice].strip()
-        justificativa = justificativas[indice].strip() or None
         arquivo = arquivos[indice]
         if not descricao or len(descricao) > 220:
             raise ValorInvalido(f"Linha {indice + 1}: informe uma descrição com até 220 caracteres.")
-        if (not arquivo or not arquivo.filename) and not justificativa:
-            raise ValorInvalido(f"Linha {indice + 1}: anexe o recibo ou justifique sua ausência.")
         linhas.append({
             "numero": indice + 1,
             "data": data_iso(datas[indice], f"Data da linha {indice + 1}"),
@@ -424,7 +420,6 @@ def _linhas_om_formulario():
             "categoria": categoria,
             "descricao": descricao,
             "valor": decimal_br(valores[indice], positivo=True),
-            "justificativa": justificativa,
             "arquivo": arquivo,
         })
     return linhas
@@ -641,8 +636,8 @@ def om_item_novo(om_id):
             for linha, preparado in zip(linhas, preparados):
                 item = conn.execute(text("""
                     INSERT INTO financeiro3_om_itens(om_id,data_despesa,centro_custo_id,
-                      categoria_id,descricao,valor,justificativa_sem_comprovante,criado_por)
-                    VALUES (:om,:data,:centro,:categoria,:descricao,:valor,:justificativa,:usuario)
+                      categoria_id,descricao,valor,criado_por)
+                    VALUES (:om,:data,:centro,:categoria,:descricao,:valor,:usuario)
                     RETURNING *
                 """), {**linha, "om": om_id, "usuario": session.get("usuario_id")}).mappings().one()
                 vinculo = _vincular_anexo(conn, preparado, "OM_ITEM", item["id"], "COMPROVANTE")
