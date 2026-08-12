@@ -10,15 +10,17 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from PIL import Image
+from flask import request
 from openpyxl import Workbook, load_workbook
 from pypdf import PdfReader
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
 from werkzeug.datastructures import FileStorage
+from werkzeug.datastructures import MultiDict
 
 os.environ.setdefault("SECRET_KEY", "test-secret-key")
 
-from app import create_app
+from app import ProdRequest, create_app
 from routes.financeiro_novo.services.anexos import (
     AnexoInvalido,
     nome_objeto_pdf,
@@ -348,6 +350,35 @@ class FinanceiroNovoIsolamentoTests(unittest.TestCase):
         self.assertEqual(resposta.status_code, 200)
         self.assertEqual(resposta.get_json(), {"duplicidades": []})
         self.assertEqual(conexao.execute.call_count, 2)
+
+    def test_formulario_suporta_mil_linhas_de_om_sem_liberar_limite(self):
+        self.assertGreaterEqual(ProdRequest.max_form_parts, 6002)
+        self.assertLessEqual(ProdRequest.max_form_parts, 7000)
+        self.assertEqual(ProdRequest.max_form_memory_size, 2 * 1024 * 1024)
+
+        app = create_app()
+        app.config.update(TESTING=True, WTF_CSRF_ENABLED=False)
+        app.add_url_rule(
+            "/__teste_partes", "teste_partes",
+            lambda: str(len(request.form.getlist("campo"))), methods=["POST"],
+        )
+        dados = MultiDict([("campo", str(indice)) for indice in range(1490)])
+        dados.add("arquivo", (io.BytesIO(b"teste"), "teste.txt"))
+        with app.test_client() as client:
+            with client.session_transaction() as sessao:
+                sessao["usuario_id"] = 1
+                sessao["ultimo_acesso"] = 9999999999
+            resposta = client.post("/__teste_partes", data=dados)
+        self.assertEqual(resposta.status_code, 200)
+        self.assertEqual(resposta.get_data(as_text=True), "1490")
+
+    def test_erro_de_lote_grande_tem_mensagem_compreensivel(self):
+        app = create_app()
+        app.config.update(TESTING=True, WTF_CSRF_ENABLED=False, MAX_CONTENT_LENGTH=10)
+        with app.test_client() as client:
+            resposta = client.post("/auth/login", data={"campo": "x" * 100})
+        self.assertEqual(resposta.status_code, 413)
+        self.assertIn("excedem o limite permitido", resposta.get_data(as_text=True))
 
     def test_rd_aplica_a_mesma_verificacao_de_duplicidades(self):
         rotas = (self.raiz / "routes" / "financeiro_novo" / "missoes.py").read_text(encoding="utf-8")

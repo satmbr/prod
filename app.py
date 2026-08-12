@@ -1,12 +1,21 @@
-from flask import Flask, session, redirect, url_for, request, flash, render_template, abort
+from flask import Flask, Request, session, redirect, url_for, request, flash, render_template, abort
 from flask_wtf.csrf import CSRFProtect, CSRFError
+from werkzeug.exceptions import RequestEntityTooLarge
 import os
 from datetime import timedelta, datetime
 
 csrf = CSRFProtect()
 
+
+class ProdRequest(Request):
+    # Uma OM pode conter até 1.000 linhas, cada uma com seis campos multipart.
+    # O limite permanece finito para proteger o parser contra abuso.
+    max_form_parts = 7000
+    max_form_memory_size = 2 * 1024 * 1024
+
 def create_app():
     app = Flask(__name__)
+    app.request_class = ProdRequest
     secret_key = os.getenv("SECRET_KEY")
     if not secret_key:
         raise RuntimeError("SECRET_KEY não definida no ambiente.")
@@ -34,6 +43,14 @@ def create_app():
     @app.errorhandler(CSRFError)
     def csrf_error(_erro):
         return "Requisição inválida ou expirada. Atualize a página e tente novamente.", 400
+
+    @app.errorhandler(RequestEntityTooLarge)
+    def requisicao_grande(_erro):
+        return (
+            "O lote ou os anexos excedem o limite permitido. "
+            "Reduza a quantidade ou o tamanho dos arquivos e tente novamente.",
+            413,
+        )
 
     @app.before_request
     def controlar_sessao():
