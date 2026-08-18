@@ -84,3 +84,5 @@ relação independente entre OM, RD, Despesas, Reembolsos e Notas de Débito.
 `migrations/012_financeiro_novo_empresas.sql` separa Despesas e Notas de
 Débito em MATISA, PRUMO e PRUMAT. Registros anteriores e importações de OM/RD
 permanecem MATISA; uma Nota de Débito só aceita despesas da mesma empresa.
+
+<!-- Verificação de publicação: 2026-08-18 -->
