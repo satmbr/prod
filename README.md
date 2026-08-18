@@ -47,9 +47,9 @@ cancelamento têm permissões independentes. O envio para aprovação exige item
 e comprovante; imagens e PDFs são armazenados como PDF canônico privado.
 
 O ciclo de missões é criado pela migration
-`migrations/006_financeiro_novo_om_rd.sql`. Cada OM pode originar uma única
-RD. Na aprovação da prestação, a diferença entre gastos e adiantamento gera
-um reembolso, uma devolução ou a liquidação imediata quando o saldo é zero.
+`migrations/006_financeiro_novo_om_rd.sql`, complementado pelas migrations
+posteriores. OM e RD são documentos independentes; ambas podem ser importadas
+para Despesas sem duplicar o pagamento registrado na origem.
 
 Notas de Débito, recebimentos e conciliações são criados pela migration
 `migrations/007_financeiro_novo_nd_relatorios.sql`. Os relatórios consolidam
@@ -78,3 +78,9 @@ centro de custo por linha da OM e restaura a criação independente de RDs com
 número, matrícula, responsável e período próprios. A tela da OM permite montar
 e salvar várias linhas em uma transação e verifica possíveis duplicidades por
 data e valor antes da gravação.
+
+`migrations/011_financeiro_novo_fluxo_documentos_previsao.sql` consolida a
+relação independente entre OM, RD, Despesas, Reembolsos e Notas de Débito.
+`migrations/012_financeiro_novo_empresas.sql` separa Despesas e Notas de
+Débito em MATISA, PRUMO e PRUMAT. Registros anteriores e importações de OM/RD
+permanecem MATISA; uma Nota de Débito só aceita despesas da mesma empresa.

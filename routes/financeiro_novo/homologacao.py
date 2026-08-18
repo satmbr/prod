@@ -77,7 +77,7 @@ def homologacao():
     permissoes_atribuidas = any(item["perfis"] > 0 for item in permissoes)
     cadastros_prontos = all(cadastros[chave] > 0 for chave in ("fornecedores", "favorecidos", "clientes", "centros", "categorias", "moedas", "contas"))
     verificacoes = [
-        {"nome": "Schema do Financeiro Novo", "ok": configuracao["versao_schema"] >= 8, "detalhe": f"Versão {configuracao['versao_schema']} · {tabelas_novas} tabelas próprias"},
+        {"nome": "Schema do Financeiro Novo", "ok": configuracao["versao_schema"] >= 10, "detalhe": f"Versão {configuracao['versao_schema']} · {tabelas_novas} tabelas próprias"},
         {"nome": "Isolamento do módulo", "ok": True, "detalhe": "Rotas automatizadas verificam ausência de referências ao módulo anterior"},
         {"nome": "Armazenamento acessível", "ok": storage["existe"] and storage["gravavel"], "detalhe": storage["raiz"]},
         {"nome": "Volume persistente no Railway", "ok": storage["persistente"], "detalhe": storage["mount"] or "Mount persistente não identificado"},

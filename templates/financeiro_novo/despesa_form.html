@@ -2,16 +2,16 @@
 {% block title %}Nova despesa · Financeiro Novo{% endblock %}
 {% block content %}
 <div class="page-wrap dsp-page narrow">
-  <div class="homolog-banner"><strong>NOVO FINANCEIRO · HOMOLOGAÇÃO</strong><span>Lançamento manual em base independente.</span></div>
+  <div class="homolog-banner"><strong>DESPESA {{ empresa }}</strong><span>Processo independente de {{ empresa_nome }}.</span></div>
   <section class="zone">
     <header class="zone-head"><div class="zone-left"><div><div class="zone-title">Nova despesa</div><div class="muted">Primeiro crie o cabeçalho; em seguida inclua itens e comprovantes.</div></div></div></header>
     <div class="zone-body">
       {% if not opcoes.fornecedores or not opcoes.centros or not opcoes.categorias or not opcoes.moedas %}
         <div class="dsp-alert">Antes de lançar, cadastre ao menos um fornecedor, centro de custo, categoria de despesa e moeda ativos.</div>
       {% endif %}
-      <form method="post">
+      <form method="post"><input type="hidden" name="empresa" value="{{ empresa }}">
         {% include "financeiro_novo/_despesa_campos.html" %}
-        <div class="dsp-actions"><button class="btn btn-primary" type="submit">Criar rascunho</button><a class="btn btn-outline" href="{{ url_for('financeiro_novo.despesas') }}">Voltar</a></div>
+        <div class="dsp-actions"><button class="btn btn-primary" type="submit">Criar rascunho</button><a class="btn btn-outline" href="{{ url_for('financeiro_novo.despesas',empresa=empresa) }}">Voltar</a></div>
       </form>
     </div>
   </section>

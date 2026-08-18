@@ -1,1 +1,20 @@
-{% extends "base.html" %}{% block title %}Notas de Débito{% endblock %}{% block content %}{% set criar='financeiro_novo:criar' in current_user_permissions or 'auth:administrar' in current_user_permissions %}<div class="page-wrap dsp-page"><div class="homolog-banner"><strong>NOVO FINANCEIRO · HOMOLOGAÇÃO</strong><span>Contas a receber por cliente</span></div><section class="zone"><header class="zone-head"><div><div class="zone-title">Notas de Débito</div><div class="muted">{{ notas|length }} nota(s)</div></div>{% if criar %}<a class="btn btn-primary" href="{{ url_for('financeiro_novo.nd_nova') }}">Nova Nota</a>{% endif %}</header><div class="zone-body"><div class="dsp-table-wrap"><table class="dsp-table"><thead><tr><th>Número</th><th>Cliente</th><th>Descrição</th><th>Vencimento</th><th>Status</th><th class="right">Total</th><th class="right">Saldo</th></tr></thead><tbody>{% for n in notas %}<tr><td><a class="dsp-number" href="{{ url_for('financeiro_novo.nd_detalhe',nd_id=n.id) }}">ND-{{ '%06d'|format(n.id) }}</a></td><td>{{ n.cliente }}</td><td>{{ n.descricao }}</td><td>{{ n.data_vencimento.strftime('%d/%m/%Y') }}</td><td><span class="dsp-status {{ n.status|lower }}">{{ n.status|replace('_',' ') }}</span></td><td class="right">{{ n.moeda }} {{ '%.2f'|format(n.valor_total)|replace('.',',') }}</td><td class="right">{{ n.moeda }} {{ '%.2f'|format(n.valor_total-n.recebido)|replace('.',',') }}</td></tr>{% else %}<tr><td colspan="7" class="dsp-empty">Nenhuma Nota de Débito.</td></tr>{% endfor %}</tbody></table></div></div></section></div>{% include "financeiro_novo/_despesa_estilos.html" %}{% endblock %}
+{% extends "base.html" %}
+{% block title %}Notas de Débito{% endblock %}
+{% block content %}
+{% set criar='financeiro_novo:criar' in current_user_permissions or 'auth:administrar' in current_user_permissions %}
+<div class="page-wrap dsp-page">
+  <div class="homolog-banner"><strong>NOTAS DE DÉBITO POR EMPRESA</strong><span>Cada nota utiliza somente despesas da mesma empresa.</span></div>
+  <nav class="company-tabs" aria-label="Empresas">
+    {% for item in empresas %}<a class="company-tab {{ 'active' if empresa==item.codigo else '' }}" href="{{ url_for('financeiro_novo.notas_debito',empresa=item.codigo) }}"><strong>{{ item.nome }}</strong><span>{{ item.quantidade }} nota(s)</span></a>{% endfor %}
+  </nav>
+  <section class="zone">
+    <header class="zone-head"><div><div class="zone-title">Notas de Débito {{ empresa|title }}</div><div class="muted">{{ notas|length }} nota(s)</div></div>{% if criar %}<a class="btn btn-primary" href="{{ url_for('financeiro_novo.nd_nova',empresa=empresa) }}">Nova Nota {{ empresa|title }}</a>{% endif %}</header>
+    <div class="zone-body"><div class="dsp-table-wrap"><table class="dsp-table"><thead><tr><th>Número</th><th>Cliente</th><th>Descrição</th><th>Vencimento</th><th>Status</th><th class="right">Total</th><th class="right">Saldo</th></tr></thead><tbody>
+      {% for n in notas %}<tr><td><a class="dsp-number" href="{{ url_for('financeiro_novo.nd_detalhe',nd_id=n.id) }}">ND-{{ '%06d'|format(n.id) }}</a></td><td>{{ n.cliente }}</td><td>{{ n.descricao }}</td><td>{{ n.data_vencimento.strftime('%d/%m/%Y') }}</td><td><span class="dsp-status {{ n.status|lower }}">{{ n.status|replace('_',' ') }}</span></td><td class="right">{{ n.moeda }} {{ '%.2f'|format(n.valor_total)|replace('.',',') }}</td><td class="right">{{ n.moeda }} {{ '%.2f'|format(n.valor_total-n.recebido)|replace('.',',') }}</td></tr>
+      {% else %}<tr><td colspan="7" class="dsp-empty">Nenhuma Nota de Débito {{ empresa|title }}.</td></tr>{% endfor %}
+    </tbody></table></div></div>
+  </section>
+</div>
+{% include "financeiro_novo/_despesa_estilos.html" %}
+<style>.company-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:0 0 14px}.company-tab{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:13px 15px;border:1px solid #d7e1e9;border-radius:10px;background:#fff;color:#173550;text-decoration:none}.company-tab span{font-size:10px;color:#708397}.company-tab.active{border-color:#173b5f;background:#eaf1f7;box-shadow:inset 0 0 0 1px #173b5f}.company-tab.active strong{color:#0b6b58}@media(max-width:720px){.company-tabs{grid-template-columns:1fr}}</style>
+{% endblock %}

@@ -7,7 +7,7 @@
 {% set pode_pagar = 'financeiro_novo:pagar' in current_user_permissions or admin %}
 {% set pode_cancelar = 'financeiro_novo:cancelar' in current_user_permissions or admin %}
 <div class="page-wrap dsp-page">
-  <div class="homolog-banner"><strong>NOVO FINANCEIRO · HOMOLOGAÇÃO</strong><span>DSP-{{ '%06d'|format(despesa.id) }} · operação auditada</span></div>
+  <div class="homolog-banner"><strong>DESPESA {{ despesa.empresa }} · DSP-{{ '%06d'|format(despesa.id) }}</strong><span>Processo de {{ empresa_nome }} · operação auditada</span></div>
   <div class="dsp-summary">
     <article class="dsp-kpi"><span>Status</span><strong><span class="dsp-status {{ despesa.status|lower }}">{{ despesa.status|replace('_',' ') }}</span></strong></article>
     <article class="dsp-kpi"><span>Total</span><strong>{{ despesa.moeda }} {{ '%.2f'|format(despesa.valor_total)|replace('.',',') }}</strong></article>
@@ -18,7 +18,7 @@
   <div class="dsp-grid">
     <div>
       <section class="zone">
-        <header class="zone-head"><div class="zone-left"><div><div class="zone-title">Dados da despesa</div><div class="muted">{{ despesa.fornecedor }} · {{ despesa.centro_codigo }} · {{ despesa.categoria_nome }}</div></div></div></header>
+        <header class="zone-head"><div class="zone-left"><div><div class="zone-title">Dados da despesa {{ despesa.empresa }}</div><div class="muted">{{ despesa.fornecedor }} · {{ despesa.centro_codigo }} · {{ despesa.categoria_nome }}</div></div></div></header>
         <div class="zone-body">
           {% if editavel and pode_editar %}
           <form method="post" action="{{ url_for('financeiro_novo.despesa_editar', despesa_id=despesa.id) }}">{% include "financeiro_novo/_despesa_campos.html" %}<div class="dsp-actions"><button class="btn btn-outline" type="submit">Salvar cabeçalho</button></div></form>

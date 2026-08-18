@@ -4,13 +4,16 @@
 {% set pode_criar = 'financeiro_novo:criar' in current_user_permissions or 'auth:administrar' in current_user_permissions %}
 <div class="page-wrap dsp-page">
   <div class="homolog-banner"><strong>NOVO FINANCEIRO · HOMOLOGAÇÃO</strong><span>Despesas lançadas somente nesta base independente.</span></div>
+  <nav class="company-tabs" aria-label="Empresas">
+    {% for item in empresas %}<a class="company-tab {{ 'active' if empresa==item.codigo else '' }}" href="{{ url_for('financeiro_novo.despesas',empresa=item.codigo) }}"><strong>{{ item.nome }}</strong><span>{{ item.quantidade }} despesa(s)</span></a>{% endfor %}
+  </nav>
   <section class="zone">
-    <header class="zone-head"><div class="zone-left"><div><div class="zone-title">Despesas</div><div class="muted">Rascunho, aprovação e pagamento em fluxo controlado</div></div></div>{% if pode_criar %}<a class="btn btn-primary" href="{{ url_for('financeiro_novo.despesa_nova') }}">Nova despesa</a>{% endif %}</header>
+    <header class="zone-head"><div class="zone-left"><div><div class="zone-title">Despesas {{ empresas|selectattr('codigo','equalto',empresa)|map(attribute='nome')|first }}</div><div class="muted">Processo independente de {{ empresa|title }}</div></div></div>{% if pode_criar %}<a class="btn btn-primary" href="{{ url_for('financeiro_novo.despesa_nova',empresa=empresa) }}">Nova despesa {{ empresa|title }}</a>{% endif %}</header>
     <div class="zone-body">
       <form method="get" class="dsp-filter">
         <input type="search" name="q" value="{{ busca }}" placeholder="Descrição, fornecedor ou documento">
         <select name="status"><option value="">Todos os status</option>{% for valor, rotulo in [('RASCUNHO','Rascunho'),('EM_APROVACAO','Em aprovação'),('APROVADA','Aprovada'),('REJEITADA','Rejeitada'),('PAGAMENTO_PARCIAL','Pagamento parcial'),('PAGA','Paga'),('CANCELADA','Cancelada')] %}<option value="{{ valor }}" {% if status == valor %}selected{% endif %}>{{ rotulo }}</option>{% endfor %}</select>
-        <button class="btn btn-outline" type="submit">Aplicar</button><a class="btn btn-outline" href="{{ url_for('financeiro_novo.despesas') }}">Limpar</a>
+        <input type="hidden" name="empresa" value="{{ empresa }}"><button class="btn btn-outline" type="submit">Aplicar</button><a class="btn btn-outline" href="{{ url_for('financeiro_novo.despesas',empresa=empresa) }}">Limpar</a>
       </form>
       <div class="dsp-table-wrap"><table class="dsp-table"><thead><tr><th>Número</th><th>Descrição</th><th>Fornecedor</th><th>Vencimento</th><th>Status</th><th class="right">Total</th><th class="right">Saldo</th></tr></thead><tbody>
       {% for item in registros %}<tr><td><a class="dsp-number" href="{{ url_for('financeiro_novo.despesa_detalhe', despesa_id=item.id) }}">DSP-{{ '%06d'|format(item.id) }}</a></td><td>{{ item.descricao }}</td><td>{{ item.fornecedor }}</td><td>{{ item.data_vencimento.strftime('%d/%m/%Y') }}</td><td><span class="dsp-status {{ item.status|lower }}">{{ item.status|replace('_',' ') }}</span></td><td class="right">{{ item.moeda }} {{ '%.2f'|format(item.valor_total)|replace('.',',') }}</td><td class="right">{{ item.moeda }} {{ '%.2f'|format(item.valor_total-item.valor_pago)|replace('.',',') }}</td></tr>
@@ -20,4 +23,5 @@
   </section>
 </div>
 {% include "financeiro_novo/_despesa_estilos.html" %}
+<style>.company-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:0 0 14px}.company-tab{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:13px 15px;border:1px solid #d7e1e9;border-radius:10px;background:#fff;color:#173550;text-decoration:none}.company-tab span{font-size:10px;color:#708397}.company-tab.active{border-color:#173b5f;background:#eaf1f7;box-shadow:inset 0 0 0 1px #173b5f}.company-tab.active strong{color:#0b6b58}@media(max-width:720px){.company-tabs{grid-template-columns:1fr}}</style>
 {% endblock %}

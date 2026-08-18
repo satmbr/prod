@@ -6,6 +6,7 @@ from routes.auth import login_required, permission_required
 from routes.financeiro_novo import bp
 from routes.financeiro_novo.despesas import FORMAS_PAGAMENTO
 from routes.financeiro_novo.services.auditoria import registrar_evento
+from routes.financeiro_novo.services.empresas import EMPRESAS, empresa_valida, nome_empresa
 from routes.financeiro_novo.services.valores import ValorInvalido, data_iso, decimal_br
 from routes.financeiro_novo.views import build_subnav
 
@@ -19,22 +20,22 @@ def _nd(conn, nd_id, bloquear=False):
     ), {"id": nd_id}).mappings().first()
 
 
-def _opcoes(conn):
+def _opcoes(conn, empresa="MATISA"):
     return {
         "clientes": conn.execute(text("SELECT id,nome_razao FROM financeiro3_clientes WHERE ativo ORDER BY nome_razao")).mappings().all(),
         "centros": conn.execute(text("SELECT id,codigo,nome FROM financeiro3_centros_custo WHERE ativo ORDER BY codigo,nome")).mappings().all(),
         "moedas": conn.execute(text("SELECT id,codigo,nome FROM financeiro3_moedas WHERE ativo ORDER BY codigo")).mappings().all(),
         "contas": conn.execute(text("SELECT c.id,c.nome,c.moeda_id,m.codigo AS moeda FROM financeiro3_contas c JOIN financeiro3_moedas m ON m.id=c.moeda_id WHERE c.ativo ORDER BY c.nome")).mappings().all(),
         "despesa_itens": conn.execute(text("""
-            SELECT i.id,d.id AS despesa_id,i.descricao,i.valor_total,cc.codigo AS centro,m.codigo AS moeda
+            SELECT i.id,d.id AS despesa_id,i.descricao,i.valor_total,cc.codigo AS centro,m.codigo AS moeda,d.empresa
             FROM financeiro3_despesa_itens i JOIN financeiro3_despesas d ON d.id=i.despesa_id
             JOIN financeiro3_centros_custo cc ON cc.id=i.centro_custo_id
             JOIN financeiro3_moedas m ON m.id=d.moeda_id
-            WHERE i.status='ATIVO' AND d.status<>'CANCELADA'
+            WHERE i.status='ATIVO' AND d.status<>'CANCELADA' AND d.empresa=:empresa
               AND NOT EXISTS(SELECT 1 FROM financeiro3_nd_itens ni
                 WHERE ni.despesa_item_id=i.id AND ni.status='ATIVO')
             ORDER BY d.id DESC,i.id LIMIT 500
-        """)).mappings().all(),
+        """), {"empresa": empresa}).mappings().all(),
     }
 
 
@@ -44,6 +45,7 @@ def _dados_cabecalho(form):
     except ValueError as exc:
         raise ValorInvalido("Selecione cadastros válidos.") from exc
     dados.update({"descricao": (form.get("descricao") or "").strip(),
+                  "empresa": empresa_valida(form.get("empresa")),
                   "data_emissao": data_iso(form.get("data_emissao"), "Data de emissão"),
                   "data_vencimento": data_iso(form.get("data_vencimento"), "Data de vencimento"),
                   "observacoes": (form.get("observacoes") or "").strip() or None})
@@ -68,23 +70,38 @@ def _validar_refs(conn, dados):
 @login_required
 @permission_required("financeiro_novo", "visualizar")
 def notas_debito():
+    try:
+        empresa = empresa_valida(request.args.get("empresa"))
+    except ValorInvalido:
+        abort(400)
     with get_engine().connect() as conn:
         notas = conn.execute(text("""
             SELECT n.*,c.nome_razao AS cliente,cc.codigo AS centro,m.codigo AS moeda,
               COALESCE((SELECT SUM(r.valor) FROM financeiro3_nd_recebimentos r WHERE r.nota_debito_id=n.id AND r.status='ATIVO'),0) AS recebido
             FROM financeiro3_notas_debito n JOIN financeiro3_clientes c ON c.id=n.cliente_id
             JOIN financeiro3_centros_custo cc ON cc.id=n.centro_custo_id
-            JOIN financeiro3_moedas m ON m.id=n.moeda_id ORDER BY n.id DESC LIMIT 500
-        """)).mappings().all()
-    return render_template("financeiro_novo/notas_debito.html", notas=notas, subnav_links=build_subnav("nd"))
+            JOIN financeiro3_moedas m ON m.id=n.moeda_id
+            WHERE n.empresa=:empresa ORDER BY n.id DESC LIMIT 500
+        """), {"empresa": empresa}).mappings().all()
+        quantidades = dict(conn.execute(text("""
+            SELECT empresa,COUNT(*) FROM financeiro3_notas_debito GROUP BY empresa
+        """)).all())
+    return render_template("financeiro_novo/notas_debito.html", notas=notas, empresa=empresa,
+        empresas=[{"codigo": codigo, "nome": nome, "quantidade": quantidades.get(codigo, 0)}
+                  for codigo, nome in EMPRESAS], subnav_links=build_subnav("nd"))
 
 
 @bp.route("/notas-debito/nova", methods=["GET", "POST"])
 @login_required
 @permission_required("financeiro_novo", "criar")
 def nd_nova():
+    try:
+        empresa = empresa_valida(request.form.get("empresa") if request.method == "POST" else request.args.get("empresa"))
+    except ValorInvalido as exc:
+        flash(str(exc), "erro")
+        return redirect(url_for("financeiro_novo.notas_debito"))
     with get_engine().connect() as conn:
-        opcoes = _opcoes(conn)
+        opcoes = _opcoes(conn, empresa)
     if request.method == "POST":
         try:
             dados = _dados_cabecalho(request.form)
@@ -92,9 +109,9 @@ def nd_nova():
             with get_engine().begin() as conn:
                 _validar_refs(conn, dados)
                 nd = conn.execute(text("""
-                    INSERT INTO financeiro3_notas_debito(cliente_id,centro_custo_id,moeda_id,descricao,
+                    INSERT INTO financeiro3_notas_debito(cliente_id,centro_custo_id,moeda_id,descricao,empresa,
                       data_emissao,data_vencimento,observacoes,criado_por)
-                    VALUES (:cliente_id,:centro_custo_id,:moeda_id,:descricao,:data_emissao,
+                    VALUES (:cliente_id,:centro_custo_id,:moeda_id,:descricao,:empresa,:data_emissao,
                       :data_vencimento,:observacoes,:usuario) RETURNING *
                 """), dados).mappings().one()
                 registrar_evento(conn, entidade="NOTA_DEBITO", entidade_id=nd["id"], evento="CRIADA", dados_novos=dict(nd))
@@ -102,7 +119,8 @@ def nd_nova():
             return redirect(url_for("financeiro_novo.nd_detalhe", nd_id=nd["id"]))
         except ValorInvalido as exc:
             flash(str(exc), "erro")
-    return render_template("financeiro_novo/nd_form.html", opcoes=opcoes, nd=None, subnav_links=build_subnav("nd"))
+    return render_template("financeiro_novo/nd_form.html", opcoes=opcoes, nd=None, empresa=empresa,
+        empresa_nome=nome_empresa(empresa), subnav_links=build_subnav("nd"))
 
 
 @bp.route("/notas-debito/<int:nd_id>/editar", methods=["GET", "POST"])
@@ -110,7 +128,8 @@ def nd_nova():
 @permission_required("financeiro_novo", "editar")
 def nd_editar(nd_id):
     with get_engine().connect() as conn:
-        nd = _nd(conn, nd_id); opcoes = _opcoes(conn)
+        nd = _nd(conn, nd_id)
+        opcoes = _opcoes(conn, nd["empresa"]) if nd else None
     if not nd: abort(404)
     if nd["status"] not in EDITAVEIS: abort(409)
     if request.method == "POST":
@@ -125,7 +144,8 @@ def nd_editar(nd_id):
             flash("Nota de Débito atualizada.","sucesso")
             return redirect(url_for("financeiro_novo.nd_detalhe",nd_id=nd_id))
         except ValorInvalido as exc: flash(str(exc),"erro")
-    return render_template("financeiro_novo/nd_form.html",opcoes=opcoes,nd=nd,subnav_links=build_subnav("nd"))
+    return render_template("financeiro_novo/nd_form.html",opcoes=opcoes,nd=nd,empresa=nd["empresa"],
+        empresa_nome=nome_empresa(nd["empresa"]),subnav_links=build_subnav("nd"))
 
 
 @bp.get("/notas-debito/<int:nd_id>")
@@ -145,11 +165,12 @@ def nd_detalhe(nd_id):
         recebimentos = conn.execute(text("SELECT r.*,c.nome AS conta FROM financeiro3_nd_recebimentos r JOIN financeiro3_contas c ON c.id=r.conta_id WHERE r.nota_debito_id=:id AND r.status='ATIVO' ORDER BY r.id DESC"), {"id": nd_id}).mappings().all()
         decisoes = conn.execute(text("SELECT * FROM financeiro3_nd_decisoes WHERE nota_debito_id=:id ORDER BY id DESC"), {"id": nd_id}).mappings().all()
         anexos = conn.execute(text("""SELECT a.id,ar.id AS arquivo_id,ar.nome_original,ar.paginas FROM financeiro3_anexos a JOIN financeiro3_arquivos ar ON ar.id=a.arquivo_id WHERE a.entidade='ND' AND a.entidade_id=:id AND a.status='ATIVO' ORDER BY a.id DESC"""), {"id": nd_id}).mappings().all()
-        opcoes = _opcoes(conn)
+        opcoes = _opcoes(conn, nd["empresa"])
     recebido = sum((r["valor"] for r in recebimentos), start=0)
     return render_template("financeiro_novo/nd_detalhe.html", nd=nd, itens=itens, recebimentos=recebimentos,
         recebido=recebido, saldo=nd["valor_total"]-recebido, decisoes=decisoes, anexos=anexos,
         opcoes=opcoes, formas=FORMAS_PAGAMENTO, editavel=nd["status"] in EDITAVEIS,
+        empresa_nome=nome_empresa(nd["empresa"]),
         subnav_links=build_subnav("nd"))
 
 
@@ -173,7 +194,7 @@ def nd_item_novo(nd_id):
             despesa_id = despesa_item_id = None
             if origem == "DESPESA_ITEM":
                 origem_item = conn.execute(text("""
-                    SELECT i.id,i.despesa_id,i.descricao,i.valor_total,d.moeda_id,i.centro_custo_id
+                    SELECT i.id,i.despesa_id,i.descricao,i.valor_total,d.moeda_id,i.centro_custo_id,d.empresa
                     FROM financeiro3_despesa_itens i JOIN financeiro3_despesas d ON d.id=i.despesa_id
                     WHERE i.id=:id AND i.status='ATIVO' AND d.status<>'CANCELADA'
                       AND NOT EXISTS(SELECT 1 FROM financeiro3_nd_itens ni
@@ -181,6 +202,8 @@ def nd_item_novo(nd_id):
                 """), {"id": origem_id}).mappings().first()
                 if not origem_item:
                     raise ValorInvalido("Linha de Despesa indisponível ou já vinculada.")
+                if origem_item["empresa"] != nd["empresa"]:
+                    raise ValorInvalido("A Despesa e a Nota de Débito devem pertencer à mesma empresa.")
                 if origem_item["moeda_id"] != nd["moeda_id"] or origem_item["centro_custo_id"] != nd["centro_custo_id"]:
                     raise ValorInvalido("A linha precisa ter a mesma moeda e centro de custo da Nota de Débito.")
                 despesa_id, despesa_item_id = origem_item["despesa_id"], origem_item["id"]

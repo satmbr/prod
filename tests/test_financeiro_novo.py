@@ -29,6 +29,7 @@ from routes.financeiro_novo.services.anexos import (
 from routes.financeiro_novo.cadastros import TIPOS, _normalizar
 from routes.financeiro_novo.services.valores import ValorInvalido, decimal_br
 from routes.financeiro_novo.services.exportacao_om import gerar_excel_om, gerar_pdf_om
+from routes.financeiro_novo.services.empresas import empresa_valida, nome_empresa
 from routes.financeiro_novo.homologacao import diagnosticar_armazenamento
 from routes.financeiro_novo.missoes import _ler_linhas_om_excel, _linhas_om_formulario
 from routes.financeiro_novo.reembolsos import _vincular_anexo
@@ -440,6 +441,33 @@ class FinanceiroNovoIsolamentoTests(unittest.TestCase):
         self.assertIn("CHECK (rd_id IS NULL)", migration)
         self.assertIn('origem not in {"MANUAL","DESPESA_ITEM"}', rotas)
         self.assertNotIn('origem == "RD"', rotas)
+
+    def test_despesas_sao_separadas_por_empresa_sem_reclassificar_dados_atuais(self):
+        migration = (self.raiz / "migrations" / "012_financeiro_novo_empresas.sql").read_text(encoding="utf-8")
+        despesas = (self.raiz / "routes" / "financeiro_novo" / "despesas.py").read_text(encoding="utf-8")
+        pagina = (self.raiz / "templates" / "financeiro_novo" / "despesas.html").read_text(encoding="utf-8")
+        self.assertGreaterEqual(migration.count("DEFAULT 'MATISA'"), 2)
+        for empresa in ("MATISA", "PRUMO", "PRUMAT"):
+            self.assertIn(empresa, migration)
+        self.assertIn("d.empresa = :empresa", despesas)
+        self.assertIn("'MATISA')", despesas)
+        self.assertIn("company-tabs", pagina)
+        self.assertIn("Nova despesa {{ empresa|title }}", pagina)
+
+    def test_nota_debito_aceita_somente_despesa_da_mesma_empresa(self):
+        migration = (self.raiz / "migrations" / "012_financeiro_novo_empresas.sql").read_text(encoding="utf-8")
+        rotas = (self.raiz / "routes" / "financeiro_novo" / "notas_debito.py").read_text(encoding="utf-8")
+        self.assertIn("financeiro3_validar_empresa_nd_item", migration)
+        self.assertIn("d.empresa=:empresa", rotas)
+        self.assertIn('origem_item["empresa"] != nd["empresa"]', rotas)
+        self.assertIn("mesma empresa", rotas)
+
+    def test_empresas_financeiras_validas_sao_fechadas(self):
+        self.assertEqual(empresa_valida(None), "MATISA")
+        self.assertEqual(empresa_valida("prumo"), "PRUMO")
+        self.assertEqual(nome_empresa("PRUMAT"), "Prumat")
+        with self.assertRaises(ValorInvalido):
+            empresa_valida("OUTRA")
 
     def test_reembolso_vinculado_nao_duplica_pagamento(self):
         migration = (self.raiz / "migrations" / "011_financeiro_novo_fluxo_documentos_previsao.sql").read_text(encoding="utf-8")

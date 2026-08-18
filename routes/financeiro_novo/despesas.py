@@ -21,6 +21,7 @@ from routes.auth import login_required, permission_required
 from routes.financeiro_novo import bp
 from routes.financeiro_novo.services.anexos import AnexoInvalido, nome_objeto_pdf, normalizar_anexo
 from routes.financeiro_novo.services.auditoria import registrar_evento
+from routes.financeiro_novo.services.empresas import EMPRESAS, empresa_valida, nome_empresa
 from routes.financeiro_novo.services.valores import ValorInvalido, data_iso, decimal_br
 from routes.financeiro_novo.views import build_subnav
 
@@ -115,10 +116,14 @@ def _validar_referencias(conn, dados):
 @login_required
 @permission_required("financeiro_novo", "visualizar")
 def despesas():
+    try:
+        empresa = empresa_valida(request.args.get("empresa"))
+    except ValorInvalido:
+        abort(400)
     busca = (request.args.get("q") or "").strip()
     status = (request.args.get("status") or "").strip().upper()
-    params = {}
-    filtros = []
+    params = {"empresa": empresa}
+    filtros = ["d.empresa = :empresa"]
     if busca:
         filtros.append("(d.descricao ILIKE :busca OR p.nome_razao ILIKE :busca OR d.numero_documento ILIKE :busca)")
         params["busca"] = f"%{busca}%"
@@ -141,8 +146,15 @@ def despesas():
             {where}
             ORDER BY d.id DESC LIMIT 500
         """), params).mappings().all()
+        quantidades = dict(conn.execute(text("""
+            SELECT empresa,COUNT(*) AS quantidade
+            FROM financeiro3_despesas GROUP BY empresa
+        """)).all())
     return render_template(
         "financeiro_novo/despesas.html", registros=registros, busca=busca, status=status,
+        empresa=empresa,
+        empresas=[{"codigo": codigo, "nome": nome, "quantidade": quantidades.get(codigo, 0)}
+                  for codigo, nome in EMPRESAS],
         subnav_links=build_subnav("despesas"),
     )
 
@@ -215,9 +227,9 @@ def _importar_origem(tipo, origem_id):
                 INSERT INTO financeiro3_despesas(descricao,fornecedor_id,favorecido_id,
                   centro_custo_id,categoria_id,moeda_id,numero_documento,data_emissao,
                   data_competencia,data_vencimento,status,pago_em,origem_tipo,{cfg['fk']},
-                  paga_na_origem,importada_em,importada_por,criado_por)
+                  paga_na_origem,importada_em,importada_por,criado_por,empresa)
                 VALUES (:descricao,:pessoa,:pessoa,:centro,:categoria,:moeda,:numero,:emissao,
-                  :competencia,:vencimento,'PAGA',NOW(),:tipo,:origem,TRUE,NOW(),:usuario,:usuario)
+                  :competencia,:vencimento,'PAGA',NOW(),:tipo,:origem,TRUE,NOW(),:usuario,:usuario,'MATISA')
                 RETURNING *
             """), {"descricao": f"Importação {tipo} {numero}", "pessoa": documento[cfg["pessoa"]],
                     "centro": itens[0]["centro_custo_id"], "categoria": itens[0]["categoria_id"],
@@ -271,11 +283,17 @@ def reembolso_importar_despesa(reembolso_id):
 @login_required
 @permission_required("financeiro_novo", "criar")
 def despesa_nova():
+    try:
+        empresa = empresa_valida(request.form.get("empresa") if request.method == "POST" else request.args.get("empresa"))
+    except ValorInvalido as exc:
+        flash(str(exc), "erro")
+        return redirect(url_for("financeiro_novo.despesas"))
     with get_engine().connect() as conn:
         opcoes = _opcoes(conn)
     if request.method == "POST":
         try:
             dados = _dados_cabecalho(request.form)
+            dados["empresa"] = empresa
             dados["usuario_id"] = session.get("usuario_id")
             with get_engine().begin() as conn:
                 _validar_referencias(conn, dados)
@@ -283,11 +301,11 @@ def despesa_nova():
                     INSERT INTO financeiro3_despesas (
                         descricao, fornecedor_id, favorecido_id, centro_custo_id, categoria_id,
                         moeda_id, numero_documento, data_emissao, data_competencia,
-                        data_vencimento, observacoes, criado_por
+                        data_vencimento, observacoes, criado_por, empresa
                     ) VALUES (
                         :descricao, :fornecedor_id, :favorecido_id, :centro_custo_id, :categoria_id,
                         :moeda_id, :numero_documento, :data_emissao, :data_competencia,
-                        :data_vencimento, :observacoes, :usuario_id
+                        :data_vencimento, :observacoes, :usuario_id, :empresa
                     ) RETURNING *
                 """), dados).mappings().one()
                 registrar_evento(conn, entidade="DESPESA", entidade_id=criada["id"], evento="CRIADA", dados_novos=dict(criada))
@@ -299,6 +317,7 @@ def despesa_nova():
             flash("Não foi possível criar a despesa. Verifique os cadastros selecionados.", "erro")
     return render_template(
         "financeiro_novo/despesa_form.html", opcoes=opcoes, despesa=None,
+        empresa=empresa, empresa_nome=nome_empresa(empresa),
         subnav_links=build_subnav("despesas"),
     )
 
@@ -347,6 +366,7 @@ def despesa_detalhe(despesa_id):
         "financeiro_novo/despesa_detalhe.html", despesa=despesa, itens=itens,
         anexos=anexos, decisoes=decisoes, pagamentos=pagamentos,
         valor_pago=valor_pago, saldo=despesa["valor_total"] - valor_pago,
+        empresa_nome=nome_empresa(despesa["empresa"]),
         opcoes=opcoes, formas_pagamento=FORMAS_PAGAMENTO, editavel=despesa["status"] in EDITAVEIS,
         subnav_links=build_subnav("despesas"),
     )
