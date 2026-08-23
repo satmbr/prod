@@ -482,6 +482,12 @@ class FinanceiroNovoIsolamentoTests(unittest.TestCase):
         self.assertNotIn("Motivo obrigatório", pagina)
         self.assertNotIn('name="motivo"', pagina)
 
+    def test_listagem_de_despesas_exibe_numero_do_documento(self):
+        pagina = (self.raiz / "templates" / "financeiro_novo" / "despesas.html").read_text(encoding="utf-8")
+        self.assertIn("<th>Documento</th>", pagina)
+        self.assertIn("item.numero_documento or '—'", pagina)
+        self.assertIn('colspan="8"', pagina)
+
     def test_nota_debito_aceita_somente_despesa_da_mesma_empresa(self):
         migration = (self.raiz / "migrations" / "012_financeiro_novo_empresas.sql").read_text(encoding="utf-8")
         rotas = (self.raiz / "routes" / "financeiro_novo" / "notas_debito.py").read_text(encoding="utf-8")
