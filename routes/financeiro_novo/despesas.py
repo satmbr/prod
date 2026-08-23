@@ -578,11 +578,8 @@ def despesa_enviar(despesa_id):
             abort(404)
         if anterior["status"] not in EDITAVEIS:
             abort(409)
-        anexos = conn.execute(text(
-            "SELECT COUNT(*) FROM financeiro3_anexos WHERE entidade='DESPESA' AND entidade_id=:id AND status='ATIVO'"
-        ), {"id": despesa_id}).scalar()
-        if anterior["valor_total"] <= 0 or not anexos:
-            flash("Inclua ao menos um item e um comprovante antes de enviar.", "erro")
+        if anterior["valor_total"] <= 0:
+            flash("Inclua ao menos um item antes de enviar.", "erro")
             return redirect(url_for("financeiro_novo.despesa_detalhe", despesa_id=despesa_id))
         novo = conn.execute(text("""
             UPDATE financeiro3_despesas SET status='EM_APROVACAO', enviado_em=NOW(),

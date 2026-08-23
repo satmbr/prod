@@ -488,6 +488,17 @@ class FinanceiroNovoIsolamentoTests(unittest.TestCase):
         self.assertIn("item.numero_documento or '—'", pagina)
         self.assertIn('colspan="8"', pagina)
 
+    def test_despesa_pode_ser_enviada_sem_comprovante(self):
+        rotas = (self.raiz / "routes" / "financeiro_novo" / "despesas.py").read_text(encoding="utf-8")
+        formulario = (self.raiz / "templates" / "financeiro_novo" / "despesa_form.html").read_text(encoding="utf-8")
+        inicio = rotas.index("def despesa_enviar")
+        fim = rotas.index("def _decidir", inicio)
+        envio = rotas[inicio:fim]
+        self.assertIn('anterior["valor_total"] <= 0', envio)
+        self.assertNotIn("financeiro3_anexos", envio)
+        self.assertNotIn("e um comprovante", envio)
+        self.assertIn("se houver, comprovantes", formulario)
+
     def test_nota_debito_aceita_somente_despesa_da_mesma_empresa(self):
         migration = (self.raiz / "migrations" / "012_financeiro_novo_empresas.sql").read_text(encoding="utf-8")
         rotas = (self.raiz / "routes" / "financeiro_novo" / "notas_debito.py").read_text(encoding="utf-8")

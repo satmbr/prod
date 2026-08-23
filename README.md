@@ -44,7 +44,8 @@ O fluxo de despesas é criado pela migration
 `migrations/005_financeiro_novo_despesas.sql`. O total é sempre calculado a
 partir dos itens, e os estados de rascunho, aprovação, pagamento e
 cancelamento têm permissões independentes. O envio para aprovação exige item
-e comprovante; imagens e PDFs são armazenados como PDF canônico privado.
+com valor; comprovantes são opcionais e, quando enviados, imagens e PDFs são
+armazenados como PDF canônico privado.
 
 O ciclo de missões é criado pela migration
 `migrations/006_financeiro_novo_om_rd.sql`, complementado pelas migrations
