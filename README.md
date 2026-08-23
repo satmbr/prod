@@ -85,4 +85,9 @@ relação independente entre OM, RD, Despesas, Reembolsos e Notas de Débito.
 Débito em MATISA, PRUMO e PRUMAT. Registros anteriores e importações de OM/RD
 permanecem MATISA; uma Nota de Débito só aceita despesas da mesma empresa.
 
+`migrations/013_financeiro_novo_pagamento_despesa_sem_conta.sql` torna a conta
+opcional no pagamento de Despesas, coerente com a ausência de controle de
+tesouraria no módulo. O cancelamento de Despesa permanece auditado por usuário
+e data, sem exigir motivo.
+
 <!-- Verificação de publicação: 2026-08-18 -->

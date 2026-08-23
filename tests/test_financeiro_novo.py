@@ -470,6 +470,18 @@ class FinanceiroNovoIsolamentoTests(unittest.TestCase):
         for parametro in (":aprovada", ":quitada", ":emitida", ":aprovado"):
             self.assertIn(parametro, conteudo)
 
+    def test_pagamento_de_despesa_nao_exige_conta_nem_motivo_para_cancelar(self):
+        migration = (self.raiz / "migrations" / "013_financeiro_novo_pagamento_despesa_sem_conta.sql").read_text(encoding="utf-8")
+        rotas = (self.raiz / "routes" / "financeiro_novo" / "despesas.py").read_text(encoding="utf-8")
+        pagina = (self.raiz / "templates" / "financeiro_novo" / "despesa_detalhe.html").read_text(encoding="utf-8")
+        self.assertIn("ALTER COLUMN conta_id DROP NOT NULL", migration)
+        self.assertNotIn('request.form.get("conta_id")', rotas)
+        self.assertNotIn("despesa_id, conta_id, data_pagamento", rotas)
+        self.assertIn("LEFT JOIN financeiro3_contas", rotas)
+        self.assertNotIn("Conta na mesma moeda", pagina)
+        self.assertNotIn("Motivo obrigatório", pagina)
+        self.assertNotIn('name="motivo"', pagina)
+
     def test_nota_debito_aceita_somente_despesa_da_mesma_empresa(self):
         migration = (self.raiz / "migrations" / "012_financeiro_novo_empresas.sql").read_text(encoding="utf-8")
         rotas = (self.raiz / "routes" / "financeiro_novo" / "notas_debito.py").read_text(encoding="utf-8")

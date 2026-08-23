@@ -357,7 +357,7 @@ def despesa_detalhe(despesa_id):
         ), {"id": despesa_id}).mappings().all()
         pagamentos = conn.execute(text("""
             SELECT pg.*, c.nome AS conta FROM financeiro3_despesa_pagamentos pg
-            JOIN financeiro3_contas c ON c.id=pg.conta_id
+            LEFT JOIN financeiro3_contas c ON c.id=pg.conta_id
             WHERE pg.despesa_id=:id AND pg.status='ATIVO' ORDER BY pg.id DESC
         """), {"id": despesa_id}).mappings().all()
         opcoes = _opcoes(conn)
@@ -655,10 +655,6 @@ def despesa_pagar(despesa_id):
     try:
         valor = decimal_br(request.form.get("valor"), positivo=True)
         data_pagamento = data_iso(request.form.get("data_pagamento"), "Data de pagamento")
-        try:
-            conta_id = int(request.form.get("conta_id") or 0)
-        except ValueError as exc:
-            raise ValorInvalido("Selecione uma conta válida.") from exc
         forma = (request.form.get("forma") or "").upper()
         if forma not in dict(FORMAS_PAGAMENTO):
             raise ValorInvalido("Forma de pagamento inválida.")
@@ -668,11 +664,6 @@ def despesa_pagar(despesa_id):
                 abort(404)
             if anterior["status"] not in {"APROVADA", "PAGAMENTO_PARCIAL"}:
                 abort(409)
-            conta_valida = conn.execute(text(
-                "SELECT EXISTS(SELECT 1 FROM financeiro3_contas WHERE id=:id AND ativo AND moeda_id=:moeda)"
-            ), {"id": conta_id, "moeda": anterior["moeda_id"]}).scalar()
-            if not conta_valida:
-                raise ValorInvalido("Selecione uma conta ativa na mesma moeda da despesa.")
             pago = conn.execute(text(
                 "SELECT COALESCE(SUM(valor),0) FROM financeiro3_despesa_pagamentos WHERE despesa_id=:id AND status='ATIVO'"
             ), {"id": despesa_id}).scalar()
@@ -680,10 +671,10 @@ def despesa_pagar(despesa_id):
                 raise ValorInvalido("O pagamento excede o saldo da despesa.")
             pagamento = conn.execute(text("""
                 INSERT INTO financeiro3_despesa_pagamentos
-                    (despesa_id, conta_id, data_pagamento, valor, forma, referencia, observacoes, criado_por)
-                VALUES (:despesa, :conta, :data, :valor, :forma, :referencia, :observacoes, :usuario)
+                    (despesa_id, data_pagamento, valor, forma, referencia, observacoes, criado_por)
+                VALUES (:despesa, :data, :valor, :forma, :referencia, :observacoes, :usuario)
                 RETURNING *
-            """), {"despesa": despesa_id, "conta": conta_id, "data": data_pagamento, "valor": valor,
+            """), {"despesa": despesa_id, "data": data_pagamento, "valor": valor,
                     "forma": forma, "referencia": (request.form.get("referencia") or "").strip() or None,
                     "observacoes": (request.form.get("observacoes_pagamento") or "").strip() or None,
                     "usuario": session.get("usuario_id")}).mappings().one()
@@ -707,10 +698,7 @@ def despesa_pagar(despesa_id):
 @login_required
 @permission_required("financeiro_novo", "cancelar")
 def despesa_cancelar(despesa_id):
-    motivo = (request.form.get("motivo") or "").strip()
-    if not motivo:
-        flash("Informe o motivo do cancelamento.", "erro")
-        return redirect(url_for("financeiro_novo.despesa_detalhe", despesa_id=despesa_id))
+    motivo = None
     with get_engine().begin() as conn:
         anterior = _despesa(conn, despesa_id, bloquear=True)
         if not anterior:
