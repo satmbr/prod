@@ -366,7 +366,7 @@ def _decidir(reembolso_id, aprovar):
         if anterior["criado_por"] == session.get("usuario_id") and "auth:administrar" not in session.get("permissoes", []):
             raise ValorInvalido("O responsável pelo lançamento não pode aprovar o próprio reembolso.")
         status = "APROVADO" if aprovar else "REJEITADO"
-        novo = conn.execute(text("UPDATE financeiro3_reembolsos SET status=:status,aprovado_por=CASE WHEN :status='APROVADO' THEN :u ELSE NULL END,aprovado_em=CASE WHEN :status='APROVADO' THEN NOW() ELSE NULL END,atualizado_em=NOW() WHERE id=:id RETURNING *"), {"status": status, "u": session.get("usuario_id"), "id": reembolso_id}).mappings().one()
+        novo = conn.execute(text("UPDATE financeiro3_reembolsos SET status=:status,aprovado_por=:aprovador,aprovado_em=CASE WHEN :aprovado THEN NOW() ELSE NULL END,atualizado_em=NOW() WHERE id=:id RETURNING *"), {"status": status, "aprovador": session.get("usuario_id") if aprovar else None, "aprovado": aprovar, "id": reembolso_id}).mappings().one()
         acao = "APROVACAO" if aprovar else "REJEICAO"
         _decisao(conn, reembolso_id, acao, "EM_APROVACAO", status, justificativa or None)
         registrar_evento(conn, entidade="REEMBOLSO", entidade_id=reembolso_id, evento=acao, dados_anteriores=dict(anterior), dados_novos=dict(novo), justificativa=justificativa)

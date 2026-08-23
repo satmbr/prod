@@ -459,6 +459,17 @@ class FinanceiroNovoIsolamentoTests(unittest.TestCase):
         self.assertIn("CAST(:favorecido_id AS BIGINT) IS NULL", despesas)
         self.assertNotIn("(:favorecido_id IS NULL", despesas)
 
+    def test_transicoes_nao_reutilizam_status_com_tipos_ambiguos_no_postgresql(self):
+        arquivos = [
+            self.raiz / "routes" / "financeiro_novo" / "despesas.py",
+            self.raiz / "routes" / "financeiro_novo" / "notas_debito.py",
+            self.raiz / "routes" / "financeiro_novo" / "reembolsos.py",
+        ]
+        conteudo = "\n".join(arquivo.read_text(encoding="utf-8") for arquivo in arquivos)
+        self.assertNotIn("CASE WHEN :status", conteudo)
+        for parametro in (":aprovada", ":quitada", ":emitida", ":aprovado"):
+            self.assertIn(parametro, conteudo)
+
     def test_nota_debito_aceita_somente_despesa_da_mesma_empresa(self):
         migration = (self.raiz / "migrations" / "012_financeiro_novo_empresas.sql").read_text(encoding="utf-8")
         rotas = (self.raiz / "routes" / "financeiro_novo" / "notas_debito.py").read_text(encoding="utf-8")

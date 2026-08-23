@@ -266,7 +266,7 @@ def _decidir(nd_id, emitir):
         if anterior["criado_por"]==session.get("usuario_id") and "auth:administrar" not in session.get("permissoes",[]):
             flash("O responsável pelo lançamento não pode emitir a própria Nota de Débito.","erro"); return
         status="EMITIDA" if emitir else "REJEITADA"; acao="EMISSAO" if emitir else "REJEICAO"
-        novo=conn.execute(text("""UPDATE financeiro3_notas_debito SET status=:status,emitido_por=CASE WHEN :status='EMITIDA' THEN :u ELSE NULL END,emitido_em=CASE WHEN :status='EMITIDA' THEN NOW() ELSE NULL END,atualizado_em=NOW() WHERE id=:id RETURNING *"""), {"status":status,"u":session.get("usuario_id"),"id":nd_id}).mappings().one()
+        novo=conn.execute(text("""UPDATE financeiro3_notas_debito SET status=:status,emitido_por=:emissor,emitido_em=CASE WHEN :emitida THEN NOW() ELSE NULL END,atualizado_em=NOW() WHERE id=:id RETURNING *"""), {"status":status,"emissor":session.get("usuario_id") if emitir else None,"emitida":emitir,"id":nd_id}).mappings().one()
         _decisao(conn,nd_id,acao,"EM_APROVACAO",status,justificativa or None)
         registrar_evento(conn,entidade="NOTA_DEBITO",entidade_id=nd_id,evento=acao,dados_anteriores=dict(anterior),dados_novos=dict(novo),justificativa=justificativa)
 

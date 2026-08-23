@@ -616,10 +616,12 @@ def _decidir(despesa_id, acao):
             return
         novo = conn.execute(text("""
             UPDATE financeiro3_despesas SET status=:status,
-                aprovado_por=CASE WHEN :status='APROVADA' THEN :usuario ELSE NULL END,
-                aprovado_em=CASE WHEN :status='APROVADA' THEN NOW() ELSE NULL END,
+                aprovado_por=:aprovador,
+                aprovado_em=CASE WHEN :aprovada THEN NOW() ELSE NULL END,
                 atualizado_por=:usuario, atualizado_em=NOW() WHERE id=:id RETURNING *
-        """), {"status": novo_status, "usuario": session.get("usuario_id"), "id": despesa_id}).mappings().one()
+        """), {"status": novo_status, "aprovador": session.get("usuario_id") if acao == "APROVACAO" else None,
+                "aprovada": acao == "APROVACAO", "usuario": session.get("usuario_id"),
+                "id": despesa_id}).mappings().one()
         conn.execute(text("""
             INSERT INTO financeiro3_despesa_decisoes
                 (despesa_id, acao, status_anterior, status_novo, justificativa, usuario_id)
@@ -689,9 +691,10 @@ def despesa_pagar(despesa_id):
             status = "PAGA" if total_pago == anterior["valor_total"] else "PAGAMENTO_PARCIAL"
             novo = conn.execute(text("""
                 UPDATE financeiro3_despesas SET status=:status,
-                    pago_em=CASE WHEN :status='PAGA' THEN NOW() ELSE NULL END,
+                    pago_em=CASE WHEN :quitada THEN NOW() ELSE NULL END,
                     atualizado_por=:usuario, atualizado_em=NOW() WHERE id=:id RETURNING *
-            """), {"status": status, "usuario": session.get("usuario_id"), "id": despesa_id}).mappings().one()
+            """), {"status": status, "quitada": status == "PAGA",
+                    "usuario": session.get("usuario_id"), "id": despesa_id}).mappings().one()
             registrar_evento(conn, entidade="DESPESA_PAGAMENTO", entidade_id=pagamento["id"], evento="REGISTRADO", dados_novos=dict(pagamento))
             registrar_evento(conn, entidade="DESPESA", entidade_id=despesa_id, evento="PAGAMENTO_REGISTRADO", dados_anteriores=dict(anterior), dados_novos=dict(novo))
         flash("Pagamento registrado.", "sucesso")
