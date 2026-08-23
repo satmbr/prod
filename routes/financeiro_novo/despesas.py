@@ -103,7 +103,7 @@ def _validar_referencias(conn, dados):
     valido = conn.execute(text("""
         SELECT
           EXISTS (SELECT 1 FROM financeiro3_pessoas WHERE id=:fornecedor_id AND ativo AND fornecedor) AND
-          (:favorecido_id IS NULL OR EXISTS (SELECT 1 FROM financeiro3_pessoas WHERE id=:favorecido_id AND ativo AND favorecido)) AND
+          (CAST(:favorecido_id AS BIGINT) IS NULL OR EXISTS (SELECT 1 FROM financeiro3_pessoas WHERE id=:favorecido_id AND ativo AND favorecido)) AND
           EXISTS (SELECT 1 FROM financeiro3_centros_custo WHERE id=:centro_custo_id AND ativo) AND
           EXISTS (SELECT 1 FROM financeiro3_categorias WHERE id=:categoria_id AND ativo AND natureza='DESPESA') AND
           EXISTS (SELECT 1 FROM financeiro3_moedas WHERE id=:moeda_id AND ativo)

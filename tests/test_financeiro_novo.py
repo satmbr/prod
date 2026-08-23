@@ -454,6 +454,11 @@ class FinanceiroNovoIsolamentoTests(unittest.TestCase):
         self.assertIn("company-tabs", pagina)
         self.assertIn("Nova despesa {{ empresa|title }}", pagina)
 
+    def test_despesa_sem_favorecido_tipifica_parametro_nulo_no_postgresql(self):
+        despesas = (self.raiz / "routes" / "financeiro_novo" / "despesas.py").read_text(encoding="utf-8")
+        self.assertIn("CAST(:favorecido_id AS BIGINT) IS NULL", despesas)
+        self.assertNotIn("(:favorecido_id IS NULL", despesas)
+
     def test_nota_debito_aceita_somente_despesa_da_mesma_empresa(self):
         migration = (self.raiz / "migrations" / "012_financeiro_novo_empresas.sql").read_text(encoding="utf-8")
         rotas = (self.raiz / "routes" / "financeiro_novo" / "notas_debito.py").read_text(encoding="utf-8")
