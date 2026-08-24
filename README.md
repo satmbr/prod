@@ -91,4 +91,9 @@ opcional no pagamento de Despesas, coerente com a ausência de controle de
 tesouraria no módulo. O cancelamento de Despesa permanece auditado por usuário
 e data, sem exigir motivo.
 
+Uma OM aprovada pode ser importada pela listagem de Despesas Matisa. Ela ocupa
+um único registro na lista, enquanto suas linhas mantêm vínculo com os itens e
+recibos originais da OM. As linhas vinculadas podem ser selecionadas em Notas
+de Débito sem copiar os arquivos no volume.
+
 <!-- Verificação de publicação: 2026-08-18 -->

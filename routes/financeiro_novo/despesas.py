@@ -150,9 +150,23 @@ def despesas():
             SELECT empresa,COUNT(*) AS quantidade
             FROM financeiro3_despesas GROUP BY empresa
         """)).all())
+        oms_importaveis = []
+        if empresa == "MATISA":
+            oms_importaveis = conn.execute(text("""
+                SELECT o.id,o.numero_om,p.nome_razao AS favorecido,m.codigo AS moeda,
+                  o.valor_total,
+                  COALESCE((SELECT SUM(pg.valor) FROM financeiro3_om_pagamentos pg
+                    WHERE pg.om_id=o.id AND pg.status='PAGO'),0) AS valor_pago
+                FROM financeiro3_oms o
+                JOIN financeiro3_pessoas p ON p.id=o.solicitante_id
+                JOIN financeiro3_moedas m ON m.id=o.moeda_id
+                WHERE o.status='APROVADA' AND o.removido_em IS NULL
+                  AND NOT EXISTS(SELECT 1 FROM financeiro3_despesas d WHERE d.origem_om_id=o.id)
+                ORDER BY o.numero_om DESC,o.id DESC LIMIT 300
+            """)).mappings().all()
     return render_template(
         "financeiro_novo/despesas.html", registros=registros, busca=busca, status=status,
-        empresa=empresa,
+        empresa=empresa, oms_importaveis=oms_importaveis,
         empresas=[{"codigo": codigo, "nome": nome, "quantidade": quantidades.get(codigo, 0)}
                   for codigo, nome in EMPRESAS],
         subnav_links=build_subnav("despesas"),
@@ -249,7 +263,10 @@ def _importar_origem(tipo, origem_id):
                         "reembolso_item": origens["reembolso_item_id"], "usuario": session.get("usuario_id")})
             registrar_evento(conn, entidade="DESPESA", entidade_id=despesa["id"], evento="IMPORTADA",
                 dados_novos={"origem_tipo": tipo, "origem_id": origem_id, "linhas": len(itens)})
-        flash(f"{tipo.title()} importada para Despesas sem duplicar o pagamento.", "sucesso")
+        mensagem = f"{tipo.title()} importada para Despesas sem duplicar o pagamento."
+        if tipo == "OM":
+            mensagem += " As linhas e os recibos permanecem vinculados à OM original."
+        flash(mensagem, "sucesso")
         return redirect(url_for("financeiro_novo.despesa_detalhe", despesa_id=despesa["id"]))
     except (ValorInvalido, IntegrityError) as exc:
         if isinstance(exc, IntegrityError):
@@ -262,6 +279,20 @@ def _importar_origem(tipo, origem_id):
 @login_required
 @permission_required("financeiro_novo", "editar")
 def om_importar_despesa(om_id):
+    return _importar_origem("OM", om_id)
+
+
+@bp.post("/despesas/importar-om")
+@login_required
+@permission_required("financeiro_novo", "editar")
+def despesa_importar_om():
+    try:
+        om_id = int(request.form.get("om_id") or 0)
+    except ValueError:
+        om_id = 0
+    if not om_id:
+        flash("Selecione uma OM para importar.", "erro")
+        return redirect(url_for("financeiro_novo.despesas", empresa="MATISA"))
     return _importar_origem("OM", om_id)
 
 
@@ -342,9 +373,27 @@ def despesa_detalhe(despesa_id):
         """), {"id": despesa_id}).mappings().first()
         if not despesa:
             abort(404)
-        itens = conn.execute(text(
-            "SELECT * FROM financeiro3_despesa_itens WHERE despesa_id=:id AND status='ATIVO' ORDER BY id"
-        ), {"id": despesa_id}).mappings().all()
+        itens = conn.execute(text("""
+            SELECT i.*,o.id AS origem_om_id,o.numero_om,
+              oi.data_despesa AS origem_data,
+              CASE WHEN oi.id IS NOT NULL THEN (
+                SELECT COUNT(*) FROM financeiro3_om_itens oi2
+                WHERE oi2.om_id=oi.om_id AND oi2.status='ATIVO' AND oi2.id<=oi.id
+              ) END AS origem_numero_linha,
+              recibo.arquivo_id AS origem_arquivo_id,
+              recibo.nome_original AS origem_nome_arquivo
+            FROM financeiro3_despesa_itens i
+            LEFT JOIN financeiro3_om_itens oi ON oi.id=i.om_item_id
+            LEFT JOIN financeiro3_oms o ON o.id=oi.om_id
+            LEFT JOIN LATERAL (
+              SELECT a.arquivo_id,ar.nome_original
+              FROM financeiro3_anexos a
+              JOIN financeiro3_arquivos ar ON ar.id=a.arquivo_id AND ar.status='ATIVO'
+              WHERE a.entidade='OM_ITEM' AND a.entidade_id=oi.id AND a.status='ATIVO'
+              ORDER BY a.id DESC LIMIT 1
+            ) recibo ON TRUE
+            WHERE i.despesa_id=:id AND i.status='ATIVO' ORDER BY i.id
+        """), {"id": despesa_id}).mappings().all()
         anexos = conn.execute(text("""
             SELECT a.id, ar.id AS arquivo_id, ar.nome_original, ar.tamanho_canonico,
                    ar.paginas, ar.criado_em, ar.assinatura_digital_detectada

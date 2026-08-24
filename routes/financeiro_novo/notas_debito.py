@@ -27,10 +27,26 @@ def _opcoes(conn, empresa="MATISA"):
         "moedas": conn.execute(text("SELECT id,codigo,nome FROM financeiro3_moedas WHERE ativo ORDER BY codigo")).mappings().all(),
         "contas": conn.execute(text("SELECT c.id,c.nome,c.moeda_id,m.codigo AS moeda FROM financeiro3_contas c JOIN financeiro3_moedas m ON m.id=c.moeda_id WHERE c.ativo ORDER BY c.nome")).mappings().all(),
         "despesa_itens": conn.execute(text("""
-            SELECT i.id,d.id AS despesa_id,i.descricao,i.valor_total,cc.codigo AS centro,m.codigo AS moeda,d.empresa
+            SELECT i.id,d.id AS despesa_id,i.descricao,i.valor_total,cc.codigo AS centro,
+              m.codigo AS moeda,d.empresa,o.id AS om_id,o.numero_om,oi.id AS om_item_id,
+              oi.data_despesa AS origem_data,
+              CASE WHEN oi.id IS NOT NULL THEN (
+                SELECT COUNT(*) FROM financeiro3_om_itens oi2
+                WHERE oi2.om_id=oi.om_id AND oi2.status='ATIVO' AND oi2.id<=oi.id
+              ) END AS om_numero_linha,
+              recibo.arquivo_id,recibo.nome_original AS nome_arquivo
             FROM financeiro3_despesa_itens i JOIN financeiro3_despesas d ON d.id=i.despesa_id
             JOIN financeiro3_centros_custo cc ON cc.id=i.centro_custo_id
             JOIN financeiro3_moedas m ON m.id=d.moeda_id
+            LEFT JOIN financeiro3_om_itens oi ON oi.id=i.om_item_id
+            LEFT JOIN financeiro3_oms o ON o.id=oi.om_id
+            LEFT JOIN LATERAL (
+              SELECT a.arquivo_id,ar.nome_original
+              FROM financeiro3_anexos a
+              JOIN financeiro3_arquivos ar ON ar.id=a.arquivo_id AND ar.status='ATIVO'
+              WHERE a.entidade='OM_ITEM' AND a.entidade_id=oi.id AND a.status='ATIVO'
+              ORDER BY a.id DESC LIMIT 1
+            ) recibo ON TRUE
             WHERE i.status='ATIVO' AND d.status<>'CANCELADA' AND d.empresa=:empresa
               AND NOT EXISTS(SELECT 1 FROM financeiro3_nd_itens ni
                 WHERE ni.despesa_item_id=i.id AND ni.status='ATIVO')
@@ -161,7 +177,26 @@ def nd_detalhe(nd_id):
         """), {"id": nd_id}).mappings().first()
         if not nd:
             abort(404)
-        itens = conn.execute(text("SELECT * FROM financeiro3_nd_itens WHERE nota_debito_id=:id AND status='ATIVO' ORDER BY id"), {"id": nd_id}).mappings().all()
+        itens = conn.execute(text("""
+            SELECT ni.*,o.id AS om_id,o.numero_om,di.om_item_id,
+              CASE WHEN oi.id IS NOT NULL THEN (
+                SELECT COUNT(*) FROM financeiro3_om_itens oi2
+                WHERE oi2.om_id=oi.om_id AND oi2.status='ATIVO' AND oi2.id<=oi.id
+              ) END AS om_numero_linha,
+              recibo.arquivo_id,recibo.nome_original AS nome_arquivo
+            FROM financeiro3_nd_itens ni
+            LEFT JOIN financeiro3_despesa_itens di ON di.id=ni.despesa_item_id
+            LEFT JOIN financeiro3_om_itens oi ON oi.id=di.om_item_id
+            LEFT JOIN financeiro3_oms o ON o.id=oi.om_id
+            LEFT JOIN LATERAL (
+              SELECT a.arquivo_id,ar.nome_original
+              FROM financeiro3_anexos a
+              JOIN financeiro3_arquivos ar ON ar.id=a.arquivo_id AND ar.status='ATIVO'
+              WHERE a.entidade='OM_ITEM' AND a.entidade_id=oi.id AND a.status='ATIVO'
+              ORDER BY a.id DESC LIMIT 1
+            ) recibo ON TRUE
+            WHERE ni.nota_debito_id=:id AND ni.status='ATIVO' ORDER BY ni.id
+        """), {"id": nd_id}).mappings().all()
         recebimentos = conn.execute(text("SELECT r.*,c.nome AS conta FROM financeiro3_nd_recebimentos r JOIN financeiro3_contas c ON c.id=r.conta_id WHERE r.nota_debito_id=:id AND r.status='ATIVO' ORDER BY r.id DESC"), {"id": nd_id}).mappings().all()
         decisoes = conn.execute(text("SELECT * FROM financeiro3_nd_decisoes WHERE nota_debito_id=:id ORDER BY id DESC"), {"id": nd_id}).mappings().all()
         anexos = conn.execute(text("""SELECT a.id,ar.id AS arquivo_id,ar.nome_original,ar.paginas FROM financeiro3_anexos a JOIN financeiro3_arquivos ar ON ar.id=a.arquivo_id WHERE a.entidade='ND' AND a.entidade_id=:id AND a.status='ATIVO' ORDER BY a.id DESC"""), {"id": nd_id}).mappings().all()

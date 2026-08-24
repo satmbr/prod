@@ -507,6 +507,27 @@ class FinanceiroNovoIsolamentoTests(unittest.TestCase):
         self.assertIn('origem_item["empresa"] != nd["empresa"]', rotas)
         self.assertIn("mesma empresa", rotas)
 
+    def test_om_importada_vira_uma_despesa_com_linhas_e_recibos_vinculados(self):
+        despesas = (self.raiz / "routes" / "financeiro_novo" / "despesas.py").read_text(encoding="utf-8")
+        notas = (self.raiz / "routes" / "financeiro_novo" / "notas_debito.py").read_text(encoding="utf-8")
+        lista = (self.raiz / "templates" / "financeiro_novo" / "despesas.html").read_text(encoding="utf-8")
+        detalhe = (self.raiz / "templates" / "financeiro_novo" / "despesa_detalhe.html").read_text(encoding="utf-8")
+        nota = (self.raiz / "templates" / "financeiro_novo" / "nd_detalhe.html").read_text(encoding="utf-8")
+        inicio = despesas.index("def _importar_origem")
+        fim = despesas.index('@bp.post("/oms/', inicio)
+        importacao = despesas[inicio:fim]
+        self.assertIn('@bp.post("/despesas/importar-om")', despesas)
+        self.assertIn("oms_importaveis", despesas)
+        self.assertIn("Importar como uma Despesa", lista)
+        self.assertIn("om_item_id", importacao)
+        self.assertNotIn("financeiro3_arquivos", importacao)
+        self.assertNotIn("financeiro3_anexos", importacao)
+        self.assertIn("OM_ITEM", despesas)
+        self.assertIn("om_item_anexo_baixar", detalhe)
+        self.assertIn("LEFT JOIN financeiro3_om_itens", notas)
+        self.assertIn("Consultar linhas disponíveis e recibos", nota)
+        self.assertIn("om_item_anexo_baixar", nota)
+
     def test_empresas_financeiras_validas_sao_fechadas(self):
         self.assertEqual(empresa_valida(None), "MATISA")
         self.assertEqual(empresa_valida("prumo"), "PRUMO")
