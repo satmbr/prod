@@ -169,11 +169,14 @@ def create_app():
                 "botao": "Acessar módulo"
             })
 
-        if "financeiro_novo:visualizar" in permissoes or "auth:administrar" in permissoes:
+        if ("financeiro_novo:visualizar" in permissoes or
+                "perfil_pagamentos:visualizar" in permissoes or
+                "auth:administrar" in permissoes):
+            acesso_financeiro = "financeiro_novo:visualizar" in permissoes or "auth:administrar" in permissoes
             cards.append({
                 "titulo": "Financeiro Novo · Homologação",
-                "descricao": "Novo módulo financeiro independente, iniciando vazio e sem acesso aos dados anteriores.",
-                "href": url_for("financeiro_novo.index"),
+                "descricao": "Módulo financeiro independente com despesas, missões e perfis de pagamentos integrados ao Drive.",
+                "href": url_for("financeiro_novo.index" if acesso_financeiro else "financeiro_novo.pagamentos_painel"),
                 "botao": "Abrir homologação"
             })
 

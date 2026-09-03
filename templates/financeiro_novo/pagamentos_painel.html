@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Perfil de Pagamentos · Financeiro Novo{% endblock %}
+{% block content %}
+{% set admin = 'perfil_pagamentos:administrar' in current_user_permissions or 'auth:administrar' in current_user_permissions %}
+{% set sincroniza = 'perfil_pagamentos:sincronizar' in current_user_permissions or 'auth:administrar' in current_user_permissions %}
+<div class="page-wrap pp-page">
+  <div class="pp-banner">
+    <div><strong>PERFIL DE PAGAMENTOS</strong><span>Controle independente de contas e comprovantes pelo Google Drive.</span></div>
+    <div class="pp-service {{ 'ok' if conta_servico else 'warn' }}">
+      {% if conta_servico %}Compartilhe as pastas com <strong>{{ conta_servico }}</strong>{% else %}Conta de serviço ainda não configurada no Railway{% endif %}
+    </div>
+  </div>
+
+  <section class="pp-summary">
+    <article><span>Total</span><strong>{{ resumo.total }}</strong><small>contas registradas</small></article>
+    <article><span>Em aberto</span><strong>{{ resumo.abertas }}</strong><small>R$ {{ '%.2f'|format(resumo.valor_aberto)|replace('.',',') }}</small></article>
+    <article class="danger"><span>Vencidas</span><strong>{{ resumo.vencidas }}</strong><small>R$ {{ '%.2f'|format(resumo.valor_vencido)|replace('.',',') }}</small></article>
+    <article><span>A reembolsar</span><strong>{{ resumo.reembolso_pendente }}</strong><small>contas pendentes</small></article>
+    <article class="success"><span>Quitadas</span><strong>{{ resumo.quitadas }}</strong><small>pagas, reembolsadas e com OM</small></article>
+  </section>
+
+  <section class="zone">
+    <header class="zone-head">
+      <div class="zone-left"><div><div class="zone-title">Perfis e pastas do Drive</div><div class="muted">Todos os usuários autorizados visualizam todos os perfis.</div></div></div>
+      {% if admin %}<a class="btn btn-primary" href="{{ url_for('financeiro_novo.pagamento_perfil_novo') }}">Novo perfil</a>{% endif %}
+    </header>
+    <div class="zone-body">
+      <div class="pp-profiles">
+        {% for perfil in perfis %}
+        <article class="pp-profile {{ 'inactive' if not perfil.ativo else '' }}">
+          <div class="pp-profile-head"><div><strong>{{ perfil.nome }}</strong><span>{{ perfil.matricula }} · {{ perfil.gmail }}</span></div><span class="pp-chip {{ perfil.status_conexao|lower }}">{{ perfil.status_conexao }}</span></div>
+          <div class="pp-profile-metrics"><span><b>{{ perfil.contas }}</b> contas</span><span><b>{{ perfil.abertas }}</b> abertas</span><span>{{ 'Ativo' if perfil.ativo else 'Inativo' }}</span></div>
+          {% if perfil.ultimo_erro %}<p class="pp-error">{{ perfil.ultimo_erro }}</p>{% endif %}
+          <p class="muted">Última sincronização: {{ perfil.ultima_sincronizacao_em.strftime('%d/%m/%Y %H:%M') if perfil.ultima_sincronizacao_em else 'Nunca executada' }}</p>
+          <div class="pp-actions">
+            <a class="btn btn-outline" href="{{ perfil.pasta_raiz_link }}" target="_blank" rel="noopener">Abrir Drive</a>
+            {% if admin %}<a class="btn btn-outline" href="{{ url_for('financeiro_novo.pagamento_perfil_editar',perfil_id=perfil.id) }}">Editar</a>{% endif %}
+            {% if sincroniza and perfil.ativo %}<form method="post" action="{{ url_for('financeiro_novo.pagamento_perfil_sincronizar',perfil_id=perfil.id) }}"><button class="btn btn-primary" type="submit">Sincronizar agora</button></form>{% endif %}
+          </div>
+        </article>
+        {% else %}<div class="pp-empty">Nenhum perfil cadastrado.</div>{% endfor %}
+      </div>
+    </div>
+  </section>
+
+  <section class="zone">
+    <header class="zone-head"><div class="zone-title">Painel de contas</div></header>
+    <div class="zone-body">
+      <form class="pp-filter" method="get">
+        <input type="search" name="q" value="{{ busca }}" placeholder="Número, descrição, OM ou perfil">
+        <select name="perfil_id"><option value="">Todos os perfis</option>{% for p in perfis %}<option value="{{ p.id }}" {% if perfil_id|string == p.id|string %}selected{% endif %}>{{ p.nome }}</option>{% endfor %}</select>
+        <select name="situacao"><option value="">Todas as situações</option>{% for valor,rotulo in [('ABERTAS','Em aberto'),('PAGAS','Pagas'),('REEMBOLSO_PENDENTE','Reembolso pendente'),('REEMBOLSADAS','Reembolsadas'),('VENCIDAS','Vencidas'),('QUITADAS','Quitadas'),('COM_ERRO','Com erro')] %}<option value="{{ valor }}" {% if situacao==valor %}selected{% endif %}>{{ rotulo }}</option>{% endfor %}</select>
+        <button class="btn btn-primary" type="submit">Aplicar</button><a class="btn btn-outline" href="{{ url_for('financeiro_novo.pagamentos_painel') }}">Limpar</a>
+      </form>
+      <div class="pp-table-wrap"><table class="pp-table"><thead><tr><th>Conta</th><th>Perfil</th><th>Descrição</th><th>Documento</th><th>Vencimento</th><th>Pagamento</th><th>Reembolso</th><th>OM</th><th>Comprovante</th><th class="right">Valor</th></tr></thead><tbody>
+      {% for conta in contas %}
+      <tr class="{{ 'overdue' if conta.status_pagamento=='ABERTA' and conta.data_vencimento < today else '' }}">
+        <td><a class="pp-number" href="{{ url_for('financeiro_novo.pagamento_conta_detalhe',conta_id=conta.id) }}">{{ conta.numero }}</a><small>{{ conta.pasta_atual|replace('_',' ') }}</small></td>
+        <td>{{ conta.perfil_nome }}<small>{{ conta.matricula }}</small></td><td>{{ conta.descricao }}</td>
+        <td>{{ conta.data_documento.strftime('%d/%m/%Y') }}</td><td>{{ conta.data_vencimento.strftime('%d/%m/%Y') }}{% if conta.status_pagamento=='ABERTA' and conta.data_vencimento < today %}<small class="late">VENCIDA</small>{% endif %}</td>
+        <td><span class="pp-chip {{ conta.status_pagamento|lower }}">{{ conta.status_pagamento }}</span></td>
+        <td><span class="pp-chip {{ conta.status_reembolso|lower }}">{{ conta.status_reembolso }}</span>{% if conta.status_reembolso=='REEMBOLSADA' and not conta.numero_om %}<small class="late">OM PENDENTE</small>{% endif %}</td>
+        <td>{{ conta.numero_om or '—' }}</td><td><span class="pp-proof {{ 'yes' if conta.tem_comprovante else 'no' }}">{{ 'Sim (' ~ conta.quantidade_comprovantes ~ ')' if conta.tem_comprovante else 'Não' }}</span></td>
+        <td class="right">R$ {{ '%.2f'|format(conta.valor)|replace('.',',') }}</td>
+      </tr>
+      {% else %}<tr><td class="pp-empty" colspan="10">Nenhuma conta encontrada.</td></tr>{% endfor %}
+      </tbody></table></div>
+    </div>
+  </section>
+
+  <div class="pp-lower">
+    <section class="zone"><header class="zone-head"><div class="zone-title">Pendências de importação</div><span class="pp-count">{{ erros|length }}</span></header><div class="zone-body pp-log">
+      {% for erro in erros %}<article><div><strong>{{ erro.tipo }} · {{ erro.perfil_nome }}</strong><span>{{ erro.nome_arquivo }}</span></div><p>{{ erro.mensagem }}</p>{% if erro.drive_web_view_link %}<a href="{{ erro.drive_web_view_link }}" target="_blank" rel="noopener">Abrir arquivo</a>{% endif %}</article>{% else %}<div class="pp-empty">Nenhuma pendência.</div>{% endfor %}
+    </div></section>
+    <section class="zone"><header class="zone-head"><div class="zone-title">Últimas sincronizações</div></header><div class="zone-body pp-log">
+      {% for sync in sincronizacoes %}<article><div><strong>{{ sync.perfil_nome or 'Perfil removido' }}</strong><span>{{ sync.iniciado_em.strftime('%d/%m/%Y %H:%M') }} · {{ sync.origem }}</span></div><p><span class="pp-chip {{ sync.status|lower }}">{{ sync.status }}</span> {{ sync.contas_novas }} conta(s), {{ sync.comprovantes_novos }} comprovante(s), {{ sync.erros }} erro(s)</p></article>{% else %}<div class="pp-empty">Nenhuma sincronização executada.</div>{% endfor %}
+    </div></section>
+  </div>
+</div>
+<style>
+.pp-page{--pp:#173b5f;--pp-soft:#eaf1f7}.pp-banner{display:flex;justify-content:space-between;gap:18px;align-items:center;padding:14px 16px;margin-bottom:14px;border:1px solid #bfd0de;border-radius:10px;background:#f4f8fb}.pp-banner strong,.pp-banner span{display:block}.pp-banner span{font-size:11px;color:#61768a;margin-top:3px}.pp-service{max-width:480px;padding:8px 11px;border-radius:8px;font-size:11px}.pp-service.ok{background:#dcfce7;color:#166534}.pp-service.warn{background:#fef3c7;color:#92400e}.pp-summary{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:14px}.pp-summary article{padding:14px;border:1px solid #dbe3ea;border-radius:10px;background:#fff}.pp-summary span,.pp-summary small{display:block;color:#6c7f91}.pp-summary strong{display:block;margin:5px 0;font-size:25px;color:var(--pp)}.pp-summary .danger strong{color:#b42318}.pp-summary .success strong{color:#087a55}.pp-profiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(310px,1fr));gap:12px}.pp-profile{padding:14px;border:1px solid #dbe3ea;border-radius:10px;background:#fff}.pp-profile.inactive{opacity:.62}.pp-profile-head{display:flex;justify-content:space-between;gap:10px}.pp-profile-head strong,.pp-profile-head span{display:block}.pp-profile-head span{font-size:11px;color:#6c7f91;margin-top:2px}.pp-profile-metrics{display:flex;gap:14px;padding:10px 0;margin:10px 0;border-block:1px solid #edf1f4;color:#61768a;font-size:11px}.pp-actions{display:flex;gap:7px;align-items:center;flex-wrap:wrap}.pp-actions form{margin:0}.pp-error{padding:7px;border-radius:6px;background:#fff0ef;color:#a52a24;font-size:11px}.pp-chip{display:inline-block;padding:4px 7px;border-radius:999px;background:#edf2f6;color:#52697d;font-size:9px;font-weight:800;letter-spacing:.04em}.pp-chip.ativa,.pp-chip.paga,.pp-chip.reembolsada,.pp-chip.sucesso{background:#dcfce7;color:#166534}.pp-chip.erro,.pp-chip.vencida{background:#fee2e2;color:#991b1b}.pp-chip.pendente,.pp-chip.aberta,.pp-chip.parcial,.pp-chip.aguardando_om{background:#fef3c7;color:#92400e}.pp-filter{display:grid;grid-template-columns:2fr 1fr 1fr auto auto;gap:8px;margin-bottom:12px}.pp-filter input,.pp-filter select{min-height:36px;border:1px solid #ccd8e2;border-radius:7px;padding:7px 9px;background:#fff}.pp-table-wrap{overflow:auto}.pp-table{width:100%;min-width:1120px;border-collapse:collapse}.pp-table th,.pp-table td{padding:9px 8px;border-bottom:1px solid #e8edf1;text-align:left;vertical-align:middle}.pp-table th{background:#f6f8fa;color:#61768a;font-size:10px;text-transform:uppercase}.pp-table td small{display:block;margin-top:3px;color:#8090a0;font-size:9px}.pp-table tr.overdue{background:#fff7f6}.pp-table .right{text-align:right}.pp-number{font-weight:800;color:#185f97}.pp-table .late{color:#b42318;font-weight:800}.pp-proof{font-size:10px;font-weight:700}.pp-proof.yes{color:#087a55}.pp-proof.no{color:#9a4e16}.pp-lower{display:grid;grid-template-columns:1fr 1fr;gap:14px}.pp-log{max-height:360px;overflow:auto}.pp-log article{padding:10px 0;border-bottom:1px solid #edf1f4}.pp-log article>div{display:flex;justify-content:space-between;gap:10px}.pp-log span{font-size:10px;color:#748697}.pp-log p{margin:5px 0;font-size:11px}.pp-log a{color:#185f8f;font-weight:700;font-size:11px}.pp-count{padding:3px 7px;border-radius:999px;background:#edf2f6}.pp-empty{padding:20px;text-align:center;color:#7d8d9b}@media(max-width:1000px){.pp-summary{grid-template-columns:repeat(2,1fr)}.pp-lower{grid-template-columns:1fr}.pp-filter{grid-template-columns:1fr}.pp-banner{align-items:flex-start;flex-direction:column}}
+</style>
+{% endblock %}

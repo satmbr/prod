@@ -17,3 +17,4 @@ from routes.financeiro_novo import relatorios  # noqa: E402, F401
 from routes.financeiro_novo import homologacao  # noqa: E402, F401
 from routes.financeiro_novo import reembolsos  # noqa: E402, F401
 from routes.financeiro_novo import previsao  # noqa: E402, F401
+from routes.financeiro_novo import perfil_pagamentos  # noqa: E402, F401

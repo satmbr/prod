@@ -97,3 +97,23 @@ recibos originais da OM. As linhas vinculadas podem ser selecionadas em Notas
 de Débito sem copiar os arquivos no volume.
 
 <!-- Verificação de publicação: 2026-08-18 -->
+
+## Perfil de Pagamentos e Google Drive
+
+O painel `/financeiro-novo/perfil-pagamentos` mantém perfis e contas isolados
+dos demais lançamentos do Financeiro Novo. Configure a credencial JSON da conta
+de serviço em `GOOGLE_SERVICE_ACCOUNT_JSON` (JSON puro ou Base64). Nunca grave
+essa credencial no repositório.
+
+Cada perfil aponta para uma pasta raiz compartilhada com o e-mail da conta de
+serviço. A primeira sincronização cria `novas_contas`, `contas_controladas`,
+`contas_quitadas`, `comprovantes` e `contas_com_erro`. O nome de entrada é:
+
+```text
+100,50 25.09.2026 28.09.2026 manutencao veicular ABERTA PENDENTE.pdf
+```
+
+Para o processamento diário das 23:00 em America/Sao_Paulo, crie no Railway um
+serviço Cron usando este repositório, comando `python sync_pagamentos.py` e
+agenda `0 2 * * *` (Railway usa UTC). A execução é idempotente pelo ID do arquivo
+no Drive e pode ser repetida manualmente pelo painel.

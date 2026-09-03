@@ -50,6 +50,12 @@ def build_subnav(active: str | None):
         },
     ]
     permissoes = session.get("permissoes", [])
+    if "perfil_pagamentos:visualizar" in permissoes or "auth:administrar" in permissoes:
+        links.append({
+            "text": "Perfil de Pagamentos",
+            "href": url_for("financeiro_novo.pagamentos_painel"),
+            "active": active == "perfil_pagamentos",
+        })
     if "financeiro_novo:administrar" in permissoes or "auth:administrar" in permissoes:
         links.append({
             "text": "Conciliação",

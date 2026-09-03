@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Editar' if perfil and perfil.id else 'Novo' }} perfil de pagamentos{% endblock %}
+{% block content %}
+<div class="page-wrap pp-form-page">
+  <section class="zone">
+    <header class="zone-head"><div><div class="zone-title">{{ 'Editar perfil' if perfil and perfil.id else 'Novo perfil de pagamentos' }}</div><div class="muted">A senha do Gmail nunca será solicitada ou armazenada.</div></div></header>
+    <div class="zone-body">
+      {% if conta_servico %}<div class="pp-instruction"><strong>Antes de sincronizar</strong><span>Compartilhe a pasta raiz com <b>{{ conta_servico }}</b>, concedendo permissão para editar e organizar arquivos.</span></div>{% else %}<div class="pp-instruction warn"><strong>Configuração pendente</strong><span>Cadastre GOOGLE_SERVICE_ACCOUNT_JSON nas variáveis do Railway. O perfil pode ser salvo agora e conectado depois.</span></div>{% endif %}
+      <form method="post" class="pp-form">
+        <label>Nome do perfil<input name="nome" maxlength="120" required value="{{ perfil.nome if perfil else '' }}" placeholder="Ex.: Administrativo São Paulo"></label>
+        <label>Matrícula<input name="matricula" maxlength="40" required value="{{ perfil.matricula if perfil else '' }}" placeholder="Ex.: 12345"></label>
+        <label>E-mail Google<input type="email" name="gmail" maxlength="254" required value="{{ perfil.gmail if perfil else '' }}" placeholder="usuario@gmail.com"></label>
+        <label class="wide">Link da pasta raiz compartilhada<input name="pasta_raiz_link" required value="{{ perfil.pasta_raiz_link if perfil else '' }}" placeholder="https://drive.google.com/drive/folders/..."><small>Na primeira sincronização serão criadas: novas_contas, contas_controladas, contas_quitadas, comprovantes e contas_com_erro.</small></label>
+        {% if perfil and perfil.id %}<label class="pp-check"><input type="checkbox" name="ativo" value="1" {% if perfil.ativo %}checked{% endif %}> Perfil ativo</label>{% endif %}
+        <div class="pp-form-actions"><a class="btn btn-outline" href="{{ url_for('financeiro_novo.pagamentos_painel') }}">Cancelar</a><button class="btn btn-primary" type="submit">Salvar perfil</button></div>
+      </form>
+      {% if perfil and perfil.id and perfil.ativo %}<form method="post" action="{{ url_for('financeiro_novo.pagamento_perfil_desativar',perfil_id=perfil.id) }}" class="pp-danger" onsubmit="return confirm('Desativar este perfil? As contas e os arquivos serão preservados.');"><div><strong>Desativar perfil</strong><span>Interrompe as sincronizações sem apagar o histórico.</span></div><button class="btn btn-outline" type="submit">Desativar</button></form>{% endif %}
+    </div>
+  </section>
+</div>
+<style>.pp-form-page{max-width:900px}.pp-instruction{display:flex;flex-direction:column;gap:3px;padding:12px;margin-bottom:16px;border-radius:8px;background:#ecfdf3;color:#166534}.pp-instruction.warn{background:#fef3c7;color:#92400e}.pp-form{display:grid;grid-template-columns:1fr 1fr;gap:14px}.pp-form label{display:flex;flex-direction:column;gap:6px;font-weight:700;color:#3d5062}.pp-form input{min-height:38px;border:1px solid #cbd7e1;border-radius:7px;padding:8px 10px;font:inherit}.pp-form small{font-weight:400;color:#728496}.pp-form .wide,.pp-form-actions,.pp-check{grid-column:1/-1}.pp-check{flex-direction:row!important;align-items:center}.pp-check input{min-height:auto}.pp-form-actions{display:flex;justify-content:flex-end;gap:8px}.pp-danger{display:flex;justify-content:space-between;align-items:center;gap:15px;margin-top:24px;padding:14px;border:1px solid #f1b8b4;border-radius:8px;background:#fff7f6}.pp-danger strong,.pp-danger span{display:block}.pp-danger span{font-size:11px;color:#7c6060}@media(max-width:700px){.pp-form{grid-template-columns:1fr}}
+</style>
+{% endblock %}
