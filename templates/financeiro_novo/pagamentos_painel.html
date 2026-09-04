@@ -22,7 +22,10 @@
   <section class="zone">
     <header class="zone-head">
       <div class="zone-left"><div><div class="zone-title">Perfis e pastas do Drive</div><div class="muted">Todos os usuários autorizados visualizam todos os perfis.</div></div></div>
-      {% if admin %}<a class="btn btn-primary" href="{{ url_for('financeiro_novo.pagamento_perfil_novo') }}">Novo perfil</a>{% endif %}
+      <div class="pp-actions">
+        {% if sincroniza %}<form method="post" action="{{ url_for('financeiro_novo.pagamentos_sincronizar') }}"><button class="btn btn-primary" type="submit">Sincronizar tudo agora</button></form>{% endif %}
+        {% if admin %}<a class="btn btn-outline" href="{{ url_for('financeiro_novo.pagamento_perfil_novo') }}">Novo perfil</a>{% endif %}
+      </div>
     </header>
     <div class="zone-body">
       <div class="pp-profiles">

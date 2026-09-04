@@ -249,6 +249,42 @@ def pagamento_perfil_sincronizar(perfil_id):
     return redirect(url_for("financeiro_novo.pagamentos_painel", perfil_id=perfil_id))
 
 
+@bp.post("/perfil-pagamentos/sincronizar")
+@login_required
+@permission_required(MODULO, "sincronizar")
+def pagamentos_sincronizar():
+    with get_engine().connect() as conn:
+        perfis = conn.execute(text("""
+            SELECT id,nome FROM financeiro3_pagamento_perfis
+            WHERE ativo ORDER BY id
+        """)).mappings().all()
+    if not perfis:
+        flash("Cadastre ao menos um perfil ativo antes de sincronizar.", "warning")
+        return redirect(url_for("financeiro_novo.pagamentos_painel"))
+
+    resultados = []
+    falhas = []
+    for perfil in perfis:
+        try:
+            resultados.append(sincronizar_perfil(
+                perfil["id"], origem="MANUAL", usuario_id=session.get("usuario_id")
+            ))
+        except Exception:
+            falhas.append(perfil["nome"])
+
+    contas = sum(item["contas_novas"] for item in resultados)
+    comprovantes = sum(item["comprovantes_novos"] for item in resultados)
+    erros = sum(item["erros"] for item in resultados) + len(falhas)
+    mensagem = (
+        f"Sincronização manual concluída: {len(resultados)} perfil(is), "
+        f"{contas} conta(s), {comprovantes} comprovante(s) e {erros} erro(s)."
+    )
+    if falhas:
+        mensagem += " Falha em: " + ", ".join(falhas) + "."
+    flash(mensagem, "warning" if erros else "sucesso")
+    return redirect(url_for("financeiro_novo.pagamentos_painel"))
+
+
 @bp.get("/perfil-pagamentos/contas/<int:conta_id>")
 @login_required
 @permission_required(MODULO, "visualizar")

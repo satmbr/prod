@@ -107,6 +107,13 @@ class PerfilPagamentosConfiguracaoTests(unittest.TestCase):
         self.assertIn("financeiro3_pagamento_comprovantes", migration)
         self.assertNotIn("financeiro3_oms", migration + routes + service)
 
+    def test_painel_tem_sincronizacao_manual_de_todos_os_perfis(self):
+        routes = (ROOT / "routes" / "financeiro_novo" / "perfil_pagamentos.py").read_text(encoding="utf-8")
+        template = (ROOT / "templates" / "financeiro_novo" / "pagamentos_painel.html").read_text(encoding="utf-8")
+        self.assertIn('@bp.post("/perfil-pagamentos/sincronizar")', routes)
+        self.assertIn("financeiro_novo.pagamentos_sincronizar", template)
+        self.assertIn("Sincronizar tudo agora", template)
+
 
 if __name__ == "__main__":
     unittest.main()
