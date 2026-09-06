@@ -47,11 +47,26 @@ class PerfilPagamentosNomeTests(unittest.TestCase):
                 "100,50 28.09.2026 25.09.2026 manutencao ABERTA PENDENTE.pdf"
             )
 
-    def test_status_livre_e_rejeitado(self):
+    def test_so_valor_e_descricao_usam_data_e_status_padrao(self):
+        conta = interpretar_nome_conta("254,00 hospedagem.jpeg")
+        self.assertEqual(conta.valor, Decimal("254.00"))
+        self.assertEqual(conta.data_documento, date.today())
+        self.assertEqual(conta.data_vencimento, date.today())
+        self.assertEqual(conta.descricao, "hospedagem")
+        self.assertEqual(conta.status_pagamento, "ABERTA")
+        self.assertEqual(conta.status_reembolso, "PENDENTE")
+
+    def test_uma_data_define_documento_e_vencimento_atual(self):
+        conta = interpretar_nome_conta("254,00 01.09.2026 abastecimento.jpeg")
+        self.assertEqual(conta.data_documento, date(2026, 9, 1))
+        self.assertEqual(conta.data_vencimento, date.today())
+        self.assertEqual(conta.descricao, "abastecimento")
+        self.assertEqual(conta.status_pagamento, "ABERTA")
+        self.assertEqual(conta.status_reembolso, "PENDENTE")
+
+    def test_descricao_continua_obrigatoria(self):
         with self.assertRaises(NomeContaInvalido):
-            interpretar_nome_conta(
-                "100,50 25.09.2026 28.09.2026 manutencao VENCIDA PENDENTE.pdf"
-            )
+            interpretar_nome_conta("254,00.pdf")
 
     def test_nome_controlado_preserva_numero_datas_e_status(self):
         nome = nome_controlado({

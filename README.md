@@ -113,6 +113,16 @@ serviço. A primeira sincronização cria `novas_contas`, `contas_controladas`,
 100,50 25.09.2026 28.09.2026 manutencao veicular ABERTA PENDENTE.pdf
 ```
 
+Somente valor e descrição são obrigatórios. As formas reduzidas também são
+aceitas:
+
+```text
+254,00 hospedagem.jpeg
+254,00 01.09.2026 abastecimento.jpeg
+```
+
+Datas ausentes usam a data atual de São Paulo. Status ausentes usam `ABERTA` e `PENDENTE`.
+
 Para o processamento diário das 23:00 em America/Sao_Paulo, crie no Railway um
 serviço Cron usando este repositório, comando `python sync_pagamentos.py` e
 agenda `0 2 * * *` (Railway usa UTC). A execução é idempotente pelo ID do arquivo

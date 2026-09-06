@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import text
 
@@ -83,27 +84,34 @@ def interpretar_nome_conta(nome_arquivo: str) -> ContaImportada:
     partes = Path(nome_arquivo).stem.split()
     if partes and re.fullmatch(r"CP-\d{6,}", partes[0], re.IGNORECASE):
         partes = partes[1:]
-    if len(partes) < 6:
-        raise NomeContaInvalido(
-            "Use: VALOR DATA_DOCUMENTO VENCIMENTO DESCRICAO ABERTA|PAGA PENDENTE|REEMBOLSADA."
-        )
-    status_pagamento = partes[-2].upper()
-    status_reembolso = partes[-1].upper()
-    if status_pagamento not in STATUS_PAGAMENTO:
-        raise NomeContaInvalido("O status de pagamento deve ser ABERTA ou PAGA.")
-    if status_reembolso not in STATUS_REEMBOLSO:
-        raise NomeContaInvalido("O status de reembolso deve ser PENDENTE ou REEMBOLSADA.")
-    descricao = " ".join(partes[3:-2]).strip()
+    if len(partes) < 2:
+        raise NomeContaInvalido("Informe pelo menos o valor e a descrição da conta.")
+
+    valor = _decimal_nome(partes.pop(0))
+    datas = []
+    while partes and len(datas) < 2 and re.fullmatch(r"\d{2}\.\d{2}\.\d{4}", partes[0]):
+        datas.append(_data_nome(partes.pop(0), "A data informada"))
+
+    hoje = datetime.now(ZoneInfo("America/Sao_Paulo")).date()
+    data_documento = datas[0] if datas else hoje
+    data_vencimento = datas[1] if len(datas) == 2 else max(hoje, data_documento)
+
+    status_pagamento = "ABERTA"
+    status_reembolso = "PENDENTE"
+    if partes and partes[-1].upper() in STATUS_REEMBOLSO:
+        status_reembolso = partes.pop().upper()
+    if partes and partes[-1].upper() in STATUS_PAGAMENTO:
+        status_pagamento = partes.pop().upper()
+
+    descricao = " ".join(partes).strip()
     if not descricao:
-        raise NomeContaInvalido("Informe a descrição entre as datas e os status.")
+        raise NomeContaInvalido("Informe a descrição da conta após o valor e as datas opcionais.")
     if len(descricao) > 220:
         raise NomeContaInvalido("A descrição deve ter até 220 caracteres.")
-    data_documento = _data_nome(partes[1], "A data do documento")
-    data_vencimento = _data_nome(partes[2], "A data de vencimento")
     if data_vencimento < data_documento:
         raise NomeContaInvalido("A data de vencimento não pode ser anterior à data do documento.")
     return ContaImportada(
-        valor=_decimal_nome(partes[0]),
+        valor=valor,
         data_documento=data_documento,
         data_vencimento=data_vencimento,
         descricao=descricao,
