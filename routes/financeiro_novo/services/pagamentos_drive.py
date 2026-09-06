@@ -289,16 +289,19 @@ def _criar_ou_obter_conta(perfil: dict, arquivo: dict, dados: ContaImportada) ->
                mime_type,valor,data_documento,data_vencimento,descricao,status_pagamento,
                status_reembolso,data_pagamento,data_reembolso,status_sincronizacao)
             VALUES (:perfil,:arquivo,:nome,:nome,:link,:mime,:valor,:documento,:vencimento,
-                    :descricao,:pagamento,:reembolso,
-                    CASE WHEN :pagamento='PAGA' THEN CURRENT_DATE ELSE NULL END,
-                    CASE WHEN :reembolso='REEMBOLSADA' THEN CURRENT_DATE ELSE NULL END,
-                    CASE WHEN :reembolso='REEMBOLSADA' THEN 'AGUARDANDO_OM' ELSE 'PENDENTE' END)
+                    :descricao,:pagamento,:reembolso,:data_pagamento,
+                    :data_reembolso,:status_sincronizacao)
             RETURNING *
         """), {"perfil": perfil["id"], "arquivo": arquivo["id"], "nome": arquivo["name"],
                  "link": arquivo.get("webViewLink"), "mime": arquivo.get("mimeType"),
                  "valor": dados.valor, "documento": dados.data_documento,
                  "vencimento": dados.data_vencimento, "descricao": dados.descricao,
-                 "pagamento": dados.status_pagamento, "reembolso": dados.status_reembolso}).mappings().one()
+                 "pagamento": dados.status_pagamento, "reembolso": dados.status_reembolso,
+                 "data_pagamento": date.today() if dados.status_pagamento == "PAGA" else None,
+                 "data_reembolso": date.today() if dados.status_reembolso == "REEMBOLSADA" else None,
+                 "status_sincronizacao": (
+                     "AGUARDANDO_OM" if dados.status_reembolso == "REEMBOLSADA" else "PENDENTE"
+                 )}).mappings().one()
         numero = f"CP-{conta['id']:06d}"
         conta = conn.execute(text("""
             UPDATE financeiro3_pagamento_contas SET numero=:numero WHERE id=:id RETURNING *

@@ -114,6 +114,13 @@ class PerfilPagamentosConfiguracaoTests(unittest.TestCase):
         self.assertIn("financeiro_novo.pagamentos_sincronizar", template)
         self.assertIn("Sincronizar tudo agora", template)
 
+    def test_importacao_nao_reutiliza_status_em_case_do_postgresql(self):
+        service = (ROOT / "routes" / "financeiro_novo" / "services" / "pagamentos_drive.py").read_text(encoding="utf-8")
+        self.assertNotIn("CASE WHEN :pagamento", service)
+        self.assertNotIn("CASE WHEN :reembolso", service)
+        self.assertIn('"data_pagamento": date.today()', service)
+        self.assertIn('"status_sincronizacao": (', service)
+
 
 if __name__ == "__main__":
     unittest.main()
