@@ -98,16 +98,26 @@ de Débito sem copiar os arquivos no volume.
 
 <!-- Verificação de publicação: 2026-08-18 -->
 
-## Perfil de Pagamentos e Google Drive
+## Perfil de Pagamentos e portal de arquivos
 
 O painel `/financeiro-novo/perfil-pagamentos` mantém perfis e contas isolados
-dos demais lançamentos do Financeiro Novo. Configure a credencial JSON da conta
-de serviço em `GOOGLE_SERVICE_ACCOUNT_JSON` (JSON puro ou Base64). Nunca grave
-essa credencial no repositório.
+dos demais lançamentos do Financeiro Novo. Os arquivos ficam em um Railway
+Storage Bucket privado e são enviados por um portal separado, sem login no
+sistema principal. Cada perfil recebe um link longo e revogável.
 
-Cada perfil aponta para uma pasta raiz compartilhada com o e-mail da conta de
-serviço. A primeira sincronização cria `novas_contas`, `contas_controladas`,
-`contas_quitadas`, `comprovantes` e `contas_com_erro`. O nome de entrada é:
+Crie um segundo serviço Railway usando este repositório e o comando:
+
+```text
+gunicorn portal_arquivos:app --bind 0.0.0.0:$PORT --workers 2 --threads 4 --timeout 120
+```
+
+O serviço principal, o portal e o Cron precisam receber referências para as
+credenciais do mesmo Bucket: `BUCKET`, `ENDPOINT`, `ACCESS_KEY_ID`,
+`SECRET_ACCESS_KEY` e `REGION`. O principal também recebe
+`PORTAL_PUBLIC_URL=https://dominio-do-portal`.
+
+O portal apresenta `novas_contas`, `contas_controladas`, `contas_quitadas`,
+`comprovantes` e `contas_com_erro`. O nome completo de entrada é:
 
 ```text
 100,50 25.09.2026 28.09.2026 manutencao veicular ABERTA PENDENTE.pdf
@@ -126,4 +136,7 @@ Datas ausentes usam a data atual de São Paulo. Status ausentes usam `ABERTA` e 
 Para o processamento diário das 23:00 em America/Sao_Paulo, crie no Railway um
 serviço Cron usando este repositório, comando `python sync_pagamentos.py` e
 agenda `0 2 * * *` (Railway usa UTC). A execução é idempotente pelo ID do arquivo
-no Drive e pode ser repetida manualmente pelo painel.
+no Bucket e pode ser repetida manualmente pelo painel. O portal não registra
+sessão no sistema principal e envia cabeçalhos para impedir indexação, cache e
+vazamento do endereço por referência. Quem possuir o link poderá acessar os
+arquivos daquele perfil; regenere o link no cadastro para revogar o anterior.

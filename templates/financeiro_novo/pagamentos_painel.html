@@ -5,9 +5,9 @@
 {% set sincroniza = 'perfil_pagamentos:sincronizar' in current_user_permissions or 'auth:administrar' in current_user_permissions %}
 <div class="page-wrap pp-page">
   <div class="pp-banner">
-    <div><strong>PERFIL DE PAGAMENTOS</strong><span>Controle independente de contas e comprovantes pelo Google Drive.</span></div>
-    <div class="pp-service {{ 'ok' if conta_servico else 'warn' }}">
-      {% if conta_servico %}Compartilhe as pastas com <strong>{{ conta_servico }}</strong>{% else %}Conta de serviço ainda não configurada no Railway{% endif %}
+    <div><strong>PERFIL DE PAGAMENTOS</strong><span>Controle independente com portal externo de arquivos.</span></div>
+    <div class="pp-service {{ 'ok' if bucket_ativo and portal_base_url else 'warn' }}">
+      {% if bucket_ativo and portal_base_url %}Bucket e portal externo configurados{% elif not bucket_ativo %}Railway Bucket ainda não conectado{% else %}Configure PORTAL_PUBLIC_URL no serviço principal{% endif %}
     </div>
   </div>
 
@@ -21,7 +21,7 @@
 
   <section class="zone">
     <header class="zone-head">
-      <div class="zone-left"><div><div class="zone-title">Perfis e pastas do Drive</div><div class="muted">Todos os usuários autorizados visualizam todos os perfis.</div></div></div>
+      <div class="zone-left"><div><div class="zone-title">Perfis e portais de arquivos</div><div class="muted">O acesso externo ocorre por link e não abre o sistema principal.</div></div></div>
       <div class="pp-actions">
         {% if sincroniza %}<form method="post" action="{{ url_for('financeiro_novo.pagamentos_sincronizar') }}"><button class="btn btn-primary" type="submit">Sincronizar tudo agora</button></form>{% endif %}
         {% if admin %}<a class="btn btn-outline" href="{{ url_for('financeiro_novo.pagamento_perfil_novo') }}">Novo perfil</a>{% endif %}
@@ -36,7 +36,7 @@
           {% if perfil.ultimo_erro %}<p class="pp-error">{{ perfil.ultimo_erro }}</p>{% endif %}
           <p class="muted">Última sincronização: {{ perfil.ultima_sincronizacao_em.strftime('%d/%m/%Y %H:%M') if perfil.ultima_sincronizacao_em else 'Nunca executada' }}</p>
           <div class="pp-actions">
-            <a class="btn btn-outline" href="{{ perfil.pasta_raiz_link }}" target="_blank" rel="noopener">Abrir Drive</a>
+            {% if portal_url(perfil) %}<a class="btn btn-outline" href="{{ portal_url(perfil) }}" target="_blank" rel="noopener noreferrer">Abrir portal</a>{% endif %}
             {% if admin %}<a class="btn btn-outline" href="{{ url_for('financeiro_novo.pagamento_perfil_editar',perfil_id=perfil.id) }}">Editar</a>{% endif %}
             {% if sincroniza and perfil.ativo %}<form method="post" action="{{ url_for('financeiro_novo.pagamento_perfil_sincronizar',perfil_id=perfil.id) }}"><button class="btn btn-primary" type="submit">Sincronizar agora</button></form>{% endif %}
           </div>

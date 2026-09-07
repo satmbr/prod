@@ -175,7 +175,7 @@ def create_app():
             acesso_financeiro = "financeiro_novo:visualizar" in permissoes or "auth:administrar" in permissoes
             cards.append({
                 "titulo": "Financeiro Novo · Homologação",
-                "descricao": "Módulo financeiro independente com despesas, missões e perfis de pagamentos integrados ao Drive.",
+                "descricao": "Módulo financeiro independente com despesas, missões e perfis de pagamentos integrados ao portal de arquivos.",
                 "href": url_for("financeiro_novo.index" if acesso_financeiro else "financeiro_novo.pagamentos_painel"),
                 "botao": "Abrir homologação"
             })

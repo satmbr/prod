@@ -1,7 +1,7 @@
 import json
 import sys
 
-from routes.financeiro_novo.services.pagamentos_drive import sincronizar_todos
+from routes.financeiro_novo.services.pagamentos_bucket import sincronizar_todos
 
 
 def main():

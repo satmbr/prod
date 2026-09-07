@@ -1,4 +1,6 @@
+import os
 import re
+import secrets
 from datetime import date
 
 from flask import abort, flash, redirect, render_template, request, session, url_for
@@ -9,10 +11,9 @@ from db import get_engine
 from routes.auth import login_required, permission_required
 from routes.financeiro_novo import bp
 from routes.financeiro_novo.services.auditoria import registrar_evento
-from routes.financeiro_novo.services.pagamentos_drive import (
-    PagamentosDriveErro,
-    email_conta_servico,
-    extrair_id_pasta,
+from routes.financeiro_novo.services.pagamentos_bucket import (
+    PagamentosStorageErro,
+    bucket_configurado,
     sincronizar_arquivo_da_conta,
     sincronizar_perfil,
 )
@@ -36,19 +37,23 @@ def _dados_perfil(form):
     nome = (form.get("nome") or "").strip()
     matricula = (form.get("matricula") or "").strip().upper()
     gmail = (form.get("gmail") or "").strip().lower()
-    pasta_link = (form.get("pasta_raiz_link") or "").strip()
     if not nome or len(nome) > 120:
         raise ValorInvalido("Informe um nome com até 120 caracteres.")
     if not matricula or len(matricula) > 40:
         raise ValorInvalido("Informe uma matrícula com até 40 caracteres.")
     if not EMAIL_RE.fullmatch(gmail) or len(gmail) > 254:
         raise ValorInvalido("Informe um e-mail Google válido.")
-    try:
-        pasta_id = extrair_id_pasta(pasta_link)
-    except ValueError as exc:
-        raise ValorInvalido(str(exc)) from exc
-    return {"nome": nome, "matricula": matricula, "gmail": gmail,
-            "pasta_raiz_link": pasta_link, "pasta_raiz_id": pasta_id}
+    return {"nome": nome, "matricula": matricula, "gmail": gmail}
+
+
+def _portal_base_url():
+    return (os.getenv("PORTAL_PUBLIC_URL") or "").strip().rstrip("/")
+
+
+def _portal_url(perfil):
+    base = _portal_base_url()
+    token = perfil.get("portal_token") if perfil else None
+    return f"{base}/p/{token}/" if base and token else None
 
 
 @bp.get("/perfil-pagamentos")
@@ -126,7 +131,8 @@ def pagamentos_painel():
     return render_template(
         "financeiro_novo/pagamentos_painel.html", perfis=perfis, contas=contas,
         resumo=resumo, erros=erros, sincronizacoes=sincronizacoes, busca=busca,
-        perfil_id=perfil_id, situacao=situacao, conta_servico=email_conta_servico(),
+        perfil_id=perfil_id, situacao=situacao, bucket_ativo=bucket_configurado(),
+        portal_base_url=_portal_base_url(), portal_url=_portal_url,
         today=date.today(), subnav_links=build_subnav("perfil_pagamentos"),
     )
 
@@ -140,26 +146,38 @@ def pagamento_perfil_novo():
         try:
             dados = _dados_perfil(request.form)
             dados["usuario"] = session.get("usuario_id")
+            dados["token"] = secrets.token_urlsafe(40)
+            dados["raiz"] = f"bucket-{dados['token']}"
+            dados["prefixo"] = f"perfil_pagamentos/novo-{dados['token']}"
             with get_engine().begin() as conn:
                 perfil = conn.execute(text("""
                     INSERT INTO financeiro3_pagamento_perfis
-                      (nome,matricula,gmail,pasta_raiz_id,pasta_raiz_link,criado_por,atualizado_por)
-                    VALUES (:nome,:matricula,:gmail,:pasta_raiz_id,:pasta_raiz_link,:usuario,:usuario)
+                      (nome,matricula,gmail,pasta_raiz_id,pasta_raiz_link,
+                       pasta_novas_id,pasta_controladas_id,pasta_quitadas_id,
+                       pasta_comprovantes_id,pasta_erros_id,portal_token,storage_prefix,
+                       criado_por,atualizado_por)
+                    VALUES (:nome,:matricula,:gmail,:raiz,'','novas_contas','contas_controladas',
+                            'contas_quitadas','comprovantes','contas_com_erro',:token,
+                            :prefixo,:usuario,:usuario)
                     RETURNING *
                 """), dados).mappings().one()
+                perfil = conn.execute(text("""
+                    UPDATE financeiro3_pagamento_perfis
+                    SET storage_prefix='perfil_pagamentos/' || id WHERE id=:id RETURNING *
+                """), {"id": perfil["id"]}).mappings().one()
                 registrar_evento(conn, entidade="PERFIL_PAGAMENTO", entidade_id=perfil["id"],
                                  evento="CRIADO", dados_novos=dict(perfil))
-            flash("Perfil criado. Compartilhe a pasta com a conta de serviço e sincronize.", "sucesso")
+            flash("Perfil criado. O link exclusivo do portal já pode ser compartilhado.", "sucesso")
             return redirect(url_for("financeiro_novo.pagamentos_painel"))
         except ValorInvalido as exc:
             flash(str(exc), "erro")
             perfil = request.form
         except IntegrityError:
-            flash("Matrícula, e-mail ou pasta já estão vinculados a outro perfil.", "erro")
+            flash("Matrícula ou e-mail já estão vinculados a outro perfil.", "erro")
             perfil = request.form
     return render_template(
         "financeiro_novo/pagamento_perfil_form.html", perfil=perfil,
-        conta_servico=email_conta_servico(), subnav_links=build_subnav("perfil_pagamentos"),
+        portal_base_url=_portal_base_url(), subnav_links=build_subnav("perfil_pagamentos"),
     )
 
 
@@ -184,19 +202,11 @@ def pagamento_perfil_editar(perfil_id):
                 ), {"id": perfil_id}).mappings().first()
                 if not anterior:
                     abort(404)
-                pasta_mudou = anterior["pasta_raiz_id"] != dados["pasta_raiz_id"]
                 atualizado = conn.execute(text("""
                     UPDATE financeiro3_pagamento_perfis SET nome=:nome,matricula=:matricula,
-                      gmail=:gmail,pasta_raiz_id=:pasta_raiz_id,pasta_raiz_link=:pasta_raiz_link,
-                      ativo=:ativo,atualizado_por=:usuario,atualizado_em=NOW(),
-                      status_conexao=CASE WHEN :pasta_mudou THEN 'PENDENTE' ELSE status_conexao END,
-                      pasta_novas_id=CASE WHEN :pasta_mudou THEN NULL ELSE pasta_novas_id END,
-                      pasta_controladas_id=CASE WHEN :pasta_mudou THEN NULL ELSE pasta_controladas_id END,
-                      pasta_quitadas_id=CASE WHEN :pasta_mudou THEN NULL ELSE pasta_quitadas_id END,
-                      pasta_comprovantes_id=CASE WHEN :pasta_mudou THEN NULL ELSE pasta_comprovantes_id END,
-                      pasta_erros_id=CASE WHEN :pasta_mudou THEN NULL ELSE pasta_erros_id END
+                      gmail=:gmail,ativo=:ativo,atualizado_por=:usuario,atualizado_em=NOW()
                     WHERE id=:id RETURNING *
-                """), {**dados, "pasta_mudou": pasta_mudou}).mappings().one()
+                """), dados).mappings().one()
                 registrar_evento(conn, entidade="PERFIL_PAGAMENTO", entidade_id=perfil_id,
                                  evento="EDITADO", dados_anteriores=dict(anterior), dados_novos=dict(atualizado))
             flash("Perfil atualizado.", "sucesso")
@@ -205,12 +215,35 @@ def pagamento_perfil_editar(perfil_id):
             flash(str(exc), "erro")
             perfil = {**request.form, "id": perfil_id, "ativo": request.form.get("ativo") == "1"}
         except IntegrityError:
-            flash("Matrícula, e-mail ou pasta já estão vinculados a outro perfil.", "erro")
+            flash("Matrícula ou e-mail já estão vinculados a outro perfil.", "erro")
             perfil = {**request.form, "id": perfil_id, "ativo": request.form.get("ativo") == "1"}
     return render_template(
         "financeiro_novo/pagamento_perfil_form.html", perfil=perfil,
-        conta_servico=email_conta_servico(), subnav_links=build_subnav("perfil_pagamentos"),
+        portal_base_url=_portal_base_url(), portal_url=_portal_url(perfil),
+        subnav_links=build_subnav("perfil_pagamentos"),
     )
+
+
+@bp.post("/perfil-pagamentos/perfis/<int:perfil_id>/regenerar-link")
+@login_required
+@permission_required(MODULO, "administrar")
+def pagamento_perfil_regenerar_link(perfil_id):
+    novo_token = secrets.token_urlsafe(40)
+    with get_engine().begin() as conn:
+        anterior = conn.execute(text(
+            "SELECT * FROM financeiro3_pagamento_perfis WHERE id=:id FOR UPDATE"
+        ), {"id": perfil_id}).mappings().first()
+        if not anterior:
+            abort(404)
+        conn.execute(text("""
+            UPDATE financeiro3_pagamento_perfis SET portal_token=:token,
+              atualizado_por=:usuario,atualizado_em=NOW() WHERE id=:id
+        """), {"token": novo_token, "usuario": session.get("usuario_id"), "id": perfil_id})
+        registrar_evento(conn, entidade="PERFIL_PAGAMENTO", entidade_id=perfil_id,
+                         evento="LINK_PORTAL_REGERADO", dados_anteriores={"portal_token": "revogado"},
+                         dados_novos={"portal_token": "gerado"})
+    flash("Novo link gerado. O endereço anterior deixou de funcionar.", "sucesso")
+    return redirect(url_for("financeiro_novo.pagamento_perfil_editar", perfil_id=perfil_id))
 
 
 @bp.post("/perfil-pagamentos/perfis/<int:perfil_id>/desativar")
@@ -343,8 +376,8 @@ def pagamento_conta_editar(conta_id):
             registrar_evento(conn, entidade="PERFIL_PAGAMENTO_CONTA", entidade_id=conta_id,
                              evento="EDITADA", dados_anteriores=dict(anterior), dados_novos=dict(novo))
         sincronizar_arquivo_da_conta(conta_id)
-        flash("Conta atualizada e renomeada no Drive.", "sucesso")
-    except (ValorInvalido, PagamentosDriveErro) as exc:
+        flash("Conta atualizada e arquivo renomeado no portal.", "sucesso")
+    except (ValorInvalido, PagamentosStorageErro) as exc:
         flash(str(exc), "erro")
     return redirect(url_for("financeiro_novo.pagamento_conta_detalhe", conta_id=conta_id))
 
