@@ -140,3 +140,34 @@ no Bucket e pode ser repetida manualmente pelo painel. O portal não registra
 sessão no sistema principal e envia cabeçalhos para impedir indexação, cache e
 vazamento do endereço por referência. Quem possuir o link poderá acessar os
 arquivos daquele perfil; regenere o link no cadastro para revogar o anterior.
+
+## Bot do Telegram
+
+O bot é um terceiro serviço Railway, isolado do sistema principal e do portal.
+Ele recebe arquivos em conversa privada e os grava nas mesmas pastas
+**novas_contas** e **comprovantes** do Railway Bucket. O processamento continua
+sendo feito pela sincronização manual ou automática das 23h.
+
+Crie o serviço usando o mesmo repositório e o comando:
+
+~~~text
+python start_telegram.py
+~~~
+
+No serviço **telegram-bot**, configure:
+
+- **DATABASE_URL** apontando para o mesmo PostgreSQL;
+- **BUCKET**, **ENDPOINT**, **ACCESS_KEY_ID**, **SECRET_ACCESS_KEY** e **REGION**
+  apontando para o mesmo Bucket;
+- **TELEGRAM_BOT_TOKEN**, obtido no BotFather;
+- **TELEGRAM_WEBHOOK_SECRET**, com letras, números, sublinhado ou hífen;
+- **TELEGRAM_PUBLIC_URL=https://dominio-publico-do-bot**.
+
+No serviço principal, configure **TELEGRAM_BOT_USERNAME** com o usuário público
+do bot, sem necessidade do caractere @. O cadastro de cada perfil exibirá o
+botão **Vincular Telegram**. Ao abri-lo, o comando /start associa o chat ao
+perfil. Os comandos disponíveis são /nova, /comprovante, /status e /ajuda.
+
+Documentos preservam o próprio nome. Ao enviar uma imagem como foto, use como
+legenda o nome completo da conta; sem extensão, o bot acrescenta .jpg. O limite
+de download da API de bots do Telegram é 20 MB.

@@ -149,14 +149,16 @@ def localizar_arquivo(perfil: dict | int, arquivo_id: str, pastas=None) -> dict 
     return None
 
 
-def enviar_arquivo(perfil: dict | int, pasta: str, arquivo) -> dict:
+def enviar_arquivo(perfil: dict | int, pasta: str, arquivo, *, arquivo_id: str | None = None) -> dict:
     if pasta not in PASTAS_GRAVAVEIS:
         raise PagamentosStorageErro("Envios são permitidos somente em novas_contas e comprovantes.")
     nome = limpar_nome_arquivo(arquivo.filename)
     extensao = Path(nome).suffix.lower()
     if extensao not in EXTENSOES_ACEITAS:
         raise PagamentosStorageErro("Use arquivos PDF, JPG, JPEG ou PNG.")
-    arquivo_id = uuid.uuid4().hex
+    arquivo_id = arquivo_id or uuid.uuid4().hex
+    if not re.fullmatch(r"[0-9a-f]{32}", arquivo_id):
+        raise PagamentosStorageErro("Identificador de arquivo inválido.")
     chave = _chave(perfil, pasta, arquivo_id, nome)
     s3, bucket = _s3()
     s3.put_object(

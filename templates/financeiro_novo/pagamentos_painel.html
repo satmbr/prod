@@ -32,11 +32,12 @@
         {% for perfil in perfis %}
         <article class="pp-profile {{ 'inactive' if not perfil.ativo else '' }}">
           <div class="pp-profile-head"><div><strong>{{ perfil.nome }}</strong><span>Matrícula {{ perfil.matricula }}</span></div><span class="pp-chip {{ perfil.status_conexao|lower }}">{{ perfil.status_conexao }}</span></div>
-          <div class="pp-profile-metrics"><span><b>{{ perfil.contas }}</b> contas</span><span><b>{{ perfil.abertas }}</b> abertas</span><span>{{ 'Ativo' if perfil.ativo else 'Inativo' }}</span></div>
+          <div class="pp-profile-metrics"><span><b>{{ perfil.contas }}</b> contas</span><span><b>{{ perfil.abertas }}</b> abertas</span><span>{{ 'Ativo' if perfil.ativo else 'Inativo' }}</span><span>Telegram: {{ perfil.telegram_chat_nome or ('não vinculado' if telegram_username else 'não configurado') }}</span></div>
           {% if perfil.ultimo_erro %}<p class="pp-error">{{ perfil.ultimo_erro }}</p>{% endif %}
           <p class="muted">Última sincronização: {{ perfil.ultima_sincronizacao_em.strftime('%d/%m/%Y %H:%M') if perfil.ultima_sincronizacao_em else 'Nunca executada' }}</p>
           <div class="pp-actions">
             {% if portal_url(perfil) %}<a class="btn btn-outline" href="{{ portal_url(perfil) }}" target="_blank" rel="noopener noreferrer">Abrir portal</a>{% endif %}
+            {% if admin and telegram_url(perfil) and perfil.ativo %}<a class="btn btn-outline" href="{{ telegram_url(perfil) }}" target="_blank" rel="noopener noreferrer">Vincular Telegram</a>{% endif %}
             {% if admin %}<a class="btn btn-outline" href="{{ url_for('financeiro_novo.pagamento_perfil_editar',perfil_id=perfil.id) }}">Editar</a>{% endif %}
             {% if sincroniza and perfil.ativo %}<form method="post" action="{{ url_for('financeiro_novo.pagamento_perfil_sincronizar',perfil_id=perfil.id) }}"><button class="btn btn-primary" type="submit">Sincronizar agora</button></form>{% endif %}
           </div>

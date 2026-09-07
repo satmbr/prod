@@ -124,6 +124,17 @@ class PerfilPagamentosConfiguracaoTests(unittest.TestCase):
         self.assertNotIn("perfil.gmail", painel)
         self.assertIn("SET gmail=NULL", migration)
 
+    def test_telegram_tem_vinculo_por_perfil_e_servico_isolado(self):
+        migration = (ROOT / "migrations" / "017_perfil_pagamentos_telegram.sql").read_text(encoding="utf-8")
+        routes = (ROOT / "routes" / "financeiro_novo" / "perfil_pagamentos.py").read_text(encoding="utf-8")
+        painel = (ROOT / "templates" / "financeiro_novo" / "pagamentos_painel.html").read_text(encoding="utf-8")
+        bot = (ROOT / "telegram_bot.py").read_text(encoding="utf-8")
+        self.assertIn("telegram_token", migration)
+        self.assertIn("financeiro3_pagamento_telegram_updates", migration)
+        self.assertIn("pagamento_perfil_regenerar_telegram", routes)
+        self.assertIn("Vincular Telegram", painel)
+        self.assertNotIn("register_blueprint", bot)
+
 
 if __name__ == "__main__":
     unittest.main()

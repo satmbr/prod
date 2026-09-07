@@ -54,6 +54,17 @@ def _portal_arquivo_url(perfil, arquivo_id):
     return f"{raiz}arquivo/{arquivo_id}" if raiz and arquivo_id else None
 
 
+def _telegram_username():
+    username = (os.getenv("TELEGRAM_BOT_USERNAME") or "").strip().lstrip("@")
+    return username if username and username.replace("_", "").isalnum() else None
+
+
+def _telegram_url(perfil):
+    username = _telegram_username()
+    token = perfil.get("telegram_token") if perfil else None
+    return f"https://t.me/{username}?start={token}" if username and token else None
+
+
 @bp.get("/perfil-pagamentos")
 @login_required
 @permission_required(MODULO, "visualizar")
@@ -132,6 +143,7 @@ def pagamentos_painel():
         resumo=resumo, erros=erros, sincronizacoes=sincronizacoes, busca=busca,
         perfil_id=perfil_id, situacao=situacao, bucket_ativo=bucket_configurado(),
         portal_base_url=_portal_base_url(), portal_url=_portal_url,
+        telegram_username=_telegram_username(), telegram_url=_telegram_url,
         today=date.today(), subnav_links=build_subnav("perfil_pagamentos"),
     )
 
@@ -146,6 +158,7 @@ def pagamento_perfil_novo():
             dados = _dados_perfil(request.form)
             dados["usuario"] = session.get("usuario_id")
             dados["token"] = secrets.token_urlsafe(40)
+            dados["telegram_token"] = secrets.token_urlsafe(24)
             dados["raiz"] = f"bucket-{dados['token']}"
             dados["prefixo"] = f"perfil_pagamentos/novo-{dados['token']}"
             with get_engine().begin() as conn:
@@ -153,10 +166,10 @@ def pagamento_perfil_novo():
                     INSERT INTO financeiro3_pagamento_perfis
                       (nome,matricula,pasta_raiz_id,pasta_raiz_link,
                        pasta_novas_id,pasta_controladas_id,pasta_quitadas_id,
-                       pasta_comprovantes_id,pasta_erros_id,portal_token,storage_prefix,
+                       pasta_comprovantes_id,pasta_erros_id,portal_token,telegram_token,storage_prefix,
                        criado_por,atualizado_por)
                     VALUES (:nome,:matricula,:raiz,'','novas_contas','contas_controladas',
-                            'contas_quitadas','comprovantes','contas_com_erro',:token,
+                            'contas_quitadas','comprovantes','contas_com_erro',:token,:telegram_token,
                             :prefixo,:usuario,:usuario)
                     RETURNING *
                 """), dados).mappings().one()
@@ -176,7 +189,8 @@ def pagamento_perfil_novo():
             perfil = request.form
     return render_template(
         "financeiro_novo/pagamento_perfil_form.html", perfil=perfil,
-        portal_base_url=_portal_base_url(), subnav_links=build_subnav("perfil_pagamentos"),
+        portal_base_url=_portal_base_url(), telegram_username=_telegram_username(),
+        subnav_links=build_subnav("perfil_pagamentos"),
     )
 
 
@@ -219,6 +233,7 @@ def pagamento_perfil_editar(perfil_id):
     return render_template(
         "financeiro_novo/pagamento_perfil_form.html", perfil=perfil,
         portal_base_url=_portal_base_url(), portal_url=_portal_url(perfil),
+        telegram_username=_telegram_username(), telegram_url=_telegram_url(perfil),
         subnav_links=build_subnav("perfil_pagamentos"),
     )
 
@@ -242,6 +257,30 @@ def pagamento_perfil_regenerar_link(perfil_id):
                          evento="LINK_PORTAL_REGERADO", dados_anteriores={"portal_token": "revogado"},
                          dados_novos={"portal_token": "gerado"})
     flash("Novo link gerado. O endereço anterior deixou de funcionar.", "sucesso")
+    return redirect(url_for("financeiro_novo.pagamento_perfil_editar", perfil_id=perfil_id))
+
+
+@bp.post("/perfil-pagamentos/perfis/<int:perfil_id>/regenerar-telegram")
+@login_required
+@permission_required(MODULO, "administrar")
+def pagamento_perfil_regenerar_telegram(perfil_id):
+    novo_token = secrets.token_urlsafe(24)
+    with get_engine().begin() as conn:
+        anterior = conn.execute(text(
+            "SELECT * FROM financeiro3_pagamento_perfis WHERE id=:id FOR UPDATE"
+        ), {"id": perfil_id}).mappings().first()
+        if not anterior:
+            abort(404)
+        conn.execute(text("""
+            UPDATE financeiro3_pagamento_perfis SET telegram_token=:token,
+              telegram_chat_id=NULL,telegram_chat_nome=NULL,telegram_modo='NOVAS',
+              atualizado_por=:usuario,atualizado_em=NOW() WHERE id=:id
+        """), {"token": novo_token, "usuario": session.get("usuario_id"), "id": perfil_id})
+        registrar_evento(conn, entidade="PERFIL_PAGAMENTO", entidade_id=perfil_id,
+                         evento="LINK_TELEGRAM_REGERADO",
+                         dados_anteriores={"telegram_chat": "desvinculado"},
+                         dados_novos={"telegram_token": "gerado"})
+    flash("Novo vínculo do Telegram gerado. O chat anterior foi desvinculado.", "sucesso")
     return redirect(url_for("financeiro_novo.pagamento_perfil_editar", perfil_id=perfil_id))
 
 
