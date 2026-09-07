@@ -32,7 +32,7 @@ def _perfil(token: str) -> dict:
         abort(404)
     with get_engine().connect() as conn:
         perfil = conn.execute(text("""
-            SELECT id,nome,matricula,gmail,portal_token,storage_prefix
+            SELECT id,nome,matricula,portal_token,storage_prefix
             FROM financeiro3_pagamento_perfis
             WHERE portal_token=:token AND ativo
         """), {"token": token}).mappings().first()

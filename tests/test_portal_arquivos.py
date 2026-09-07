@@ -71,7 +71,7 @@ class PortalIsolamentoTests(unittest.TestCase):
             app = create_portal_app()
         perfil = {
             "id": 7, "nome": "Administrativo", "matricula": "123",
-            "gmail": "perfil@example.com", "portal_token": "t" * 40,
+            "portal_token": "t" * 40,
             "storage_prefix": "perfil_pagamentos/7",
         }
         with patch("portal_arquivos._perfil", return_value=perfil), \

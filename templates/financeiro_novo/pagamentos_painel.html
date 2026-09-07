@@ -31,7 +31,7 @@
       <div class="pp-profiles">
         {% for perfil in perfis %}
         <article class="pp-profile {{ 'inactive' if not perfil.ativo else '' }}">
-          <div class="pp-profile-head"><div><strong>{{ perfil.nome }}</strong><span>{{ perfil.matricula }} · {{ perfil.gmail }}</span></div><span class="pp-chip {{ perfil.status_conexao|lower }}">{{ perfil.status_conexao }}</span></div>
+          <div class="pp-profile-head"><div><strong>{{ perfil.nome }}</strong><span>Matrícula {{ perfil.matricula }}</span></div><span class="pp-chip {{ perfil.status_conexao|lower }}">{{ perfil.status_conexao }}</span></div>
           <div class="pp-profile-metrics"><span><b>{{ perfil.contas }}</b> contas</span><span><b>{{ perfil.abertas }}</b> abertas</span><span>{{ 'Ativo' if perfil.ativo else 'Inativo' }}</span></div>
           {% if perfil.ultimo_erro %}<p class="pp-error">{{ perfil.ultimo_erro }}</p>{% endif %}
           <p class="muted">Última sincronização: {{ perfil.ultima_sincronizacao_em.strftime('%d/%m/%Y %H:%M') if perfil.ultima_sincronizacao_em else 'Nunca executada' }}</p>
@@ -73,7 +73,7 @@
 
   <div class="pp-lower">
     <section class="zone"><header class="zone-head"><div class="zone-title">Pendências de importação</div><span class="pp-count">{{ erros|length }}</span></header><div class="zone-body pp-log">
-      {% for erro in erros %}<article><div><strong>{{ erro.tipo }} · {{ erro.perfil_nome }}</strong><span>{{ erro.nome_arquivo }}</span></div><p>{{ erro.mensagem }}</p>{% if erro.drive_web_view_link %}<a href="{{ erro.drive_web_view_link }}" target="_blank" rel="noopener">Abrir arquivo</a>{% endif %}</article>{% else %}<div class="pp-empty">Nenhuma pendência.</div>{% endfor %}
+      {% for erro in erros %}<article><div><strong>{{ erro.tipo }} · {{ erro.perfil_nome }}</strong><span>{{ erro.nome_arquivo }}</span></div><p>{{ erro.mensagem }}</p>{% if portal_url(erro) %}<a href="{{ portal_url(erro) }}contas_com_erro" target="_blank" rel="noopener noreferrer">Abrir pasta de erros</a>{% endif %}</article>{% else %}<div class="pp-empty">Nenhuma pendência.</div>{% endfor %}
     </div></section>
     <section class="zone"><header class="zone-head"><div class="zone-title">Últimas sincronizações</div></header><div class="zone-body pp-log">
       {% for sync in sincronizacoes %}<article><div><strong>{{ sync.perfil_nome or 'Perfil removido' }}</strong><span>{{ sync.iniciado_em.strftime('%d/%m/%Y %H:%M') }} · {{ sync.origem }}</span></div><p><span class="pp-chip {{ sync.status|lower }}">{{ sync.status }}</span> {{ sync.contas_novas }} conta(s), {{ sync.comprovantes_novos }} comprovante(s), {{ sync.erros }} erro(s)</p></article>{% else %}<div class="pp-empty">Nenhuma sincronização executada.</div>{% endfor %}

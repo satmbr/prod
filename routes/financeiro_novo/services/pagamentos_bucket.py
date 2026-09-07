@@ -9,7 +9,7 @@ from sqlalchemy import text
 
 from db import get_engine
 from routes.financeiro_novo.services.auditoria import registrar_evento
-from routes.financeiro_novo.services.pagamentos_drive import (
+from routes.financeiro_novo.services.pagamentos_nomes import (
     EXTENSOES_ACEITAS,
     TIPOS_ACEITOS,
     NomeContaInvalido,

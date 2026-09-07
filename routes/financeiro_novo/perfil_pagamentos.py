@@ -1,5 +1,4 @@
 import os
-import re
 import secrets
 from datetime import date
 
@@ -22,9 +21,6 @@ from routes.financeiro_novo.views import build_subnav
 
 
 MODULO = "perfil_pagamentos"
-EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
-
-
 def _conta(conn, conta_id, *, bloquear=False):
     sufixo = " FOR UPDATE" if bloquear else ""
     return conn.execute(
@@ -36,14 +32,11 @@ def _conta(conn, conta_id, *, bloquear=False):
 def _dados_perfil(form):
     nome = (form.get("nome") or "").strip()
     matricula = (form.get("matricula") or "").strip().upper()
-    gmail = (form.get("gmail") or "").strip().lower()
     if not nome or len(nome) > 120:
         raise ValorInvalido("Informe um nome com até 120 caracteres.")
     if not matricula or len(matricula) > 40:
         raise ValorInvalido("Informe uma matrícula com até 40 caracteres.")
-    if not EMAIL_RE.fullmatch(gmail) or len(gmail) > 254:
-        raise ValorInvalido("Informe um e-mail Google válido.")
-    return {"nome": nome, "matricula": matricula, "gmail": gmail}
+    return {"nome": nome, "matricula": matricula}
 
 
 def _portal_base_url():
@@ -54,6 +47,11 @@ def _portal_url(perfil):
     base = _portal_base_url()
     token = perfil.get("portal_token") if perfil else None
     return f"{base}/p/{token}/" if base and token else None
+
+
+def _portal_arquivo_url(perfil, arquivo_id):
+    raiz = _portal_url(perfil)
+    return f"{raiz}arquivo/{arquivo_id}" if raiz and arquivo_id else None
 
 
 @bp.get("/perfil-pagamentos")
@@ -119,7 +117,8 @@ def pagamentos_painel():
             FROM financeiro3_pagamento_contas
         """)).mappings().one()
         erros = conn.execute(text("""
-            SELECT e.*,p.nome AS perfil_nome FROM financeiro3_pagamento_importacao_erros e
+            SELECT e.*,p.nome AS perfil_nome,p.portal_token
+            FROM financeiro3_pagamento_importacao_erros e
             JOIN financeiro3_pagamento_perfis p ON p.id=e.perfil_id
             WHERE NOT e.resolvido ORDER BY e.ultima_ocorrencia_em DESC LIMIT 30
         """)).mappings().all()
@@ -152,11 +151,11 @@ def pagamento_perfil_novo():
             with get_engine().begin() as conn:
                 perfil = conn.execute(text("""
                     INSERT INTO financeiro3_pagamento_perfis
-                      (nome,matricula,gmail,pasta_raiz_id,pasta_raiz_link,
+                      (nome,matricula,pasta_raiz_id,pasta_raiz_link,
                        pasta_novas_id,pasta_controladas_id,pasta_quitadas_id,
                        pasta_comprovantes_id,pasta_erros_id,portal_token,storage_prefix,
                        criado_por,atualizado_por)
-                    VALUES (:nome,:matricula,:gmail,:raiz,'','novas_contas','contas_controladas',
+                    VALUES (:nome,:matricula,:raiz,'','novas_contas','contas_controladas',
                             'contas_quitadas','comprovantes','contas_com_erro',:token,
                             :prefixo,:usuario,:usuario)
                     RETURNING *
@@ -173,7 +172,7 @@ def pagamento_perfil_novo():
             flash(str(exc), "erro")
             perfil = request.form
         except IntegrityError:
-            flash("Matrícula ou e-mail já estão vinculados a outro perfil.", "erro")
+            flash("A matrícula já está vinculada a outro perfil.", "erro")
             perfil = request.form
     return render_template(
         "financeiro_novo/pagamento_perfil_form.html", perfil=perfil,
@@ -204,7 +203,7 @@ def pagamento_perfil_editar(perfil_id):
                     abort(404)
                 atualizado = conn.execute(text("""
                     UPDATE financeiro3_pagamento_perfis SET nome=:nome,matricula=:matricula,
-                      gmail=:gmail,ativo=:ativo,atualizado_por=:usuario,atualizado_em=NOW()
+                      ativo=:ativo,atualizado_por=:usuario,atualizado_em=NOW()
                     WHERE id=:id RETURNING *
                 """), dados).mappings().one()
                 registrar_evento(conn, entidade="PERFIL_PAGAMENTO", entidade_id=perfil_id,
@@ -215,7 +214,7 @@ def pagamento_perfil_editar(perfil_id):
             flash(str(exc), "erro")
             perfil = {**request.form, "id": perfil_id, "ativo": request.form.get("ativo") == "1"}
         except IntegrityError:
-            flash("Matrícula ou e-mail já estão vinculados a outro perfil.", "erro")
+            flash("A matrícula já está vinculada a outro perfil.", "erro")
             perfil = {**request.form, "id": perfil_id, "ativo": request.form.get("ativo") == "1"}
     return render_template(
         "financeiro_novo/pagamento_perfil_form.html", perfil=perfil,
@@ -324,7 +323,7 @@ def pagamentos_sincronizar():
 def pagamento_conta_detalhe(conta_id):
     with get_engine().connect() as conn:
         conta = conn.execute(text("""
-            SELECT c.*,p.nome AS perfil_nome,p.matricula,p.gmail
+            SELECT c.*,p.nome AS perfil_nome,p.matricula,p.portal_token
             FROM financeiro3_pagamento_contas c
             JOIN financeiro3_pagamento_perfis p ON p.id=c.perfil_id
             WHERE c.id=:id
@@ -344,6 +343,7 @@ def pagamento_conta_detalhe(conta_id):
     return render_template(
         "financeiro_novo/pagamento_conta_detalhe.html", conta=conta,
         comprovantes=comprovantes, historico=historico, today=date.today(),
+        portal_arquivo_url=lambda arquivo_id: _portal_arquivo_url(conta, arquivo_id),
         subnav_links=build_subnav("perfil_pagamentos"),
     )
 

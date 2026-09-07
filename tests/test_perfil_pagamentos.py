@@ -1,17 +1,11 @@
-import base64
-import json
-import os
 import unittest
 from datetime import date
 from decimal import Decimal
 from pathlib import Path
-from unittest.mock import patch
 
-from routes.financeiro_novo.services.pagamentos_drive import (
+from routes.financeiro_novo.services.pagamentos_nomes import (
     NomeContaInvalido,
     conta_pronta_para_quitadas,
-    email_conta_servico,
-    extrair_id_pasta,
     formatar_valor_nome,
     interpretar_nome_conta,
     nome_controlado,
@@ -97,25 +91,11 @@ class PerfilPagamentosNomeTests(unittest.TestCase):
         base["numero_om"] = "OM 9988"
         self.assertTrue(conta_pronta_para_quitadas(base))
 
-    def test_extrai_id_de_link_ou_id_direto(self):
-        folder_id = "1AbCdEfGhIjKlMnOpQrStUvWxYz"
-        self.assertEqual(extrair_id_pasta(f"https://drive.google.com/drive/folders/{folder_id}?usp=sharing"), folder_id)
-        self.assertEqual(extrair_id_pasta(folder_id), folder_id)
-
-
 class PerfilPagamentosConfiguracaoTests(unittest.TestCase):
-    def test_email_da_conta_de_servico_em_json_ou_base64(self):
-        info = {"client_email": "robot@projeto.iam.gserviceaccount.com"}
-        with patch.dict(os.environ, {"GOOGLE_SERVICE_ACCOUNT_JSON": json.dumps(info)}, clear=False):
-            self.assertEqual(email_conta_servico(), info["client_email"])
-        encoded = base64.b64encode(json.dumps(info).encode()).decode()
-        with patch.dict(os.environ, {"GOOGLE_SERVICE_ACCOUNT_JSON": encoded}, clear=False):
-            self.assertEqual(email_conta_servico(), info["client_email"])
-
     def test_migration_e_rotas_mantem_modulo_independente(self):
         migration = (ROOT / "migrations" / "014_perfil_pagamentos_drive.sql").read_text(encoding="utf-8")
         routes = (ROOT / "routes" / "financeiro_novo" / "perfil_pagamentos.py").read_text(encoding="utf-8")
-        service = (ROOT / "routes" / "financeiro_novo" / "services" / "pagamentos_drive.py").read_text(encoding="utf-8")
+        service = (ROOT / "routes" / "financeiro_novo" / "services" / "pagamentos_bucket.py").read_text(encoding="utf-8")
         self.assertIn("'perfil_pagamentos'", migration)
         self.assertIn("financeiro3_pagamento_perfis", migration)
         self.assertIn("financeiro3_pagamento_contas", migration)
@@ -130,11 +110,19 @@ class PerfilPagamentosConfiguracaoTests(unittest.TestCase):
         self.assertIn("Sincronizar tudo agora", template)
 
     def test_importacao_nao_reutiliza_status_em_case_do_postgresql(self):
-        service = (ROOT / "routes" / "financeiro_novo" / "services" / "pagamentos_drive.py").read_text(encoding="utf-8")
+        service = (ROOT / "routes" / "financeiro_novo" / "services" / "pagamentos_bucket.py").read_text(encoding="utf-8")
         self.assertNotIn("CASE WHEN :pagamento", service)
         self.assertNotIn("CASE WHEN :reembolso", service)
         self.assertIn('"data_pagamento": date.today()', service)
-        self.assertIn('"status_sincronizacao": (', service)
+        self.assertIn('"sync": "AGUARDANDO_OM"', service)
+
+    def test_interface_e_migracao_removem_email_do_perfil(self):
+        form = (ROOT / "templates" / "financeiro_novo" / "pagamento_perfil_form.html").read_text(encoding="utf-8")
+        painel = (ROOT / "templates" / "financeiro_novo" / "pagamentos_painel.html").read_text(encoding="utf-8")
+        migration = (ROOT / "migrations" / "016_perfil_pagamentos_sem_email.sql").read_text(encoding="utf-8")
+        self.assertNotIn('name="gmail"', form)
+        self.assertNotIn("perfil.gmail", painel)
+        self.assertIn("SET gmail=NULL", migration)
 
 
 if __name__ == "__main__":

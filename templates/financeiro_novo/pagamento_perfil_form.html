@@ -3,13 +3,12 @@
 {% block content %}
 <div class="page-wrap pp-form-page">
   <section class="zone">
-    <header class="zone-head"><div><div class="zone-title">{{ 'Editar perfil' if perfil and perfil.id else 'Novo perfil de pagamentos' }}</div><div class="muted">O e-mail é apenas uma identificação. Nenhuma senha será solicitada.</div></div></header>
+    <header class="zone-head"><div><div class="zone-title">{{ 'Editar perfil' if perfil and perfil.id else 'Novo perfil de pagamentos' }}</div><div class="muted">Identifique o perfil pelo nome e pela matrícula.</div></div></header>
     <div class="zone-body">
       {% if perfil and perfil.id and portal_url %}<div class="pp-instruction"><strong>Link exclusivo do portal</strong><span>Qualquer pessoa com este endereço poderá acessar os arquivos deste perfil, sem acessar o sistema principal.</span><div class="pp-link"><input id="portal-link" readonly value="{{ portal_url }}"><button class="btn btn-outline" type="button" onclick="navigator.clipboard.writeText(document.getElementById('portal-link').value)">Copiar</button><a class="btn btn-primary" target="_blank" rel="noopener noreferrer" href="{{ portal_url }}">Abrir portal</a></div></div>{% elif perfil and perfil.id %}<div class="pp-instruction warn"><strong>Domínio do portal pendente</strong><span>Configure PORTAL_PUBLIC_URL no serviço principal para disponibilizar o link externo.</span></div>{% else %}<div class="pp-instruction"><strong>Portal separado</strong><span>Depois de salvar, o sistema criará um link exclusivo para as cinco pastas deste perfil.</span></div>{% endif %}
       <form method="post" class="pp-form">
         <label>Nome do perfil<input name="nome" maxlength="120" required value="{{ perfil.nome if perfil else '' }}" placeholder="Ex.: Administrativo São Paulo"></label>
         <label>Matrícula<input name="matricula" maxlength="40" required value="{{ perfil.matricula if perfil else '' }}" placeholder="Ex.: 12345"></label>
-        <label>E-mail Google<input type="email" name="gmail" maxlength="254" required value="{{ perfil.gmail if perfil else '' }}" placeholder="usuario@gmail.com"></label>
         <div class="wide pp-folders"><strong>Pastas disponíveis no portal</strong><span>novas_contas · contas_controladas · contas_quitadas · comprovantes · contas_com_erro</span></div>
         {% if perfil and perfil.id %}<label class="pp-check"><input type="checkbox" name="ativo" value="1" {% if perfil.ativo %}checked{% endif %}> Perfil ativo</label>{% endif %}
         <div class="pp-form-actions"><a class="btn btn-outline" href="{{ url_for('financeiro_novo.pagamentos_painel') }}">Cancelar</a><button class="btn btn-primary" type="submit">Salvar perfil</button></div>
