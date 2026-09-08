@@ -57,8 +57,31 @@ def _api(metodo: str, dados: dict | None = None) -> dict:
     return payload.get("result")
 
 
-def enviar_mensagem(chat_id: int, mensagem: str) -> None:
-    _api("sendMessage", {"chat_id": chat_id, "text": mensagem})
+def enviar_mensagem(chat_id: int, mensagem: str, botoes: list[list[str]] | None = None) -> None:
+    dados = {"chat_id": chat_id, "text": mensagem}
+    if botoes:
+        dados["reply_markup"] = {
+            "keyboard": [
+                [{"text": rotulo} for rotulo in linha]
+                for linha in botoes
+            ],
+            "resize_keyboard": True,
+            "one_time_keyboard": True,
+        }
+    else:
+        dados["reply_markup"] = {"remove_keyboard": True}
+    _api("sendMessage", dados)
+
+
+def _resposta(texto: str, botoes: list[list[str]] | None = None) -> dict:
+    return {"texto": texto, "botoes": botoes}
+
+
+def _enviar_resposta(chat_id: int, resposta) -> None:
+    if isinstance(resposta, dict):
+        enviar_mensagem(chat_id, resposta["texto"], resposta.get("botoes"))
+    else:
+        enviar_mensagem(chat_id, resposta)
 
 
 def _baixar_arquivo(file_id: str) -> bytes:
@@ -277,7 +300,7 @@ def _gravar_arquivo(
     enviar_arquivo(perfil, pasta, arquivo, arquivo_id=arquivo_id)
 
 
-def _processar_resposta_pendencia(chat_id: int, resposta: str) -> str:
+def _processar_resposta_pendencia(chat_id: int, resposta: str) -> str | dict:
     resposta = resposta.strip()
     if not resposta or resposta.startswith("/"):
         return "Responda à pergunta atual ou use /cancelar."
@@ -301,25 +324,39 @@ def _processar_resposta_pendencia(chat_id: int, resposta: str) -> str:
                 UPDATE financeiro3_pagamento_telegram_pendencias
                 SET valor=:valor,etapa='DATA_DOCUMENTO',atualizado_em=NOW() WHERE chat_id=:chat
             """), {"valor": valor, "chat": chat_id})
-            return "2/6 — Qual é a data do documento?\nUse DD.MM.AAAA ou responda HOJE."
+            return _resposta(
+                "2/6 — Qual é a data do documento?\n"
+                "Toque em HOJE ou informe outra data no formato DD.MM.AAAA.",
+                [["HOJE"]],
+            )
         if etapa == "DATA_DOCUMENTO":
             try:
                 data = _data_informada(resposta, "A data do documento")
             except TelegramErro as exc:
-                return str(exc)
+                return _resposta(str(exc), [["HOJE"]])
             conn.execute(text("""
                 UPDATE financeiro3_pagamento_telegram_pendencias
                 SET data_documento=:data,etapa='DATA_VENCIMENTO',atualizado_em=NOW()
                 WHERE chat_id=:chat
             """), {"data": data, "chat": chat_id})
-            return "3/6 — Qual é a data de vencimento?\nUse DD.MM.AAAA ou responda HOJE."
+            data_documento = data.strftime("%d.%m.%Y")
+            return _resposta(
+                "3/6 — Qual é a data de vencimento?\n"
+                "Escolha a data do documento, HOJE ou informe outra data.",
+                [[data_documento, "HOJE"]],
+            )
         if etapa == "DATA_VENCIMENTO":
             try:
                 data = _data_informada(resposta, "A data de vencimento")
             except TelegramErro as exc:
-                return str(exc)
+                data_documento = pendencia["data_documento"].strftime("%d.%m.%Y")
+                return _resposta(str(exc), [[data_documento, "HOJE"]])
             if data < pendencia["data_documento"]:
-                return "A data de vencimento não pode ser anterior à data do documento. Informe novamente."
+                data_documento = pendencia["data_documento"].strftime("%d.%m.%Y")
+                return _resposta(
+                    "A data de vencimento não pode ser anterior à data do documento. Informe novamente.",
+                    [[data_documento, "HOJE"]],
+                )
             conn.execute(text("""
                 UPDATE financeiro3_pagamento_telegram_pendencias
                 SET data_vencimento=:data,etapa='DESCRICAO',atualizado_em=NOW()
@@ -335,24 +372,38 @@ def _processar_resposta_pendencia(chat_id: int, resposta: str) -> str:
                 SET descricao=:descricao,etapa='PAGAMENTO',atualizado_em=NOW()
                 WHERE chat_id=:chat
             """), {"descricao": descricao, "chat": chat_id})
-            return "5/6 — Qual é o status do pagamento?\nResponda ABERTA ou PAGA."
+            return _resposta(
+                "5/6 — Qual é o status do pagamento?\n"
+                "ABERTA é a opção padrão.",
+                [["ABERTA", "PAGA"]],
+            )
         if etapa == "PAGAMENTO":
             status = resposta.upper()
             if status in {"PADRAO", "PADRÃO"}:
                 status = "ABERTA"
             if status not in {"ABERTA", "PAGA"}:
-                return "Status inválido. Responda ABERTA ou PAGA."
+                return _resposta(
+                    "Status inválido. Escolha ABERTA ou PAGA.",
+                    [["ABERTA", "PAGA"]],
+                )
             conn.execute(text("""
                 UPDATE financeiro3_pagamento_telegram_pendencias
                 SET status_pagamento=:status,etapa='REEMBOLSO',atualizado_em=NOW()
                 WHERE chat_id=:chat
             """), {"status": status, "chat": chat_id})
-            return "6/6 — Qual é o status do reembolso?\nResponda PENDENTE ou REEMBOLSADA."
+            return _resposta(
+                "6/6 — Qual é o status do reembolso?\n"
+                "PENDENTE é a opção padrão.",
+                [["PENDENTE", "REEMBOLSADA"]],
+            )
         status_reembolso = resposta.upper()
         if status_reembolso in {"PADRAO", "PADRÃO"}:
             status_reembolso = "PENDENTE"
         if status_reembolso not in {"PENDENTE", "REEMBOLSADA"}:
-            return "Status inválido. Responda PENDENTE ou REEMBOLSADA."
+            return _resposta(
+                "Status inválido. Escolha PENDENTE ou REEMBOLSADA.",
+                [["PENDENTE", "REEMBOLSADA"]],
+            )
         finalizar = dict(pendencia)
     nome = _nome_pendencia(finalizar, status_reembolso)
     perfil = {"id": finalizar["perfil_id"], "storage_prefix": finalizar["storage_prefix"]}
@@ -450,7 +501,7 @@ def processar_update(update: dict) -> None:
                     resposta = _receber_arquivo(perfil, mensagem, update_id)
         _finalizar_update(update_id, "CONCLUIDO")
         try:
-            enviar_mensagem(int(chat_id), resposta)
+            _enviar_resposta(int(chat_id), resposta)
         except Exception:
             pass
     except Exception as exc:

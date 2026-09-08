@@ -178,3 +178,8 @@ vencimento, descrição, status do pagamento e status do reembolso. As datas
 aceitam DD.MM.AAAA, DD/MM/AAAA ou HOJE. O comando /cancelar descarta o
 preenchimento sem enviar o arquivo ao Bucket. A pendência guarda somente a
 referência temporária do Telegram e expira depois de sete dias.
+
+Nas perguntas com respostas padronizadas, o bot apresenta um teclado clicável.
+Na data do documento aparece HOJE; no vencimento aparecem a própria data do
+documento e HOJE, sem impedir que o usuário digite outra data. Os status
+ABERTA/PAGA e PENDENTE/REEMBOLSADA também são exibidos como botões.

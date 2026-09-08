@@ -35,6 +35,23 @@ class TelegramBotHttpTests(unittest.TestCase):
 
 
 class TelegramBotArquivoTests(unittest.TestCase):
+    def test_mensagem_com_opcoes_cria_botoes_clicaveis(self):
+        with patch.object(pagamentos_telegram, "_api") as api:
+            pagamentos_telegram.enviar_mensagem(
+                123, "Escolha o status", [["ABERTA", "PAGA"]]
+            )
+        dados = api.call_args.args[1]
+        self.assertEqual(
+            dados["reply_markup"]["keyboard"],
+            [[{"text": "ABERTA"}, {"text": "PAGA"}]],
+        )
+        self.assertTrue(dados["reply_markup"]["one_time_keyboard"])
+
+    def test_mensagem_sem_opcoes_remove_teclado_anterior(self):
+        with patch.object(pagamentos_telegram, "_api") as api:
+            pagamentos_telegram.enviar_mensagem(123, "Concluído")
+        self.assertTrue(api.call_args.args[1]["reply_markup"]["remove_keyboard"])
+
     def test_documento_preserva_nome_original(self):
         nome, file_id, tamanho, mime = pagamentos_telegram._nome_e_arquivo({
             "document": {
