@@ -135,6 +135,15 @@ class PerfilPagamentosConfiguracaoTests(unittest.TestCase):
         self.assertIn("Vincular Telegram", painel)
         self.assertNotIn("register_blueprint", bot)
 
+    def test_telegram_persiste_cadastro_guiado_sem_guardar_arquivo(self):
+        migration = (ROOT / "migrations" / "018_telegram_cadastro_guiado.sql").read_text(encoding="utf-8")
+        service = (ROOT / "routes" / "financeiro_novo" / "services" / "pagamentos_telegram.py").read_text(encoding="utf-8")
+        self.assertIn("financeiro3_pagamento_telegram_pendencias", migration)
+        self.assertIn("update_id_arquivo", migration)
+        self.assertNotIn("BYTEA", migration.upper())
+        self.assertIn('elif comando == "/cancelar"', service)
+        self.assertIn('"max_connections": 1', service)
+
 
 if __name__ == "__main__":
     unittest.main()

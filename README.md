@@ -171,3 +171,10 @@ perfil. Os comandos disponíveis são /nova, /comprovante, /status e /ajuda.
 Documentos preservam o próprio nome. Ao enviar uma imagem como foto, use como
 legenda o nome completo da conta; sem extensão, o bot acrescenta .jpg. O limite
 de download da API de bots do Telegram é 20 MB.
+
+Se o arquivo de uma conta tiver nome aleatório ou a foto for enviada sem
+legenda, o bot inicia um cadastro guiado. Ele pergunta valor, data do documento,
+vencimento, descrição, status do pagamento e status do reembolso. As datas
+aceitam DD.MM.AAAA, DD/MM/AAAA ou HOJE. O comando /cancelar descarta o
+preenchimento sem enviar o arquivo ao Bucket. A pendência guarda somente a
+referência temporária do Telegram e expira depois de sete dias.

@@ -1,5 +1,7 @@
 import os
 import unittest
+from datetime import date
+from decimal import Decimal
 from unittest.mock import patch
 
 import telegram_bot
@@ -54,9 +56,37 @@ class TelegramBotArquivoTests(unittest.TestCase):
         self.assertEqual(file_id, "maior")
         self.assertEqual(mime, "image/jpeg")
 
-    def test_foto_sem_legenda_e_rejeitada(self):
-        with self.assertRaises(pagamentos_telegram.TelegramErro):
-            pagamentos_telegram._nome_e_arquivo({"photo": [{"file_id": "foto"}]})
+    def test_foto_sem_legenda_recebe_nome_temporario(self):
+        nome, file_id, _, mime = pagamentos_telegram._nome_e_arquivo({
+            "photo": [{"file_id": "foto", "file_size": 99}]
+        })
+        self.assertEqual(nome, "foto.jpg")
+        self.assertEqual(file_id, "foto")
+        self.assertEqual(mime, "image/jpeg")
+
+    def test_cadastro_guiado_monta_nome_padronizado(self):
+        nome = pagamentos_telegram._nome_pendencia({
+            "valor": Decimal("1254.5"),
+            "data_documento": date(2026, 9, 8),
+            "data_vencimento": date(2026, 9, 30),
+            "descricao": "manutenção / veículo",
+            "status_pagamento": "ABERTA",
+            "extensao": ".pdf",
+        }, "PENDENTE")
+        self.assertEqual(
+            nome,
+            "1.254,50 08.09.2026 30.09.2026 manutenção - veículo ABERTA PENDENTE.pdf",
+        )
+
+    def test_cadastro_guiado_aceita_dois_formatos_de_data(self):
+        self.assertEqual(
+            pagamentos_telegram._data_informada("08.09.2026", "Data"),
+            date(2026, 9, 8),
+        )
+        self.assertEqual(
+            pagamentos_telegram._data_informada("30/09/2026", "Data"),
+            date(2026, 9, 30),
+        )
 
     def test_segredo_do_webhook_usa_comparacao_exata(self):
         with patch.dict(os.environ, {"TELEGRAM_WEBHOOK_SECRET": "segredo_123"}, clear=False):
