@@ -12,6 +12,7 @@ from routes.operacao_producao import (
     gerar_relatorio_xlsx,
 )
 from routes.operacao_relatorio_pdf import gerar_relatorio_diario_pdf
+from routes.operacao_resumos import carregar_resumo
 from db import get_engine
 
 bp = Blueprint("operacao", __name__, url_prefix="/operacao")
@@ -30,8 +31,8 @@ def user_can(chave: str) -> bool:
 # -------------------------------------------------------------------
 def build_operacao_subnav(active: str | None):
     """
-    Monta os links do sub-menu (Produção / Registro / Cadastro).
-    'active' deve ser: 'producao', 'registro', 'cadastro' ou None.
+    Monta os links do sub-menu (Produção / Resumos / Registro / Cadastro).
+    'active' deve ser: 'producao', 'resumos', 'registro', 'cadastro' ou None.
     """
     links = []
 
@@ -49,6 +50,14 @@ def build_operacao_subnav(active: str | None):
                 "href": url_for("operacao.registro"),
                 "active": active == "registro",
             }
+        )
+        links.insert(
+            1,
+            {
+                "text": "Resumos",
+                "href": url_for("operacao.resumos"),
+                "active": active == "resumos",
+            },
         )
 
     if user_can("operacao:criar"):
@@ -110,6 +119,35 @@ def index():
     return render_template(
         "operacao/index.html",
         subnav_links=subnav,
+    )
+
+
+# -------------------------------------------------------------------
+# /operacao/resumos
+# -------------------------------------------------------------------
+@bp.get("/resumos")
+@login_required
+@permission_required("operacao", "visualizar")
+def resumos():
+    def ids(nome):
+        return [valor for valor in request.args.getlist(nome) if valor.isdigit()]
+
+    gerar = request.args.get("gerar") == "1"
+    incluir_parte_diaria = request.args.get("incluir_parte_diaria") == "1"
+    with get_engine().connect() as conn:
+        resumo = carregar_resumo(
+            conn,
+            eh_ids=ids("eh_ids"),
+            frente_ids=ids("frente_ids"),
+            maquina_ids=ids("maquina_ids"),
+            finalizada_ids=ids("finalizada_ids"),
+            incluir_parte_diaria=incluir_parte_diaria,
+            gerar=gerar,
+        )
+    return render_template(
+        "operacao/resumos.html",
+        subnav_links=build_operacao_subnav("resumos"),
+        resumo=resumo,
     )
 
 

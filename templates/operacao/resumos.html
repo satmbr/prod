@@ -1,0 +1,276 @@
+{% extends "base.html" %}
+{% block title %}Operação · Resumos{% endblock %}
+
+{% block content %}
+{% set r = resumo %}
+<div class="page-wrap resumo-page">
+  <style>
+    .resumo-page { --navy:#16324f; --blue:#246b9e; --green:#26845b; --red:#b42318; --amber:#b7791f; }
+    .resumo-page .zone { margin-bottom:12px; }
+    .resumo-page .zone-body { padding:14px; }
+    .summary-config { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+    .selector { border:1px solid #d9e2ec; border-radius:10px; padding:12px; background:#fff; }
+    .selector.full { grid-column:1/-1; }
+    .selector-title { color:var(--navy); font-size:12px; font-weight:800; margin-bottom:4px; }
+    .selector-note { color:#66778a; font-size:10px; margin-bottom:9px; }
+    .check-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:7px; }
+    .check-card { display:flex; align-items:flex-start; gap:8px; padding:8px; border:1px solid #e0e7ef; border-radius:8px; background:#f9fbfd; font-size:11px; color:#34495e; }
+    .check-card input { margin-top:2px; }
+    .check-card strong { display:block; color:var(--navy); }
+    .plan-finished { margin-left:24px; margin-top:5px; color:#74520b; font-size:10px; }
+    .actions { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:12px; }
+    .kpi-grid { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:8px; }
+    .kpi { padding:11px; border:1px solid #d9e2ec; border-radius:9px; background:#fff; box-shadow:0 2px 8px rgba(22,50,79,.05); }
+    .kpi .label { color:#60758a; font-size:9px; font-weight:800; min-height:24px; text-transform:uppercase; letter-spacing:.03em; }
+    .kpi .value { color:var(--navy); font-size:20px; font-weight:800; margin-top:3px; }
+    .kpi .sub { color:#6f7f90; font-size:9px; margin-top:2px; }
+    .kpi.good { border-left:4px solid var(--green); }
+    .kpi.warn { border-left:4px solid var(--amber); }
+    .kpi.danger { border-left:4px solid var(--red); }
+    .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    .panel { border:1px solid #d9e2ec; border-radius:9px; background:#fff; padding:11px; }
+    .panel-title { color:var(--navy); font-size:12px; font-weight:800; margin-bottom:9px; }
+    .chart-box { position:relative; height:300px; }
+    .table-scroll { overflow:auto; max-height:470px; }
+    .summary-table { width:100%; border-collapse:collapse; }
+    .summary-table th,.summary-table td { padding:7px 6px !important; font-size:10px !important; text-align:right; white-space:nowrap; }
+    .summary-table th:first-child,.summary-table td:first-child,.summary-table .left { text-align:left; }
+    .summary-table thead th { position:sticky; top:0; z-index:1; background:#edf3f8; color:var(--navy); }
+    .plan-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(265px,1fr)); gap:10px; }
+    .plan-card { border:1px solid #d9e2ec; border-radius:10px; padding:12px; background:#fff; }
+    .plan-head { display:flex; justify-content:space-between; gap:8px; align-items:center; margin-bottom:9px; }
+    .plan-name { color:var(--navy); font-size:13px; font-weight:800; }
+    .pill { display:inline-block; border-radius:999px; padding:3px 8px; font-size:9px; font-weight:800; text-transform:uppercase; }
+    .pill.active { background:#e3f0fb; color:#195c91; }
+    .pill.done { background:#def4e8; color:#17623e; }
+    .plan-values { display:grid; grid-template-columns:repeat(2,1fr); gap:7px; }
+    .metric { background:#f6f9fc; border-radius:7px; padding:7px; }
+    .metric span { display:block; color:#6b7d8f; font-size:9px; }
+    .metric strong { color:var(--navy); font-size:13px; }
+    .projection { margin-top:9px; padding:8px; background:#fff8e8; border:1px solid #efd89b; border-radius:7px; color:#6f5314; font-size:10px; }
+    .final-note { margin-top:9px; color:#27704f; font-size:10px; }
+    .empty { color:#718096; text-align:center; padding:20px; }
+    .alert-banner { border:1px solid #efb4ae; background:#fff5f4; color:#8e241d; padding:10px 12px; border-radius:8px; }
+    .section-note { color:#60758a; font-size:10px; font-weight:400; margin-left:6px; }
+    .impact-total { color:#9a5e09; font-weight:800; }
+    @media(max-width:1100px){.kpi-grid{grid-template-columns:repeat(3,1fr)}}
+    @media(max-width:760px){.summary-config,.grid-2{grid-template-columns:1fr}.kpi-grid{grid-template-columns:repeat(2,1fr)}}
+    @media print {
+      .summary-config-wrap,.print-hide { display:none !important; }
+      .resumo-page .zone { break-inside:avoid; box-shadow:none; }
+      .table-scroll { max-height:none; overflow:visible; }
+    }
+  </style>
+
+  <section class="zone summary-config-wrap">
+    <header class="zone-head">
+      <div class="zone-left"><span class="zone-icon">🧭</span><div class="zone-title">Resumos gerenciais</div></div>
+    </header>
+    <div class="zone-body">
+      <form method="get" id="resumo-form">
+        <input type="hidden" name="gerar" value="1">
+        <div class="summary-config">
+          <div class="selector full">
+            <div class="selector-title">1. EHs / planos incluídos</div>
+            <div class="selector-note">Selecione um ou vários planos. Marque “plano finalizado” para impedir qualquer tendência ou projeção daquela EH.</div>
+            <div class="check-grid">
+              {% for eh in r.ehs %}
+              <div class="check-card">
+                <div>
+                  <label><input class="eh-check" type="checkbox" name="eh_ids" value="{{ eh.id }}" {{ 'checked' if eh.id in r.eh_ids else '' }}> <strong>{{ eh.nome }}</strong></label>
+                  <label class="plan-finished"><input class="finished-check" data-eh="{{ eh.id }}" type="checkbox" name="finalizada_ids" value="{{ eh.id }}" {{ 'checked' if eh.id in r.finalizada_ids else '' }}> Plano finalizado</label>
+                </div>
+              </div>
+              {% else %}<div class="empty">Nenhuma EH cadastrada.</div>{% endfor %}
+            </div>
+          </div>
+
+          <div class="selector">
+            <div class="selector-title">2. Frentes do resumo</div>
+            <div class="selector-note">Produção, comparações, médias e impactos respeitarão somente estas frentes.</div>
+            <div class="check-grid">
+              {% for frente in r.frentes_disponiveis %}
+              <label class="check-card"><input type="checkbox" name="frente_ids" value="{{ frente.id }}" {{ 'checked' if frente.id in r.frente_ids else '' }}><span><strong>{{ frente.nome }}</strong>{{ frente.codigo or '' }}</span></label>
+              {% else %}<div class="empty">Nenhuma frente cadastrada.</div>{% endfor %}
+            </div>
+          </div>
+
+          <div class="selector">
+            <div class="selector-title">3. Parte Diária e máquinas</div>
+            <div class="selector-note">Os indicadores de velocidade usam produção executada ÷ horas da atividade Renovação. Não existe velocidade planejada.</div>
+            <label class="check-card"><input id="include-part" type="checkbox" name="incluir_parte_diaria" value="1" {{ 'checked' if r.incluir_parte_diaria else '' }}><span><strong>Incluir Parte Diária</strong>Tempos, disponibilidade, manutenção, atividades e velocidades executadas.</span></label>
+            <div id="machine-list" class="check-grid" style="margin-top:8px">
+              {% for maquina in r.maquinas_disponiveis %}
+              <label class="check-card"><input class="machine-check" type="checkbox" name="maquina_ids" value="{{ maquina.id }}" data-tag="{{ maquina.tag }}" {{ 'checked' if maquina.id in r.maquina_ids else '' }}><span><strong>{{ maquina.tag }}</strong>{{ maquina.descricao }}</span></label>
+              {% else %}<div class="empty">Nenhuma máquina ativa cadastrada.</div>{% endfor %}
+            </div>
+          </div>
+        </div>
+        <div class="actions">
+          <button class="btn primary" type="submit">Gerar resumo</button>
+          {% if r.gerado %}<button class="btn info" type="button" onclick="window.print()">Imprimir / salvar PDF</button>{% endif %}
+        </div>
+      </form>
+    </div>
+  </section>
+
+  {% if r.erro %}<div class="alert-banner">{{ r.erro }}</div>{% endif %}
+
+  {% if r.gerado and not r.erro %}
+  {% set p = r.producao %}
+  <section class="zone">
+    <header class="zone-head">
+      <div class="zone-left"><span class="zone-icon">📑</span><div class="zone-title">Resultado consolidado <span class="section-note">{% if p.inicio %}{{ p.inicio.strftime('%d/%m/%Y') }} a {{ p.fim.strftime('%d/%m/%Y') }}{% else %}sem período disponível{% endif %}</span></div></div>
+    </header>
+    <div class="zone-body">
+      <div class="kpi-grid">
+        <div class="kpi"><div class="label">Planejado</div><div class="value">{{ '{:,.0f}'.format(p.kpis.planejado).replace(',', '.') }}</div><div class="sub">total selecionado</div></div>
+        <div class="kpi good"><div class="label">Executado</div><div class="value">{{ '{:,.0f}'.format(p.kpis.realizado).replace(',', '.') }}</div><div class="sub">total selecionado</div></div>
+        <div class="kpi {{ 'good' if p.kpis.diferenca >= 0 else 'danger' }}"><div class="label">Diferença</div><div class="value">{{ '{:+,.0f}'.format(p.kpis.diferenca).replace(',', '.') }}</div><div class="sub">executado − planejado</div></div>
+        <div class="kpi {{ 'good' if p.kpis.aderencia >= 100 else 'warn' }}"><div class="label">Aderência</div><div class="value">{{ '%.1f'|format(p.kpis.aderencia) }}%</div><div class="sub">executado / planejado</div></div>
+        <div class="kpi"><div class="label">Média por dia produtivo</div><div class="value">{{ '{:,.0f}'.format(p.kpis.media_dia_produzido).replace(',', '.') }}</div><div class="sub">{{ p.kpis.dias_com_producao }} dias com execução</div></div>
+        <div class="kpi"><div class="label">Média de todo o período</div><div class="value">{{ '{:,.0f}'.format(p.kpis.media_dia_periodo).replace(',', '.') }}</div><div class="sub">{{ p.kpis.dias_periodo }} dias corridos</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="zone">
+    <header class="zone-head"><div class="zone-left"><span class="zone-icon">🗂️</span><div class="zone-title">Resultado por plano</div></div></header>
+    <div class="zone-body">
+      <div class="plan-grid">
+        {% for plano in p.planos %}
+        <article class="plan-card">
+          <div class="plan-head"><div class="plan-name">{{ plano.nome }}</div><span class="pill {{ 'done' if plano.finalizado else 'active' }}">{{ 'Finalizado' if plano.finalizado else 'Em andamento' }}</span></div>
+          <div class="plan-values">
+            <div class="metric"><span>Planejado</span><strong>{{ '{:,.0f}'.format(plano.planejado).replace(',', '.') }}</strong></div>
+            <div class="metric"><span>Executado</span><strong>{{ '{:,.0f}'.format(plano.realizado).replace(',', '.') }}</strong></div>
+            <div class="metric"><span>Diferença final/atual</span><strong>{{ '{:+,.0f}'.format(plano.diferenca).replace(',', '.') }}</strong></div>
+            <div class="metric"><span>Média produtiva</span><strong>{{ '{:,.0f}'.format(plano.media_dia).replace(',', '.') }}/dia</strong></div>
+          </div>
+          {% if plano.finalizado %}
+            <div class="final-note">Plano encerrado: resultado apresentado sem tendência ou projeção.</div>
+          {% elif plano.restante <= 0 %}
+            <div class="final-note">O executado já alcançou o volume planejado.</div>
+          {% else %}
+            <div class="projection">
+              Restam <strong>{{ '{:,.0f}'.format(plano.restante).replace(',', '.') }}</strong>.
+              {% if plano.data_projetada %}Mantida a média executada, conclusão estimada em <strong>{{ plano.data_projetada.strftime('%d/%m/%Y') }}</strong> ({{ plano.dias_estimados }} dias).{% else %}Ainda não há produção suficiente para calcular tendência.{% endif %}
+              {% if plano.ritmo_necessario %}<br>Ritmo necessário nos dias planejados restantes: <strong>{{ '{:,.0f}'.format(plano.ritmo_necessario).replace(',', '.') }}/dia</strong>.{% endif %}
+            </div>
+          {% endif %}
+        </article>
+        {% else %}<div class="empty">Não há produção planejada ou executada no escopo escolhido.</div>{% endfor %}
+      </div>
+    </div>
+  </section>
+
+  {% if p.serie %}
+  <section class="zone">
+    <header class="zone-head"><div class="zone-left"><span class="zone-icon">📈</span><div class="zone-title">Evolução da produção</div></div></header>
+    <div class="zone-body">
+      <div class="grid-2">
+        <div class="panel"><div class="panel-title">Planejado x executado por dia</div><div class="chart-box"><canvas id="chart-diario"></canvas></div></div>
+        <div class="panel"><div class="panel-title">Planejado x executado acumulado</div><div class="chart-box"><canvas id="chart-acumulado"></canvas></div></div>
+      </div>
+      <div class="table-scroll" style="margin-top:12px">
+        <table class="table summary-table">
+          <thead><tr><th>Data</th><th>Planejado dia</th><th>Executado dia</th><th>Planejado acum.</th><th>Executado acum.</th><th>Diferença</th></tr></thead>
+          <tbody>{% for item in p.serie %}<tr><td>{{ item.data[8:10] }}/{{ item.data[5:7] }}/{{ item.data[0:4] }}</td><td>{{ item.planejado|round|int }}</td><td>{{ item.realizado|round|int }}</td><td>{{ item.planejado_acumulado|round|int }}</td><td>{{ item.realizado_acumulado|round|int }}</td><td>{{ '{:+,.0f}'.format(item.diferenca).replace(',', '.') }}</td></tr>{% endfor %}</tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+  {% endif %}
+
+  <section class="zone">
+    <header class="zone-head"><div class="zone-left"><span class="zone-icon">🛤️</span><div class="zone-title">Resultado por frente</div></div></header>
+    <div class="zone-body"><div class="table-scroll"><table class="table summary-table">
+      <thead><tr><th class="left">Frente</th><th>Planejado</th><th>Executado</th><th>Diferença</th><th>Aderência</th></tr></thead>
+      <tbody>{% for frente in p.frentes %}<tr><td class="left"><strong>{{ frente.nome }}</strong></td><td>{{ frente.planejado|round|int }}</td><td>{{ frente.realizado|round|int }}</td><td>{{ '{:+,.0f}'.format(frente.diferenca).replace(',', '.') }}</td><td>{{ '%.1f'|format(frente.aderencia) }}%</td></tr>{% else %}<tr><td colspan="5" class="empty">Sem dados para as frentes escolhidas.</td></tr>{% endfor %}</tbody>
+    </table></div></div>
+  </section>
+
+  {% if r.incluir_parte_diaria %}
+  <section class="zone">
+    <header class="zone-head"><div class="zone-left"><span class="zone-icon">🚜</span><div class="zone-title">Parte Diária · máquinas selecionadas</div></div></header>
+    <div class="zone-body">
+      <div class="plan-grid">
+        {% for maquina in r.parte_diaria.maquinas %}
+        <article class="plan-card">
+          <div class="plan-head"><div><div class="plan-name">{{ maquina.tag }}</div><small>{{ maquina.descricao }}</small></div><span class="pill active">{{ maquina.dias }} dias</span></div>
+          <div class="plan-values">
+            <div class="metric"><span>Tempo registrado</span><strong>{{ '%.1f'|format(maquina.horas_total) }} h</strong></div>
+            <div class="metric"><span>Média diária</span><strong>{{ '%.1f'|format(maquina.media_horas_dia) }} h</strong></div>
+            <div class="metric"><span>Renovação</span><strong>{{ '%.1f'|format(maquina.horas_producao) }} h</strong><span>média {{ '%.1f'|format(maquina.media_producao_dia) }} h/dia</span></div>
+            <div class="metric"><span>Disponibilidade operacional</span><strong>{{ '%.1f'|format(maquina.disponibilidade) }}%</strong></div>
+            <div class="metric"><span>Manutenção corretiva</span><strong>{{ '%.1f'|format(maquina.horas_corretiva) }} h</strong><span>média {{ '%.1f'|format(maquina.media_corretiva_dia) }} h/dia</span></div>
+            <div class="metric"><span>Manutenção preventiva</span><strong>{{ '%.1f'|format(maquina.horas_preventiva) }} h</strong><span>média {{ '%.1f'|format(maquina.media_preventiva_dia) }} h/dia</span></div>
+            <div class="metric"><span>Utilização produtiva</span><strong>{{ '%.1f'|format(maquina.utilizacao) }}%</strong></div>
+            <div class="metric"><span>Velocidade consolidada</span><strong>{{ '%.1f'|format(maquina.velocidade_consolidada) }}/h</strong></div>
+            <div class="metric"><span>Velocidade média diária</span><strong>{{ '%.1f'|format(maquina.velocidade_media_diaria) }}/h</strong></div>
+          </div>
+        </article>
+        {% else %}<div class="empty">Nenhum apontamento de Parte Diária encontrado para as máquinas e o período selecionados.</div>{% endfor %}
+      </div>
+      {% if r.parte_diaria.atividades %}
+      <div class="grid-2" style="margin-top:12px">
+        <div class="panel"><div class="panel-title">Principais atividades e eventos por tempo</div><div class="table-scroll"><table class="table summary-table"><thead><tr><th class="left">Máquina / atividade</th><th>Ocorrências</th><th>Tempo</th></tr></thead><tbody>{% for item in r.parte_diaria.atividades %}<tr><td class="left"><strong>{{ item.maquina }}</strong><br>{{ item.atividade }}</td><td>{{ item.ocorrencias }}</td><td>{{ '%.1f'|format(item.horas) }} h</td></tr>{% endfor %}</tbody></table></div></div>
+        <div class="panel"><div class="panel-title">Tempos diários e velocidade executada</div><div class="table-scroll"><table class="table summary-table"><thead><tr><th>Data</th><th class="left">Máquina</th><th>Total</th><th>Renovação</th><th>Corretiva</th><th>Preventiva</th><th>Velocidade</th></tr></thead><tbody>{% for item in r.parte_diaria.serie %}<tr><td>{{ item.data[8:10] }}/{{ item.data[5:7] }}/{{ item.data[0:4] }}</td><td class="left">{{ item.maquina }}</td><td>{{ '%.1f'|format(item.total / 60) }} h</td><td>{{ '%.1f'|format(item.producao / 60) }} h</td><td>{{ '%.1f'|format(item.corretiva / 60) }} h</td><td>{{ '%.1f'|format(item.preventiva / 60) }} h</td><td>{{ '%.1f'|format(item.velocidade) }}/h</td></tr>{% endfor %}</tbody></table></div></div>
+      </div>
+      {% endif %}
+      <p class="selector-note" style="margin-top:9px">Disponibilidade operacional = (tempo registrado − corretivas − preventivas) ÷ tempo registrado. Velocidades são exclusivamente executadas: produção da frente Renovação ÷ horas apontadas como Renovação.</p>
+    </div>
+  </section>
+  {% endif %}
+
+  {% if r.impactos %}
+  <section class="zone">
+    <header class="zone-head"><div class="zone-left"><span class="zone-icon">⚠️</span><div class="zone-title">Impactos diários cadastrados <span class="section-note"><span class="impact-total">{{ '%.1f'|format(r.impacto_horas) }} h</span> nas frentes selecionadas</span></div></div></header>
+    <div class="zone-body"><div class="grid-2">
+      <div class="panel"><div class="panel-title">Registros</div><div class="table-scroll"><table class="table summary-table"><thead><tr><th>Data</th><th class="left">EH / frente / impacto</th><th>Tempo</th><th>Status</th></tr></thead><tbody>{% for item in r.impactos %}<tr><td>{{ item.data.strftime('%d/%m/%Y') }}</td><td class="left"><strong>{{ item.eh }} · {{ item.frente }}</strong><br>{{ r.categorias_impacto.get(item.categoria, item.categoria) }} — {{ item.descricao }}</td><td>{{ item.minutos_perdidos }} min</td><td>{{ item.status.replace('_', ' ').title() }}</td></tr>{% endfor %}</tbody></table></div></div>
+      <div class="panel"><div class="panel-title">Horas perdidas por categoria</div><div class="chart-box"><canvas id="chart-impactos-resumo"></canvas></div></div>
+    </div></div>
+  </section>
+  {% endif %}
+  {% endif %}
+</div>
+
+<script>
+  const includePart = document.getElementById("include-part");
+  const machineList = document.getElementById("machine-list");
+  function updateMachines(selectDefault) {
+    if (!includePart || !machineList) return;
+    machineList.style.display = includePart.checked ? "grid" : "none";
+    const checks = [...machineList.querySelectorAll(".machine-check")];
+    checks.forEach(input => input.disabled = !includePart.checked);
+    if (includePart.checked && selectDefault && !checks.some(input => input.checked)) {
+      const p190 = checks.find(input => input.dataset.tag === "P190-66001");
+      if (p190) p190.checked = true;
+    }
+  }
+  if (includePart) {
+    includePart.addEventListener("change", () => updateMachines(true));
+    updateMachines(false);
+  }
+  document.querySelectorAll(".eh-check").forEach(eh => {
+    const finished = document.querySelector(`.finished-check[data-eh="${eh.value}"]`);
+    const sync = () => { if (finished) { finished.disabled = !eh.checked; if (!eh.checked) finished.checked = false; } };
+    eh.addEventListener("change", sync); sync();
+  });
+</script>
+
+{% if r.gerado and not r.erro and r.producao.serie %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  const summaryChart = {{ r.grafico|tojson }};
+  const brDate = value => { const p=String(value).split("-"); return p.length===3 ? `${p[2]}/${p[1]}` : value; };
+  const opts = {responsive:true,maintainAspectRatio:false,interaction:{mode:"index",intersect:false},plugins:{legend:{position:"bottom",labels:{boxWidth:12,font:{size:10}}}},scales:{x:{ticks:{font:{size:9},maxRotation:0}},y:{beginAtZero:true,ticks:{font:{size:9}}}}};
+  new Chart(document.getElementById("chart-diario"),{type:"bar",data:{labels:summaryChart.labels.map(brDate),datasets:[{label:"Planejado",data:summaryChart.planejado,backgroundColor:"rgba(120,145,168,.75)"},{label:"Executado",data:summaryChart.realizado,backgroundColor:"rgba(38,132,91,.82)"}]},options:opts});
+  new Chart(document.getElementById("chart-acumulado"),{type:"line",data:{labels:summaryChart.labels.map(brDate),datasets:[{label:"Planejado acumulado",data:summaryChart.planejado_acumulado,borderColor:"#7891a8",borderDash:[5,4],tension:.2},{label:"Executado acumulado",data:summaryChart.realizado_acumulado,borderColor:"#26845b",backgroundColor:"rgba(38,132,91,.12)",fill:true,tension:.2}]},options:opts});
+  {% if r.impactos %}
+  const impactChart = {{ r.impacto_grafico|tojson }};
+  new Chart(document.getElementById("chart-impactos-resumo"),{type:"bar",data:{labels:impactChart.labels,datasets:[{label:"Horas perdidas",data:impactChart.valores,backgroundColor:"#d17a22"}]},options:{...opts,indexAxis:"y"}});
+  {% endif %}
+</script>
+{% endif %}
+{% endblock %}

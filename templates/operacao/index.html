@@ -28,6 +28,13 @@
         {% endif %}
 
         {% if 'operacao:visualizar' in current_user_permissions or 'auth:administrar' in current_user_permissions %}
+        <a href="{{ url_for('operacao.resumos') }}" style="background:#fff; border:1px solid #d9e1ea; border-radius:14px; padding:18px; display:block;">
+          <h3 style="margin:0 0 8px 0; color:#16324F;">Resumos</h3>
+          <p style="margin:0; color:#667487;">Gere relatórios gerenciais consolidados por EH, frente e máquina, com produção, tendências, Parte Diária, impactos e KPIs.</p>
+        </a>
+        {% endif %}
+
+        {% if 'operacao:visualizar' in current_user_permissions or 'auth:administrar' in current_user_permissions %}
         <a href="{{ url_for('operacao.registro') }}" style="background:#fff; border:1px solid #d9e1ea; border-radius:14px; padding:18px; display:block;">
           <h3 style="margin:0 0 8px 0; color:#16324F;">Registro</h3>
           <p style="margin:0; color:#667487;">Consulte os registros planejados e executados e acompanhe os lançamentos por EH, frente e data.</p>
