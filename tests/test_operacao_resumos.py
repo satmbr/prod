@@ -3,6 +3,7 @@ from datetime import date
 from pathlib import Path
 
 from routes.operacao_resumos import (
+    _montar_tabela_diaria,
     _resumir_producao,
     calcular_indicadores_maquina,
     classificar_atividade,
@@ -52,6 +53,37 @@ class ResumoProducaoTests(unittest.TestCase):
         self.assertEqual(resumo["kpis"]["realizado"], 125)
         self.assertEqual(resumo["kpis"]["diferenca"], -25)
 
+    def test_tabela_diaria_segue_modelo_e_preenche_dias_sem_lancamento(self):
+        linhas = self.linhas()
+        linhas.append(
+            {
+                **linhas[0],
+                "data": date(2026, 1, 3),
+                "planejado": 100,
+                "realizado": 120,
+            }
+        )
+        tabela = _montar_tabela_diaria(linhas, [])
+        self.assertEqual(len(tabela), 3)
+        self.assertEqual(tabela[1]["data"], date(2026, 1, 2))
+        self.assertEqual(tabela[1]["planejado_dia"], 0)
+        self.assertEqual(tabela[1]["planejado_total"], 150)
+        self.assertEqual(tabela[1]["realizado_total"], 125)
+        self.assertIn("dia_semana", tabela[0])
+        self.assertIn("atraso_dias", tabela[0])
+
+    def test_tabela_inclui_impactos_da_eh_e_data(self):
+        impacto = {
+            "eh_id": 1,
+            "data": date(2026, 1, 1),
+            "frente": "01 - Renovação",
+            "descricao": "Chuva forte",
+            "minutos_perdidos": 45,
+        }
+        tabela = _montar_tabela_diaria(self.linhas(), [impacto])
+        self.assertIn("Chuva forte", tabela[0]["observacoes"])
+        self.assertIn("45 min", tabela[0]["observacoes"])
+
 
 class ResumoMaquinasTests(unittest.TestCase):
     def test_classifica_atividades_com_acentos_e_variacoes(self):
@@ -84,6 +116,13 @@ class ResumoTemplateTests(unittest.TestCase):
 
     def test_impactos_sao_condicionais(self):
         self.assertIn("{% if r.impactos %}", self.template)
+
+    def test_exibe_tabela_modelo_e_novos_graficos(self):
+        self.assertIn("Observações / impactos", self.template)
+        self.assertIn('id="chart-mesclado"', self.template)
+        self.assertIn('id="chart-frentes-acumulado"', self.template)
+        self.assertIn('id="chart-parte-tempos"', self.template)
+        self.assertIn('id="chart-parte-velocidade"', self.template)
 
 
 if __name__ == "__main__":

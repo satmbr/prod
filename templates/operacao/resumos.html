@@ -36,6 +36,9 @@
     .summary-table th,.summary-table td { padding:7px 6px !important; font-size:10px !important; text-align:right; white-space:nowrap; }
     .summary-table th:first-child,.summary-table td:first-child,.summary-table .left { text-align:left; }
     .summary-table thead th { position:sticky; top:0; z-index:1; background:#edf3f8; color:var(--navy); }
+    .summary-table .observations { min-width:260px; white-space:normal; text-align:left; }
+    .summary-table tr.weekend-row { background:#f8fafc; }
+    .summary-table tfoot th,.summary-table tfoot td { background:#edf3f8; color:var(--navy); font-weight:800; }
     .plan-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(265px,1fr)); gap:10px; }
     .plan-card { border:1px solid #d9e2ec; border-radius:10px; padding:12px; background:#fff; }
     .plan-head { display:flex; justify-content:space-between; gap:8px; align-items:center; margin-bottom:9px; }
@@ -172,10 +175,31 @@
         <div class="panel"><div class="panel-title">Planejado x executado por dia</div><div class="chart-box"><canvas id="chart-diario"></canvas></div></div>
         <div class="panel"><div class="panel-title">Planejado x executado acumulado</div><div class="chart-box"><canvas id="chart-acumulado"></canvas></div></div>
       </div>
+      <div class="panel" style="margin-top:12px"><div class="panel-title">Produção diária e acumulada · gráfico mesclado</div><div class="chart-box" style="height:360px"><canvas id="chart-mesclado"></canvas></div></div>
       <div class="table-scroll" style="margin-top:12px">
         <table class="table summary-table">
-          <thead><tr><th>Data</th><th>Planejado dia</th><th>Executado dia</th><th>Planejado acum.</th><th>Executado acum.</th><th>Diferença</th></tr></thead>
-          <tbody>{% for item in p.serie %}<tr><td>{{ item.data[8:10] }}/{{ item.data[5:7] }}/{{ item.data[0:4] }}</td><td>{{ item.planejado|round|int }}</td><td>{{ item.realizado|round|int }}</td><td>{{ item.planejado_acumulado|round|int }}</td><td>{{ item.realizado_acumulado|round|int }}</td><td>{{ '{:+,.0f}'.format(item.diferenca).replace(',', '.') }}</td></tr>{% endfor %}</tbody>
+          <thead><tr><th>Data</th><th class="left">Dia</th><th class="left">Local</th><th>Planejado<br>dia (un)</th><th>Planejado<br>total (un)</th><th>Executado<br>dia (un)</th><th>Executado<br>total (un)</th><th>Diferença<br>(un)</th><th>Atraso / adiant.<br>(dias)</th><th class="observations">Observações / impactos</th></tr></thead>
+          <tbody>
+          {% for item in p.tabela %}
+            <tr class="{{ 'weekend-row' if item.data.weekday() >= 5 else '' }}">
+              <td>{{ item.data.strftime('%d/%m/%Y') }}</td>
+              <td class="left">{{ item.dia_semana }}</td>
+              <td class="left"><strong>{{ item.local }}</strong></td>
+              <td>{{ item.planejado_dia|round|int }}</td>
+              <td>{{ item.planejado_total|round|int }}</td>
+              <td>{{ item.realizado_dia|round|int }}</td>
+              <td>{{ item.realizado_total|round|int }}</td>
+              <td>{{ '{:+,.0f}'.format(item.diferenca).replace(',', '.') }}</td>
+              <td>{% if item.atraso_dias is not none %}{{ '%+.2f'|format(item.atraso_dias)|replace('.', ',') }}{% else %}—{% endif %}</td>
+              <td class="observations">{{ item.observacoes or '—' }}</td>
+            </tr>
+          {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr><th colspan="3">TOTAL PLANEJADO</th><td colspan="7">{{ '{:,.0f}'.format(p.kpis.planejado).replace(',', '.') }} un</td></tr>
+            <tr><th colspan="3">TOTAL EXECUTADO</th><td colspan="7">{{ '{:,.0f}'.format(p.kpis.realizado).replace(',', '.') }} un</td></tr>
+            <tr><th colspan="3">BACKLOG</th><td colspan="7">{{ '{:,.0f}'.format([p.kpis.planejado - p.kpis.realizado, 0]|max).replace(',', '.') }} un</td></tr>
+          </tfoot>
         </table>
       </div>
     </div>
@@ -184,10 +208,13 @@
 
   <section class="zone">
     <header class="zone-head"><div class="zone-left"><span class="zone-icon">🛤️</span><div class="zone-title">Resultado por frente</div></div></header>
-    <div class="zone-body"><div class="table-scroll"><table class="table summary-table">
-      <thead><tr><th class="left">Frente</th><th>Planejado</th><th>Executado</th><th>Diferença</th><th>Aderência</th></tr></thead>
-      <tbody>{% for frente in p.frentes %}<tr><td class="left"><strong>{{ frente.nome }}</strong></td><td>{{ frente.planejado|round|int }}</td><td>{{ frente.realizado|round|int }}</td><td>{{ '{:+,.0f}'.format(frente.diferenca).replace(',', '.') }}</td><td>{{ '%.1f'|format(frente.aderencia) }}%</td></tr>{% else %}<tr><td colspan="5" class="empty">Sem dados para as frentes escolhidas.</td></tr>{% endfor %}</tbody>
-    </table></div></div>
+    <div class="zone-body">
+      <div class="table-scroll"><table class="table summary-table">
+        <thead><tr><th class="left">Frente</th><th>Planejado</th><th>Executado</th><th>Diferença</th><th>Aderência</th></tr></thead>
+        <tbody>{% for frente in p.frentes %}<tr><td class="left"><strong>{{ frente.nome }}</strong></td><td>{{ frente.planejado|round|int }}</td><td>{{ frente.realizado|round|int }}</td><td>{{ '{:+,.0f}'.format(frente.diferenca).replace(',', '.') }}</td><td>{{ '%.1f'|format(frente.aderencia) }}%</td></tr>{% else %}<tr><td colspan="5" class="empty">Sem dados para as frentes escolhidas.</td></tr>{% endfor %}</tbody>
+      </table></div>
+      {% if p.frentes %}<div class="panel" style="margin-top:12px"><div class="panel-title">Acumulado por frente · planejado, executado e backlog</div><div class="chart-box"><canvas id="chart-frentes-acumulado"></canvas></div></div>{% endif %}
+    </div>
   </section>
 
   {% if r.incluir_parte_diaria %}
@@ -212,6 +239,12 @@
         </article>
         {% else %}<div class="empty">Nenhum apontamento de Parte Diária encontrado para as máquinas e o período selecionados.</div>{% endfor %}
       </div>
+      {% if r.parte_diaria.serie %}
+      <div class="grid-2" style="margin-top:12px">
+        <div class="panel"><div class="panel-title">Distribuição diária dos tempos</div><div class="chart-box"><canvas id="chart-parte-tempos"></canvas></div></div>
+        <div class="panel"><div class="panel-title">Velocidade executada diária · produção ÷ horas de Renovação</div><div class="chart-box"><canvas id="chart-parte-velocidade"></canvas></div></div>
+      </div>
+      {% endif %}
       {% if r.parte_diaria.atividades %}
       <div class="grid-2" style="margin-top:12px">
         <div class="panel"><div class="panel-title">Principais atividades e eventos por tempo</div><div class="table-scroll"><table class="table summary-table"><thead><tr><th class="left">Máquina / atividade</th><th>Ocorrências</th><th>Tempo</th></tr></thead><tbody>{% for item in r.parte_diaria.atividades %}<tr><td class="left"><strong>{{ item.maquina }}</strong><br>{{ item.atividade }}</td><td>{{ item.ocorrencias }}</td><td>{{ '%.1f'|format(item.horas) }} h</td></tr>{% endfor %}</tbody></table></div></div>
@@ -267,6 +300,30 @@
   const opts = {responsive:true,maintainAspectRatio:false,interaction:{mode:"index",intersect:false},plugins:{legend:{position:"bottom",labels:{boxWidth:12,font:{size:10}}}},scales:{x:{ticks:{font:{size:9},maxRotation:0}},y:{beginAtZero:true,ticks:{font:{size:9}}}}};
   new Chart(document.getElementById("chart-diario"),{type:"bar",data:{labels:summaryChart.labels.map(brDate),datasets:[{label:"Planejado",data:summaryChart.planejado,backgroundColor:"rgba(120,145,168,.75)"},{label:"Executado",data:summaryChart.realizado,backgroundColor:"rgba(38,132,91,.82)"}]},options:opts});
   new Chart(document.getElementById("chart-acumulado"),{type:"line",data:{labels:summaryChart.labels.map(brDate),datasets:[{label:"Planejado acumulado",data:summaryChart.planejado_acumulado,borderColor:"#7891a8",borderDash:[5,4],tension:.2},{label:"Executado acumulado",data:summaryChart.realizado_acumulado,borderColor:"#26845b",backgroundColor:"rgba(38,132,91,.12)",fill:true,tension:.2}]},options:opts});
+  new Chart(document.getElementById("chart-mesclado"),{type:"bar",data:{labels:summaryChart.labels.map(brDate),datasets:[
+    {type:"bar",label:"Planejado dia",data:summaryChart.planejado,backgroundColor:"rgba(110,173,69,.82)",borderColor:"#4f8f2f",borderWidth:1,yAxisID:"yDia"},
+    {type:"bar",label:"Executado dia",data:summaryChart.realizado,backgroundColor:"rgba(240,122,41,.85)",borderColor:"#d96316",borderWidth:1,yAxisID:"yDia"},
+    {type:"line",label:"Planejado total",data:summaryChart.planejado_acumulado,borderColor:"#7891a8",backgroundColor:"#7891a8",borderWidth:2,tension:.15,pointRadius:2,yAxisID:"yTotal"},
+    {type:"line",label:"Executado total",data:summaryChart.realizado_acumulado,borderColor:"#e0aa00",backgroundColor:"#e0aa00",borderWidth:3,tension:.15,pointRadius:2,yAxisID:"yTotal"}
+  ]},options:{...opts,scales:{x:opts.scales.x,yDia:{beginAtZero:true,position:"left",title:{display:true,text:"Produção diária"},ticks:{font:{size:9}}},yTotal:{beginAtZero:true,position:"right",title:{display:true,text:"Produção acumulada"},grid:{drawOnChartArea:false},ticks:{font:{size:9}}}}}});
+  {% if p.frentes %}
+  new Chart(document.getElementById("chart-frentes-acumulado"),{type:"bar",data:{labels:summaryChart.frente_labels,datasets:[
+    {label:"Planejado total",data:summaryChart.frente_planejado,backgroundColor:"rgba(110,173,69,.82)"},
+    {label:"Executado total",data:summaryChart.frente_realizado,backgroundColor:"rgba(240,122,41,.85)"},
+    {label:"Backlog",data:summaryChart.frente_backlog,backgroundColor:"rgba(158,165,173,.78)"}
+  ]},options:opts});
+  {% endif %}
+  {% if r.incluir_parte_diaria and r.parte_diaria.serie %}
+  const partChart = {{ r.parte_diaria.grafico|tojson }};
+  const partLabels = partChart.labels.map(value => { const pieces=String(value).split(" · "); return `${brDate(pieces[0])} · ${pieces[1] || ''}`; });
+  new Chart(document.getElementById("chart-parte-tempos"),{type:"bar",data:{labels:partLabels,datasets:[
+    {label:"Renovação",data:partChart.producao,backgroundColor:"#26845b"},
+    {label:"Corretiva",data:partChart.corretiva,backgroundColor:"#b42318"},
+    {label:"Preventiva",data:partChart.preventiva,backgroundColor:"#d9a025"},
+    {label:"Outras atividades",data:partChart.outras,backgroundColor:"#7891a8"}
+  ]},options:{...opts,scales:{x:{...opts.scales.x,stacked:true},y:{...opts.scales.y,stacked:true,title:{display:true,text:"Horas"}}}}});
+  new Chart(document.getElementById("chart-parte-velocidade"),{type:"line",data:{labels:partLabels,datasets:[{label:"Velocidade executada (un/h)",data:partChart.velocidade,borderColor:"#246b9e",backgroundColor:"rgba(36,107,158,.14)",fill:true,tension:.2,pointRadius:3}]},options:opts});
+  {% endif %}
   {% if r.impactos %}
   const impactChart = {{ r.impacto_grafico|tojson }};
   new Chart(document.getElementById("chart-impactos-resumo"),{type:"bar",data:{labels:impactChart.labels,datasets:[{label:"Horas perdidas",data:impactChart.valores,backgroundColor:"#d17a22"}]},options:{...opts,indexAxis:"y"}});

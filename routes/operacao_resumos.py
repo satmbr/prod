@@ -8,6 +8,17 @@ from sqlalchemy import text
 from routes.operacao_producao import CATEGORIAS_IMPACTO
 
 
+DIAS_SEMANA = (
+    "segunda-feira",
+    "terça-feira",
+    "quarta-feira",
+    "quinta-feira",
+    "sexta-feira",
+    "sábado",
+    "domingo",
+)
+
+
 def _float(valor):
     return float(valor or 0)
 
@@ -249,6 +260,58 @@ def _resumir_producao(rows, finalizada_ids):
     }
 
 
+def _montar_tabela_diaria(rows, impactos):
+    """Monta uma linha por EH e dia, mantendo acumulados independentes por plano."""
+    por_plano = {}
+    for row in rows:
+        plano = por_plano.setdefault(
+            int(row["eh_id"]),
+            {"nome": row["eh"], "dias": defaultdict(lambda: {"planejado": 0.0, "realizado": 0.0})},
+        )
+        dia = plano["dias"][row["data"]]
+        dia["planejado"] += _float(row["planejado"])
+        dia["realizado"] += _float(row["realizado"])
+
+    observacoes = defaultdict(list)
+    for impacto in impactos:
+        observacoes[(int(impacto["eh_id"]), impacto["data"])].append(
+            f'{impacto["frente"]}: {impacto["descricao"]} ({int(impacto["minutos_perdidos"] or 0)} min)'
+        )
+
+    tabela = []
+    for eh_id, plano in sorted(por_plano.items(), key=lambda item: item[1]["nome"]):
+        if not plano["dias"]:
+            continue
+        inicio = min(plano["dias"])
+        fim = max(plano["dias"])
+        dias_planejados = [item["planejado"] for item in plano["dias"].values() if item["planejado"] > 0]
+        media_planejada = sum(dias_planejados) / len(dias_planejados) if dias_planejados else 0.0
+        acumulado_planejado = 0.0
+        acumulado_realizado = 0.0
+        data_atual = inicio
+        while data_atual <= fim:
+            valores = plano["dias"].get(data_atual, {"planejado": 0.0, "realizado": 0.0})
+            acumulado_planejado += valores["planejado"]
+            acumulado_realizado += valores["realizado"]
+            diferenca = acumulado_realizado - acumulado_planejado
+            tabela.append(
+                {
+                    "data": data_atual,
+                    "dia_semana": DIAS_SEMANA[data_atual.weekday()],
+                    "local": plano["nome"],
+                    "planejado_dia": valores["planejado"],
+                    "planejado_total": acumulado_planejado,
+                    "realizado_dia": valores["realizado"],
+                    "realizado_total": acumulado_realizado,
+                    "diferenca": diferenca,
+                    "atraso_dias": diferenca / media_planejada if media_planejada else None,
+                    "observacoes": " · ".join(observacoes.get((eh_id, data_atual), [])),
+                }
+            )
+            data_atual += timedelta(days=1)
+    return tabela
+
+
 def _impactos(conn, eh_ids, frente_ids, inicio, fim):
     if not inicio or not fim:
         return []
@@ -258,7 +321,7 @@ def _impactos(conn, eh_ids, frente_ids, inicio, fim):
     return conn.execute(
         text(
             f"""
-            SELECT i.id, i.data, i.minutos_perdidos, i.categoria, i.descricao,
+            SELECT i.id, i.data, i.eh_id, i.frente_id, i.minutos_perdidos, i.categoria, i.descricao,
                    i.responsavel, i.providencia, i.status, e.eh, f.frente
             FROM operacao_impacto i
             JOIN entre_house e ON e.id = i.eh_id
@@ -275,7 +338,7 @@ def _impactos(conn, eh_ids, frente_ids, inicio, fim):
 
 def _parte_diaria(conn, maquina_ids, inicio, fim, renovacao_por_data):
     if not maquina_ids or not inicio or not fim:
-        return {"maquinas": [], "eventos": [], "atividades": [], "serie": []}
+        return {"maquinas": [], "eventos": [], "atividades": [], "serie": [], "grafico": {}}
     params = {"inicio": inicio, "fim": fim}
     maquinas_sql = _clausula_in("maquina", maquina_ids, params)
     rows = conn.execute(
@@ -375,10 +438,24 @@ def _parte_diaria(conn, maquina_ids, inicio, fim, renovacao_por_data):
                 "data": data_iso,
                 "maquina": maquina["tag"],
                 **valores,
+                "outras": max(0.0, valores["total"] - valores["producao"] - valores["corretiva"] - valores["preventiva"]),
                 "velocidade": renovacao_por_data.get(data_iso, 0.0) / horas_producao if horas_producao else 0.0,
             }
         )
-    return {"maquinas": resultado_maquinas, "eventos": eventos, "atividades": atividades_resultado, "serie": serie_resultado}
+    return {
+        "maquinas": resultado_maquinas,
+        "eventos": eventos,
+        "atividades": atividades_resultado,
+        "serie": serie_resultado,
+        "grafico": {
+            "labels": [f'{item["data"]} · {item["maquina"]}' for item in serie_resultado],
+            "producao": [round(item["producao"] / 60.0, 2) for item in serie_resultado],
+            "corretiva": [round(item["corretiva"] / 60.0, 2) for item in serie_resultado],
+            "preventiva": [round(item["preventiva"] / 60.0, 2) for item in serie_resultado],
+            "outras": [round(item["outras"] / 60.0, 2) for item in serie_resultado],
+            "velocidade": [round(item["velocidade"], 2) for item in serie_resultado],
+        },
+    }
 
 
 def carregar_resumo(conn, eh_ids=None, frente_ids=None, maquina_ids=None, incluir_parte_diaria=False, finalizada_ids=None, gerar=False):
@@ -417,8 +494,10 @@ def carregar_resumo(conn, eh_ids=None, frente_ids=None, maquina_ids=None, inclui
         resultado["erro"] = "Selecione ao menos uma EH e uma frente para gerar o resumo."
         return resultado
 
-    producao = _resumir_producao(_producao(conn, eh_ids, frente_ids), finalizada_ids)
+    producao_rows = _producao(conn, eh_ids, frente_ids)
+    producao = _resumir_producao(producao_rows, finalizada_ids)
     impactos = _impactos(conn, eh_ids, frente_ids, producao["inicio"], producao["fim"])
+    producao["tabela"] = _montar_tabela_diaria(producao_rows, impactos)
     parte_diaria = _parte_diaria(
         conn, maquina_ids if incluir_parte_diaria else [], producao["inicio"], producao["fim"], producao["renovacao_por_data"]
     )
@@ -443,6 +522,10 @@ def carregar_resumo(conn, eh_ids=None, frente_ids=None, maquina_ids=None, inclui
                 "realizado": [item["realizado"] for item in producao["serie"]],
                 "planejado_acumulado": [item["planejado_acumulado"] for item in producao["serie"]],
                 "realizado_acumulado": [item["realizado_acumulado"] for item in producao["serie"]],
+                "frente_labels": [item["nome"] for item in producao["frentes"]],
+                "frente_planejado": [item["planejado"] for item in producao["frentes"]],
+                "frente_realizado": [item["realizado"] for item in producao["frentes"]],
+                "frente_backlog": [max(0.0, item["planejado"] - item["realizado"]) for item in producao["frentes"]],
             },
         }
     )
