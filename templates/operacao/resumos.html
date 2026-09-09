@@ -70,7 +70,8 @@
     .value-toggle-btn.off { opacity:.35; text-decoration:line-through; }
     .card-copy-host { position:relative; }
     .card-copy-host > .copy-image-btn { top:5px; right:5px; }
-    .kpi.card-copy-host { padding-right:34px; }
+    .consolidated-kpis.card-copy-host { border:1px solid #d9e2ec; border-radius:12px; padding:30px 8px 8px; }
+    .consolidated-kpis.card-copy-host > .copy-image-btn { top:5px; right:7px; }
     .plan-card.card-copy-host .plan-head { padding-right:24px; }
     .summary-table tr.supplement-row td { color:#60758a; background:#fbfcfe; border-top:0; }
     .activity-table { table-layout:fixed; }
@@ -393,7 +394,7 @@
     });
     return button;
   }
-  document.querySelectorAll(".resumo-page canvas, .resumo-page table, .resumo-page .consolidated-kpis, .resumo-page .kpi, .resumo-page .plan-card").forEach(target => {
+  document.querySelectorAll(".resumo-page canvas, .resumo-page table, .resumo-page .consolidated-kpis, .resumo-page .plan-card").forEach(target => {
     const isCanvas = target.tagName === "CANVAS";
     const isTable = target.tagName === "TABLE";
     const host = isCanvas ? target.closest(".chart-box") : (isTable ? target.closest(".table-scroll") : target);

@@ -169,13 +169,14 @@ class ResumoTemplateTests(unittest.TestCase):
         self.assertIn("Ligar ou desligar valores das linhas", self.template)
         self.assertIn("Ligar ou desligar valores das barras", self.template)
 
-    def test_cartoes_e_kpis_tambem_podem_ser_copiados(self):
-        self.assertIn(".resumo-page .kpi, .resumo-page .plan-card", self.template)
+    def test_cartoes_de_plano_e_maquina_tambem_podem_ser_copiados(self):
+        self.assertIn(".resumo-page .plan-card", self.template)
         self.assertIn("card-copy-host", self.template)
 
     def test_resultado_consolidado_pode_ser_copiado_em_conjunto(self):
         self.assertIn("consolidated-kpis", self.template)
         self.assertIn(".resumo-page .consolidated-kpis", self.template)
+        self.assertNotIn(".resumo-page .kpi, .resumo-page .plan-card", self.template)
 
     def test_tabela_de_atividades_alinha_nome_a_esquerda_e_numeros_ao_centro(self):
         self.assertIn("activity-table", self.template)
