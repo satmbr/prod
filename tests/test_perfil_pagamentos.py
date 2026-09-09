@@ -112,6 +112,11 @@ class PerfilPagamentosConfiguracaoTests(unittest.TestCase):
         self.assertIn('@bp.post("/perfil-pagamentos/contas/<int:conta_id>/replicar-om")', routes)
         self.assertIn("o.status='RASCUNHO'", routes)
         self.assertIn("CRIADO_PELO_PERFIL_PAGAMENTOS", routes)
+        self.assertIn('@bp.get("/perfil-pagamentos/contas/<int:conta_id>/duplicidades-om")', routes)
+        self.assertIn("FROM financeiro3_om_itens", routes)
+        self.assertNotIn("financeiro3_rd_itens", routes)
+        self.assertIn("confirmar_duplicidade", painel)
+        self.assertIn("Possíveis lançamentos repetidos em OMs", painel)
         self.assertIn("pp-replicate", painel)
         self.assertIn("Replicar linha", painel)
 

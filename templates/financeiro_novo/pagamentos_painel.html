@@ -84,6 +84,7 @@
   {% if pode_replicar %}
   <dialog id="pp-om-dialog" class="pp-dialog">
     <form id="pp-om-form" method="post">
+      <input type="hidden" name="confirmar_duplicidade" value="0">
       <div class="pp-dialog-head">
         <div><strong>Replicar conta para OM</strong><span id="pp-om-conta"></span></div>
         <button type="button" class="pp-dialog-close" aria-label="Fechar">×</button>
@@ -96,7 +97,8 @@
         </select>
       </label>
       <small>O centro padrão da OM será usado e a categoria ficará como “A classificar” para edição posterior.</small>
-      <div class="pp-dialog-actions"><button type="button" class="btn btn-outline pp-dialog-close">Cancelar</button><button type="submit" class="btn btn-primary">Replicar linha</button></div>
+      <div id="pp-duplicate-feedback" class="pp-duplicate-feedback" hidden></div>
+      <div class="pp-dialog-actions"><button type="button" class="btn btn-outline pp-dialog-close">Cancelar</button><button type="submit" class="btn btn-primary" id="pp-om-submit">Replicar linha</button></div>
     </form>
   </dialog>
   {% endif %}
@@ -113,20 +115,70 @@
 <style>
 .pp-page{--pp:#173b5f;--pp-soft:#eaf1f7}.pp-banner{display:flex;justify-content:space-between;gap:18px;align-items:center;padding:14px 16px;margin-bottom:14px;border:1px solid #bfd0de;border-radius:10px;background:#f4f8fb}.pp-banner strong,.pp-banner span{display:block}.pp-banner span{font-size:11px;color:#61768a;margin-top:3px}.pp-service{max-width:480px;padding:8px 11px;border-radius:8px;font-size:11px}.pp-service.ok{background:#dcfce7;color:#166534}.pp-service.warn{background:#fef3c7;color:#92400e}.pp-summary{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:14px}.pp-summary article{padding:14px;border:1px solid #dbe3ea;border-radius:10px;background:#fff}.pp-summary span,.pp-summary small{display:block;color:#6c7f91}.pp-summary strong{display:block;margin:5px 0;font-size:25px;color:var(--pp)}.pp-summary .danger strong{color:#b42318}.pp-summary .success strong{color:#087a55}.pp-profiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(310px,1fr));gap:12px}.pp-profile{padding:14px;border:1px solid #dbe3ea;border-radius:10px;background:#fff}.pp-profile.inactive{opacity:.62}.pp-profile-head{display:flex;justify-content:space-between;gap:10px}.pp-profile-head strong,.pp-profile-head span{display:block}.pp-profile-head span{font-size:11px;color:#6c7f91;margin-top:2px}.pp-profile-metrics{display:flex;gap:14px;padding:10px 0;margin:10px 0;border-block:1px solid #edf1f4;color:#61768a;font-size:11px}.pp-actions{display:flex;gap:7px;align-items:center;flex-wrap:wrap}.pp-actions form{margin:0}.pp-error{padding:7px;border-radius:6px;background:#fff0ef;color:#a52a24;font-size:11px}.pp-chip{display:inline-block;padding:4px 7px;border-radius:999px;background:#edf2f6;color:#52697d;font-size:9px;font-weight:800;letter-spacing:.04em}.pp-chip.ativa,.pp-chip.paga,.pp-chip.reembolsada,.pp-chip.sucesso{background:#dcfce7;color:#166534}.pp-chip.erro,.pp-chip.vencida{background:#fee2e2;color:#991b1b}.pp-chip.pendente,.pp-chip.aberta,.pp-chip.parcial,.pp-chip.aguardando_om{background:#fef3c7;color:#92400e}.pp-filter{display:grid;grid-template-columns:2fr 1fr 1fr auto auto;gap:8px;margin-bottom:12px}.pp-filter input,.pp-filter select{min-height:36px;border:1px solid #ccd8e2;border-radius:7px;padding:7px 9px;background:#fff}.pp-table-wrap{overflow:auto}.pp-table{width:100%;min-width:1120px;border-collapse:collapse}.pp-table th,.pp-table td{padding:9px 8px;border-bottom:1px solid #e8edf1;text-align:left;vertical-align:middle}.pp-table th{background:#f6f8fa;color:#61768a;font-size:10px;text-transform:uppercase}.pp-table td small{display:block;margin-top:3px;color:#8090a0;font-size:9px}.pp-table tr.overdue{background:#fff7f6}.pp-table .right{text-align:right}.pp-number{font-weight:800;color:#185f97}.pp-table .late{color:#b42318;font-weight:800}.pp-proof{font-size:10px;font-weight:700}.pp-proof.yes{color:#087a55}.pp-proof.no{color:#9a4e16}.pp-lower{display:grid;grid-template-columns:1fr 1fr;gap:14px}.pp-log{max-height:360px;overflow:auto}.pp-log article{padding:10px 0;border-bottom:1px solid #edf1f4}.pp-log article>div{display:flex;justify-content:space-between;gap:10px}.pp-log span{font-size:10px;color:#748697}.pp-log p{margin:5px 0;font-size:11px}.pp-log a{color:#185f8f;font-weight:700;font-size:11px}.pp-count{padding:3px 7px;border-radius:999px;background:#edf2f6}.pp-empty{padding:20px;text-align:center;color:#7d8d9b}@media(max-width:1000px){.pp-summary{grid-template-columns:repeat(2,1fr)}.pp-lower{grid-template-columns:1fr}.pp-filter{grid-template-columns:1fr}.pp-banner{align-items:flex-start;flex-direction:column}}
 .pp-om-cell{text-align:center!important}.pp-om-link{color:#185f97;font-weight:800}.pp-replicate{width:25px;height:25px;border:1px solid #bfd0de;border-radius:6px;background:#f4f8fb;color:#173b5f;font-size:16px;font-weight:800;line-height:1;cursor:pointer}.pp-replicate:hover{background:#dceaf4}.pp-replicate:disabled{opacity:.4;cursor:not-allowed}.pp-dialog{width:min(560px,calc(100% - 28px));padding:0;border:1px solid #bfd0de;border-radius:12px;color:#173b5f;box-shadow:0 18px 60px #173b5f33}.pp-dialog::backdrop{background:#0f294066}.pp-dialog form{padding:18px}.pp-dialog-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}.pp-dialog-head strong,.pp-dialog-head span,.pp-dialog label span,.pp-dialog>form>small{display:block}.pp-dialog-head span{margin-top:3px;color:#61768a;font-size:11px}.pp-dialog p{color:#52697d;font-size:12px;line-height:1.5}.pp-dialog label span{margin-bottom:5px;font-size:11px;font-weight:800}.pp-dialog select{width:100%;min-height:40px;padding:8px;border:1px solid #ccd8e2;border-radius:7px;background:#fff}.pp-dialog>form>small{margin-top:8px;color:#748697}.pp-dialog-close{border:0;background:transparent;color:#52697d;font-size:22px;cursor:pointer}.pp-dialog-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}.pp-dialog-actions .pp-dialog-close{font-size:inherit}
+.pp-duplicate-feedback{margin-top:12px;padding:10px;border:1px solid #f0c36a;border-radius:8px;background:#fff8e5;color:#7a4b00;font-size:11px}.pp-duplicate-feedback strong{display:block;margin-bottom:5px}.pp-duplicate-feedback ul{margin:0;padding-left:18px}.pp-duplicate-feedback li+li{margin-top:3px}
 </style>
 {% if pode_replicar %}<script>
 (() => {
   const dialog = document.getElementById('pp-om-dialog');
   const form = document.getElementById('pp-om-form');
   const conta = document.getElementById('pp-om-conta');
+  const confirmacao = form?.querySelector('[name="confirmar_duplicidade"]');
+  const feedback = document.getElementById('pp-duplicate-feedback');
+  const submit = document.getElementById('pp-om-submit');
+  const duplicidadesUrl = {{ url_for('financeiro_novo.pagamento_conta_duplicidades_om',conta_id=0)|tojson }};
+  let contaId = null;
   if (!dialog || !form) return;
   document.querySelectorAll('.pp-replicate:not(:disabled)').forEach(button => {
     button.addEventListener('click', () => {
+      contaId = button.dataset.contaId;
       form.action = {{ url_for('financeiro_novo.pagamento_conta_replicar_om',conta_id=0)|tojson }}.replace('/0/', '/' + button.dataset.contaId + '/');
       conta.textContent = button.dataset.contaNumero;
       form.querySelector('[name="om_id"]').value = '';
+      confirmacao.value = '0';
+      feedback.hidden = true;
+      feedback.replaceChildren();
+      submit.textContent = 'Replicar linha';
       dialog.showModal();
     });
+  });
+  form.addEventListener('submit', async event => {
+    if (confirmacao.value === '1') return;
+    event.preventDefault();
+    submit.disabled = true;
+    submit.textContent = 'Verificando…';
+    try {
+      const response = await fetch(duplicidadesUrl.replace('/0/', '/' + contaId + '/'), {
+        credentials: 'same-origin',
+        headers: {'Accept': 'application/json'},
+      });
+      if (!response.ok) throw new Error('Não foi possível verificar duplicidades.');
+      const dados = await response.json();
+      if (!dados.duplicidades.length) {
+        confirmacao.value = '1';
+        form.submit();
+        return;
+      }
+      const titulo = document.createElement('strong');
+      titulo.textContent = 'Possíveis lançamentos repetidos em OMs';
+      const lista = document.createElement('ul');
+      dados.duplicidades.forEach(item => {
+        const linha = document.createElement('li');
+        linha.textContent = 'OM ' + item.numero_om + ' · linha ' + item.numero_linha
+          + ' · ' + item.data + ' · R$ ' + item.valor.replace('.', ',')
+          + ' · ' + item.descricao;
+        lista.appendChild(linha);
+      });
+      feedback.replaceChildren(titulo, lista);
+      feedback.hidden = false;
+      confirmacao.value = '1';
+      submit.textContent = 'Replicar mesmo assim';
+    } catch (erro) {
+      feedback.textContent = erro.message;
+      feedback.hidden = false;
+      submit.textContent = 'Tentar novamente';
+    } finally {
+      submit.disabled = false;
+    }
   });
   dialog.querySelectorAll('.pp-dialog-close').forEach(button => button.addEventListener('click', () => dialog.close()));
   dialog.addEventListener('click', event => { if (event.target === dialog) dialog.close(); });

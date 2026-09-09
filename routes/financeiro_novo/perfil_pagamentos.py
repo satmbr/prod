@@ -3,7 +3,7 @@ import secrets
 from datetime import date
 from io import BytesIO
 
-from flask import abort, flash, redirect, render_template, request, session, url_for
+from flask import abort, flash, jsonify, redirect, render_template, request, session, url_for
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from werkzeug.datastructures import FileStorage
@@ -31,6 +31,23 @@ def _conta(conn, conta_id, *, bloquear=False):
         text(f"SELECT * FROM financeiro3_pagamento_contas WHERE id=:id{sufixo}"),
         {"id": conta_id},
     ).mappings().first()
+
+
+def _duplicidades_om_conta(conn, conta):
+    return conn.execute(text("""
+        SELECT o.id AS om_id,o.numero_om,i.id AS item_id,i.descricao,i.data_despesa,i.valor,
+          (SELECT COUNT(*) FROM financeiro3_om_itens anterior
+           WHERE anterior.om_id=i.om_id AND anterior.status='ATIVO'
+             AND anterior.id<=i.id) AS numero_linha
+        FROM financeiro3_om_itens i
+        JOIN financeiro3_oms o ON o.id=i.om_id
+        WHERE i.status='ATIVO' AND o.removido_em IS NULL
+          AND i.data_despesa=:data AND i.valor=:valor
+        ORDER BY o.numero_om,i.id
+    """), {
+        "data": conta["data_documento"],
+        "valor": conta["valor"],
+    }).mappings().all()
 
 
 def _dados_perfil(form):
@@ -518,6 +535,7 @@ def pagamento_conta_replicar_om(conta_id):
 
     preparado = None
     try:
+        confirmar_duplicidade = request.form.get("confirmar_duplicidade") == "1"
         try:
             om_id = int(request.form.get("om_id") or 0)
         except ValueError as exc:
@@ -536,6 +554,17 @@ def pagamento_conta_replicar_om(conta_id):
             abort(404)
         if origem["om_id"]:
             raise ValorInvalido("Esta conta já foi replicada para uma OM.")
+        with get_engine().connect() as conn:
+            duplicidades = _duplicidades_om_conta(conn, origem)
+        if duplicidades and not confirmar_duplicidade:
+            numeros = ", ".join(
+                f"OM {item['numero_om']} · linha {item['numero_linha']}"
+                for item in duplicidades
+            )
+            raise ValorInvalido(
+                f"Já existem lançamentos em OM com a mesma data e valor: {numeros}. "
+                "Revise e confirme explicitamente para replicar."
+            )
 
         arquivo = baixar_arquivo(
             {"id": origem["perfil_id"], "storage_prefix": origem["storage_prefix"]},
@@ -562,6 +591,12 @@ def pagamento_conta_replicar_om(conta_id):
                 raise ValorInvalido("A OM selecionada não existe mais.")
             if om["status"] != "RASCUNHO":
                 raise ValorInvalido("A conta só pode ser replicada para uma OM em rascunho.")
+            duplicidades = _duplicidades_om_conta(conn, conta)
+            if duplicidades and not confirmar_duplicidade:
+                raise ValorInvalido(
+                    "Foi encontrado um lançamento em OM com a mesma data e valor. "
+                    "Revise e confirme explicitamente para replicar."
+                )
             categoria_id = conn.execute(text("""
                 SELECT id FROM financeiro3_categorias
                 WHERE codigo='A_CLASSIFICAR' AND natureza='DESPESA'
@@ -607,3 +642,26 @@ def pagamento_conta_replicar_om(conta_id):
             preparado[3].unlink(missing_ok=True)
         raise
     return redirect(url_for("financeiro_novo.pagamentos_painel"))
+
+
+@bp.get("/perfil-pagamentos/contas/<int:conta_id>/duplicidades-om")
+@login_required
+@permission_required(MODULO, "editar")
+@permission_required("financeiro_novo", "editar")
+def pagamento_conta_duplicidades_om(conta_id):
+    with get_engine().connect() as conn:
+        conta = _conta(conn, conta_id)
+        if not conta:
+            abort(404)
+        duplicidades = _duplicidades_om_conta(conn, conta)
+    return jsonify({
+        "duplicidades": [{
+            "om_id": item["om_id"],
+            "numero_om": item["numero_om"],
+            "item_id": item["item_id"],
+            "numero_linha": item["numero_linha"],
+            "data": item["data_despesa"].strftime("%d/%m/%Y"),
+            "descricao": item["descricao"],
+            "valor": str(item["valor"]),
+        } for item in duplicidades],
+    })
