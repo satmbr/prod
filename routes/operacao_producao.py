@@ -325,6 +325,19 @@ def carregar_dashboard(
         {"eh_id": eh_id, "inicio": inicio, "fim": fim},
     ).mappings().all()
 
+    observacoes = conn.execute(
+        text(
+            """
+            SELECT o.id, o.data, o.observacao, o.frente_id, f.frente
+            FROM operacao_observacao o
+            JOIN frente_equipe f ON f.id = o.frente_id
+            WHERE o.eh_id = :eh_id AND o.data BETWEEN :inicio AND :fim
+            ORDER BY o.data DESC, o.id DESC
+            """
+        ),
+        {"eh_id": eh_id, "inicio": inicio, "fim": fim},
+    ).mappings().all()
+
     patio = conn.execute(
         text(
             """
@@ -431,6 +444,7 @@ def carregar_dashboard(
         "saldo_inicial": saldos,
         "diario": diario,
         "impactos": impactos,
+        "observacoes": observacoes,
         "patio": patio,
         "parte_diaria": parte_diaria,
         "patio_totais": patio_totais,

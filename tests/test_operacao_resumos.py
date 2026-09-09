@@ -84,6 +84,25 @@ class ResumoProducaoTests(unittest.TestCase):
         self.assertIn("Chuva forte", tabela[0]["observacoes"])
         self.assertIn("45 min", tabela[0]["observacoes"])
 
+    def test_impacto_e_observacao_usam_linhas_separadas(self):
+        impacto = {
+            "eh_id": 1,
+            "data": date(2026, 1, 1),
+            "frente": "01 - Renovação",
+            "descricao": "Chuva forte",
+            "minutos_perdidos": 45,
+        }
+        observacao = {
+            "eh_id": 1,
+            "data": date(2026, 1, 1),
+            "frente": "01 - Renovação",
+            "observacao": "Equipe liberada às 08h",
+        }
+        tabela = _montar_tabela_diaria(self.linhas(), [impacto], [observacao])
+        self.assertIn("Impacto", tabela[0]["observacoes"])
+        self.assertEqual(len(tabela[0]["complementos"]), 1)
+        self.assertIn("Equipe liberada", tabela[0]["complementos"][0])
+
 
 class ResumoMaquinasTests(unittest.TestCase):
     def test_classifica_atividades_com_acentos_e_variacoes(self):
@@ -143,6 +162,43 @@ class ResumoTemplateTests(unittest.TestCase):
         self.assertIn('backgroundColor:null', self.template)
         self.assertIn('.resumo-page canvas, .resumo-page table', self.template)
         self.assertIn("ClipboardItem", self.template)
+
+    def test_graficos_permitam_alternar_valores_de_linhas_e_barras(self):
+        self.assertIn("$showLineValues", self.template)
+        self.assertIn("$showBarValues", self.template)
+        self.assertIn("Ligar ou desligar valores das linhas", self.template)
+        self.assertIn("Ligar ou desligar valores das barras", self.template)
+
+    def test_cartoes_e_kpis_tambem_podem_ser_copiados(self):
+        self.assertIn(".resumo-page .kpi, .resumo-page .plan-card", self.template)
+        self.assertIn("card-copy-host", self.template)
+
+    def test_tabela_de_atividades_alinha_nome_a_esquerda_e_numeros_ao_centro(self):
+        self.assertIn("activity-table", self.template)
+        self.assertIn("activity-name-value", self.template)
+        self.assertIn("text-align:left !important", self.template)
+
+
+class RegistroObservacoesTests(unittest.TestCase):
+    def setUp(self):
+        raiz = Path(__file__).resolve().parents[1]
+        self.registro = (raiz / "templates" / "operacao" / "registro.html").read_text(encoding="utf-8")
+        self.rotas = (raiz / "routes" / "operacao.py").read_text(encoding="utf-8")
+        self.migracao = (raiz / "migrations" / "019_operacao_observacoes.sql").read_text(encoding="utf-8")
+
+    def test_registro_possui_formulario_de_observacao(self):
+        self.assertIn("Observações para o resumo", self.registro)
+        self.assertIn("operacao.producao_observacao_create", self.registro)
+        self.assertIn('name="observacao"', self.registro)
+
+    def test_rotas_criam_e_excluem_observacoes(self):
+        self.assertIn("def producao_observacao_create", self.rotas)
+        self.assertIn("def producao_observacao_delete", self.rotas)
+
+    def test_migracao_vincula_observacao_a_eh_e_frente(self):
+        self.assertIn("CREATE TABLE IF NOT EXISTS operacao_observacao", self.migracao)
+        self.assertIn("REFERENCES entre_house", self.migracao)
+        self.assertIn("REFERENCES frente_equipe", self.migracao)
 
 
 if __name__ == "__main__":

@@ -63,6 +63,19 @@
     .copy-image-btn:hover { opacity:1; background:#edf3f8; border-color:#9eb3c7; }
     .copy-image-btn.copied { color:var(--green); border-color:#8fc7aa; }
     .copy-image-btn.failed { color:var(--red); border-color:#e0a29d; }
+    .chart-image-controls { position:absolute; top:2px; right:2px; z-index:6; display:flex; gap:3px; }
+    .chart-image-controls .copy-image-btn { position:static; }
+    .value-toggle-btn { width:21px; height:21px; padding:0; border:1px solid #cbd8e5; border-radius:5px; background:rgba(255,255,255,.92); color:var(--navy); font-size:11px; line-height:19px; cursor:pointer; opacity:.78; }
+    .value-toggle-btn:hover { opacity:1; background:#edf3f8; }
+    .value-toggle-btn.off { opacity:.35; text-decoration:line-through; }
+    .card-copy-host { position:relative; }
+    .card-copy-host > .copy-image-btn { top:5px; right:5px; }
+    .kpi.card-copy-host { padding-right:34px; }
+    .plan-card.card-copy-host .plan-head { padding-right:24px; }
+    .summary-table tr.supplement-row td { color:#60758a; background:#fbfcfe; border-top:0; }
+    .activity-table { table-layout:fixed; }
+    .activity-table th,.activity-table td { text-align:center !important; }
+    .activity-table td.activity-name-value { text-align:left !important; white-space:normal; }
     @media(max-width:1100px){.kpi-grid{grid-template-columns:repeat(3,1fr)}}
     @media(max-width:760px){.summary-config,.grid-2,.front-result-grid{grid-template-columns:1fr}.kpi-grid{grid-template-columns:repeat(2,1fr)}}
     @media print {
@@ -200,6 +213,12 @@
               <td>{% if item.atraso_dias is not none %}{{ '%+.2f'|format(item.atraso_dias)|replace('.', ',') }}{% else %}—{% endif %}</td>
               <td class="observations">{{ item.observacoes or '—' }}</td>
             </tr>
+            {% for complemento in item.complementos %}
+            <tr class="supplement-row">
+              <td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>
+              <td class="observations">{{ complemento }}</td>
+            </tr>
+            {% endfor %}
           {% endfor %}
           </tbody>
           <tfoot>
@@ -256,7 +275,7 @@
       {% endif %}
       {% if r.parte_diaria.atividades %}
       <div class="grid-2" style="margin-top:12px">
-        <div class="panel"><div class="panel-title">Principais atividades e eventos por tempo</div><div class="table-scroll"><table class="table summary-table"><thead><tr><th class="left">Máquina / atividade</th><th>Ocorrências</th><th>Tempo</th></tr></thead><tbody>{% for item in r.parte_diaria.atividades %}<tr><td class="left"><strong>{{ item.maquina }}</strong><br>{{ item.atividade }}</td><td>{{ item.ocorrencias }}</td><td>{{ '%.1f'|format(item.horas) }} h</td></tr>{% endfor %}</tbody></table></div></div>
+        <div class="panel"><div class="panel-title">Principais atividades e eventos por tempo</div><div class="table-scroll"><table class="table summary-table activity-table"><colgroup><col style="width:60%"><col style="width:20%"><col style="width:20%"></colgroup><thead><tr><th>Máquina / atividade</th><th>Ocorrências</th><th>Tempo</th></tr></thead><tbody>{% for item in r.parte_diaria.atividades %}<tr><td class="activity-name-value"><strong>{{ item.maquina }}</strong><br>{{ item.atividade }}</td><td>{{ item.ocorrencias }}</td><td>{{ '%.1f'|format(item.horas) }} h</td></tr>{% endfor %}</tbody></table></div></div>
         <div class="panel"><div class="panel-title">Tempos diários e velocidade executada</div><div class="table-scroll"><table class="table summary-table"><thead><tr><th>Data</th><th class="left">Máquina</th><th>Total</th><th>Renovação</th><th>Corretiva</th><th>Preventiva</th><th>Velocidade</th></tr></thead><tbody>{% for item in r.parte_diaria.serie %}<tr><td>{{ item.data[8:10] }}/{{ item.data[5:7] }}/{{ item.data[0:4] }}</td><td class="left">{{ item.maquina }}</td><td>{{ '%.1f'|format(item.total / 60) }} h</td><td>{{ '%.1f'|format(item.producao / 60) }} h</td><td>{{ '%.1f'|format(item.corretiva / 60) }} h</td><td>{{ '%.1f'|format(item.preventiva / 60) }} h</td><td>{{ '%.1f'|format(item.velocidade) }}/h</td></tr>{% endfor %}</tbody></table></div></div>
       </div>
       {% endif %}
@@ -311,7 +330,23 @@
         blob = await canvasToBlob(target);
       } else {
         if (typeof html2canvas !== "function") throw new Error("Conversor de imagem indisponível.");
-        const canvas = await html2canvas(target, {backgroundColor:null, scale:2, useCORS:true, logging:false});
+        const copyId = `copy-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+        target.dataset.copyImageId = copyId;
+        const canvas = await html2canvas(target, {
+          backgroundColor:null,
+          scale:2,
+          useCORS:true,
+          logging:false,
+          ignoreElements:element => element.classList && (element.classList.contains("copy-image-btn") || element.classList.contains("chart-image-controls")),
+          onclone:documentClone => {
+            const clonedTarget = documentClone.querySelector(`[data-copy-image-id="${copyId}"]`);
+            if (clonedTarget) {
+              clonedTarget.style.background = "transparent";
+              clonedTarget.style.boxShadow = "none";
+            }
+          }
+        });
+        delete target.dataset.copyImageId;
         blob = await canvasToBlob(canvas);
       }
       if (!navigator.clipboard || typeof ClipboardItem === "undefined") throw new Error("Cópia de imagem não suportada neste navegador.");
@@ -331,10 +366,7 @@
       }, 2200);
     }
   }
-  document.querySelectorAll(".resumo-page canvas, .resumo-page table").forEach(target => {
-    const host = target.tagName === "CANVAS" ? target.closest(".chart-box") : target.closest(".table-scroll");
-    if (!host) return;
-    host.classList.add("copy-host");
+  function createCopyButton(target) {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "copy-image-btn print-hide";
@@ -342,7 +374,44 @@
     button.title = "Copiar como imagem PNG transparente";
     button.setAttribute("aria-label", button.title);
     button.addEventListener("click", () => copyElementAsImage(target, button));
-    host.prepend(button);
+    return button;
+  }
+  function createValueToggle(target, kind, symbol, title) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "value-toggle-btn print-hide";
+    button.textContent = symbol;
+    button.title = title;
+    button.setAttribute("aria-label", title);
+    button.addEventListener("click", () => {
+      const chart = window.Chart && Chart.getChart(target);
+      if (!chart) return;
+      const stateName = kind === "line" ? "$showLineValues" : "$showBarValues";
+      chart[stateName] = chart[stateName] === false;
+      button.classList.toggle("off", chart[stateName] === false);
+      chart.draw();
+    });
+    return button;
+  }
+  document.querySelectorAll(".resumo-page canvas, .resumo-page table, .resumo-page .kpi, .resumo-page .plan-card").forEach(target => {
+    const isCanvas = target.tagName === "CANVAS";
+    const isTable = target.tagName === "TABLE";
+    const host = isCanvas ? target.closest(".chart-box") : (isTable ? target.closest(".table-scroll") : target);
+    if (!host) return;
+    if (isCanvas || isTable) host.classList.add("copy-host");
+    else host.classList.add("card-copy-host");
+    if (isCanvas) {
+      const controls = document.createElement("div");
+      controls.className = "chart-image-controls print-hide";
+      controls.append(
+        createValueToggle(target, "line", "⌁", "Ligar ou desligar valores das linhas"),
+        createValueToggle(target, "bar", "▥", "Ligar ou desligar valores das barras"),
+        createCopyButton(target)
+      );
+      host.prepend(controls);
+    } else {
+      host.prepend(createCopyButton(target));
+    }
   });
 </script>
 
@@ -363,6 +432,9 @@
       ctx.font = `${options.fontSize || 9}px Arial`;
       chart.data.datasets.forEach((dataset, datasetIndex) => {
         if (dataset.showValues === false) return;
+        const datasetType = dataset.type || chart.config.type;
+        if (datasetType === "line" && chart.$showLineValues === false) return;
+        if (datasetType === "bar" && chart.$showBarValues === false) return;
         const meta = chart.getDatasetMeta(datasetIndex);
         if (meta.hidden) return;
         meta.data.forEach((element, index) => {

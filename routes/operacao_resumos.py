@@ -260,7 +260,7 @@ def _resumir_producao(rows, finalizada_ids):
     }
 
 
-def _montar_tabela_diaria(rows, impactos):
+def _montar_tabela_diaria(rows, impactos, observacoes_registradas=None):
     """Monta uma linha por EH e dia, mantendo acumulados independentes por plano."""
     por_plano = {}
     for row in rows:
@@ -272,10 +272,14 @@ def _montar_tabela_diaria(rows, impactos):
         dia["planejado"] += _float(row["planejado"])
         dia["realizado"] += _float(row["realizado"])
 
-    observacoes = defaultdict(list)
+    anotacoes = defaultdict(list)
     for impacto in impactos:
-        observacoes[(int(impacto["eh_id"]), impacto["data"])].append(
-            f'{impacto["frente"]}: {impacto["descricao"]} ({int(impacto["minutos_perdidos"] or 0)} min)'
+        anotacoes[(int(impacto["eh_id"]), impacto["data"])].append(
+            f'Impacto — {impacto["frente"]}: {impacto["descricao"]} ({int(impacto["minutos_perdidos"] or 0)} min)'
+        )
+    for observacao in observacoes_registradas or []:
+        anotacoes[(int(observacao["eh_id"]), observacao["data"])].append(
+            f'Observação — {observacao["frente"]}: {observacao["observacao"]}'
         )
 
     tabela = []
@@ -294,6 +298,7 @@ def _montar_tabela_diaria(rows, impactos):
             acumulado_planejado += valores["planejado"]
             acumulado_realizado += valores["realizado"]
             diferenca = acumulado_realizado - acumulado_planejado
+            textos = anotacoes.get((eh_id, data_atual), [])
             tabela.append(
                 {
                     "data": data_atual,
@@ -305,7 +310,8 @@ def _montar_tabela_diaria(rows, impactos):
                     "realizado_total": acumulado_realizado,
                     "diferenca": diferenca,
                     "atraso_dias": diferenca / media_planejada if media_planejada else None,
-                    "observacoes": " · ".join(observacoes.get((eh_id, data_atual), [])),
+                    "observacoes": textos[0] if textos else "",
+                    "complementos": textos[1:],
                 }
             )
             data_atual += timedelta(days=1)
@@ -330,6 +336,30 @@ def _impactos(conn, eh_ids, frente_ids, inicio, fim):
               AND i.frente_id IN ({frentes_sql})
               AND i.data BETWEEN :inicio AND :fim
             ORDER BY i.data DESC, i.minutos_perdidos DESC, i.id DESC
+            """
+        ),
+        params,
+    ).mappings().all()
+
+
+def _observacoes(conn, eh_ids, frente_ids, inicio, fim):
+    if not inicio or not fim:
+        return []
+    params = {"inicio": inicio, "fim": fim}
+    ehs_sql = _clausula_in("observacao_eh", eh_ids, params)
+    frentes_sql = _clausula_in("observacao_frente", frente_ids, params)
+    return conn.execute(
+        text(
+            f"""
+            SELECT o.id, o.data, o.eh_id, o.frente_id, o.observacao,
+                   e.eh, f.frente
+            FROM operacao_observacao o
+            JOIN entre_house e ON e.id = o.eh_id
+            JOIN frente_equipe f ON f.id = o.frente_id
+            WHERE o.eh_id IN ({ehs_sql})
+              AND o.frente_id IN ({frentes_sql})
+              AND o.data BETWEEN :inicio AND :fim
+            ORDER BY o.data, o.id
             """
         ),
         params,
@@ -497,7 +527,8 @@ def carregar_resumo(conn, eh_ids=None, frente_ids=None, maquina_ids=None, inclui
     producao_rows = _producao(conn, eh_ids, frente_ids)
     producao = _resumir_producao(producao_rows, finalizada_ids)
     impactos = _impactos(conn, eh_ids, frente_ids, producao["inicio"], producao["fim"])
-    producao["tabela"] = _montar_tabela_diaria(producao_rows, impactos)
+    observacoes = _observacoes(conn, eh_ids, frente_ids, producao["inicio"], producao["fim"])
+    producao["tabela"] = _montar_tabela_diaria(producao_rows, impactos, observacoes)
     parte_diaria = _parte_diaria(
         conn, maquina_ids if incluir_parte_diaria else [], producao["inicio"], producao["fim"], producao["renovacao_por_data"]
     )
@@ -509,6 +540,7 @@ def carregar_resumo(conn, eh_ids=None, frente_ids=None, maquina_ids=None, inclui
         {
             "producao": producao,
             "impactos": impactos,
+            "observacoes": observacoes,
             "impacto_horas": sum(_float(item["minutos_perdidos"]) for item in impactos) / 60.0,
             "impacto_grafico": {
                 "labels": [dict(CATEGORIAS_IMPACTO).get(codigo, codigo) for codigo in impacto_por_categoria],

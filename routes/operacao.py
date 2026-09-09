@@ -1151,6 +1151,70 @@ def producao_impacto_delete(impacto_id):
     return _redirecionar_registro_controles(eh_id)
 
 
+@bp.route("/registro/observacoes", methods=["POST"])
+@login_required
+@permission_required("operacao", "criar")
+def producao_observacao_create():
+    eh_id = request.form.get("eh_id")
+    frente_id = request.form.get("frente_id")
+    data_observacao = _data_iso_ou_none(request.form.get("data"))
+    observacao = (request.form.get("observacao") or "").strip()
+    if (
+        not eh_id
+        or not str(eh_id).isdigit()
+        or not frente_id
+        or not str(frente_id).isdigit()
+        or not data_observacao
+        or not observacao
+    ):
+        flash("Preencha data, frente e observação.", "warning")
+        return _redirecionar_registro_controles(eh_id, data_observacao)
+
+    with get_engine().begin() as conn:
+        frente_valida = conn.execute(
+            text(
+                """
+                SELECT 1
+                FROM frente_equipe
+                WHERE id = :frente_id AND COALESCE(escopo, 'EH') = 'EH'
+                """
+            ),
+            {"frente_id": frente_id},
+        ).scalar()
+        if not frente_valida:
+            flash("Selecione uma frente válida da EH.", "warning")
+            return _redirecionar_registro_controles(eh_id, data_observacao)
+        conn.execute(
+            text(
+                """
+                INSERT INTO operacao_observacao
+                    (data, eh_id, frente_id, observacao, criado_por)
+                VALUES (:data, :eh_id, :frente_id, :observacao, :usuario)
+                """
+            ),
+            {
+                "data": data_observacao,
+                "eh_id": eh_id,
+                "frente_id": frente_id,
+                "observacao": observacao,
+                "usuario": session.get("usuario_id"),
+            },
+        )
+    flash("Observação operacional registrada.", "success")
+    return _redirecionar_registro_controles(eh_id, data_observacao)
+
+
+@bp.route("/registro/observacoes/<int:observacao_id>/excluir", methods=["POST"])
+@login_required
+@permission_required("operacao", "excluir")
+def producao_observacao_delete(observacao_id):
+    eh_id = request.form.get("eh_id")
+    with get_engine().begin() as conn:
+        conn.execute(text("DELETE FROM operacao_observacao WHERE id = :id"), {"id": observacao_id})
+    flash("Observação operacional excluída.", "success")
+    return _redirecionar_registro_controles(eh_id)
+
+
 @bp.route("/registro/patio", methods=["POST"])
 @login_required
 @permission_required("operacao", "criar")
