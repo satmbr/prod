@@ -124,6 +124,26 @@ class ResumoTemplateTests(unittest.TestCase):
         self.assertIn('id="chart-parte-tempos"', self.template)
         self.assertIn('id="chart-parte-velocidade"', self.template)
 
+    def test_usa_paleta_do_site_e_resultado_por_frente_compacto(self):
+        self.assertNotIn("rgba(110,173,69", self.template)
+        self.assertNotIn("rgba(240,122,41", self.template)
+        self.assertIn("front-result-grid", self.template)
+        self.assertIn("#16324f", self.template)
+        self.assertIn("#246b9e", self.template)
+        self.assertIn("#0f8b8d", self.template)
+
+    def test_tabelas_centralizadas_sem_barra_de_rolagem(self):
+        self.assertIn("overflow:visible", self.template)
+        self.assertIn("text-align:center", self.template)
+        self.assertNotIn("max-height:470px", self.template)
+
+    def test_graficos_tem_valores_e_todos_os_elementos_podem_ser_copiados(self):
+        self.assertIn("valueLabelsPlugin", self.template)
+        self.assertIn("copyElementAsImage", self.template)
+        self.assertIn('backgroundColor:null', self.template)
+        self.assertIn('.resumo-page canvas, .resumo-page table', self.template)
+        self.assertIn("ClipboardItem", self.template)
+
 
 if __name__ == "__main__":
     unittest.main()

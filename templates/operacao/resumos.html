@@ -31,12 +31,12 @@
     .panel { border:1px solid #d9e2ec; border-radius:9px; background:#fff; padding:11px; }
     .panel-title { color:var(--navy); font-size:12px; font-weight:800; margin-bottom:9px; }
     .chart-box { position:relative; height:300px; }
-    .table-scroll { overflow:auto; max-height:470px; }
+    .table-scroll { overflow:visible; max-height:none; }
     .summary-table { width:100%; border-collapse:collapse; }
-    .summary-table th,.summary-table td { padding:7px 6px !important; font-size:10px !important; text-align:right; white-space:nowrap; }
-    .summary-table th:first-child,.summary-table td:first-child,.summary-table .left { text-align:left; }
+    .summary-table th,.summary-table td { padding:7px 6px !important; font-size:10px !important; text-align:center; white-space:normal; vertical-align:middle; }
+    .summary-table th:first-child,.summary-table td:first-child,.summary-table .left { text-align:center; }
     .summary-table thead th { position:sticky; top:0; z-index:1; background:#edf3f8; color:var(--navy); }
-    .summary-table .observations { min-width:260px; white-space:normal; text-align:left; }
+    .summary-table .observations { min-width:220px; white-space:normal; text-align:center; }
     .summary-table tr.weekend-row { background:#f8fafc; }
     .summary-table tfoot th,.summary-table tfoot td { background:#edf3f8; color:var(--navy); font-weight:800; }
     .plan-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(265px,1fr)); gap:10px; }
@@ -56,8 +56,15 @@
     .alert-banner { border:1px solid #efb4ae; background:#fff5f4; color:#8e241d; padding:10px 12px; border-radius:8px; }
     .section-note { color:#60758a; font-size:10px; font-weight:400; margin-left:6px; }
     .impact-total { color:#9a5e09; font-weight:800; }
+    .front-result-grid { display:grid; grid-template-columns:minmax(0,.9fr) minmax(340px,1.1fr); gap:12px; align-items:start; }
+    .front-result-grid .chart-box { height:235px; }
+    .copy-host { position:relative; padding-top:25px; }
+    .copy-image-btn { position:absolute; top:2px; right:2px; z-index:5; width:21px; height:21px; padding:0; border:1px solid #cbd8e5; border-radius:5px; background:rgba(255,255,255,.92); color:var(--navy); font-size:12px; line-height:19px; cursor:pointer; opacity:.72; }
+    .copy-image-btn:hover { opacity:1; background:#edf3f8; border-color:#9eb3c7; }
+    .copy-image-btn.copied { color:var(--green); border-color:#8fc7aa; }
+    .copy-image-btn.failed { color:var(--red); border-color:#e0a29d; }
     @media(max-width:1100px){.kpi-grid{grid-template-columns:repeat(3,1fr)}}
-    @media(max-width:760px){.summary-config,.grid-2{grid-template-columns:1fr}.kpi-grid{grid-template-columns:repeat(2,1fr)}}
+    @media(max-width:760px){.summary-config,.grid-2,.front-result-grid{grid-template-columns:1fr}.kpi-grid{grid-template-columns:repeat(2,1fr)}}
     @media print {
       .summary-config-wrap,.print-hide { display:none !important; }
       .resumo-page .zone { break-inside:avoid; box-shadow:none; }
@@ -209,11 +216,13 @@
   <section class="zone">
     <header class="zone-head"><div class="zone-left"><span class="zone-icon">🛤️</span><div class="zone-title">Resultado por frente</div></div></header>
     <div class="zone-body">
+      <div class="front-result-grid">
       <div class="table-scroll"><table class="table summary-table">
         <thead><tr><th class="left">Frente</th><th>Planejado</th><th>Executado</th><th>Diferença</th><th>Aderência</th></tr></thead>
         <tbody>{% for frente in p.frentes %}<tr><td class="left"><strong>{{ frente.nome }}</strong></td><td>{{ frente.planejado|round|int }}</td><td>{{ frente.realizado|round|int }}</td><td>{{ '{:+,.0f}'.format(frente.diferenca).replace(',', '.') }}</td><td>{{ '%.1f'|format(frente.aderencia) }}%</td></tr>{% else %}<tr><td colspan="5" class="empty">Sem dados para as frentes escolhidas.</td></tr>{% endfor %}</tbody>
       </table></div>
-      {% if p.frentes %}<div class="panel" style="margin-top:12px"><div class="panel-title">Acumulado por frente · planejado, executado e backlog</div><div class="chart-box"><canvas id="chart-frentes-acumulado"></canvas></div></div>{% endif %}
+      {% if p.frentes %}<div class="panel"><div class="panel-title">Acumulado por frente · planejado, executado e backlog</div><div class="chart-box"><canvas id="chart-frentes-acumulado"></canvas></div></div>{% endif %}
+      </div>
     </div>
   </section>
 
@@ -268,6 +277,7 @@
   {% endif %}
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <script>
   const includePart = document.getElementById("include-part");
   const machineList = document.getElementById("machine-list");
@@ -290,6 +300,50 @@
     const sync = () => { if (finished) { finished.disabled = !eh.checked; if (!eh.checked) finished.checked = false; } };
     eh.addEventListener("change", sync); sync();
   });
+
+  function canvasToBlob(canvas) {
+    return new Promise((resolve, reject) => canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error("Falha ao gerar imagem.")), "image/png"));
+  }
+  async function copyElementAsImage(target, button) {
+    try {
+      let blob;
+      if (target.tagName === "CANVAS") {
+        blob = await canvasToBlob(target);
+      } else {
+        if (typeof html2canvas !== "function") throw new Error("Conversor de imagem indisponível.");
+        const canvas = await html2canvas(target, {backgroundColor:null, scale:2, useCORS:true, logging:false});
+        blob = await canvasToBlob(canvas);
+      }
+      if (!navigator.clipboard || typeof ClipboardItem === "undefined") throw new Error("Cópia de imagem não suportada neste navegador.");
+      await navigator.clipboard.write([new ClipboardItem({"image/png":blob})]);
+      button.textContent = "✓";
+      button.classList.add("copied");
+      button.title = "Imagem copiada";
+    } catch (error) {
+      button.textContent = "!";
+      button.classList.add("failed");
+      button.title = error.message || "Não foi possível copiar a imagem";
+    } finally {
+      window.setTimeout(() => {
+        button.textContent = "⧉";
+        button.classList.remove("copied", "failed");
+        button.title = "Copiar como imagem PNG transparente";
+      }, 2200);
+    }
+  }
+  document.querySelectorAll(".resumo-page canvas, .resumo-page table").forEach(target => {
+    const host = target.tagName === "CANVAS" ? target.closest(".chart-box") : target.closest(".table-scroll");
+    if (!host) return;
+    host.classList.add("copy-host");
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "copy-image-btn print-hide";
+    button.textContent = "⧉";
+    button.title = "Copiar como imagem PNG transparente";
+    button.setAttribute("aria-label", button.title);
+    button.addEventListener("click", () => copyElementAsImage(target, button));
+    host.prepend(button);
+  });
 </script>
 
 {% if r.gerado and not r.erro and r.producao.serie %}
@@ -297,32 +351,58 @@
 <script>
   const summaryChart = {{ r.grafico|tojson }};
   const brDate = value => { const p=String(value).split("-"); return p.length===3 ? `${p[2]}/${p[1]}` : value; };
-  const opts = {responsive:true,maintainAspectRatio:false,interaction:{mode:"index",intersect:false},plugins:{legend:{position:"bottom",labels:{boxWidth:12,font:{size:10}}}},scales:{x:{ticks:{font:{size:9},maxRotation:0}},y:{beginAtZero:true,ticks:{font:{size:9}}}}};
+  const formatChartValue = value => new Intl.NumberFormat("pt-BR", {maximumFractionDigits:1}).format(Number(value));
+  const valueLabelsPlugin = {
+    id:"valueLabels",
+    afterDatasetsDraw(chart, _args, options) {
+      if (!options || options.display === false) return;
+      const {ctx} = chart;
+      ctx.save();
+      ctx.textAlign = "center";
+      ctx.textBaseline = "bottom";
+      ctx.font = `${options.fontSize || 9}px Arial`;
+      chart.data.datasets.forEach((dataset, datasetIndex) => {
+        if (dataset.showValues === false) return;
+        const meta = chart.getDatasetMeta(datasetIndex);
+        if (meta.hidden) return;
+        meta.data.forEach((element, index) => {
+          const value = Number(dataset.data[index]);
+          if (!Number.isFinite(value) || (value === 0 && options.skipZero !== false)) return;
+          const position = element.tooltipPosition();
+          ctx.fillStyle = dataset.valueColor || "#16324f";
+          ctx.fillText(formatChartValue(value), position.x, position.y - (dataset.valueOffset ?? 5));
+        });
+      });
+      ctx.restore();
+    }
+  };
+  Chart.register(valueLabelsPlugin);
+  const opts = {responsive:true,maintainAspectRatio:false,layout:{padding:{top:18}},interaction:{mode:"index",intersect:false},plugins:{legend:{position:"bottom",labels:{boxWidth:12,font:{size:10}}},valueLabels:{display:true,fontSize:9}},scales:{x:{ticks:{font:{size:9},maxRotation:0}},y:{beginAtZero:true,ticks:{font:{size:9}}}}};
   new Chart(document.getElementById("chart-diario"),{type:"bar",data:{labels:summaryChart.labels.map(brDate),datasets:[{label:"Planejado",data:summaryChart.planejado,backgroundColor:"rgba(120,145,168,.75)"},{label:"Executado",data:summaryChart.realizado,backgroundColor:"rgba(38,132,91,.82)"}]},options:opts});
   new Chart(document.getElementById("chart-acumulado"),{type:"line",data:{labels:summaryChart.labels.map(brDate),datasets:[{label:"Planejado acumulado",data:summaryChart.planejado_acumulado,borderColor:"#7891a8",borderDash:[5,4],tension:.2},{label:"Executado acumulado",data:summaryChart.realizado_acumulado,borderColor:"#26845b",backgroundColor:"rgba(38,132,91,.12)",fill:true,tension:.2}]},options:opts});
   new Chart(document.getElementById("chart-mesclado"),{type:"bar",data:{labels:summaryChart.labels.map(brDate),datasets:[
-    {type:"bar",label:"Planejado dia",data:summaryChart.planejado,backgroundColor:"rgba(110,173,69,.82)",borderColor:"#4f8f2f",borderWidth:1,yAxisID:"yDia"},
-    {type:"bar",label:"Executado dia",data:summaryChart.realizado,backgroundColor:"rgba(240,122,41,.85)",borderColor:"#d96316",borderWidth:1,yAxisID:"yDia"},
-    {type:"line",label:"Planejado total",data:summaryChart.planejado_acumulado,borderColor:"#7891a8",backgroundColor:"#7891a8",borderWidth:2,tension:.15,pointRadius:2,yAxisID:"yTotal"},
-    {type:"line",label:"Executado total",data:summaryChart.realizado_acumulado,borderColor:"#e0aa00",backgroundColor:"#e0aa00",borderWidth:3,tension:.15,pointRadius:2,yAxisID:"yTotal"}
+    {type:"bar",label:"Planejado dia",data:summaryChart.planejado,backgroundColor:"rgba(120,145,168,.78)",borderColor:"#7891a8",borderWidth:1,yAxisID:"yDia",valueColor:"#526b82"},
+    {type:"bar",label:"Executado dia",data:summaryChart.realizado,backgroundColor:"rgba(38,132,91,.82)",borderColor:"#26845b",borderWidth:1,yAxisID:"yDia",valueColor:"#17623e"},
+    {type:"line",label:"Planejado total",data:summaryChart.planejado_acumulado,borderColor:"#246b9e",backgroundColor:"#246b9e",borderWidth:2,borderDash:[5,4],tension:.15,pointRadius:2,yAxisID:"yTotal",valueColor:"#195c91",valueOffset:12},
+    {type:"line",label:"Executado total",data:summaryChart.realizado_acumulado,borderColor:"#0f8b8d",backgroundColor:"#0f8b8d",borderWidth:3,tension:.15,pointRadius:2,yAxisID:"yTotal",valueColor:"#087174",valueOffset:-5}
   ]},options:{...opts,scales:{x:opts.scales.x,yDia:{beginAtZero:true,position:"left",title:{display:true,text:"Produção diária"},ticks:{font:{size:9}}},yTotal:{beginAtZero:true,position:"right",title:{display:true,text:"Produção acumulada"},grid:{drawOnChartArea:false},ticks:{font:{size:9}}}}}});
   {% if p.frentes %}
   new Chart(document.getElementById("chart-frentes-acumulado"),{type:"bar",data:{labels:summaryChart.frente_labels,datasets:[
-    {label:"Planejado total",data:summaryChart.frente_planejado,backgroundColor:"rgba(110,173,69,.82)"},
-    {label:"Executado total",data:summaryChart.frente_realizado,backgroundColor:"rgba(240,122,41,.85)"},
-    {label:"Backlog",data:summaryChart.frente_backlog,backgroundColor:"rgba(158,165,173,.78)"}
+    {label:"Planejado total",data:summaryChart.frente_planejado,backgroundColor:"rgba(120,145,168,.82)",valueColor:"#526b82"},
+    {label:"Executado total",data:summaryChart.frente_realizado,backgroundColor:"rgba(38,132,91,.84)",valueColor:"#17623e"},
+    {label:"Backlog",data:summaryChart.frente_backlog,backgroundColor:"rgba(183,121,31,.78)",valueColor:"#8a5a00"}
   ]},options:opts});
   {% endif %}
   {% if r.incluir_parte_diaria and r.parte_diaria.serie %}
   const partChart = {{ r.parte_diaria.grafico|tojson }};
   const partLabels = partChart.labels.map(value => { const pieces=String(value).split(" · "); return `${brDate(pieces[0])} · ${pieces[1] || ''}`; });
   new Chart(document.getElementById("chart-parte-tempos"),{type:"bar",data:{labels:partLabels,datasets:[
-    {label:"Renovação",data:partChart.producao,backgroundColor:"#26845b"},
+    {label:"Renovação",data:partChart.producao,backgroundColor:"#246b9e",valueColor:"#195c91"},
     {label:"Corretiva",data:partChart.corretiva,backgroundColor:"#b42318"},
-    {label:"Preventiva",data:partChart.preventiva,backgroundColor:"#d9a025"},
+    {label:"Preventiva",data:partChart.preventiva,backgroundColor:"#b7791f"},
     {label:"Outras atividades",data:partChart.outras,backgroundColor:"#7891a8"}
   ]},options:{...opts,scales:{x:{...opts.scales.x,stacked:true},y:{...opts.scales.y,stacked:true,title:{display:true,text:"Horas"}}}}});
-  new Chart(document.getElementById("chart-parte-velocidade"),{type:"line",data:{labels:partLabels,datasets:[{label:"Velocidade executada (un/h)",data:partChart.velocidade,borderColor:"#246b9e",backgroundColor:"rgba(36,107,158,.14)",fill:true,tension:.2,pointRadius:3}]},options:opts});
+  new Chart(document.getElementById("chart-parte-velocidade"),{type:"line",data:{labels:partLabels,datasets:[{label:"Velocidade executada (un/h)",data:partChart.velocidade,borderColor:"#0f8b8d",backgroundColor:"rgba(15,139,141,.13)",valueColor:"#087174",fill:true,tension:.2,pointRadius:3}]},options:opts});
   {% endif %}
   {% if r.impactos %}
   const impactChart = {{ r.impacto_grafico|tojson }};
