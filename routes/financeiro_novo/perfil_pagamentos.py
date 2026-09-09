@@ -143,7 +143,7 @@ def pagamentos_painel():
         """)).mappings().all()
         contas = conn.execute(text(f"""
             SELECT c.*,p.nome AS perfil_nome,p.matricula,
-              om.numero_om AS numero_om_vinculada,
+              om.numero_om AS numero_om_vinculada,om.status AS om_status_vinculada,
               EXISTS(SELECT 1 FROM financeiro3_pagamento_comprovantes cp
                      WHERE cp.conta_id=c.id AND cp.ativo) AS tem_comprovante,
               (SELECT COUNT(*) FROM financeiro3_pagamento_comprovantes cp
@@ -692,6 +692,81 @@ def pagamento_conta_replicar_om(conta_id):
         if preparado:
             preparado[3].unlink(missing_ok=True)
         raise
+    return redirect(url_for("financeiro_novo.pagamentos_painel"))
+
+
+@bp.post("/perfil-pagamentos/contas/<int:conta_id>/desvincular-om")
+@login_required
+@permission_required(MODULO, "editar")
+@permission_required("financeiro_novo", "editar")
+def pagamento_conta_desvincular_om(conta_id):
+    try:
+        with get_engine().begin() as conn:
+            conta = _conta(conn, conta_id, bloquear=True)
+            if not conta:
+                abort(404)
+            if not conta["om_id"]:
+                raise ValorInvalido("Esta conta não está vinculada a uma OM.")
+
+            om = conn.execute(text("""
+                SELECT id,numero_om,status FROM financeiro3_oms
+                WHERE id=:id AND removido_em IS NULL FOR UPDATE
+            """), {"id": conta["om_id"]}).mappings().first()
+            if not om:
+                raise ValorInvalido("A OM vinculada a esta conta não está mais disponível.")
+
+            item_removido = None
+            if om["status"] == "RASCUNHO" and conta["om_item_id"]:
+                item_anterior = conn.execute(text("""
+                    SELECT * FROM financeiro3_om_itens
+                    WHERE id=:item AND om_id=:om AND status='ATIVO' FOR UPDATE
+                """), {"item": conta["om_item_id"], "om": om["id"]}).mappings().first()
+                if item_anterior:
+                    item_removido = conn.execute(text("""
+                        UPDATE financeiro3_om_itens
+                        SET status='REMOVIDO',removido_por=:usuario,removido_em=NOW()
+                        WHERE id=:item RETURNING *
+                    """), {
+                        "usuario": session.get("usuario_id"),
+                        "item": conta["om_item_id"],
+                    }).mappings().one()
+                    registrar_evento(
+                        conn, entidade="OM_ITEM", entidade_id=conta["om_item_id"],
+                        evento="REMOVIDO_POR_DESVINCULO_PERFIL_PAGAMENTOS",
+                        dados_anteriores=dict(item_anterior), dados_novos=dict(item_removido),
+                    )
+
+            nova_conta = conn.execute(text("""
+                UPDATE financeiro3_pagamento_contas
+                SET om_id=NULL,om_item_id=NULL,atualizado_em=NOW()
+                WHERE id=:id RETURNING *
+            """), {"id": conta_id}).mappings().one()
+            registrar_evento(
+                conn, entidade="PERFIL_PAGAMENTO_CONTA", entidade_id=conta_id,
+                evento="DESVINCULADA_DA_OM", dados_anteriores=dict(conta),
+                dados_novos={
+                    **dict(nova_conta), "om_numero": om["numero_om"],
+                    "om_status": om["status"], "linha_removida": bool(item_removido),
+                },
+            )
+
+        if item_removido:
+            flash(
+                f"Conta {conta['numero']} desvinculada da OM {om['numero_om']}; "
+                "a linha foi removida do rascunho.", "sucesso",
+            )
+        elif om["status"] == "RASCUNHO":
+            flash(
+                f"Conta {conta['numero']} desvinculada da OM {om['numero_om']}; "
+                "a linha vinculada já não estava ativa no rascunho.", "sucesso",
+            )
+        else:
+            flash(
+                f"Conta {conta['numero']} desvinculada da OM {om['numero_om']}. "
+                "A linha da OM foi preservada porque ela não está em rascunho.", "sucesso",
+            )
+    except ValorInvalido as exc:
+        flash(str(exc), "erro")
     return redirect(url_for("financeiro_novo.pagamentos_painel"))
 
 

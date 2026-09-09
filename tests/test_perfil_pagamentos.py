@@ -120,6 +120,18 @@ class PerfilPagamentosConfiguracaoTests(unittest.TestCase):
         self.assertIn("pp-replicate", painel)
         self.assertIn("Replicar linha", painel)
 
+    def test_conta_pode_ser_desvinculada_da_om_com_remocao_condicional(self):
+        routes = (ROOT / "routes" / "financeiro_novo" / "perfil_pagamentos.py").read_text(encoding="utf-8")
+        painel = (ROOT / "templates" / "financeiro_novo" / "pagamentos_painel.html").read_text(encoding="utf-8")
+        self.assertIn('@bp.post("/perfil-pagamentos/contas/<int:conta_id>/desvincular-om")', routes)
+        self.assertIn('om["status"] == "RASCUNHO"', routes)
+        self.assertIn("REMOVIDO_POR_DESVINCULO_PERFIL_PAGAMENTOS", routes)
+        self.assertIn("SET om_id=NULL,om_item_id=NULL", routes)
+        self.assertIn("pp-om-actions-open", painel)
+        self.assertIn("Abrir OM", painel)
+        self.assertIn("Desvincular", painel)
+        self.assertIn("Confirma o desvínculo", painel)
+
     def test_linha_de_om_pode_ser_editada_depois_da_replica(self):
         routes = (ROOT / "routes" / "financeiro_novo" / "missoes.py").read_text(encoding="utf-8")
         detalhe = (ROOT / "templates" / "financeiro_novo" / "om_detalhe.html").read_text(encoding="utf-8")
