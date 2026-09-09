@@ -1,17 +1,21 @@
 import os
 import secrets
 from datetime import date
+from io import BytesIO
 
 from flask import abort, flash, redirect, render_template, request, session, url_for
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
+from werkzeug.datastructures import FileStorage
 
 from db import get_engine
 from routes.auth import login_required, permission_required
 from routes.financeiro_novo import bp
+from routes.financeiro_novo.services.anexos import AnexoInvalido
 from routes.financeiro_novo.services.auditoria import registrar_evento
 from routes.financeiro_novo.services.pagamentos_bucket import (
     PagamentosStorageErro,
+    baixar_arquivo,
     bucket_configurado,
     sincronizar_arquivo_da_conta,
     sincronizar_perfil,
@@ -75,7 +79,8 @@ def pagamentos_painel():
     params = {}
     filtros = []
     if busca:
-        filtros.append("(c.numero ILIKE :busca OR c.descricao ILIKE :busca OR c.numero_om ILIKE :busca OR p.nome ILIKE :busca)")
+        filtros.append("(c.numero ILIKE :busca OR c.descricao ILIKE :busca OR "
+                       "c.numero_om ILIKE :busca OR om.numero_om ILIKE :busca OR p.nome ILIKE :busca)")
         params["busca"] = f"%{busca}%"
     if perfil_id:
         try:
@@ -107,12 +112,14 @@ def pagamentos_painel():
         """)).mappings().all()
         contas = conn.execute(text(f"""
             SELECT c.*,p.nome AS perfil_nome,p.matricula,
+              om.numero_om AS numero_om_vinculada,
               EXISTS(SELECT 1 FROM financeiro3_pagamento_comprovantes cp
                      WHERE cp.conta_id=c.id AND cp.ativo) AS tem_comprovante,
               (SELECT COUNT(*) FROM financeiro3_pagamento_comprovantes cp
                WHERE cp.conta_id=c.id AND cp.ativo) AS quantidade_comprovantes
             FROM financeiro3_pagamento_contas c
             JOIN financeiro3_pagamento_perfis p ON p.id=c.perfil_id
+            LEFT JOIN financeiro3_oms om ON om.id=c.om_id AND om.removido_em IS NULL
             {where}
             ORDER BY (c.status_pagamento='ABERTA' AND c.data_vencimento<CURRENT_DATE) DESC,
                      c.data_vencimento,c.id DESC LIMIT 500
@@ -138,13 +145,23 @@ def pagamentos_painel():
             LEFT JOIN financeiro3_pagamento_perfis p ON p.id=s.perfil_id
             ORDER BY s.id DESC LIMIT 15
         """)).mappings().all()
+        oms_rascunho = conn.execute(text("""
+            SELECT o.id,o.numero_om,o.matricula_favorecido,
+                   p.nome_razao AS favorecido,m.codigo AS moeda,o.valor_total
+            FROM financeiro3_oms o
+            JOIN financeiro3_pessoas p ON p.id=o.solicitante_id
+            JOIN financeiro3_moedas m ON m.id=o.moeda_id
+            WHERE o.status='RASCUNHO' AND o.removido_em IS NULL
+            ORDER BY o.numero_om,o.id
+        """)).mappings().all()
     return render_template(
         "financeiro_novo/pagamentos_painel.html", perfis=perfis, contas=contas,
         resumo=resumo, erros=erros, sincronizacoes=sincronizacoes, busca=busca,
         perfil_id=perfil_id, situacao=situacao, bucket_ativo=bucket_configurado(),
         portal_base_url=_portal_base_url(), portal_url=_portal_url,
         telegram_username=_telegram_username(), telegram_url=_telegram_url,
-        today=date.today(), subnav_links=build_subnav("perfil_pagamentos"),
+        oms_rascunho=oms_rascunho, today=date.today(),
+        subnav_links=build_subnav("perfil_pagamentos"),
     )
 
 
@@ -362,9 +379,11 @@ def pagamentos_sincronizar():
 def pagamento_conta_detalhe(conta_id):
     with get_engine().connect() as conn:
         conta = conn.execute(text("""
-            SELECT c.*,p.nome AS perfil_nome,p.matricula,p.portal_token
+            SELECT c.*,p.nome AS perfil_nome,p.matricula,p.portal_token,
+                   om.numero_om AS numero_om_vinculada
             FROM financeiro3_pagamento_contas c
             JOIN financeiro3_pagamento_perfis p ON p.id=c.perfil_id
+            LEFT JOIN financeiro3_oms om ON om.id=c.om_id AND om.removido_em IS NULL
             WHERE c.id=:id
         """), {"id": conta_id}).mappings().first()
         if not conta:
@@ -467,6 +486,13 @@ def pagamento_conta_reembolso(conta_id):
             anterior = _conta(conn, conta_id, bloquear=True)
             if not anterior:
                 abort(404)
+            if status == "REEMBOLSADA" and anterior["om_id"]:
+                numero_om = conn.execute(text("""
+                    SELECT numero_om FROM financeiro3_oms
+                    WHERE id=:id AND removido_em IS NULL
+                """), {"id": anterior["om_id"]}).scalar()
+                if not numero_om:
+                    raise ValorInvalido("A OM vinculada a esta conta não está mais disponível.")
             novo = conn.execute(text("""
                 UPDATE financeiro3_pagamento_contas SET status_reembolso=:status,
                   numero_om=:om,data_reembolso=:data,reembolso_por=:usuario,
@@ -481,3 +507,103 @@ def pagamento_conta_reembolso(conta_id):
     except ValorInvalido as exc:
         flash(str(exc), "erro")
     return redirect(url_for("financeiro_novo.pagamento_conta_detalhe", conta_id=conta_id))
+
+
+@bp.post("/perfil-pagamentos/contas/<int:conta_id>/replicar-om")
+@login_required
+@permission_required(MODULO, "editar")
+@permission_required("financeiro_novo", "editar")
+def pagamento_conta_replicar_om(conta_id):
+    from routes.financeiro_novo.reembolsos import _preparar_anexo, _vincular_anexo
+
+    preparado = None
+    try:
+        try:
+            om_id = int(request.form.get("om_id") or 0)
+        except ValueError as exc:
+            raise ValorInvalido("Selecione uma OM válida.") from exc
+        if not om_id:
+            raise ValorInvalido("Selecione a OM que receberá esta conta.")
+
+        with get_engine().connect() as conn:
+            origem = conn.execute(text("""
+                SELECT c.*,p.storage_prefix
+                FROM financeiro3_pagamento_contas c
+                JOIN financeiro3_pagamento_perfis p ON p.id=c.perfil_id
+                WHERE c.id=:id
+            """), {"id": conta_id}).mappings().first()
+        if not origem:
+            abort(404)
+        if origem["om_id"]:
+            raise ValorInvalido("Esta conta já foi replicada para uma OM.")
+
+        arquivo = baixar_arquivo(
+            {"id": origem["perfil_id"], "storage_prefix": origem["storage_prefix"]},
+            origem["drive_file_id"],
+        )
+        recibo = FileStorage(
+            stream=BytesIO(arquivo["conteudo"]),
+            filename=origem["drive_nome_atual"],
+            content_type=arquivo["mimeType"],
+        )
+        preparado = _preparar_anexo(recibo)
+
+        with get_engine().begin() as conn:
+            conta = _conta(conn, conta_id, bloquear=True)
+            if not conta:
+                abort(404)
+            if conta["om_id"]:
+                raise ValorInvalido("Esta conta já foi replicada para uma OM.")
+            om = conn.execute(text("""
+                SELECT * FROM financeiro3_oms
+                WHERE id=:id AND removido_em IS NULL FOR UPDATE
+            """), {"id": om_id}).mappings().first()
+            if not om:
+                raise ValorInvalido("A OM selecionada não existe mais.")
+            if om["status"] != "RASCUNHO":
+                raise ValorInvalido("A conta só pode ser replicada para uma OM em rascunho.")
+            categoria_id = conn.execute(text("""
+                SELECT id FROM financeiro3_categorias
+                WHERE codigo='A_CLASSIFICAR' AND natureza='DESPESA'
+            """)).scalar()
+            if not categoria_id:
+                raise ValorInvalido("A categoria temporária A_CLASSIFICAR não está configurada.")
+
+            item = conn.execute(text("""
+                INSERT INTO financeiro3_om_itens
+                  (om_id,data_despesa,centro_custo_id,categoria_id,descricao,valor,criado_por)
+                VALUES (:om,:data,:centro,:categoria,:descricao,:valor,:usuario)
+                RETURNING *
+            """), {
+                "om": om_id,
+                "data": conta["data_documento"],
+                "centro": om["centro_custo_id"],
+                "categoria": categoria_id,
+                "descricao": conta["descricao"],
+                "valor": conta["valor"],
+                "usuario": session.get("usuario_id"),
+            }).mappings().one()
+            anexo_id = _vincular_anexo(conn, preparado, "OM_ITEM", item["id"], "COMPROVANTE")
+            nova_conta = conn.execute(text("""
+                UPDATE financeiro3_pagamento_contas
+                SET om_id=:om,om_item_id=:item,atualizado_em=NOW()
+                WHERE id=:id RETURNING *
+            """), {"om": om_id, "item": item["id"], "id": conta_id}).mappings().one()
+            registrar_evento(
+                conn, entidade="OM_ITEM", entidade_id=item["id"], evento="CRIADO_PELO_PERFIL_PAGAMENTOS",
+                dados_novos={**dict(item), "conta_id": conta_id, "anexo_id": anexo_id},
+            )
+            registrar_evento(
+                conn, entidade="PERFIL_PAGAMENTO_CONTA", entidade_id=conta_id,
+                evento="REPLICADA_PARA_OM", dados_anteriores=dict(conta), dados_novos=dict(nova_conta),
+            )
+        flash(f"Conta {origem['numero']} replicada para a OM {om['numero_om']}.", "sucesso")
+    except (ValorInvalido, PagamentosStorageErro, AnexoInvalido) as exc:
+        if preparado:
+            preparado[3].unlink(missing_ok=True)
+        flash(str(exc), "erro")
+    except Exception:
+        if preparado:
+            preparado[3].unlink(missing_ok=True)
+        raise
+    return redirect(url_for("financeiro_novo.pagamentos_painel"))

@@ -100,7 +100,26 @@ class PerfilPagamentosConfiguracaoTests(unittest.TestCase):
         self.assertIn("financeiro3_pagamento_perfis", migration)
         self.assertIn("financeiro3_pagamento_contas", migration)
         self.assertIn("financeiro3_pagamento_comprovantes", migration)
-        self.assertNotIn("financeiro3_oms", migration + routes + service)
+        self.assertNotIn("financeiro3_oms", migration + service)
+
+    def test_conta_pode_ser_replicada_para_om_em_rascunho(self):
+        migration = (ROOT / "migrations" / "020_perfil_pagamentos_replica_om.sql").read_text(encoding="utf-8")
+        routes = (ROOT / "routes" / "financeiro_novo" / "perfil_pagamentos.py").read_text(encoding="utf-8")
+        painel = (ROOT / "templates" / "financeiro_novo" / "pagamentos_painel.html").read_text(encoding="utf-8")
+        self.assertIn("ADD COLUMN IF NOT EXISTS om_id", migration)
+        self.assertIn("ADD COLUMN IF NOT EXISTS om_item_id", migration)
+        self.assertIn("A_CLASSIFICAR", migration)
+        self.assertIn('@bp.post("/perfil-pagamentos/contas/<int:conta_id>/replicar-om")', routes)
+        self.assertIn("o.status='RASCUNHO'", routes)
+        self.assertIn("CRIADO_PELO_PERFIL_PAGAMENTOS", routes)
+        self.assertIn("pp-replicate", painel)
+        self.assertIn("Replicar linha", painel)
+
+    def test_linha_de_om_pode_ser_editada_depois_da_replica(self):
+        routes = (ROOT / "routes" / "financeiro_novo" / "missoes.py").read_text(encoding="utf-8")
+        detalhe = (ROOT / "templates" / "financeiro_novo" / "om_detalhe.html").read_text(encoding="utf-8")
+        self.assertIn('@bp.post("/oms/<int:om_id>/itens/<int:item_id>/editar")', routes)
+        self.assertIn("om_item_editar", detalhe)
 
     def test_painel_tem_sincronizacao_manual_de_todos_os_perfis(self):
         routes = (ROOT / "routes" / "financeiro_novo" / "perfil_pagamentos.py").read_text(encoding="utf-8")

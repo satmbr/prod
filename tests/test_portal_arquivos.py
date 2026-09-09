@@ -1,10 +1,12 @@
 import os
 import unittest
 from datetime import datetime, timezone
+from io import BytesIO
 from unittest.mock import patch
 
 from routes.financeiro_novo.services.pagamentos_bucket import (
     PagamentosStorageErro,
+    baixar_arquivo,
     configuracao_bucket,
     limpar_nome_arquivo,
     listar_arquivos,
@@ -12,6 +14,9 @@ from routes.financeiro_novo.services.pagamentos_bucket import (
 
 
 class FakeS3:
+    def __init__(self):
+        self.corpo = BytesIO(b"%PDF-1.4\nrecibo")
+
     def list_objects_v2(self, **_params):
         return {"Contents": [
             {
@@ -21,6 +26,9 @@ class FakeS3:
             },
             {"Key": "perfil_pagamentos/7/novas_contas/arquivo-fora-do-padrao.pdf", "Size": 3},
         ]}
+
+    def get_object(self, **_params):
+        return {"Body": self.corpo, "ContentType": "application/pdf"}
 
 
 class PagamentosBucketTests(unittest.TestCase):
@@ -52,6 +60,15 @@ class PagamentosBucketTests(unittest.TestCase):
         self.assertEqual(len(arquivos), 1)
         self.assertEqual(arquivos[0]["id"], "a" * 32)
         self.assertEqual(arquivos[0]["name"], "100,00 hospedagem.pdf")
+
+    def test_baixa_arquivo_para_replica_e_fecha_resposta(self):
+        perfil = {"id": 7, "storage_prefix": "perfil_pagamentos/7"}
+        s3 = FakeS3()
+        with patch("routes.financeiro_novo.services.pagamentos_bucket._s3", return_value=(s3, "bucket")):
+            arquivo = baixar_arquivo(perfil, "a" * 32)
+        self.assertEqual(arquivo["conteudo"], b"%PDF-1.4\nrecibo")
+        self.assertEqual(arquivo["mimeType"], "application/pdf")
+        self.assertTrue(s3.corpo.closed)
 
 
 class PortalIsolamentoTests(unittest.TestCase):

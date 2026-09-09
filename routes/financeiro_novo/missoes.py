@@ -732,6 +732,64 @@ def om_item_novo(om_id):
     return redirect(url_for("financeiro_novo.om_detalhe", om_id=om_id))
 
 
+@bp.post("/oms/<int:om_id>/itens/<int:item_id>/editar")
+@login_required
+@permission_required("financeiro_novo", "editar")
+def om_item_editar(om_id, item_id):
+    try:
+        try:
+            centro_custo_id = int(request.form.get("centro_custo_id") or 0)
+            categoria_id = int(request.form.get("categoria_id") or 0)
+        except ValueError as exc:
+            raise ValorInvalido("Selecione o centro de custo e a categoria.") from exc
+        descricao = (request.form.get("descricao") or "").strip()
+        if not descricao or len(descricao) > 220:
+            raise ValorInvalido("Informe uma descrição com até 220 caracteres.")
+        dados = {
+            "om": om_id,
+            "item": item_id,
+            "data": data_iso(request.form.get("data_despesa"), "Data"),
+            "centro": centro_custo_id,
+            "categoria": categoria_id,
+            "descricao": descricao,
+            "valor": decimal_br(request.form.get("valor"), positivo=True),
+        }
+        with get_engine().begin() as conn:
+            om = _registro(conn, "financeiro3_oms", om_id, True)
+            if not om:
+                abort(404)
+            if om["status"] not in EDITAVEIS:
+                abort(409)
+            anterior = conn.execute(text("""
+                SELECT * FROM financeiro3_om_itens
+                WHERE id=:item AND om_id=:om AND status='ATIVO' FOR UPDATE
+            """), dados).mappings().first()
+            if not anterior:
+                abort(404)
+            referencias = conn.execute(text("""
+                SELECT EXISTS(SELECT 1 FROM financeiro3_centros_custo
+                              WHERE id=:centro AND ativo)
+                   AND EXISTS(SELECT 1 FROM financeiro3_categorias
+                              WHERE id=:categoria AND ativo AND natureza='DESPESA')
+            """), dados).scalar()
+            if not referencias:
+                raise ValorInvalido("Centro de custo ou categoria inválidos.")
+            novo = conn.execute(text("""
+                UPDATE financeiro3_om_itens
+                SET data_despesa=:data,centro_custo_id=:centro,categoria_id=:categoria,
+                    descricao=:descricao,valor=:valor
+                WHERE id=:item AND om_id=:om RETURNING *
+            """), dados).mappings().one()
+            registrar_evento(
+                conn, entidade="OM_ITEM", entidade_id=item_id, evento="EDITADO",
+                dados_anteriores=dict(anterior), dados_novos=dict(novo),
+            )
+        flash("Linha da OM atualizada.", "sucesso")
+    except ValorInvalido as exc:
+        flash(str(exc), "erro")
+    return redirect(url_for("financeiro_novo.om_detalhe", om_id=om_id))
+
+
 @bp.post("/oms/<int:om_id>/itens/<int:item_id>/remover")
 @login_required
 @permission_required("financeiro_novo", "editar")

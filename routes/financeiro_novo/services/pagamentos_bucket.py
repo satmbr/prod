@@ -29,6 +29,7 @@ PASTAS = (
 )
 PASTAS_GRAVAVEIS = {"novas_contas", "comprovantes"}
 PASTAS_EDITAVEIS = PASTAS_GRAVAVEIS | {"contas_com_erro"}
+TAMANHO_MAXIMO_DOWNLOAD = 20 * 1024 * 1024
 
 
 class PagamentosStorageErro(RuntimeError):
@@ -225,6 +226,37 @@ def url_temporaria(perfil: dict | int, arquivo_id: str, *, download=False) -> st
         Params={"Bucket": bucket, "Key": arquivo["key"], "ResponseContentDisposition": disposicao},
         ExpiresIn=300,
     )
+
+
+def baixar_arquivo(perfil: dict | int, arquivo_id: str) -> dict:
+    """Lê um arquivo do portal para uso interno, preservando seus metadados."""
+    arquivo = localizar_arquivo(perfil, arquivo_id)
+    if not arquivo:
+        raise PagamentosStorageErro("Arquivo da conta não encontrado no portal.")
+    s3, bucket = _s3()
+    try:
+        resposta = s3.get_object(Bucket=bucket, Key=arquivo["key"])
+        corpo = resposta["Body"]
+        try:
+            conteudo = corpo.read(TAMANHO_MAXIMO_DOWNLOAD + 1)
+        finally:
+            corpo.close()
+    except PagamentosStorageErro:
+        raise
+    except Exception as exc:
+        raise PagamentosStorageErro(
+            "Não foi possível ler o arquivo da conta no portal."
+        ) from exc
+    if not conteudo:
+        raise PagamentosStorageErro("O arquivo da conta está vazio.")
+    if len(conteudo) > TAMANHO_MAXIMO_DOWNLOAD:
+        raise PagamentosStorageErro("O arquivo da conta excede o limite de 20 MB.")
+    return {
+        **arquivo,
+        "conteudo": conteudo,
+        "mimeType": resposta.get("ContentType") or arquivo.get("mimeType")
+        or "application/octet-stream",
+    }
 
 
 def _registrar_erro(conn, perfil_id: int, arquivo: dict, tipo: str, mensagem: str):
