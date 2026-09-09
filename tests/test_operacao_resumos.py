@@ -166,6 +166,12 @@ class ResumoTemplateTests(unittest.TestCase):
         self.assertIn("text-align:center", self.template)
         self.assertNotIn("max-height:470px", self.template)
 
+    def test_tabela_diaria_pode_ocultar_dias_totalmente_vazios(self):
+        self.assertIn("production-daily-table", self.template)
+        self.assertIn("empty-production-day", self.template)
+        self.assertIn("createEmptyDaysToggle", self.template)
+        self.assertIn("Ocultar dias sem planejamento, execução, observação ou impacto", self.template)
+
     def test_graficos_tem_valores_e_todos_os_elementos_podem_ser_copiados(self):
         self.assertIn("valueLabelsPlugin", self.template)
         self.assertIn("copyElementAsImage", self.template)
