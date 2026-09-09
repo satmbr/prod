@@ -124,8 +124,10 @@ def _finalizar_update(update_id: int, status: str, mensagem: str | None = None):
 def _perfil_por_chat(chat_id: int) -> dict | None:
     with get_engine().connect() as conn:
         perfil = conn.execute(text("""
-            SELECT * FROM financeiro3_pagamento_perfis
-            WHERE telegram_chat_id=:chat AND ativo
+            SELECT p.*,tc.modo AS telegram_modo,tc.chat_nome AS telegram_chat_nome
+            FROM financeiro3_pagamento_telegram_chats tc
+            JOIN financeiro3_pagamento_perfis p ON p.id=tc.perfil_id
+            WHERE tc.chat_id=:chat AND p.ativo
         """), {"chat": chat_id}).mappings().first()
     return dict(perfil) if perfil else None
 
@@ -143,19 +145,21 @@ def _vincular(chat: dict, token: str) -> str:
         """), {"token": token}).mappings().first()
         if not perfil:
             return "Este link de vinculação é inválido ou foi revogado."
-        if perfil["telegram_chat_id"] and perfil["telegram_chat_id"] != chat_id:
-            return "Este perfil já está vinculado a outro chat. Gere um novo vínculo no sistema."
         conn.execute(text(
             "DELETE FROM financeiro3_pagamento_telegram_pendencias WHERE chat_id=:chat"
         ), {"chat": chat_id})
         conn.execute(text("""
-            UPDATE financeiro3_pagamento_perfis
-            SET telegram_chat_id=NULL,telegram_chat_nome=NULL,telegram_modo='NOVAS',atualizado_em=NOW()
-            WHERE telegram_chat_id=:chat AND id<>:id
-        """), {"chat": chat_id, "id": perfil["id"]})
+            INSERT INTO financeiro3_pagamento_telegram_chats
+              (chat_id,perfil_id,chat_nome,modo)
+            VALUES (:chat,:id,:nome,'NOVAS')
+            ON CONFLICT (chat_id) DO UPDATE SET
+              perfil_id=EXCLUDED.perfil_id,chat_nome=EXCLUDED.chat_nome,modo='NOVAS',
+              atualizado_em=NOW()
+        """), {"chat": chat_id, "nome": nome_chat[:200], "id": perfil["id"]})
         conn.execute(text("""
             UPDATE financeiro3_pagamento_perfis
-            SET telegram_chat_id=:chat,telegram_chat_nome=:nome,telegram_modo='NOVAS',
+            SET telegram_chat_id=COALESCE(telegram_chat_id,:chat),
+                telegram_chat_nome=COALESCE(telegram_chat_nome,:nome),
                 atualizado_em=NOW() WHERE id=:id
         """), {"chat": chat_id, "nome": nome_chat[:200], "id": perfil["id"]})
     return (
@@ -171,8 +175,11 @@ def _alterar_modo(chat_id: int, modo: str) -> str:
             "DELETE FROM financeiro3_pagamento_telegram_pendencias WHERE chat_id=:chat"
         ), {"chat": chat_id})
         perfil = conn.execute(text("""
-            UPDATE financeiro3_pagamento_perfis SET telegram_modo=:modo,atualizado_em=NOW()
-            WHERE telegram_chat_id=:chat AND ativo RETURNING nome
+            UPDATE financeiro3_pagamento_telegram_chats tc
+            SET modo=:modo,atualizado_em=NOW()
+            FROM financeiro3_pagamento_perfis p
+            WHERE tc.chat_id=:chat AND p.id=tc.perfil_id AND p.ativo
+            RETURNING p.nome
         """), {"modo": modo, "chat": chat_id}).mappings().first()
     if not perfil:
         return "Este chat ainda não está vinculado. Use o link disponível no perfil de pagamentos."

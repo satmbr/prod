@@ -86,6 +86,15 @@ def _telegram_url(perfil):
     return f"https://t.me/{username}?start={token}" if username and token else None
 
 
+def _telegram_chats(conn, perfil_id):
+    return conn.execute(text("""
+        SELECT chat_id,chat_nome,modo,vinculado_em,atualizado_em
+        FROM financeiro3_pagamento_telegram_chats
+        WHERE perfil_id=:perfil
+        ORDER BY chat_nome,chat_id
+    """), {"perfil": perfil_id}).mappings().all()
+
+
 @bp.get("/perfil-pagamentos")
 @login_required
 @permission_required(MODULO, "visualizar")
@@ -124,7 +133,12 @@ def pagamentos_painel():
             SELECT p.*,
               (SELECT COUNT(*) FROM financeiro3_pagamento_contas c WHERE c.perfil_id=p.id) AS contas,
               (SELECT COUNT(*) FROM financeiro3_pagamento_contas c
-               WHERE c.perfil_id=p.id AND c.status_pagamento='ABERTA') AS abertas
+               WHERE c.perfil_id=p.id AND c.status_pagamento='ABERTA') AS abertas,
+              (SELECT COUNT(*) FROM financeiro3_pagamento_telegram_chats tc
+               WHERE tc.perfil_id=p.id) AS telegram_chats,
+              (SELECT STRING_AGG(tc.chat_nome,', ' ORDER BY tc.chat_nome)
+               FROM financeiro3_pagamento_telegram_chats tc
+               WHERE tc.perfil_id=p.id) AS telegram_chat_nomes
             FROM financeiro3_pagamento_perfis p ORDER BY p.ativo DESC,p.nome
         """)).mappings().all()
         contas = conn.execute(text(f"""
@@ -224,6 +238,7 @@ def pagamento_perfil_novo():
     return render_template(
         "financeiro_novo/pagamento_perfil_form.html", perfil=perfil,
         portal_base_url=_portal_base_url(), telegram_username=_telegram_username(),
+        telegram_chats=[],
         subnav_links=build_subnav("perfil_pagamentos"),
     )
 
@@ -236,6 +251,7 @@ def pagamento_perfil_editar(perfil_id):
         perfil = conn.execute(text(
             "SELECT * FROM financeiro3_pagamento_perfis WHERE id=:id"
         ), {"id": perfil_id}).mappings().first()
+        telegram_chats = _telegram_chats(conn, perfil_id) if perfil else []
     if not perfil:
         abort(404)
     if request.method == "POST":
@@ -268,6 +284,7 @@ def pagamento_perfil_editar(perfil_id):
         "financeiro_novo/pagamento_perfil_form.html", perfil=perfil,
         portal_base_url=_portal_base_url(), portal_url=_portal_url(perfil),
         telegram_username=_telegram_username(), telegram_url=_telegram_url(perfil),
+        telegram_chats=telegram_chats,
         subnav_links=build_subnav("perfil_pagamentos"),
     )
 
@@ -307,14 +324,48 @@ def pagamento_perfil_regenerar_telegram(perfil_id):
             abort(404)
         conn.execute(text("""
             UPDATE financeiro3_pagamento_perfis SET telegram_token=:token,
-              telegram_chat_id=NULL,telegram_chat_nome=NULL,telegram_modo='NOVAS',
               atualizado_por=:usuario,atualizado_em=NOW() WHERE id=:id
         """), {"token": novo_token, "usuario": session.get("usuario_id"), "id": perfil_id})
         registrar_evento(conn, entidade="PERFIL_PAGAMENTO", entidade_id=perfil_id,
                          evento="LINK_TELEGRAM_REGERADO",
-                         dados_anteriores={"telegram_chat": "desvinculado"},
-                         dados_novos={"telegram_token": "gerado"})
-    flash("Novo vínculo do Telegram gerado. O chat anterior foi desvinculado.", "sucesso")
+                         dados_anteriores={"telegram_token": "revogado"},
+                         dados_novos={"telegram_token": "gerado", "chats_preservados": True})
+    flash("Novo link de convite gerado. Os chats já vinculados continuam ativos.", "sucesso")
+    return redirect(url_for("financeiro_novo.pagamento_perfil_editar", perfil_id=perfil_id))
+
+
+@bp.post("/perfil-pagamentos/perfis/<int:perfil_id>/telegram/<int:chat_id>/remover")
+@login_required
+@permission_required(MODULO, "administrar")
+def pagamento_perfil_telegram_remover(perfil_id, chat_id):
+    with get_engine().begin() as conn:
+        chat = conn.execute(text("""
+            DELETE FROM financeiro3_pagamento_telegram_chats
+            WHERE perfil_id=:perfil AND chat_id=:chat
+            RETURNING chat_id,chat_nome,modo
+        """), {"perfil": perfil_id, "chat": chat_id}).mappings().first()
+        if not chat:
+            abort(404)
+        conn.execute(text(
+            "DELETE FROM financeiro3_pagamento_telegram_pendencias WHERE chat_id=:chat"
+        ), {"chat": chat_id})
+        conn.execute(text("""
+            UPDATE financeiro3_pagamento_perfis p SET
+              telegram_chat_id=(SELECT tc.chat_id FROM financeiro3_pagamento_telegram_chats tc
+                                WHERE tc.perfil_id=p.id ORDER BY tc.vinculado_em,tc.chat_id LIMIT 1),
+              telegram_chat_nome=(SELECT tc.chat_nome FROM financeiro3_pagamento_telegram_chats tc
+                                  WHERE tc.perfil_id=p.id ORDER BY tc.vinculado_em,tc.chat_id LIMIT 1),
+              telegram_modo=COALESCE((SELECT tc.modo FROM financeiro3_pagamento_telegram_chats tc
+                                     WHERE tc.perfil_id=p.id ORDER BY tc.vinculado_em,tc.chat_id LIMIT 1),'NOVAS'),
+              atualizado_por=:usuario,atualizado_em=NOW()
+            WHERE p.id=:perfil
+        """), {"perfil": perfil_id, "usuario": session.get("usuario_id")})
+        registrar_evento(
+            conn, entidade="PERFIL_PAGAMENTO", entidade_id=perfil_id,
+            evento="TELEGRAM_DESVINCULADO",
+            dados_anteriores={"chat_id": chat["chat_id"], "chat_nome": chat["chat_nome"]},
+        )
+    flash(f"Telegram {chat['chat_nome']} desvinculado.", "sucesso")
     return redirect(url_for("financeiro_novo.pagamento_perfil_editar", perfil_id=perfil_id))
 
 

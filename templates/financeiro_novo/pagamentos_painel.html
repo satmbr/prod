@@ -33,7 +33,8 @@
         {% for perfil in perfis %}
         <article class="pp-profile {{ 'inactive' if not perfil.ativo else '' }}">
           <div class="pp-profile-head"><div><strong>{{ perfil.nome }}</strong><span>Matrícula {{ perfil.matricula }}</span></div><span class="pp-chip {{ perfil.status_conexao|lower }}">{{ perfil.status_conexao }}</span></div>
-          <div class="pp-profile-metrics"><span><b>{{ perfil.contas }}</b> contas</span><span><b>{{ perfil.abertas }}</b> abertas</span><span>{{ 'Ativo' if perfil.ativo else 'Inativo' }}</span><span>Telegram: {{ perfil.telegram_chat_nome or ('não vinculado' if telegram_username else 'não configurado') }}</span></div>
+          <div class="pp-profile-metrics"><span><b>{{ perfil.contas }}</b> contas</span><span><b>{{ perfil.abertas }}</b> abertas</span><span>{{ 'Ativo' if perfil.ativo else 'Inativo' }}</span><span>Telegram: {% if telegram_username %}<b>{{ perfil.telegram_chats }}</b> chat(s){% else %}não configurado{% endif %}</span></div>
+          {% if perfil.telegram_chat_nomes %}<p class="muted">Chats vinculados: {{ perfil.telegram_chat_nomes }}</p>{% endif %}
           {% if perfil.ultimo_erro %}<p class="pp-error">{{ perfil.ultimo_erro }}</p>{% endif %}
           <p class="muted">Última sincronização: {{ perfil.ultima_sincronizacao_em.strftime('%d/%m/%Y %H:%M') if perfil.ultima_sincronizacao_em else 'Nunca executada' }}</p>
           <div class="pp-actions">

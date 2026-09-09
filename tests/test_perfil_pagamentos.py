@@ -159,6 +159,21 @@ class PerfilPagamentosConfiguracaoTests(unittest.TestCase):
         self.assertIn("Vincular Telegram", painel)
         self.assertNotIn("register_blueprint", bot)
 
+    def test_perfil_aceita_multiplos_chats_do_telegram(self):
+        migration = (ROOT / "migrations" / "021_perfil_pagamentos_multiplos_telegrams.sql").read_text(encoding="utf-8")
+        service = (ROOT / "routes" / "financeiro_novo" / "services" / "pagamentos_telegram.py").read_text(encoding="utf-8")
+        routes = (ROOT / "routes" / "financeiro_novo" / "perfil_pagamentos.py").read_text(encoding="utf-8")
+        form = (ROOT / "templates" / "financeiro_novo" / "pagamento_perfil_form.html").read_text(encoding="utf-8")
+        self.assertIn("financeiro3_pagamento_telegram_chats", migration)
+        self.assertIn("ON CONFLICT (chat_id) DO UPDATE", migration)
+        self.assertIn("FROM financeiro3_pagamento_telegram_chats", service)
+        self.assertIn("INSERT INTO financeiro3_pagamento_telegram_chats", service)
+        self.assertNotIn("Este perfil já está vinculado a outro chat", service)
+        self.assertIn("pagamento_perfil_telegram_remover", routes)
+        self.assertIn("chats_preservados", routes)
+        self.assertIn("Vincular outro Telegram", form)
+        self.assertIn("Telegrams autorizados", form)
+
     def test_telegram_persiste_cadastro_guiado_sem_guardar_arquivo(self):
         migration = (ROOT / "migrations" / "018_telegram_cadastro_guiado.sql").read_text(encoding="utf-8")
         service = (ROOT / "routes" / "financeiro_novo" / "services" / "pagamentos_telegram.py").read_text(encoding="utf-8")
