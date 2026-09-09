@@ -173,6 +173,10 @@ class ResumoTemplateTests(unittest.TestCase):
         self.assertIn(".resumo-page .kpi, .resumo-page .plan-card", self.template)
         self.assertIn("card-copy-host", self.template)
 
+    def test_resultado_consolidado_pode_ser_copiado_em_conjunto(self):
+        self.assertIn("consolidated-kpis", self.template)
+        self.assertIn(".resumo-page .consolidated-kpis", self.template)
+
     def test_tabela_de_atividades_alinha_nome_a_esquerda_e_numeros_ao_centro(self):
         self.assertIn("activity-table", self.template)
         self.assertIn("activity-name-value", self.template)
@@ -190,6 +194,7 @@ class RegistroObservacoesTests(unittest.TestCase):
         self.assertIn("Observações para o resumo", self.registro)
         self.assertIn("operacao.producao_observacao_create", self.registro)
         self.assertIn('name="observacao"', self.registro)
+        self.assertIn('<select name="eh_id" required>', self.registro)
 
     def test_rotas_criam_e_excluem_observacoes(self):
         self.assertIn("def producao_observacao_create", self.rotas)

@@ -405,11 +405,11 @@
           <p class="section-note">Registre informações relevantes que não representam perda de tempo. Elas aparecerão na coluna “Observações / impactos” do Resumo, junto dos impactos da mesma data e frente.</p>
           {% if can_create %}
           <form method="post" action="{{ url_for('operacao.producao_observacao_create') }}">
-            <input type="hidden" name="eh_id" value="{{ d.eh_id }}">
             <div class="control-grid">
+              <label class="field"><span>EH</span><select name="eh_id" required>{% for eh in d.ehs %}<option value="{{ eh.id }}" {{ 'selected' if d.eh_id == eh.id else '' }}>{{ eh.nome }}</option>{% endfor %}</select></label>
               <label class="field"><span>Data</span><input type="date" name="data" value="{{ today }}" required></label>
               <label class="field"><span>Frente</span><select name="frente_id" required><option value="">Selecione</option>{% for frente in d.frentes %}<option value="{{ frente.id }}">{{ frente.frente }}</option>{% endfor %}</select></label>
-              <label class="field" style="grid-column:span 2"><span>Observação</span><textarea name="observacao" required></textarea></label>
+              <label class="field" style="grid-column:1 / -1"><span>Observação</span><textarea name="observacao" required></textarea></label>
             </div>
             <div class="toolbar-actions"><button class="btn primary" type="submit">Registrar observação</button></div>
           </form>

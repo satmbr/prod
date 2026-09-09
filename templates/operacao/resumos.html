@@ -146,7 +146,7 @@
       <div class="zone-left"><span class="zone-icon">📑</span><div class="zone-title">Resultado consolidado <span class="section-note">{% if p.inicio %}{{ p.inicio.strftime('%d/%m/%Y') }} a {{ p.fim.strftime('%d/%m/%Y') }}{% else %}sem período disponível{% endif %}</span></div></div>
     </header>
     <div class="zone-body">
-      <div class="kpi-grid">
+      <div class="kpi-grid consolidated-kpis">
         <div class="kpi"><div class="label">Planejado</div><div class="value">{{ '{:,.0f}'.format(p.kpis.planejado).replace(',', '.') }}</div><div class="sub">total selecionado</div></div>
         <div class="kpi good"><div class="label">Executado</div><div class="value">{{ '{:,.0f}'.format(p.kpis.realizado).replace(',', '.') }}</div><div class="sub">total selecionado</div></div>
         <div class="kpi {{ 'good' if p.kpis.diferenca >= 0 else 'danger' }}"><div class="label">Diferença</div><div class="value">{{ '{:+,.0f}'.format(p.kpis.diferenca).replace(',', '.') }}</div><div class="sub">executado − planejado</div></div>
@@ -393,7 +393,7 @@
     });
     return button;
   }
-  document.querySelectorAll(".resumo-page canvas, .resumo-page table, .resumo-page .kpi, .resumo-page .plan-card").forEach(target => {
+  document.querySelectorAll(".resumo-page canvas, .resumo-page table, .resumo-page .consolidated-kpis, .resumo-page .kpi, .resumo-page .plan-card").forEach(target => {
     const isCanvas = target.tagName === "CANVAS";
     const isTable = target.tagName === "TABLE";
     const host = isCanvas ? target.closest(".chart-box") : (isTable ? target.closest(".table-scroll") : target);
