@@ -279,7 +279,7 @@ def _montar_tabela_diaria(rows, impactos, observacoes_registradas=None):
         )
     for observacao in observacoes_registradas or []:
         anotacoes[(int(observacao["eh_id"]), observacao["data"])].append(
-            f'Observação — {observacao["frente"]}: {observacao["observacao"]}'
+            observacao["observacao"]
         )
 
     tabela = []

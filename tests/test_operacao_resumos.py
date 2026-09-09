@@ -101,7 +101,17 @@ class ResumoProducaoTests(unittest.TestCase):
         tabela = _montar_tabela_diaria(self.linhas(), [impacto], [observacao])
         self.assertIn("Impacto", tabela[0]["observacoes"])
         self.assertEqual(len(tabela[0]["complementos"]), 1)
-        self.assertIn("Equipe liberada", tabela[0]["complementos"][0])
+        self.assertEqual(tabela[0]["complementos"][0], "Equipe liberada às 08h")
+
+    def test_observacao_sem_impacto_aparece_sem_prefixo(self):
+        observacao = {
+            "eh_id": 1,
+            "data": date(2026, 1, 1),
+            "frente": "01 - Renovação",
+            "observacao": "Realizada entrada da P190.",
+        }
+        tabela = _montar_tabela_diaria(self.linhas(), [], [observacao])
+        self.assertEqual(tabela[0]["observacoes"], "Realizada entrada da P190.")
 
 
 class ResumoMaquinasTests(unittest.TestCase):
