@@ -1,9 +1,11 @@
+import hashlib
 import os
+import re
 import secrets
 from datetime import date
 from io import BytesIO
 
-from flask import abort, flash, jsonify, redirect, render_template, request, session, url_for
+from flask import abort, flash, jsonify, redirect, render_template, request, send_file, session, url_for
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from werkzeug.datastructures import FileStorage
@@ -93,6 +95,30 @@ def _telegram_chats(conn, perfil_id):
         WHERE perfil_id=:perfil
         ORDER BY chat_nome,chat_id
     """), {"perfil": perfil_id}).mappings().all()
+
+
+@bp.get("/perfil-pagamentos/telegram/recibos/<token>")
+def pagamento_telegram_recibo_temporario(token):
+    if not re.fullmatch(r"[A-Za-z0-9_-]{32,100}", token):
+        abort(404)
+    token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    with get_engine().connect() as conn:
+        recibo = conn.execute(text("""
+            SELECT ar.object_key,ar.nome_original
+            FROM financeiro3_pagamento_telegram_recibo_tokens t
+            JOIN financeiro3_arquivos ar ON ar.id=t.arquivo_id AND ar.status='ATIVO'
+            WHERE t.token_hash=:token AND t.expira_em>NOW()
+        """), {"token": token_hash}).mappings().first()
+    if not recibo:
+        abort(404)
+    from routes.financeiro_novo.reembolsos import _caminho
+    caminho = _caminho(recibo["object_key"])
+    if not caminho.is_file():
+        abort(404)
+    return send_file(
+        caminho, mimetype="application/pdf", as_attachment=True,
+        download_name=recibo["nome_original"] or "recibo.pdf",
+    )
 
 
 @bp.get("/perfil-pagamentos")

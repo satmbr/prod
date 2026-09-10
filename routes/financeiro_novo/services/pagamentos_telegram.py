@@ -4,6 +4,7 @@ import io
 import json
 import os
 import re
+import secrets
 from datetime import datetime
 from pathlib import Path
 from urllib.error import HTTPError, URLError
@@ -71,6 +72,10 @@ def enviar_mensagem(chat_id: int, mensagem: str, botoes: list[list[str]] | None 
     else:
         dados["reply_markup"] = {"remove_keyboard": True}
     _api("sendMessage", dados)
+
+
+def enviar_documento_url(chat_id: int, url: str, legenda: str) -> None:
+    _api("sendDocument", {"chat_id": chat_id, "document": url, "caption": legenda[:1024]})
 
 
 def _resposta(texto: str, botoes: list[list[str]] | None = None) -> dict:
@@ -218,6 +223,97 @@ def _normalizar_nome_extensao(nome: str, mime: str) -> tuple[str, str]:
     return nome, extensao
 
 
+def _sistema_public_url() -> str:
+    return (os.getenv("SISTEMA_PUBLIC_URL") or
+            "https://prod-production-70de.up.railway.app").strip().rstrip("/")
+
+
+def _duplicidades_om(conn, data_documento, valor, chat_id: int) -> list[dict]:
+    registros = conn.execute(text("""
+        SELECT o.id AS om_id,o.numero_om,o.status AS om_status,
+          i.id AS item_id,i.descricao,i.data_despesa,i.valor,
+          (SELECT COUNT(*) FROM financeiro3_om_itens anterior
+           WHERE anterior.om_id=i.om_id AND anterior.status='ATIVO'
+             AND anterior.id<=i.id) AS numero_linha,
+          recibo.arquivo_id,recibo.nome_original
+        FROM financeiro3_om_itens i
+        JOIN financeiro3_oms o ON o.id=i.om_id
+        LEFT JOIN LATERAL (
+          SELECT a.arquivo_id,ar.nome_original
+          FROM financeiro3_anexos a
+          JOIN financeiro3_arquivos ar ON ar.id=a.arquivo_id AND ar.status='ATIVO'
+          WHERE a.entidade='OM_ITEM' AND a.entidade_id=i.id AND a.status='ATIVO'
+          ORDER BY a.id LIMIT 1
+        ) recibo ON TRUE
+        WHERE i.status='ATIVO' AND o.removido_em IS NULL
+          AND i.data_despesa=:data AND i.valor=:valor
+        ORDER BY o.numero_om,i.id LIMIT 10
+    """), {"data": data_documento, "valor": valor}).mappings().all()
+    if not registros:
+        return []
+
+    conn.execute(text("""
+        DELETE FROM financeiro3_pagamento_telegram_recibo_tokens
+        WHERE expira_em<=NOW()
+    """))
+    urls_por_arquivo = {}
+    resultado = []
+    for registro in registros:
+        item = dict(registro)
+        arquivo_id = item.get("arquivo_id")
+        if arquivo_id and arquivo_id not in urls_por_arquivo:
+            token = secrets.token_urlsafe(32)
+            token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+            conn.execute(text("""
+                INSERT INTO financeiro3_pagamento_telegram_recibo_tokens
+                  (token_hash,arquivo_id,om_item_id,chat_id,expira_em)
+                VALUES (:token,:arquivo,:item,:chat,NOW()+INTERVAL '15 minutes')
+            """), {
+                "token": token_hash, "arquivo": arquivo_id,
+                "item": item["item_id"], "chat": chat_id,
+            })
+            urls_por_arquivo[arquivo_id] = (
+                f"{_sistema_public_url()}/financeiro-novo/perfil-pagamentos/"
+                f"telegram/recibos/{token}"
+            )
+        item["recibo_url"] = urls_por_arquivo.get(arquivo_id)
+        resultado.append(item)
+    return resultado
+
+
+def _alertar_duplicidades(chat_id: int, duplicidades: list[dict]) -> dict:
+    urls_enviadas = set()
+    for item in duplicidades:
+        url = item.get("recibo_url")
+        if not url or url in urls_enviadas:
+            continue
+        urls_enviadas.add(url)
+        legenda = (
+            f"Recibo já existente · OM {item['numero_om']} · linha {item['numero_linha']}\n"
+            f"{item['data_despesa'].strftime('%d/%m/%Y')} · "
+            f"R$ {formatar_valor_nome(item['valor'])} · {item['descricao']}"
+        )
+        try:
+            enviar_documento_url(chat_id, url, legenda)
+        except TelegramErro:
+            enviar_mensagem(chat_id, f"{legenda}\nRecibo temporário: {url}")
+
+    linhas = []
+    for item in duplicidades:
+        recibo = "recibo enviado acima" if item.get("recibo_url") else "sem recibo anexado"
+        linhas.append(
+            f"• OM {item['numero_om']} · linha {item['numero_linha']} · "
+            f"{item['data_despesa'].strftime('%d/%m/%Y')} · "
+            f"R$ {formatar_valor_nome(item['valor'])} · {recibo}"
+        )
+    return _resposta(
+        "Encontrei possível lançamento repetido em OM com a mesma data e valor:\n\n"
+        + "\n".join(linhas)
+        + "\n\nDeseja enviar esta nova conta mesmo assim?",
+        [["ENVIAR MESMO ASSIM", "CANCELAR ENVIO"]],
+    )
+
+
 def _pendencia_por_chat(chat_id: int) -> dict | None:
     with get_engine().begin() as conn:
         conn.execute(text("""
@@ -257,7 +353,8 @@ def _iniciar_pendencia(
               nome_original=EXCLUDED.nome_original,mime_type=EXCLUDED.mime_type,
               tamanho=EXCLUDED.tamanho,extensao=EXCLUDED.extensao,etapa='VALOR',
               valor=NULL,data_documento=NULL,data_vencimento=NULL,descricao=NULL,
-              status_pagamento=NULL,atualizado_em=NOW()
+              status_pagamento=NULL,status_reembolso=NULL,nome_destino=NULL,
+              atualizado_em=NOW()
         """), {
             "chat": int(mensagem["chat"]["id"]), "perfil": perfil["id"],
             "update": update_id, "mensagem": mensagem.get("message_id"),
@@ -269,6 +366,48 @@ def _iniciar_pendencia(
         "1/6 — Qual é o valor da conta?\nExemplo: 254,00\n\n"
         "Use /cancelar para abandonar este cadastro."
     )
+
+
+def _iniciar_confirmacao_estruturada(
+    perfil: dict, mensagem: dict, update_id: int, nome: str,
+    file_id: str, tamanho: int, mime: str, extensao: str, dados,
+) -> list[dict]:
+    chat_id = int(mensagem["chat"]["id"])
+    with get_engine().begin() as conn:
+        duplicidades = _duplicidades_om(
+            conn, dados.data_documento, dados.valor, chat_id,
+        )
+        if not duplicidades:
+            return []
+        conn.execute(text("""
+            INSERT INTO financeiro3_pagamento_telegram_pendencias
+              (chat_id,perfil_id,update_id_arquivo,message_id_arquivo,file_id,
+               nome_original,nome_destino,mime_type,tamanho,extensao,etapa,
+               valor,data_documento,data_vencimento,descricao,
+               status_pagamento,status_reembolso)
+            VALUES (:chat,:perfil,:update,:mensagem,:arquivo,:nome,:destino,:mime,
+                    :tamanho,:extensao,'CONFIRMAR_DUPLICIDADE',:valor,:documento,
+                    :vencimento,:descricao,:pagamento,:reembolso)
+            ON CONFLICT (chat_id) DO UPDATE SET
+              perfil_id=EXCLUDED.perfil_id,update_id_arquivo=EXCLUDED.update_id_arquivo,
+              message_id_arquivo=EXCLUDED.message_id_arquivo,file_id=EXCLUDED.file_id,
+              nome_original=EXCLUDED.nome_original,nome_destino=EXCLUDED.nome_destino,
+              mime_type=EXCLUDED.mime_type,tamanho=EXCLUDED.tamanho,
+              extensao=EXCLUDED.extensao,etapa='CONFIRMAR_DUPLICIDADE',
+              valor=EXCLUDED.valor,data_documento=EXCLUDED.data_documento,
+              data_vencimento=EXCLUDED.data_vencimento,descricao=EXCLUDED.descricao,
+              status_pagamento=EXCLUDED.status_pagamento,
+              status_reembolso=EXCLUDED.status_reembolso,atualizado_em=NOW()
+        """), {
+            "chat": chat_id, "perfil": perfil["id"], "update": update_id,
+            "mensagem": mensagem.get("message_id"), "arquivo": file_id,
+            "nome": nome[:500], "destino": nome[:500], "mime": mime[:120],
+            "tamanho": tamanho, "extensao": extensao, "valor": dados.valor,
+            "documento": dados.data_documento, "vencimento": dados.data_vencimento,
+            "descricao": dados.descricao, "pagamento": dados.status_pagamento,
+            "reembolso": dados.status_reembolso,
+        })
+    return duplicidades
 
 
 def _data_informada(valor: str, rotulo: str):
@@ -312,6 +451,7 @@ def _processar_resposta_pendencia(chat_id: int, resposta: str) -> str | dict:
     if not resposta or resposta.startswith("/"):
         return "Responda à pergunta atual ou use /cancelar."
     finalizar = None
+    duplicidades = None
     with get_engine().begin() as conn:
         pendencia = conn.execute(text("""
             SELECT q.*,p.nome AS perfil_nome,p.storage_prefix,p.ativo
@@ -403,16 +543,48 @@ def _processar_resposta_pendencia(chat_id: int, resposta: str) -> str | dict:
                 "PENDENTE é a opção padrão.",
                 [["PENDENTE", "REEMBOLSADA"]],
             )
-        status_reembolso = resposta.upper()
-        if status_reembolso in {"PADRAO", "PADRÃO"}:
-            status_reembolso = "PENDENTE"
-        if status_reembolso not in {"PENDENTE", "REEMBOLSADA"}:
-            return _resposta(
-                "Status inválido. Escolha PENDENTE ou REEMBOLSADA.",
-                [["PENDENTE", "REEMBOLSADA"]],
+        if etapa == "CONFIRMAR_DUPLICIDADE":
+            escolha = resposta.upper()
+            if escolha == "CANCELAR ENVIO":
+                conn.execute(text("""
+                    DELETE FROM financeiro3_pagamento_telegram_pendencias
+                    WHERE chat_id=:chat
+                """), {"chat": chat_id})
+                return "Envio cancelado. O arquivo não foi incluído em novas_contas."
+            if escolha != "ENVIAR MESMO ASSIM":
+                return _resposta(
+                    "Escolha se deseja enviar a nova conta apesar da possível duplicidade.",
+                    [["ENVIAR MESMO ASSIM", "CANCELAR ENVIO"]],
+                )
+            finalizar = dict(pendencia)
+        elif etapa == "REEMBOLSO":
+            status_reembolso = resposta.upper()
+            if status_reembolso in {"PADRAO", "PADRÃO"}:
+                status_reembolso = "PENDENTE"
+            if status_reembolso not in {"PENDENTE", "REEMBOLSADA"}:
+                return _resposta(
+                    "Status inválido. Escolha PENDENTE ou REEMBOLSADA.",
+                    [["PENDENTE", "REEMBOLSADA"]],
+                )
+            duplicidades = _duplicidades_om(
+                conn, pendencia["data_documento"], pendencia["valor"], chat_id,
             )
-        finalizar = dict(pendencia)
-    nome = _nome_pendencia(finalizar, status_reembolso)
+            if duplicidades:
+                conn.execute(text("""
+                    UPDATE financeiro3_pagamento_telegram_pendencias
+                    SET status_reembolso=:status,etapa='CONFIRMAR_DUPLICIDADE',
+                      atualizado_em=NOW() WHERE chat_id=:chat
+                """), {"status": status_reembolso, "chat": chat_id})
+            else:
+                finalizar = dict(pendencia)
+                finalizar["status_reembolso"] = status_reembolso
+        else:
+            return "Etapa do cadastro inválida. Use /cancelar e envie o arquivo novamente."
+    if duplicidades:
+        return _alertar_duplicidades(chat_id, duplicidades)
+    nome = finalizar.get("nome_destino") or _nome_pendencia(
+        finalizar, finalizar["status_reembolso"],
+    )
     perfil = {"id": finalizar["perfil_id"], "storage_prefix": finalizar["storage_prefix"]}
     identificador = (
         f"telegram:{chat_id}:{finalizar['message_id_arquivo']}:"
@@ -439,11 +611,16 @@ def _receber_arquivo(perfil: dict, mensagem: dict, update_id: int) -> str:
     pasta = "comprovantes" if perfil["telegram_modo"] == "COMPROVANTES" else "novas_contas"
     if pasta == "novas_contas":
         try:
-            interpretar_nome_conta(nome)
+            dados = interpretar_nome_conta(nome)
         except NomeContaInvalido:
             return _iniciar_pendencia(
                 perfil, mensagem, update_id, nome, file_id, tamanho, mime, extensao
             )
+        duplicidades = _iniciar_confirmacao_estruturada(
+            perfil, mensagem, update_id, nome, file_id, tamanho, mime, extensao, dados,
+        )
+        if duplicidades:
+            return _alertar_duplicidades(int(mensagem["chat"]["id"]), duplicidades)
     elif not numero_conta_do_comprovante(nome):
         raise TelegramErro("O comprovante deve começar com o número da conta, como CP-000001.pdf.")
     identificador = (

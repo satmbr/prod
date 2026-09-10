@@ -66,6 +66,7 @@ def create_app():
             "home",
             "health",
             "static",
+            "financeiro_novo.pagamento_telegram_recibo_temporario",
         }
 
         if request.endpoint in rotas_livres or request.endpoint is None:

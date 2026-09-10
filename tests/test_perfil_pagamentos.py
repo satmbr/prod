@@ -195,6 +195,23 @@ class PerfilPagamentosConfiguracaoTests(unittest.TestCase):
         self.assertIn('elif comando == "/cancelar"', service)
         self.assertIn('"max_connections": 1', service)
 
+    def test_telegram_confere_duplicidade_somente_em_oms_e_envia_recibo(self):
+        migration = (ROOT / "migrations" / "022_telegram_duplicidade_om.sql").read_text(encoding="utf-8")
+        service = (ROOT / "routes" / "financeiro_novo" / "services" / "pagamentos_telegram.py").read_text(encoding="utf-8")
+        routes = (ROOT / "routes" / "financeiro_novo" / "perfil_pagamentos.py").read_text(encoding="utf-8")
+        app = (ROOT / "app.py").read_text(encoding="utf-8")
+        self.assertIn("CONFIRMAR_DUPLICIDADE", migration)
+        self.assertIn("financeiro3_pagamento_telegram_recibo_tokens", migration)
+        self.assertIn("FROM financeiro3_om_itens i", service)
+        self.assertIn("i.data_despesa=:data AND i.valor=:valor", service)
+        self.assertNotIn("financeiro3_rd_itens", service)
+        self.assertIn('enviar_documento_url(chat_id, url, legenda)', service)
+        self.assertIn("ENVIAR MESMO ASSIM", service)
+        self.assertIn("CANCELAR ENVIO", service)
+        self.assertIn("pagamento_telegram_recibo_temporario", routes)
+        self.assertIn("t.expira_em>NOW()", routes)
+        self.assertIn('"financeiro_novo.pagamento_telegram_recibo_temporario"', app)
+
 
 if __name__ == "__main__":
     unittest.main()
