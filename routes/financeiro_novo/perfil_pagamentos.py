@@ -19,6 +19,7 @@ from routes.financeiro_novo.services.pagamentos_bucket import (
     PagamentosStorageErro,
     baixar_arquivo,
     bucket_configurado,
+    excluir_arquivo_registrado,
     sincronizar_arquivo_da_conta,
     sincronizar_perfil,
 )
@@ -30,7 +31,8 @@ MODULO = "perfil_pagamentos"
 def _conta(conn, conta_id, *, bloquear=False):
     sufixo = " FOR UPDATE" if bloquear else ""
     return conn.execute(
-        text(f"SELECT * FROM financeiro3_pagamento_contas WHERE id=:id{sufixo}"),
+        text(f"SELECT * FROM financeiro3_pagamento_contas "
+             f"WHERE id=:id AND excluida_em IS NULL{sufixo}"),
         {"id": conta_id},
     ).mappings().first()
 
@@ -129,7 +131,7 @@ def pagamentos_painel():
     perfil_id = (request.args.get("perfil_id") or "").strip()
     situacao = (request.args.get("situacao") or "").strip().upper()
     params = {}
-    filtros = []
+    filtros = ["c.excluida_em IS NULL"]
     if busca:
         filtros.append("(c.numero ILIKE :busca OR c.descricao ILIKE :busca OR "
                        "c.numero_om ILIKE :busca OR om.numero_om ILIKE :busca OR p.nome ILIKE :busca)")
@@ -157,9 +159,11 @@ def pagamentos_painel():
     with get_engine().connect() as conn:
         perfis = conn.execute(text("""
             SELECT p.*,
-              (SELECT COUNT(*) FROM financeiro3_pagamento_contas c WHERE c.perfil_id=p.id) AS contas,
               (SELECT COUNT(*) FROM financeiro3_pagamento_contas c
-               WHERE c.perfil_id=p.id AND c.status_pagamento='ABERTA') AS abertas,
+               WHERE c.perfil_id=p.id AND c.excluida_em IS NULL) AS contas,
+              (SELECT COUNT(*) FROM financeiro3_pagamento_contas c
+               WHERE c.perfil_id=p.id AND c.excluida_em IS NULL
+                 AND c.status_pagamento='ABERTA') AS abertas,
               (SELECT COUNT(*) FROM financeiro3_pagamento_telegram_chats tc
                WHERE tc.perfil_id=p.id) AS telegram_chats,
               (SELECT STRING_AGG(tc.chat_nome,', ' ORDER BY tc.chat_nome)
@@ -189,7 +193,7 @@ def pagamentos_painel():
               COUNT(*) FILTER (WHERE pasta_atual='QUITADAS') AS quitadas,
               COALESCE(SUM(valor) FILTER (WHERE status_pagamento='ABERTA'),0) AS valor_aberto,
               COALESCE(SUM(valor) FILTER (WHERE status_pagamento='ABERTA' AND data_vencimento<CURRENT_DATE),0) AS valor_vencido
-            FROM financeiro3_pagamento_contas
+            FROM financeiro3_pagamento_contas WHERE excluida_em IS NULL
         """)).mappings().one()
         erros = conn.execute(text("""
             SELECT e.*,p.nome AS perfil_nome,p.portal_token
@@ -478,7 +482,7 @@ def pagamento_conta_detalhe(conta_id):
             FROM financeiro3_pagamento_contas c
             JOIN financeiro3_pagamento_perfis p ON p.id=c.perfil_id
             LEFT JOIN financeiro3_oms om ON om.id=c.om_id AND om.removido_em IS NULL
-            WHERE c.id=:id
+            WHERE c.id=:id AND c.excluida_em IS NULL
         """), {"id": conta_id}).mappings().first()
         if not conta:
             abort(404)
@@ -498,6 +502,63 @@ def pagamento_conta_detalhe(conta_id):
         portal_arquivo_url=lambda arquivo_id: _portal_arquivo_url(conta, arquivo_id),
         subnav_links=build_subnav("perfil_pagamentos"),
     )
+
+
+@bp.post("/perfil-pagamentos/contas/<int:conta_id>/excluir")
+@login_required
+@permission_required(MODULO, "administrar")
+def pagamento_conta_excluir(conta_id):
+    try:
+        with get_engine().begin() as conn:
+            conta = _conta(conn, conta_id, bloquear=True)
+            if not conta:
+                abort(404)
+            if conta["om_id"] or conta["om_item_id"]:
+                raise ValorInvalido(
+                    "Desvincule a conta da OM antes de excluí-la."
+                )
+            perfil = conn.execute(text("""
+                SELECT id,storage_prefix FROM financeiro3_pagamento_perfis
+                WHERE id=:id
+            """), {"id": conta["perfil_id"]}).mappings().one()
+            comprovantes = conn.execute(text("""
+                SELECT drive_file_id FROM financeiro3_pagamento_comprovantes
+                WHERE conta_id=:id AND ativo FOR UPDATE
+            """), {"id": conta_id}).mappings().all()
+            arquivos = {conta["drive_file_id"]}
+            arquivos.update(item["drive_file_id"] for item in comprovantes)
+            removidos = sum(
+                excluir_arquivo_registrado(dict(perfil), arquivo_id)
+                for arquivo_id in arquivos if arquivo_id
+            )
+            conn.execute(text("""
+                UPDATE financeiro3_pagamento_comprovantes
+                SET ativo=FALSE,atualizado_em=NOW()
+                WHERE conta_id=:id AND ativo
+            """), {"id": conta_id})
+            nova = conn.execute(text("""
+                UPDATE financeiro3_pagamento_contas
+                SET excluida_em=NOW(),excluida_por=:usuario,
+                  motivo_exclusao='Exclusão manual pelo detalhe da conta',
+                  atualizado_em=NOW()
+                WHERE id=:id RETURNING *
+            """), {
+                "id": conta_id, "usuario": session.get("usuario_id"),
+            }).mappings().one()
+            registrar_evento(
+                conn, entidade="PERFIL_PAGAMENTO_CONTA", entidade_id=conta_id,
+                evento="EXCLUIDA", dados_anteriores=dict(conta),
+                dados_novos={**dict(nova), "arquivos_removidos": removidos},
+                justificativa="Exclusão manual confirmada pelo usuário",
+            )
+        flash(
+            f"Conta {conta['numero']} excluída com seus arquivos do portal.",
+            "sucesso",
+        )
+        return redirect(url_for("financeiro_novo.pagamentos_painel"))
+    except (ValorInvalido, PagamentosStorageErro) as exc:
+        flash(str(exc), "erro")
+        return redirect(url_for("financeiro_novo.pagamento_conta_detalhe", conta_id=conta_id))
 
 
 @bp.post("/perfil-pagamentos/contas/<int:conta_id>/editar")

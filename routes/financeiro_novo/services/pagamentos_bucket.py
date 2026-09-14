@@ -200,6 +200,16 @@ def excluir_arquivo(perfil: dict | int, pasta: str, arquivo_id: str) -> None:
     s3.delete_object(Bucket=bucket, Key=arquivo["key"])
 
 
+def excluir_arquivo_registrado(perfil: dict | int, arquivo_id: str) -> bool:
+    """Exclui um objeto conhecido pelo sistema, inclusive de pastas controladas."""
+    arquivo = localizar_arquivo(perfil, arquivo_id)
+    if not arquivo:
+        return False
+    s3, bucket = _s3()
+    s3.delete_object(Bucket=bucket, Key=arquivo["key"])
+    return True
+
+
 def reenviar_arquivo_erro(perfil: dict, arquivo_id: str, novo_nome: str) -> dict:
     arquivo = localizar_arquivo(perfil, arquivo_id, ["contas_com_erro"])
     if not arquivo:
@@ -355,21 +365,23 @@ def _sincronizar_comprovantes(perfil: dict, contadores: dict):
             conn.execute(text("""
                 UPDATE financeiro3_pagamento_comprovantes cp SET ativo=FALSE,atualizado_em=NOW()
                 FROM financeiro3_pagamento_contas c
-                WHERE cp.conta_id=c.id AND c.perfil_id=:perfil AND cp.ativo
+                WHERE cp.conta_id=c.id AND c.perfil_id=:perfil
+                  AND c.excluida_em IS NULL AND cp.ativo
                   AND NOT (cp.drive_file_id = ANY(:ids))
             """), {"perfil": perfil["id"], "ids": ids_encontrados})
         else:
             conn.execute(text("""
                 UPDATE financeiro3_pagamento_comprovantes cp SET ativo=FALSE,atualizado_em=NOW()
                 FROM financeiro3_pagamento_contas c
-                WHERE cp.conta_id=c.id AND c.perfil_id=:perfil AND cp.ativo
+                WHERE cp.conta_id=c.id AND c.perfil_id=:perfil
+                  AND c.excluida_em IS NULL AND cp.ativo
             """), {"perfil": perfil["id"]})
     for arquivo in arquivos:
         numero = numero_conta_do_comprovante(arquivo["name"])
         with get_engine().begin() as conn:
             conta = conn.execute(text("""
                 SELECT id FROM financeiro3_pagamento_contas
-                WHERE perfil_id=:perfil AND numero=:numero
+                WHERE perfil_id=:perfil AND numero=:numero AND excluida_em IS NULL
             """), {"perfil": perfil["id"], "numero": numero}).mappings().first() if numero else None
             if not conta:
                 _registrar_erro(conn, perfil["id"], arquivo, "COMPROVANTE",
@@ -401,7 +413,8 @@ def _sincronizar_comprovantes(perfil: dict, contadores: dict):
 def _reconciliar_contas(perfil: dict, contadores: dict):
     with get_engine().connect() as conn:
         contas = [dict(item) for item in conn.execute(text("""
-            SELECT * FROM financeiro3_pagamento_contas WHERE perfil_id=:perfil ORDER BY id
+            SELECT * FROM financeiro3_pagamento_contas
+            WHERE perfil_id=:perfil AND excluida_em IS NULL ORDER BY id
         """), {"perfil": perfil["id"]}).mappings().all()]
     for conta in contas:
         if not re.fullmatch(r"[0-9a-f]{32}", conta["drive_file_id"] or ""):
@@ -491,7 +504,7 @@ def sincronizar_arquivo_da_conta(conta_id: int) -> None:
             SELECT c.*,p.storage_prefix,p.id AS perfil_storage_id
             FROM financeiro3_pagamento_contas c
             JOIN financeiro3_pagamento_perfis p ON p.id=c.perfil_id
-            WHERE c.id=:id AND p.ativo
+            WHERE c.id=:id AND c.excluida_em IS NULL AND p.ativo
         """), {"id": conta_id}).mappings().first()
     if not conta:
         return

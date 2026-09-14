@@ -132,6 +132,20 @@ class PerfilPagamentosConfiguracaoTests(unittest.TestCase):
         self.assertIn("Desvincular", painel)
         self.assertIn("Confirma o desvínculo", painel)
 
+    def test_detalhe_permite_excluir_conta_com_auditoria(self):
+        migration = (ROOT / "migrations" / "023_perfil_pagamentos_excluir_conta.sql").read_text(encoding="utf-8")
+        routes = (ROOT / "routes" / "financeiro_novo" / "perfil_pagamentos.py").read_text(encoding="utf-8")
+        service = (ROOT / "routes" / "financeiro_novo" / "services" / "pagamentos_bucket.py").read_text(encoding="utf-8")
+        detalhe = (ROOT / "templates" / "financeiro_novo" / "pagamento_conta_detalhe.html").read_text(encoding="utf-8")
+        self.assertIn("excluida_em TIMESTAMPTZ", migration)
+        self.assertIn('@bp.post("/perfil-pagamentos/contas/<int:conta_id>/excluir")', routes)
+        self.assertIn('evento="EXCLUIDA"', routes)
+        self.assertIn("excluir_arquivo_registrado", routes + service)
+        self.assertIn("c.excluida_em IS NULL", routes + service)
+        self.assertIn("Desvincule a conta da OM antes de excluí-la", routes)
+        self.assertIn("Excluir conta", detalhe)
+        self.assertIn("Confirma a exclusão da conta", detalhe)
+
     def test_linha_de_om_pode_ser_editada_depois_da_replica(self):
         routes = (ROOT / "routes" / "financeiro_novo" / "missoes.py").read_text(encoding="utf-8")
         detalhe = (ROOT / "templates" / "financeiro_novo" / "om_detalhe.html").read_text(encoding="utf-8")
