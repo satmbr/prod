@@ -320,8 +320,18 @@ def _criar_ou_obter_conta(perfil: dict, arquivo: dict, dados) -> tuple[dict, boo
             UPDATE financeiro3_pagamento_contas SET numero=:numero WHERE id=:id RETURNING *
         """), {"numero": numero, "id": conta["id"]}).mappings().one()
         _resolver_erro(conn, perfil["id"], arquivo["id"], "CONTA")
+        envio_telegram = conn.execute(text("""
+            SELECT chat_id,chat_nome,telegram_user_id,telegram_username,
+                   telegram_nome,update_id,message_id,enviado_em
+            FROM financeiro3_pagamento_telegram_envios
+            WHERE drive_file_id=:arquivo
+        """), {"arquivo": arquivo["id"]}).mappings().first()
+        dados_evento = dict(conta)
+        if envio_telegram:
+            dados_evento["origem_telegram"] = dict(envio_telegram)
         registrar_evento(conn, entidade="PERFIL_PAGAMENTO_CONTA", entidade_id=conta["id"],
-                         evento="IMPORTADA_PORTAL", dados_novos=dict(conta))
+                         evento="IMPORTADA_TELEGRAM" if envio_telegram else "IMPORTADA_PORTAL",
+                         dados_novos=dados_evento)
         return dict(conta), True
 
 
@@ -405,9 +415,19 @@ def _sincronizar_comprovantes(perfil: dict, contadores: dict):
             _resolver_erro(conn, perfil["id"], arquivo["id"], "COMPROVANTE")
             if resultado["inserido"]:
                 contadores["comprovantes_novos"] += 1
+                envio_telegram = conn.execute(text("""
+                    SELECT chat_id,chat_nome,telegram_user_id,telegram_username,
+                           telegram_nome,update_id,message_id,enviado_em
+                    FROM financeiro3_pagamento_telegram_envios
+                    WHERE drive_file_id=:arquivo
+                """), {"arquivo": arquivo["id"]}).mappings().first()
+                dados_evento = {"arquivo_id": arquivo["id"], "nome": arquivo["name"]}
+                if envio_telegram:
+                    dados_evento["origem_telegram"] = dict(envio_telegram)
                 registrar_evento(conn, entidade="PERFIL_PAGAMENTO_CONTA", entidade_id=conta["id"],
-                                 evento="COMPROVANTE_LOCALIZADO",
-                                 dados_novos={"arquivo_id": arquivo["id"], "nome": arquivo["name"]})
+                                 evento=("COMPROVANTE_TELEGRAM" if envio_telegram
+                                         else "COMPROVANTE_LOCALIZADO"),
+                                 dados_novos=dados_evento)
 
 
 def _reconciliar_contas(perfil: dict, contadores: dict):

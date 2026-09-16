@@ -35,6 +35,27 @@ class TelegramBotHttpTests(unittest.TestCase):
 
 
 class TelegramBotArquivoTests(unittest.TestCase):
+    def test_identifica_remetente_e_horario_original_do_telegram(self):
+        origem = pagamentos_telegram._origem_telegram(
+            {"telegram_chat_nome": "Chat financeiro"},
+            {
+                "chat": {"id": 123},
+                "from": {
+                    "id": 456, "first_name": "Maria", "last_name": "Silva",
+                    "username": "maria.silva",
+                },
+                "message_id": 789,
+                "date": 0,
+            },
+            999,
+        )
+        self.assertEqual(origem["telegram_nome"], "Maria Silva")
+        self.assertEqual(origem["telegram_username"], "maria.silva")
+        self.assertEqual(origem["chat_nome"], "Chat financeiro")
+        self.assertEqual(origem["update_id"], 999)
+        self.assertEqual(origem["message_id"], 789)
+        self.assertEqual(origem["enviado_em"].isoformat(), "1970-01-01T00:00:00+00:00")
+
     def test_mensagem_com_opcoes_cria_botoes_clicaveis(self):
         with patch.object(pagamentos_telegram, "_api") as api:
             pagamentos_telegram.enviar_mensagem(

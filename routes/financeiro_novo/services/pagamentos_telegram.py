@@ -82,6 +82,31 @@ def _resposta(texto: str, botoes: list[list[str]] | None = None) -> dict:
     return {"texto": texto, "botoes": botoes}
 
 
+def _origem_telegram(perfil: dict, mensagem: dict, update_id: int) -> dict:
+    remetente = mensagem.get("from") or {}
+    chat = mensagem.get("chat") or {}
+    nome = " ".join(filter(None, [
+        remetente.get("first_name"), remetente.get("last_name"),
+    ])).strip()
+    username = (remetente.get("username") or "").strip() or None
+    nome = nome or username or perfil.get("telegram_chat_nome") or str(chat.get("id"))
+    timestamp = mensagem.get("date")
+    enviado_em = (
+        datetime.fromtimestamp(int(timestamp), ZoneInfo("UTC"))
+        if timestamp is not None else datetime.now(ZoneInfo("UTC"))
+    )
+    return {
+        "chat_id": int(chat["id"]),
+        "chat_nome": (perfil.get("telegram_chat_nome") or nome)[:200],
+        "telegram_user_id": remetente.get("id"),
+        "telegram_username": username[:200] if username else None,
+        "telegram_nome": nome[:240],
+        "update_id": update_id,
+        "message_id": mensagem.get("message_id"),
+        "enviado_em": enviado_em,
+    }
+
+
 def _enviar_resposta(chat_id: int, resposta) -> None:
     if isinstance(resposta, dict):
         enviar_mensagem(chat_id, resposta["texto"], resposta.get("botoes"))
@@ -341,17 +366,24 @@ def _iniciar_pendencia(
     perfil: dict, mensagem: dict, update_id: int, nome: str,
     file_id: str, tamanho: int, mime: str, extensao: str,
 ) -> str:
+    origem = _origem_telegram(perfil, mensagem, update_id)
     with get_engine().begin() as conn:
         conn.execute(text("""
             INSERT INTO financeiro3_pagamento_telegram_pendencias
               (chat_id,perfil_id,update_id_arquivo,message_id_arquivo,file_id,
-               nome_original,mime_type,tamanho,extensao,etapa)
-            VALUES (:chat,:perfil,:update,:mensagem,:arquivo,:nome,:mime,:tamanho,:extensao,'VALOR')
+               nome_original,mime_type,tamanho,extensao,etapa,telegram_user_id,
+               telegram_username,telegram_nome,telegram_enviado_em)
+            VALUES (:chat,:perfil,:update,:mensagem,:arquivo,:nome,:mime,:tamanho,
+                    :extensao,'VALOR',:usuario,:username,:telegram_nome,:enviado_em)
             ON CONFLICT (chat_id) DO UPDATE SET
               perfil_id=EXCLUDED.perfil_id,update_id_arquivo=EXCLUDED.update_id_arquivo,
               message_id_arquivo=EXCLUDED.message_id_arquivo,file_id=EXCLUDED.file_id,
               nome_original=EXCLUDED.nome_original,mime_type=EXCLUDED.mime_type,
               tamanho=EXCLUDED.tamanho,extensao=EXCLUDED.extensao,etapa='VALOR',
+              telegram_user_id=EXCLUDED.telegram_user_id,
+              telegram_username=EXCLUDED.telegram_username,
+              telegram_nome=EXCLUDED.telegram_nome,
+              telegram_enviado_em=EXCLUDED.telegram_enviado_em,
               valor=NULL,data_documento=NULL,data_vencimento=NULL,descricao=NULL,
               status_pagamento=NULL,status_reembolso=NULL,nome_destino=NULL,
               atualizado_em=NOW()
@@ -360,6 +392,10 @@ def _iniciar_pendencia(
             "update": update_id, "mensagem": mensagem.get("message_id"),
             "arquivo": file_id, "nome": nome[:500], "mime": mime[:120],
             "tamanho": tamanho, "extensao": extensao,
+            "usuario": origem.get("telegram_user_id"),
+            "username": origem.get("telegram_username"),
+            "telegram_nome": origem["telegram_nome"],
+            "enviado_em": origem["enviado_em"],
         })
     return (
         "Não consegui identificar os dados pelo nome do arquivo. Vou cadastrá-lo com você.\n\n"
@@ -373,6 +409,7 @@ def _iniciar_confirmacao_estruturada(
     file_id: str, tamanho: int, mime: str, extensao: str, dados,
 ) -> list[dict]:
     chat_id = int(mensagem["chat"]["id"])
+    origem = _origem_telegram(perfil, mensagem, update_id)
     with get_engine().begin() as conn:
         duplicidades = _duplicidades_om(
             conn, dados.data_documento, dados.valor, chat_id,
@@ -382,12 +419,14 @@ def _iniciar_confirmacao_estruturada(
         conn.execute(text("""
             INSERT INTO financeiro3_pagamento_telegram_pendencias
               (chat_id,perfil_id,update_id_arquivo,message_id_arquivo,file_id,
-               nome_original,nome_destino,mime_type,tamanho,extensao,etapa,
+              nome_original,nome_destino,mime_type,tamanho,extensao,etapa,
                valor,data_documento,data_vencimento,descricao,
-               status_pagamento,status_reembolso)
+               status_pagamento,status_reembolso,telegram_user_id,
+               telegram_username,telegram_nome,telegram_enviado_em)
             VALUES (:chat,:perfil,:update,:mensagem,:arquivo,:nome,:destino,:mime,
                     :tamanho,:extensao,'CONFIRMAR_DUPLICIDADE',:valor,:documento,
-                    :vencimento,:descricao,:pagamento,:reembolso)
+                    :vencimento,:descricao,:pagamento,:reembolso,:usuario,:username,
+                    :telegram_nome,:enviado_em)
             ON CONFLICT (chat_id) DO UPDATE SET
               perfil_id=EXCLUDED.perfil_id,update_id_arquivo=EXCLUDED.update_id_arquivo,
               message_id_arquivo=EXCLUDED.message_id_arquivo,file_id=EXCLUDED.file_id,
@@ -397,7 +436,11 @@ def _iniciar_confirmacao_estruturada(
               valor=EXCLUDED.valor,data_documento=EXCLUDED.data_documento,
               data_vencimento=EXCLUDED.data_vencimento,descricao=EXCLUDED.descricao,
               status_pagamento=EXCLUDED.status_pagamento,
-              status_reembolso=EXCLUDED.status_reembolso,atualizado_em=NOW()
+              status_reembolso=EXCLUDED.status_reembolso,
+              telegram_user_id=EXCLUDED.telegram_user_id,
+              telegram_username=EXCLUDED.telegram_username,
+              telegram_nome=EXCLUDED.telegram_nome,
+              telegram_enviado_em=EXCLUDED.telegram_enviado_em,atualizado_em=NOW()
         """), {
             "chat": chat_id, "perfil": perfil["id"], "update": update_id,
             "mensagem": mensagem.get("message_id"), "arquivo": file_id,
@@ -406,6 +449,10 @@ def _iniciar_confirmacao_estruturada(
             "documento": dados.data_documento, "vencimento": dados.data_vencimento,
             "descricao": dados.descricao, "pagamento": dados.status_pagamento,
             "reembolso": dados.status_reembolso,
+            "usuario": origem.get("telegram_user_id"),
+            "username": origem.get("telegram_username"),
+            "telegram_nome": origem["telegram_nome"],
+            "enviado_em": origem["enviado_em"],
         })
     return duplicidades
 
@@ -436,7 +483,7 @@ def _nome_pendencia(dados: dict, status_reembolso: str) -> str:
 
 def _gravar_arquivo(
     perfil: dict, pasta: str, nome: str, file_id: str, tamanho: int,
-    mime: str, identificador: str,
+    mime: str, identificador: str, origem: dict,
 ) -> None:
     if tamanho > MAX_TELEGRAM_DOWNLOAD:
         raise TelegramErro("O arquivo ultrapassa o limite de 20 MB do Telegram.")
@@ -444,6 +491,28 @@ def _gravar_arquivo(
     arquivo_id = hashlib.sha256(identificador.encode()).hexdigest()[:32]
     arquivo = FileStorage(stream=io.BytesIO(conteudo), filename=nome, content_type=mime)
     enviar_arquivo(perfil, pasta, arquivo, arquivo_id=arquivo_id)
+    with get_engine().begin() as conn:
+        conn.execute(text("""
+            INSERT INTO financeiro3_pagamento_telegram_envios
+              (perfil_id,drive_file_id,pasta,chat_id,chat_nome,telegram_user_id,
+               telegram_username,telegram_nome,update_id,message_id,nome_arquivo,enviado_em)
+            VALUES (:perfil,:arquivo,:pasta,:chat,:chat_nome,:usuario,:username,
+                    :nome,:update,:mensagem,:nome_arquivo,:enviado_em)
+            ON CONFLICT (drive_file_id) DO UPDATE SET
+              perfil_id=EXCLUDED.perfil_id,pasta=EXCLUDED.pasta,chat_id=EXCLUDED.chat_id,
+              chat_nome=EXCLUDED.chat_nome,telegram_user_id=EXCLUDED.telegram_user_id,
+              telegram_username=EXCLUDED.telegram_username,telegram_nome=EXCLUDED.telegram_nome,
+              update_id=EXCLUDED.update_id,message_id=EXCLUDED.message_id,
+              nome_arquivo=EXCLUDED.nome_arquivo,enviado_em=EXCLUDED.enviado_em
+        """), {
+            "perfil": perfil["id"], "arquivo": arquivo_id, "pasta": pasta,
+            "chat": origem["chat_id"], "chat_nome": origem.get("chat_nome"),
+            "usuario": origem.get("telegram_user_id"),
+            "username": origem.get("telegram_username"),
+            "nome": origem["telegram_nome"], "update": origem.get("update_id"),
+            "mensagem": origem.get("message_id"), "nome_arquivo": nome,
+            "enviado_em": origem["enviado_em"],
+        })
 
 
 def _processar_resposta_pendencia(chat_id: int, resposta: str) -> str | dict:
@@ -586,13 +655,24 @@ def _processar_resposta_pendencia(chat_id: int, resposta: str) -> str | dict:
         finalizar, finalizar["status_reembolso"],
     )
     perfil = {"id": finalizar["perfil_id"], "storage_prefix": finalizar["storage_prefix"]}
+    origem = {
+        "chat_id": chat_id,
+        "chat_nome": finalizar.get("telegram_nome"),
+        "telegram_user_id": finalizar.get("telegram_user_id"),
+        "telegram_username": finalizar.get("telegram_username"),
+        "telegram_nome": finalizar.get("telegram_nome") or str(chat_id),
+        "update_id": finalizar.get("update_id_arquivo"),
+        "message_id": finalizar.get("message_id_arquivo"),
+        "enviado_em": finalizar.get("telegram_enviado_em")
+        or datetime.now(ZoneInfo("UTC")),
+    }
     identificador = (
         f"telegram:{chat_id}:{finalizar['message_id_arquivo']}:"
         f"{finalizar['file_id']}:{finalizar['update_id_arquivo']}"
     )
     _gravar_arquivo(
         perfil, "novas_contas", nome, finalizar["file_id"], finalizar["tamanho"],
-        finalizar["mime_type"], identificador,
+        finalizar["mime_type"], identificador, origem,
     )
     with get_engine().begin() as conn:
         conn.execute(text("""
@@ -627,7 +707,10 @@ def _receber_arquivo(perfil: dict, mensagem: dict, update_id: int) -> str:
         f"telegram:{mensagem.get('chat', {}).get('id')}:"
         f"{mensagem.get('message_id')}:{file_id}:{update_id}"
     )
-    _gravar_arquivo(perfil, pasta, nome, file_id, tamanho, mime, identificador)
+    origem = _origem_telegram(perfil, mensagem, update_id)
+    _gravar_arquivo(
+        perfil, pasta, nome, file_id, tamanho, mime, identificador, origem,
+    )
     return f"Arquivo recebido em {pasta}:\n{nome}\n\nEle será processado na próxima sincronização."
 
 

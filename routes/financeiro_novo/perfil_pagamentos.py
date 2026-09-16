@@ -491,10 +491,22 @@ def pagamento_conta_detalhe(conta_id):
             WHERE conta_id=:id AND ativo ORDER BY id
         """), {"id": conta_id}).mappings().all()
         historico = conn.execute(text("""
-            SELECT evento,username,justificativa,criado_em,dados_anteriores,dados_novos
-            FROM financeiro3_auditoria
-            WHERE entidade='PERFIL_PAGAMENTO_CONTA' AND entidade_id=:id
-            ORDER BY id DESC LIMIT 100
+            SELECT a.evento,a.username,a.usuario_id,a.justificativa,a.criado_em,
+                   a.criado_em AT TIME ZONE 'America/Sao_Paulo' AS criado_em_local,
+                   a.dados_anteriores,a.dados_novos,
+                   COALESCE(NULLIF(u.nome,''),NULLIF(a.username,''),'sistema') AS autor_nome,
+                   COALESCE(NULLIF(u.username,''),NULLIF(a.username,'')) AS autor_login,
+                   a.dados_novos->'origem_telegram'->>'telegram_nome' AS telegram_nome,
+                   a.dados_novos->'origem_telegram'->>'telegram_username' AS telegram_username,
+                   a.dados_novos->'origem_telegram'->>'chat_nome' AS telegram_chat_nome,
+                   CASE WHEN a.dados_novos->'origem_telegram'->>'enviado_em' IS NOT NULL
+                        THEN (a.dados_novos->'origem_telegram'->>'enviado_em')::timestamptz
+                             AT TIME ZONE 'America/Sao_Paulo'
+                   END AS telegram_enviado_em_local
+            FROM financeiro3_auditoria a
+            LEFT JOIN usuarios u ON u.id=a.usuario_id
+            WHERE a.entidade='PERFIL_PAGAMENTO_CONTA' AND a.entidade_id=:id
+            ORDER BY a.id DESC LIMIT 100
         """), {"id": conta_id}).mappings().all()
     return render_template(
         "financeiro_novo/pagamento_conta_detalhe.html", conta=conta,

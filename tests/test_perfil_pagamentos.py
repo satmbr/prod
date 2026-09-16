@@ -226,6 +226,20 @@ class PerfilPagamentosConfiguracaoTests(unittest.TestCase):
         self.assertIn("t.expira_em>NOW()", routes)
         self.assertIn('"financeiro_novo.pagamento_telegram_recibo_temporario"', app)
 
+    def test_historico_identifica_usuario_e_origem_do_telegram(self):
+        migration = (ROOT / "migrations" / "024_perfil_pagamentos_autoria_telegram.sql").read_text(encoding="utf-8")
+        telegram = (ROOT / "routes" / "financeiro_novo" / "services" / "pagamentos_telegram.py").read_text(encoding="utf-8")
+        bucket = (ROOT / "routes" / "financeiro_novo" / "services" / "pagamentos_bucket.py").read_text(encoding="utf-8")
+        routes = (ROOT / "routes" / "financeiro_novo" / "perfil_pagamentos.py").read_text(encoding="utf-8")
+        detalhe = (ROOT / "templates" / "financeiro_novo" / "pagamento_conta_detalhe.html").read_text(encoding="utf-8")
+        self.assertIn("financeiro3_pagamento_telegram_envios", migration)
+        self.assertIn("telegram_enviado_em", migration)
+        self.assertIn("_origem_telegram", telegram)
+        self.assertIn("IMPORTADA_TELEGRAM", bucket)
+        self.assertIn("LEFT JOIN usuarios u ON u.id=a.usuario_id", routes)
+        self.assertIn("Usuário do sistema", detalhe)
+        self.assertIn("Enviado pelo bot Telegram", detalhe)
+
 
 if __name__ == "__main__":
     unittest.main()
