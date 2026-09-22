@@ -796,6 +796,11 @@ def configurar_webhook() -> dict:
     if not dominio.startswith("https://"):
         raise TelegramErro("Configure TELEGRAM_PUBLIC_URL com o domínio HTTPS do serviço do bot.")
     _api("setMyCommands", {"commands": [
+        {"command": "menu", "description": "Abrir o menu do Bot Prumat"},
+        {"command": "solicitar", "description": "Iniciar uma solicitação"},
+        {"command": "minhas", "description": "Acompanhar minhas solicitações"},
+        {"command": "alterar", "description": "Alterar solicitação ainda não decidida"},
+        {"command": "pendencias", "description": "Ver aprovações pendentes"},
         {"command": "nova", "description": "Enviar contas para novas_contas"},
         {"command": "comprovante", "description": "Enviar comprovantes"},
         {"command": "status", "description": "Consultar perfil e destino atual"},

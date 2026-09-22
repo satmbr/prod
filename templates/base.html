@@ -67,6 +67,14 @@
       </a>
       {% endif %}
 
+      {% if 'bot:visualizar' in current_user_permissions or 'auth:administrar' in current_user_permissions %}
+      <a class="sidebar-link{% if request.blueprint == 'bot' %} active{% endif %}"
+         href="{{ url_for('bot.index') }}">
+        <svg class="si" viewBox="0 0 24 24"><path d="M12 2a2 2 0 012 2v1h3a4 4 0 014 4v7a4 4 0 01-4 4H7a4 4 0 01-4-4V9a4 4 0 014-4h3V4a2 2 0 012-2zm-4 9a1.5 1.5 0 100 3 1.5 1.5 0 000-3zm8 0a1.5 1.5 0 100 3 1.5 1.5 0 000-3zm-7 5v2h6v-2H9z"/></svg>
+        Bot Prumat
+      </a>
+      {% endif %}
+
       {% if 'auth:administrar' in current_user_permissions %}
       <div class="sidebar-section-label" style="margin-top:12px;">ADMINISTRAÇÃO</div>
       <a class="sidebar-link{% if request.endpoint and 'auth.usuarios' == request.endpoint %} active{% endif %}"

@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Bot Prumat{% endblock %}{% block module_name %}Bot Prumat{% endblock %}
+{% block breadcrumb %}Bot Prumat / Visão geral{% endblock %}
+{% block content %}{% include "bot/_styles.html" %}
+<div class="bot-head"><div><h1>Gestão do Bot Prumat</h1><p>Fluxos corporativos, acessos, aprovações e execução em um só lugar.</p></div><div class="bot-actions"><a class="bot-btn" href="{{ url_for('bot.solicitacoes') }}">Ver solicitações</a><a class="bot-btn primary" href="{{ url_for('bot.fluxos') }}">{{ 'Configurar fluxos' if ('bot:administrar' in current_user_permissions or 'auth:administrar' in current_user_permissions) else 'Ver fluxos' }}</a></div></div>
+<div class="bot-grid">
+  <div class="bot-card bot-kpi"><small>Colaboradores ativos</small><strong>{{ totais.colaboradores }}</strong></div>
+  <div class="bot-card bot-kpi"><small>Telegrams vinculados</small><strong>{{ totais.vinculados }}</strong></div>
+  <div class="bot-card bot-kpi"><small>Fluxos liberados</small><strong>{{ totais.fluxos }}</strong></div>
+  <div class="bot-card bot-kpi"><small>Aguardando aprovação</small><strong>{{ totais.pendentes }}</strong></div>
+</div>
+<div class="bot-panel"><div class="bot-panel-head"><h2>Solicitações recentes</h2><span class="bot-muted">{{ totais.hoje }} criada(s) hoje</span></div><div class="bot-table-wrap">
+<table class="bot-table"><thead><tr><th>Número</th><th>Fluxo</th><th>Solicitante</th><th>Situação</th><th>Data</th></tr></thead><tbody>
+{% for item in recentes %}<tr><td><a href="{{ url_for('bot.solicitacao_detalhe', solicitacao_id=item.id) if item.id is defined else url_for('bot.solicitacoes') }}"><strong>{{ item.numero }}</strong></a></td><td>{{ item.fluxo }}</td><td>{{ item.solicitante }}</td><td><span class="bot-badge">{{ item.status|replace('_',' ') }}</span></td><td>{{ item.criado_em.strftime('%d/%m/%Y %H:%M') }}</td></tr>{% else %}<tr><td colspan="5" class="bot-empty">Nenhuma solicitação criada ainda.</td></tr>{% endfor %}
+</tbody></table></div></div>
+{% endblock %}

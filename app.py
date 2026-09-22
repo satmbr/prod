@@ -118,6 +118,9 @@ def create_app():
     from routes.financeiro_novo import bp as financeiro_novo_bp
     app.register_blueprint(financeiro_novo_bp)
 
+    from routes.bot import bp as bot_bp
+    app.register_blueprint(bot_bp)
+
     @app.get("/")
     def home():
         return render_template("home_publica.html")
@@ -179,6 +182,14 @@ def create_app():
                 "descricao": "Módulo financeiro independente com despesas, missões e perfis de pagamentos integrados ao portal de arquivos.",
                 "href": url_for("financeiro_novo.index" if acesso_financeiro else "financeiro_novo.pagamentos_painel"),
                 "botao": "Abrir homologação"
+            })
+
+        if "bot:visualizar" in permissoes or "auth:administrar" in permissoes:
+            cards.append({
+                "titulo": "Bot Prumat",
+                "descricao": "Gerencie colaboradores, perfis, fluxos, aprovações e solicitações do bot corporativo.",
+                "href": url_for("bot.index"),
+                "botao": "Gerenciar bot"
             })
 
         return render_template("index.html", cards=cards)

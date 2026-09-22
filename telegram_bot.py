@@ -6,6 +6,7 @@ from routes.financeiro_novo.services.pagamentos_telegram import (
     processar_update,
     webhook_autentico,
 )
+from routes.bot_telegram import processar_update_bot
 
 
 def create_telegram_app():
@@ -30,7 +31,10 @@ def create_telegram_app():
         update = request.get_json(silent=True)
         if not isinstance(update, dict):
             abort(400)
-        processar_update(update)
+        # O motor corporativo trata apenas comandos e conversas próprios.
+        # Qualquer outra mensagem segue para o fluxo financeiro já existente.
+        if not processar_update_bot(update):
+            processar_update(update)
         return {"ok": True}
 
     return app
