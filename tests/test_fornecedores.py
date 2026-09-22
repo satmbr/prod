@@ -33,6 +33,22 @@ class FornecedoresEstruturaTests(unittest.TestCase):
         self.assertIn("bdi_valor =", self.rota)
         self.assertIn("total = subtotal + bdi_valor", self.rota)
 
+    def test_revisao_oferece_desconto_ajuste_aceite_e_contraproposta(self):
+        self.assertIn('acao in {"revisar", "desconto"}', self.rota)
+        self.assertIn('acao == "propor_ajuste"', self.rota)
+        self.assertIn("def aceitar_ajuste", self.rota)
+        portal = (ROOT / "templates" / "fornecedores" / "portal_detalhe.html").read_text(encoding="utf-8")
+        self.assertIn("Aceitar ajuste", portal)
+        self.assertIn("Propor valores", portal)
+        self.assertIn("Ajustar valores", portal)
+
+    def test_negociacao_mostra_apenas_orcamento_atual(self):
+        detalhe = (ROOT / "templates" / "fornecedores" / "portal_detalhe.html").read_text(encoding="utf-8")
+        self.assertIn("Orçamento atual", detalhe)
+        self.assertNotIn("Seu orçamento · versão", detalhe)
+        migracao = (ROOT / "migrations" / "027_fornecedores_negociacao_viva.sql").read_text(encoding="utf-8")
+        self.assertIn("valor_unitario_proposto_admin", migracao)
+
     def test_portal_nao_libera_sistema_principal(self):
         fonte = (ROOT / "app.py").read_text(encoding="utf-8")
         self.assertIn('request.blueprint == "portal_fornecedor"', fonte)

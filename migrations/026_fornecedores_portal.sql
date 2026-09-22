@@ -79,6 +79,8 @@ CREATE TABLE IF NOT EXISTS fornecedor_orcamentos (
     bdi_valor NUMERIC(14,2) NOT NULL DEFAULT 0 CHECK (bdi_valor >= 0),
     total_aprovado NUMERIC(14,2),
     motivo_decisao TEXT,
+    revisao_tipo VARCHAR(20) CHECK (revisao_tipo IS NULL OR revisao_tipo IN ('DESCONTO','AJUSTE_ADMIN')),
+    revisao_observacao TEXT,
     decidido_por INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
     decidido_em TIMESTAMPTZ,
     criado_em TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -94,6 +96,8 @@ CREATE TABLE IF NOT EXISTS fornecedor_orcamento_itens (
     quantidade NUMERIC(14,4) NOT NULL CHECK (quantidade > 0),
     valor_unitario_original NUMERIC(14,2) NOT NULL CHECK (valor_unitario_original >= 0),
     valor_unitario_ajustado NUMERIC(14,2),
+    valor_unitario_proposto_admin NUMERIC(14,2)
+        CHECK (valor_unitario_proposto_admin IS NULL OR valor_unitario_proposto_admin >= 0),
     CHECK (valor_unitario_ajustado IS NULL OR valor_unitario_ajustado >= valor_unitario_original),
     UNIQUE (orcamento_id, ordem)
 );
