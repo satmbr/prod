@@ -69,7 +69,7 @@ def create_app():
             "financeiro_novo.pagamento_telegram_recibo_temporario",
         }
 
-        if request.endpoint in rotas_livres or request.endpoint is None:
+        if request.endpoint in rotas_livres or request.blueprint == "portal_fornecedor" or request.endpoint is None:
             return
 
         # Redireciona usuário não autenticado para qualquer rota protegida
@@ -120,6 +120,10 @@ def create_app():
 
     from routes.bot import bp as bot_bp
     app.register_blueprint(bot_bp)
+
+    from routes.fornecedores import bp as fornecedores_bp, portal_bp as portal_fornecedor_bp
+    app.register_blueprint(fornecedores_bp)
+    app.register_blueprint(portal_fornecedor_bp)
 
     @app.get("/")
     def home():
@@ -190,6 +194,14 @@ def create_app():
                 "descricao": "Gerencie colaboradores, perfis, fluxos, aprovações e solicitações do bot corporativo.",
                 "href": url_for("bot.index"),
                 "botao": "Gerenciar bot"
+            })
+
+        if "fornecedores:visualizar" in permissoes or "auth:administrar" in permissoes:
+            cards.append({
+                "titulo": "Fornecedores",
+                "descricao": "Gerencie fornecedores, cotações, aprovações, execução de serviços, evidências e notas fiscais.",
+                "href": url_for("fornecedores.index"),
+                "botao": "Gerenciar fornecedores"
             })
 
         return render_template("index.html", cards=cards)

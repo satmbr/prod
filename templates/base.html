@@ -75,6 +75,14 @@
       </a>
       {% endif %}
 
+      {% if 'fornecedores:visualizar' in current_user_permissions or 'auth:administrar' in current_user_permissions %}
+      <a class="sidebar-link{% if request.blueprint == 'fornecedores' %} active{% endif %}"
+         href="{{ url_for('fornecedores.index') }}">
+        <svg class="si" viewBox="0 0 24 24"><path d="M20 8h-3V4H3a2 2 0 00-2 2v11h2a3 3 0 006 0h6a3 3 0 006 0h2v-5l-3-4zM6 19a2 2 0 110-4 2 2 0 010 4zm11-9h2l2 3h-4v-3zm1 9a2 2 0 110-4 2 2 0 010 4z"/></svg>
+        Fornecedores
+      </a>
+      {% endif %}
+
       {% if 'auth:administrar' in current_user_permissions %}
       <div class="sidebar-section-label" style="margin-top:12px;">ADMINISTRAÇÃO</div>
       <a class="sidebar-link{% if request.endpoint and 'auth.usuarios' == request.endpoint %} active{% endif %}"
