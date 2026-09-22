@@ -45,12 +45,21 @@ CREATE TABLE IF NOT EXISTS fornecedor_solicitacoes (
     previsao_execucao DATE,
     status VARCHAR(28) NOT NULL DEFAULT 'RASCUNHO'
         CHECK (status IN ('RASCUNHO','ENVIADA','ORCAMENTO_RECEBIDO','REVISAO_SOLICITADA',
-          'APROVADA','REJEITADA','EM_EXECUCAO','AGUARDANDO_FECHAMENTO','FECHADA','CANCELADA')),
+          'APROVADA','REJEITADA','EM_EXECUCAO','AGUARDANDO_FECHAMENTO','FECHADA',
+          'CANCELAMENTO_SOLICITADO','CANCELADA')),
     criado_por INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
     criado_em TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     atualizado_em TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     fechado_em TIMESTAMPTZ,
-    fechado_por INTEGER REFERENCES usuarios(id) ON DELETE SET NULL
+    fechado_por INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
+    cancelamento_motivo TEXT,
+    cancelamento_solicitado_em TIMESTAMPTZ,
+    cancelamento_solicitado_por INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
+    cancelamento_decidido_em TIMESTAMPTZ,
+    cancelamento_decisao VARCHAR(12)
+        CHECK (cancelamento_decisao IS NULL OR cancelamento_decisao IN ('ACEITO','RECUSADO')),
+    cancelamento_resposta TEXT,
+    status_antes_cancelamento VARCHAR(28)
 );
 
 CREATE TABLE IF NOT EXISTS fornecedor_solicitacao_destinos (
@@ -59,7 +68,8 @@ CREATE TABLE IF NOT EXISTS fornecedor_solicitacao_destinos (
     fornecedor_id BIGINT NOT NULL REFERENCES fornecedores(id) ON DELETE RESTRICT,
     status VARCHAR(28) NOT NULL DEFAULT 'AGUARDANDO_ORCAMENTO'
         CHECK (status IN ('AGUARDANDO_ORCAMENTO','ORCAMENTO_RECEBIDO','REVISAO_SOLICITADA',
-          'APROVADO','REJEITADO','ENCERRADO','EM_EXECUCAO','AGUARDANDO_FECHAMENTO','FECHADO')),
+          'APROVADO','REJEITADO','ENCERRADO','EM_EXECUCAO','AGUARDANDO_FECHAMENTO','FECHADO',
+          'CANCELAMENTO_SOLICITADO','CANCELADO')),
     visualizado_em TIMESTAMPTZ,
     respondido_em TIMESTAMPTZ,
     atualizado_em TIMESTAMPTZ NOT NULL DEFAULT NOW(),

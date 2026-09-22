@@ -1,4 +1,5 @@
 import secrets
+import shutil
 import uuid
 from datetime import date
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
@@ -95,8 +96,12 @@ def index():
               (SELECT COUNT(*) FROM fornecedores WHERE ativo) fornecedores,
               (SELECT COUNT(*) FROM fornecedores WHERE ativo AND portal_ativo) portais,
               (SELECT COUNT(*) FROM fornecedor_solicitacoes WHERE status IN ('ENVIADA','ORCAMENTO_RECEBIDO','REVISAO_SOLICITADA')) pendentes,
-              (SELECT COUNT(*) FROM fornecedor_solicitacoes WHERE status IN ('APROVADA','EM_EXECUCAO','AGUARDANDO_FECHAMENTO')) execucao,
-              (SELECT COALESCE(SUM(total_aprovado),0) FROM fornecedor_orcamentos WHERE status='APROVADO') contratado
+              (SELECT COUNT(*) FROM fornecedor_solicitacoes WHERE status IN ('APROVADA','EM_EXECUCAO','AGUARDANDO_FECHAMENTO','CANCELAMENTO_SOLICITADO')) execucao,
+              (SELECT COALESCE(SUM(o.total_aprovado),0)
+                 FROM fornecedor_orcamentos o
+                 JOIN fornecedor_solicitacao_destinos d ON d.id=o.destino_id
+                 JOIN fornecedor_solicitacoes s ON s.id=d.solicitacao_id
+                WHERE o.status='APROVADO' AND s.status NOT IN ('CANCELADA','CANCELAMENTO_SOLICITADO')) contratado
         """)).mappings().one()
         recentes = conn.execute(text("""
             SELECT s.id,s.numero,s.titulo,s.status,s.criado_em,
@@ -443,6 +448,107 @@ def decidir_orcamento(orcamento_id):
     return redirect(url_for("fornecedores.solicitacao_detalhe", solicitacao_id=orcamento["solicitacao_id"]))
 
 
+@bp.post("/solicitacoes/<int:solicitacao_id>/cancelar")
+@login_required
+@permission_required("fornecedores", "administrar")
+def cancelar_solicitacao(solicitacao_id):
+    motivo = (request.form.get("motivo") or "").strip()
+    if not motivo:
+        flash("Informe o motivo do cancelamento.", "warning")
+        return redirect(url_for("fornecedores.solicitacao_detalhe", solicitacao_id=solicitacao_id))
+
+    mensagem = "A solicitação não está disponível para cancelamento."
+    categoria = "warning"
+    with get_engine().begin() as conn:
+        solicitacao = conn.execute(text("""
+            SELECT * FROM fornecedor_solicitacoes WHERE id=:id FOR UPDATE
+        """), {"id": solicitacao_id}).mappings().first()
+        if not solicitacao:
+            abort(404)
+        if solicitacao["status"] in {"EM_EXECUCAO", "AGUARDANDO_FECHAMENTO"}:
+            destino = conn.execute(text("""
+                SELECT id,fornecedor_id FROM fornecedor_solicitacao_destinos
+                WHERE solicitacao_id=:id AND status IN ('EM_EXECUCAO','AGUARDANDO_FECHAMENTO')
+                ORDER BY id LIMIT 1 FOR UPDATE
+            """), {"id": solicitacao_id}).mappings().first()
+            if destino:
+                conn.execute(text("""
+                    UPDATE fornecedor_solicitacoes
+                       SET status_antes_cancelamento=status,status='CANCELAMENTO_SOLICITADO',
+                           cancelamento_motivo=:m,cancelamento_solicitado_em=NOW(),
+                           cancelamento_solicitado_por=:u,cancelamento_decidido_em=NULL,
+                           cancelamento_decisao=NULL,cancelamento_resposta=NULL,atualizado_em=NOW()
+                     WHERE id=:id
+                """), {"m": motivo, "u": session.get("usuario_id"), "id": solicitacao_id})
+                conn.execute(text("""
+                    UPDATE fornecedor_solicitacao_destinos
+                       SET status='CANCELAMENTO_SOLICITADO',atualizado_em=NOW()
+                     WHERE id=:id
+                """), {"id": destino["id"]})
+                _evento(conn, solicitacao_id, "CANCELAMENTO_SOLICITADO",
+                        motivo, destino["id"])
+                mensagem = "Pedido de cancelamento enviado ao fornecedor."
+                categoria = "success"
+        elif solicitacao["status"] in {
+            "RASCUNHO", "ENVIADA", "ORCAMENTO_RECEBIDO", "REVISAO_SOLICITADA",
+            "APROVADA", "REJEITADA"
+        }:
+            conn.execute(text("""
+                UPDATE fornecedor_solicitacoes
+                   SET status_antes_cancelamento=status,status='CANCELADA',
+                       cancelamento_motivo=:m,cancelamento_solicitado_em=NOW(),
+                       cancelamento_solicitado_por=:u,cancelamento_decidido_em=NOW(),
+                       cancelamento_decisao='ACEITO',cancelamento_resposta='Cancelamento direto pelo administrador.',
+                       atualizado_em=NOW()
+                 WHERE id=:id
+            """), {"m": motivo, "u": session.get("usuario_id"), "id": solicitacao_id})
+            conn.execute(text("""
+                UPDATE fornecedor_solicitacao_destinos
+                   SET status='CANCELADO',atualizado_em=NOW()
+                 WHERE solicitacao_id=:id
+            """), {"id": solicitacao_id})
+            _evento(conn, solicitacao_id, "CANCELADA",
+                    "Solicitação cancelada diretamente. " + motivo)
+            mensagem = "Solicitação cancelada. Agora ela pode ser excluída definitivamente."
+            categoria = "success"
+    flash(mensagem, categoria)
+    return redirect(url_for("fornecedores.solicitacao_detalhe", solicitacao_id=solicitacao_id))
+
+
+@bp.post("/solicitacoes/<int:solicitacao_id>/excluir")
+@login_required
+@permission_required("fornecedores", "administrar")
+def excluir_solicitacao(solicitacao_id):
+    caminhos = []
+    numero = None
+    with get_engine().begin() as conn:
+        solicitacao = conn.execute(text("""
+            SELECT id,numero,status FROM fornecedor_solicitacoes WHERE id=:id FOR UPDATE
+        """), {"id": solicitacao_id}).mappings().first()
+        if not solicitacao:
+            abort(404)
+        if solicitacao["status"] != "CANCELADA":
+            flash("Somente solicitações canceladas podem ser excluídas.", "warning")
+            return redirect(url_for("fornecedores.solicitacao_detalhe", solicitacao_id=solicitacao_id))
+        numero = solicitacao["numero"]
+        caminhos = conn.execute(text("""
+            SELECT caminho_relativo FROM fornecedor_arquivos WHERE solicitacao_id=:id
+        """), {"id": solicitacao_id}).scalars().all()
+        conn.execute(text("DELETE FROM fornecedor_solicitacoes WHERE id=:id"),
+                     {"id": solicitacao_id})
+
+    raiz = Path(current_app.config["UPLOAD_ROOT"]).resolve()
+    for relativo in caminhos:
+        caminho = (raiz / relativo).resolve()
+        if raiz in caminho.parents and caminho.is_file():
+            caminho.unlink()
+    pasta = (raiz / "fornecedores" / str(solicitacao_id)).resolve()
+    if raiz in pasta.parents and pasta.is_dir():
+        shutil.rmtree(pasta)
+    flash(f"Solicitação {numero} excluída do sistema e do portal do fornecedor.", "success")
+    return redirect(url_for("fornecedores.solicitacoes"))
+
+
 @bp.post("/solicitacoes/<int:solicitacao_id>/fechar")
 @login_required
 @permission_required("fornecedores", "fechar")
@@ -533,7 +639,8 @@ def _destino_portal(conn, solicitacao_id, lock=False):
     trava = " FOR UPDATE" if lock else ""
     return conn.execute(text("""
         SELECT d.*,s.numero,s.titulo,s.descricao,s.local_servico,s.prazo_orcamento,
-          s.previsao_execucao,s.status solicitacao_status
+          s.previsao_execucao,s.status solicitacao_status,s.cancelamento_motivo,
+          s.cancelamento_solicitado_em,s.cancelamento_decisao,s.cancelamento_resposta
         FROM fornecedor_solicitacao_destinos d JOIN fornecedor_solicitacoes s ON s.id=d.solicitacao_id
         WHERE d.solicitacao_id=:s AND d.fornecedor_id=:f
     """ + trava), {"s": solicitacao_id, "f": session["portal_fornecedor_id"]}).mappings().first()
@@ -677,6 +784,65 @@ def aceitar_ajuste(solicitacao_id):
         flash("Ajuste aceito e enviado para aprovação final.", "success")
     except ValueError as exc:
         flash(str(exc), "warning")
+    return redirect(url_for("portal_fornecedor.detalhe", solicitacao_id=solicitacao_id))
+
+
+@portal_bp.post("/solicitacoes/<int:solicitacao_id>/responder-cancelamento")
+@portal_required
+def responder_cancelamento(solicitacao_id):
+    acao = request.form.get("acao")
+    resposta = (request.form.get("resposta") or "").strip() or None
+    mensagem = "Resposta inválida."
+    categoria = "warning"
+    with get_engine().begin() as conn:
+        destino = _destino_portal(conn, solicitacao_id, True)
+        if not destino or destino["status"] != "CANCELAMENTO_SOLICITADO":
+            flash("Não existe pedido de cancelamento aguardando sua resposta.", "warning")
+            return redirect(url_for("portal_fornecedor.detalhe", solicitacao_id=solicitacao_id))
+        solicitacao = conn.execute(text("""
+            SELECT * FROM fornecedor_solicitacoes WHERE id=:id FOR UPDATE
+        """), {"id": solicitacao_id}).mappings().first()
+        if not solicitacao or solicitacao["status"] != "CANCELAMENTO_SOLICITADO":
+            flash("O pedido de cancelamento já foi encerrado.", "warning")
+            return redirect(url_for("portal_fornecedor.detalhe", solicitacao_id=solicitacao_id))
+
+        if acao == "aceitar":
+            conn.execute(text("""
+                UPDATE fornecedor_solicitacoes
+                   SET status='CANCELADA',cancelamento_decidido_em=NOW(),
+                       cancelamento_decisao='ACEITO',cancelamento_resposta=:r,atualizado_em=NOW()
+                 WHERE id=:id
+            """), {"r": resposta, "id": solicitacao_id})
+            conn.execute(text("""
+                UPDATE fornecedor_solicitacao_destinos
+                   SET status='CANCELADO',atualizado_em=NOW()
+                 WHERE solicitacao_id=:id
+            """), {"id": solicitacao_id})
+            _evento(conn, solicitacao_id, "CANCELAMENTO_ACEITO",
+                    resposta or "Fornecedor aceitou o cancelamento.",
+                    destino["id"], session["portal_fornecedor_id"])
+            mensagem = "Cancelamento aceito. A solicitação foi encerrada."
+            categoria = "success"
+        elif acao == "recusar":
+            anterior = solicitacao["status_antes_cancelamento"]
+            if anterior not in {"EM_EXECUCAO", "AGUARDANDO_FECHAMENTO"}:
+                anterior = "EM_EXECUCAO"
+            conn.execute(text("""
+                UPDATE fornecedor_solicitacoes
+                   SET status=:status,cancelamento_decidido_em=NOW(),
+                       cancelamento_decisao='RECUSADO',cancelamento_resposta=:r,atualizado_em=NOW()
+                 WHERE id=:id
+            """), {"status": anterior, "r": resposta, "id": solicitacao_id})
+            conn.execute(text("""
+                UPDATE fornecedor_solicitacao_destinos
+                   SET status=:status,atualizado_em=NOW() WHERE id=:id
+            """), {"status": anterior, "id": destino["id"]})
+            _evento(conn, solicitacao_id, "CANCELAMENTO_RECUSADO",
+                    resposta or "Fornecedor recusou o cancelamento.",
+                    destino["id"], session["portal_fornecedor_id"])
+            mensagem = "Cancelamento recusado. A execução permanece ativa."
+            categoria = "success"
+    flash(mensagem, categoria)
     return redirect(url_for("portal_fornecedor.detalhe", solicitacao_id=solicitacao_id))
 
 

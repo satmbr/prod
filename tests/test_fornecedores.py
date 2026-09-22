@@ -49,6 +49,22 @@ class FornecedoresEstruturaTests(unittest.TestCase):
         migracao = (ROOT / "migrations" / "027_fornecedores_negociacao_viva.sql").read_text(encoding="utf-8")
         self.assertIn("valor_unitario_proposto_admin", migracao)
 
+    def test_cancelamento_direto_ou_com_aceite_e_exclusao_posterior(self):
+        migracao = (ROOT / "migrations" / "028_fornecedores_cancelamento.sql").read_text(encoding="utf-8")
+        for termo in ("CANCELAMENTO_SOLICITADO", "CANCELADA", "CANCELADO", "status_antes_cancelamento"):
+            self.assertIn(termo, migracao)
+        self.assertIn("def cancelar_solicitacao", self.rota)
+        self.assertIn("def responder_cancelamento", self.rota)
+        self.assertIn("def excluir_solicitacao", self.rota)
+        self.assertIn('solicitacao["status"] != "CANCELADA"', self.rota)
+
+    def test_fornecedor_so_responde_cancelamento_e_nao_exclui(self):
+        portal = (ROOT / "templates" / "fornecedores" / "portal_detalhe.html").read_text(encoding="utf-8")
+        self.assertIn("Aceitar cancelamento", portal)
+        self.assertIn("Recusar cancelamento", portal)
+        self.assertNotIn("Excluir definitivamente", portal)
+        self.assertNotIn("Cancelar solicitação", portal)
+
     def test_portal_nao_libera_sistema_principal(self):
         fonte = (ROOT / "app.py").read_text(encoding="utf-8")
         self.assertIn('request.blueprint == "portal_fornecedor"', fonte)
@@ -62,6 +78,9 @@ class FornecedoresEstruturaTests(unittest.TestCase):
         self.assertIn("/fornecedores/solicitacoes", regras)
         self.assertIn("/portal-fornecedor", regras)
         self.assertIn("/portal-fornecedor/acesso/<token>", regras)
+        self.assertIn("/fornecedores/solicitacoes/<int:solicitacao_id>/cancelar", regras)
+        self.assertIn("/fornecedores/solicitacoes/<int:solicitacao_id>/excluir", regras)
+        self.assertIn("/portal-fornecedor/solicitacoes/<int:solicitacao_id>/responder-cancelamento", regras)
 
 
 if __name__ == "__main__":

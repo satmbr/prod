@@ -23,7 +23,7 @@
       </tbody></table></div>
       {% if d.bdi_percentual %}<p><strong>BDI:</strong> {{ d.bdi_percentual }}% · R$ {{ '%.2f'|format(d.bdi_valor)|replace('.',',') }}</p>{% endif %}
       {% if d.motivo_decisao %}<div class="fn-alert">{{ d.motivo_decisao }}</div>{% endif %}
-      {% if d.orcamento_status=='ENVIADO' and ('fornecedores:aprovar' in current_user_permissions or 'auth:administrar' in current_user_permissions) %}
+      {% if solicitacao.status not in ['CANCELADA','CANCELAMENTO_SOLICITADO'] and d.orcamento_status=='ENVIADO' and ('fornecedores:aprovar' in current_user_permissions or 'auth:administrar' in current_user_permissions) %}
       <details><summary class="fn-btn primary">Analisar e negociar</summary>
         <form method="post" action="{{ url_for('fornecedores.decidir_orcamento', orcamento_id=d.orcamento_id) }}" class="fn-panel-body">
           <p class="fn-muted">Os valores abaixo servem tanto para aprovação quanto para uma proposta ao fornecedor. Na aprovação, não podem ser reduzidos; na proposta de ajuste, podem ser negociados livremente.</p>
@@ -40,6 +40,15 @@
 </div><div>
   <div class="fn-panel"><div class="fn-panel-head"><h2>Arquivos da execução</h2></div><div class="fn-panel-body"><div class="fn-files">{% for a in arquivos if a.categoria!='SOLICITACAO' %}<a class="fn-file" target="_blank" href="{{ url_for('fornecedores.arquivo', arquivo_id=a.id) }}">{{ '🧾' if a.categoria=='NOTA_FISCAL' else '📎' }} {{ a.categoria|replace('_',' ') }} · {{ a.nome_original }}</a>{% else %}<span class="fn-muted">Nenhum arquivo enviado.</span>{% endfor %}</div></div></div>
   {% if solicitacao.status=='AGUARDANDO_FECHAMENTO' and ('fornecedores:fechar' in current_user_permissions or 'auth:administrar' in current_user_permissions) %}<form method="post" action="{{ url_for('fornecedores.fechar', solicitacao_id=solicitacao.id) }}" class="fn-panel"><div class="fn-panel-body"><button class="fn-btn success" onclick="return confirm('Confirmar conferência e fechamento do serviço?')">Conferir e fechar serviço</button></div></form>{% endif %}
+  {% if 'fornecedores:administrar' in current_user_permissions or 'auth:administrar' in current_user_permissions %}
+    {% if solicitacao.status=='CANCELAMENTO_SOLICITADO' %}
+      <div class="fn-panel"><div class="fn-panel-head"><h2>Cancelamento solicitado</h2></div><div class="fn-panel-body"><div class="fn-alert">{{ solicitacao.cancelamento_motivo }}</div><p class="fn-muted">Aguardando o fornecedor aceitar ou recusar. A execução fica bloqueada enquanto houver decisão pendente.</p></div></div>
+    {% elif solicitacao.status=='CANCELADA' %}
+      <form method="post" action="{{ url_for('fornecedores.excluir_solicitacao', solicitacao_id=solicitacao.id) }}" class="fn-panel" onsubmit="return confirm('Excluir definitivamente esta solicitação, orçamentos e todos os arquivos dos dois portais? Esta ação não pode ser desfeita.');"><div class="fn-panel-head"><h2>Solicitação cancelada</h2></div><div class="fn-panel-body"><p>{{ solicitacao.cancelamento_motivo or 'Cancelada.' }}</p><button class="fn-btn danger">Excluir definitivamente</button></div></form>
+    {% elif solicitacao.status!='FECHADA' %}
+      <form method="post" action="{{ url_for('fornecedores.cancelar_solicitacao', solicitacao_id=solicitacao.id) }}" class="fn-panel"><div class="fn-panel-head"><h2>Cancelar solicitação</h2></div><div class="fn-panel-body"><div class="fn-field"><label>Motivo do cancelamento *</label><textarea name="motivo" required placeholder="Informe ao fornecedor por que esta solicitação será cancelada"></textarea></div><p class="fn-muted">{% if solicitacao.status in ['EM_EXECUCAO','AGUARDANDO_FECHAMENTO'] %}Como o serviço já está em execução, o fornecedor precisará aceitar o cancelamento.{% else %}Como o serviço ainda não está em execução, o cancelamento será imediato.{% endif %}</p><button class="fn-btn danger" onclick="return confirm('Deseja prosseguir com o cancelamento?')">Cancelar solicitação</button></div></form>
+    {% endif %}
+  {% endif %}
   <div class="fn-panel"><div class="fn-panel-head"><h2>Histórico auditável</h2></div><div class="fn-panel-body"><ul class="fn-timeline">{% for e in eventos %}<li><strong>{{ e.tipo|replace('_',' ') }}</strong><div>{{ e.descricao }}</div><span class="fn-muted">{{ e.criado_em.strftime('%d/%m/%Y %H:%M') }} · {{ e.usuario_nome or e.fornecedor_nome or 'Sistema' }}</span></li>{% endfor %}</ul></div></div>
 </div></div>
 {% endblock %}
