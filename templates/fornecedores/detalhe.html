@@ -16,7 +16,8 @@
   {% for d in destinos %}
   <div class="fn-panel fn-supplier"><div class="fn-panel-head"><div><h2>{{ d.nome_fantasia or d.razao_social }}</h2><span class="fn-muted">{{ d.cnpj or '' }}</span></div><span class="fn-badge">{{ d.status|replace('_',' ') }}</span></div><div class="fn-panel-body">
     {% if d.orcamento_id %}
-      <div class="fn-actions" style="justify-content:space-between"><div><strong>Orçamento atual</strong><div class="fn-muted">{{ d.observacoes_fornecedor or 'Sem observações.' }}</div></div><div class="fn-quote-total">R$ {{ '%.2f'|format(d.total_aprovado if d.total_aprovado is not none else d.subtotal_original)|replace('.',',') }}</div></div>
+      {% set subtotal_exibido=(d.subtotal_ajustado if d.revisao_tipo=='AJUSTE_ADMIN' and d.subtotal_ajustado is not none else d.subtotal_original) %}{% set total_exibido=(d.total_aprovado if d.total_aprovado is not none else subtotal_exibido+d.bdi_valor) %}
+      <div class="fn-actions" style="justify-content:space-between"><div><strong>Orçamento atual</strong><div class="fn-muted">{{ d.observacoes_fornecedor or 'Sem observações.' }}</div></div><div class="fn-quote-total">R$ {{ '%.2f'|format(total_exibido)|replace('.',',') }}</div></div>
       {% if d.revisao_observacao %}<div class="fn-alert">{{ d.revisao_observacao }}</div>{% endif %}
       <div class="fn-table-wrap"><table class="fn-table"><thead><tr><th>Descrição</th><th>Un.</th><th>Quantidade</th><th>Valor atual</th>{% if d.revisao_tipo=='AJUSTE_ADMIN' %}<th>Proposta PRUMAT</th>{% endif %}<th>Total atual</th></tr></thead><tbody>
       {% for i in itens_por_orcamento.get(d.orcamento_id,[]) %}<tr><td>{{ i.descricao }}</td><td>{{ i.unidade }}</td><td>{{ i.quantidade }}</td><td>R$ {{ '%.2f'|format(i.valor_unitario_original)|replace('.',',') }}</td>{% if d.revisao_tipo=='AJUSTE_ADMIN' %}<td><strong>R$ {{ '%.2f'|format(i.valor_unitario_proposto_admin)|replace('.',',') }}</strong></td>{% endif %}<td>R$ {{ '%.2f'|format(i.quantidade*i.valor_unitario_original)|replace('.',',') }}</td></tr>{% endfor %}
@@ -28,12 +29,22 @@
         <form method="post" action="{{ url_for('fornecedores.decidir_orcamento', orcamento_id=d.orcamento_id) }}" class="fn-panel-body">
           <p class="fn-muted">Os valores abaixo servem tanto para aprovação quanto para uma proposta ao fornecedor. Na aprovação, não podem ser reduzidos; na proposta de ajuste, podem ser negociados livremente.</p>
           {% for i in itens_por_orcamento.get(d.orcamento_id,[]) %}<div class="fn-field"><label>{{ i.descricao }} · atual R$ {{ '%.2f'|format(i.valor_unitario_original)|replace('.',',') }}</label><input name="valor_admin_{{ i.id }}" value="{{ '%.2f'|format(i.valor_unitario_original)|replace('.',',') }}"></div>{% endfor %}
-          <div class="fn-field"><label>BDI percentual — usado somente na aprovação</label><input name="bdi_percentual" value="0,00"></div>
+          <div class="fn-field"><label>BDI percentual — aplicado à aprovação ou à proposta enviada</label><input name="bdi_percentual" value="{{ '%.2f'|format(d.bdi_percentual)|replace('.',',') }}"></div>
           <div class="fn-field"><label>Observação ao fornecedor ou motivo</label><textarea name="motivo" placeholder="Explique a negociação, revisão ou rejeição"></textarea></div>
           <div class="fn-actions"><button class="fn-btn success" name="acao" value="aprovar">Aprovar</button><button class="fn-btn primary" name="acao" value="propor_ajuste">Enviar ajuste</button><button class="fn-btn warn" name="acao" value="desconto">Solicitar desconto</button><button class="fn-btn danger" name="acao" value="rejeitar">Rejeitar</button></div>
         </form>
       </details>
-      {% elif d.orcamento_status=='REVISAO_SOLICITADA' %}<div class="fn-alert">Aguardando resposta do fornecedor à negociação.</div>{% endif %}
+      {% elif d.orcamento_status=='REVISAO_SOLICITADA' %}<div class="fn-alert">Aguardando resposta do fornecedor à negociação.</div>
+        {% if d.revisao_tipo=='AJUSTE_ADMIN' and ('fornecedores:aprovar' in current_user_permissions or 'auth:administrar' in current_user_permissions) %}
+        <details><summary class="fn-btn">Editar proposta pendente</summary>
+          <form method="post" action="{{ url_for('fornecedores.decidir_orcamento', orcamento_id=d.orcamento_id) }}" class="fn-panel-body">
+            {% for i in itens_por_orcamento.get(d.orcamento_id,[]) %}<div class="fn-field"><label>{{ i.descricao }} · valor proposto</label><input name="valor_admin_{{ i.id }}" value="{{ '%.2f'|format(i.valor_unitario_proposto_admin if i.valor_unitario_proposto_admin is not none else i.valor_unitario_original)|replace('.',',') }}"></div>{% endfor %}
+            <div class="fn-field"><label>BDI percentual</label><input name="bdi_percentual" value="{{ '%.2f'|format(d.bdi_percentual)|replace('.',',') }}"></div>
+            <div class="fn-field"><label>Observação ao fornecedor</label><textarea name="motivo">{{ d.revisao_observacao or '' }}</textarea></div>
+            <button class="fn-btn primary" name="acao" value="propor_ajuste">Atualizar proposta</button>
+          </form>
+        </details>{% endif %}
+      {% endif %}
     {% else %}<div class="fn-empty">Aguardando orçamento do fornecedor.</div>{% endif %}
   </div></div>
   {% endfor %}

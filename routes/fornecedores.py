@@ -335,7 +335,13 @@ def decidir_orcamento(orcamento_id):
             FROM fornecedor_orcamentos o JOIN fornecedor_solicitacao_destinos d ON d.id=o.destino_id
             JOIN fornecedor_solicitacoes s ON s.id=d.solicitacao_id WHERE o.id=:id FOR UPDATE
         """), {"id": orcamento_id}).mappings().first()
-        if not orcamento or orcamento["status"] != "ENVIADO":
+        editando_ajuste = bool(
+            orcamento
+            and orcamento["status"] == "REVISAO_SOLICITADA"
+            and orcamento["revisao_tipo"] == "AJUSTE_ADMIN"
+            and acao == "propor_ajuste"
+        )
+        if not orcamento or (orcamento["status"] != "ENVIADO" and not editando_ajuste):
             flash("Este orçamento não está disponível para decisão.", "warning")
             return redirect(url_for("fornecedores.solicitacoes"))
         if acao in {"revisar", "desconto"}:
@@ -357,12 +363,25 @@ def decidir_orcamento(orcamento_id):
             try:
                 propostas = []
                 alterou = False
+                subtotal_proposto = Decimal("0")
                 for item in itens:
                     valor = _decimal(request.form.get(f"valor_admin_{item['id']}"), "valor proposto")
                     propostas.append((item["id"], valor))
-                    alterou = alterou or valor != item["valor_unitario_original"]
+                    valor_anterior = (
+                        item["valor_unitario_proposto_admin"]
+                        if editando_ajuste and item["valor_unitario_proposto_admin"] is not None
+                        else item["valor_unitario_original"]
+                    )
+                    alterou = alterou or valor != valor_anterior
+                    subtotal_proposto += item["quantidade"] * valor
+                subtotal_proposto = subtotal_proposto.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+                bdi = _decimal(request.form.get("bdi_percentual") or "0", "BDI")
+                alterou = alterou or bdi != orcamento["bdi_percentual"]
                 if not alterou:
-                    raise ValueError("Altere ao menos um valor antes de enviar a proposta ao fornecedor.")
+                    raise ValueError("Altere ao menos um valor ou o BDI antes de enviar a proposta ao fornecedor.")
+                bdi_valor = (subtotal_proposto * bdi / Decimal("100")).quantize(
+                    Decimal("0.01"), rounding=ROUND_HALF_UP
+                )
             except ValueError as exc:
                 flash(str(exc), "warning")
                 return redirect(url_for("fornecedores.solicitacao_detalhe", solicitacao_id=orcamento["solicitacao_id"]))
@@ -373,14 +392,18 @@ def decidir_orcamento(orcamento_id):
             conn.execute(text("""
                 UPDATE fornecedor_orcamentos SET status='REVISAO_SOLICITADA',
                   revisao_tipo='AJUSTE_ADMIN',revisao_observacao=:m,motivo_decisao=NULL,
+                  subtotal_ajustado=:sub,bdi_percentual=:bdi,bdi_valor=:bv,total_aprovado=NULL,
                   decidido_por=:u,decidido_em=NOW() WHERE id=:id
-            """), {"m": observacao, "u": session.get("usuario_id"), "id": orcamento_id})
+            """), {"m": observacao, "sub": subtotal_proposto, "bdi": bdi,
+                    "bv": bdi_valor, "u": session.get("usuario_id"), "id": orcamento_id})
             conn.execute(text("UPDATE fornecedor_solicitacao_destinos SET status='REVISAO_SOLICITADA',atualizado_em=NOW() WHERE id=:id"), {"id": orcamento["destino_id"]})
             conn.execute(text("UPDATE fornecedor_solicitacoes SET status='REVISAO_SOLICITADA',atualizado_em=NOW() WHERE id=:id"), {"id": orcamento["solicitacao_id"]})
             _evento(conn, orcamento["solicitacao_id"], "AJUSTE_PROPOSTO",
-                    "Novos valores foram enviados ao fornecedor. " + observacao,
+                    f"Novos valores foram enviados ao fornecedor: subtotal R$ {subtotal_proposto:.2f}, "
+                    f"BDI {bdi}% e total R$ {subtotal_proposto + bdi_valor:.2f}. {observacao}",
                     orcamento["destino_id"])
-            flash("Proposta de ajuste enviada ao fornecedor.", "success")
+            flash("Proposta de ajuste atualizada para o fornecedor." if editando_ajuste
+                  else "Proposta de ajuste enviada ao fornecedor.", "success")
         elif acao == "rejeitar":
             if not motivo:
                 flash("Informe o motivo da rejeição.", "warning")
@@ -706,12 +729,18 @@ def orcamento(solicitacao_id):
                 versao = conn.execute(text("SELECT COALESCE(MAX(versao),0)+1 FROM fornecedor_orcamentos WHERE destino_id=:d"), {"d": destino["id"]}).scalar_one()
                 conn.execute(text("UPDATE fornecedor_orcamentos SET status='SUBSTITUIDO' WHERE destino_id=:d AND status IN ('ENVIADO','REVISAO_SOLICITADA')"), {"d": destino["id"]})
                 subtotal = sum(q * v for _, _, q, v in itens).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+                bdi = anterior["bdi_percentual"] if anterior and destino["status"] == "REVISAO_SOLICITADA" else Decimal("0")
+                bdi_valor = (subtotal * bdi / Decimal("100")).quantize(
+                    Decimal("0.01"), rounding=ROUND_HALF_UP
+                )
                 novo = conn.execute(text("""
-                    INSERT INTO fornecedor_orcamentos(destino_id,versao,observacoes_fornecedor,subtotal_original)
-                    VALUES (:d,:v,:o,:s) RETURNING id
+                    INSERT INTO fornecedor_orcamentos(
+                      destino_id,versao,observacoes_fornecedor,subtotal_original,
+                      bdi_percentual,bdi_valor)
+                    VALUES (:d,:v,:o,:s,:bdi,:bv) RETURNING id
                 """), {"d": destino["id"], "v": versao,
                         "o": (request.form.get("observacoes") or "").strip() or None,
-                        "s": subtotal}).scalar_one()
+                        "s": subtotal, "bdi": bdi, "bv": bdi_valor}).scalar_one()
                 for ordem, (descricao, unidade, quantidade, valor) in enumerate(itens, 1):
                     conn.execute(text("""
                         INSERT INTO fornecedor_orcamento_itens(orcamento_id,ordem,descricao,unidade,quantidade,valor_unitario_original)
@@ -724,7 +753,8 @@ def orcamento(solicitacao_id):
                 conn.execute(text("UPDATE fornecedor_solicitacao_destinos SET status='ORCAMENTO_RECEBIDO',respondido_em=NOW(),atualizado_em=NOW() WHERE id=:id"), {"id": destino["id"]})
                 conn.execute(text("UPDATE fornecedor_solicitacoes SET status='ORCAMENTO_RECEBIDO',atualizado_em=NOW() WHERE id=:id AND status<>'APROVADA'"), {"id": solicitacao_id})
                 _evento(conn, solicitacao_id, "ORCAMENTO_ENVIADO",
-                        f"Orçamento versão {versao} enviado no valor de R$ {subtotal:.2f}.",
+                        f"Orçamento versão {versao} enviado com subtotal de R$ {subtotal:.2f}, "
+                        f"BDI de {bdi}% e total de R$ {subtotal + bdi_valor:.2f}.",
                         destino["id"], session["portal_fornecedor_id"])
             flash("Orçamento enviado para análise.", "success")
             return redirect(url_for("portal_fornecedor.detalhe", solicitacao_id=solicitacao_id))
@@ -764,11 +794,20 @@ def aceitar_ajuste(solicitacao_id):
             versao = anterior["versao"] + 1
             subtotal = sum(i["quantidade"] * i["valor_unitario_proposto_admin"] for i in itens)
             subtotal = subtotal.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            bdi = anterior["bdi_percentual"]
+            bdi_valor = (subtotal * bdi / Decimal("100")).quantize(
+                Decimal("0.01"), rounding=ROUND_HALF_UP
+            )
+            total = subtotal + bdi_valor
             conn.execute(text("UPDATE fornecedor_orcamentos SET status='SUBSTITUIDO' WHERE id=:id"), {"id": anterior["id"]})
             novo = conn.execute(text("""
-                INSERT INTO fornecedor_orcamentos(destino_id,versao,status,observacoes_fornecedor,subtotal_original)
-                VALUES (:d,:v,'ENVIADO','Ajuste proposto pela PRUMAT aceito pelo fornecedor.',:s) RETURNING id
-            """), {"d": destino["id"], "v": versao, "s": subtotal}).scalar_one()
+                INSERT INTO fornecedor_orcamentos(
+                  destino_id,versao,status,observacoes_fornecedor,subtotal_original,
+                  bdi_percentual,bdi_valor)
+                VALUES (:d,:v,'ENVIADO','Ajuste proposto pela PRUMAT aceito pelo fornecedor.',
+                        :s,:bdi,:bv) RETURNING id
+            """), {"d": destino["id"], "v": versao, "s": subtotal,
+                    "bdi": bdi, "bv": bdi_valor}).scalar_one()
             for item in itens:
                 conn.execute(text("""
                     INSERT INTO fornecedor_orcamento_itens(orcamento_id,ordem,descricao,unidade,quantidade,valor_unitario_original)
@@ -779,7 +818,8 @@ def aceitar_ajuste(solicitacao_id):
             conn.execute(text("UPDATE fornecedor_solicitacao_destinos SET status='ORCAMENTO_RECEBIDO',respondido_em=NOW(),atualizado_em=NOW() WHERE id=:id"), {"id": destino["id"]})
             conn.execute(text("UPDATE fornecedor_solicitacoes SET status='ORCAMENTO_RECEBIDO',atualizado_em=NOW() WHERE id=:id"), {"id": solicitacao_id})
             _evento(conn, solicitacao_id, "AJUSTE_ACEITO",
-                    f"Fornecedor aceitou os valores propostos. Orçamento atual: R$ {subtotal:.2f}.",
+                    f"Fornecedor aceitou os valores propostos. Subtotal R$ {subtotal:.2f}, "
+                    f"BDI {bdi}% e total R$ {total:.2f}.",
                     destino["id"], session["portal_fornecedor_id"])
         flash("Ajuste aceito e enviado para aprovação final.", "success")
     except ValueError as exc:

@@ -41,6 +41,12 @@ class FornecedoresEstruturaTests(unittest.TestCase):
         self.assertIn("Aceitar ajuste", portal)
         self.assertIn("Propor valores", portal)
         self.assertIn("Ajustar valores", portal)
+        self.assertIn("subtotal_proposto * bdi", self.rota)
+        self.assertIn("subtotal + bdi_valor", self.rota)
+        self.assertIn("% BDI", portal)
+        self.assertIn("editando_ajuste", self.rota)
+        admin = (ROOT / "templates" / "fornecedores" / "detalhe.html").read_text(encoding="utf-8")
+        self.assertIn("Editar proposta pendente", admin)
 
     def test_negociacao_mostra_apenas_orcamento_atual(self):
         detalhe = (ROOT / "templates" / "fornecedores" / "portal_detalhe.html").read_text(encoding="utf-8")
