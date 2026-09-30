@@ -1,70 +1,147 @@
 {% extends "base.html" %}
 {% block title %}Permissões do Perfil | PRUMAT{% endblock %}
+{% block module_name %}Administração{% endblock %}
+{% block breadcrumb %}Administração / Perfis / Permissões{% endblock %}
 
 {% block content %}
-<div class="page-wrap" style="max-width: 1000px; margin: 24px auto;">
-  <section class="zone">
-    <div class="zone-head">
-      <div class="zone-left">
-        <div>
-          <h2 style="margin:0;">Permissões do perfil</h2>
-          <div style="color:#667487; font-size:14px; margin-top:4px;">
-            Perfil: {{ perfil.nome }}
-          </div>
-        </div>
-      </div>
-      <div class="zone-actions">
-        <a href="{{ url_for('auth.perfis') }}" class="btn btn-outline">Voltar</a>
+<style>
+  .perm-wrap{max-width:1180px;margin:0 auto;display:grid;gap:16px}
+  .perm-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  .perm-head h1{margin:0;color:var(--brand-blue);font-size:24px}
+  .perm-head p{margin:5px 0 0;color:#667487}
+  .perm-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .perm-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+  .perm-stat{background:#fff;border:1px solid #d7e2ef;border-radius:12px;padding:16px}
+  .perm-stat span{display:block;color:#667487;font-size:12px;text-transform:uppercase;font-weight:700}
+  .perm-stat strong{display:block;margin-top:5px;color:#082f55;font-size:22px}
+  .perm-alert{padding:13px 15px;border:1px solid #f0c36b;background:#fff7df;border-radius:11px;color:#704b00}
+  .perm-toolbar{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;background:#fff;border:1px solid #d7e2ef;border-radius:12px;padding:12px}
+  .perm-search{min-width:280px;flex:1;border:1px solid #c8d6e5;border-radius:9px;padding:10px 12px;font:inherit}
+  .perm-modules{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+  .perm-module{background:#fff;border:1px solid #d7e2ef;border-radius:13px;overflow:hidden}
+  .perm-module.admin{border-color:#f0c36b}
+  .perm-module-head{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:14px 16px;background:#f5f8fc;border-bottom:1px solid #d7e2ef}
+  .perm-module.admin .perm-module-head{background:#fff7df}
+  .perm-module-title{display:flex;align-items:center;gap:10px}
+  .perm-module-title input,.perm-item input{width:17px;height:17px;accent-color:#0c5a91}
+  .perm-module-title strong{color:#082f55;font-size:15px}
+  .perm-module-count{font-size:12px;color:#667487;white-space:nowrap}
+  .perm-list{display:grid}
+  .perm-item{display:grid;grid-template-columns:22px 120px 1fr;gap:8px;align-items:start;padding:12px 16px;border-bottom:1px solid #edf2f7;cursor:pointer}
+  .perm-item:last-child{border-bottom:0}
+  .perm-item:hover{background:#f9fbfd}
+  .perm-action{color:#0b4774;font-weight:700;font-size:13px;text-transform:capitalize}
+  .perm-description{color:#4c5e70;font-size:13px;line-height:1.35}
+  .perm-footer{position:sticky;bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:12px;background:#fff;border:1px solid #c8d6e5;box-shadow:0 8px 26px rgba(7,45,77,.12);border-radius:13px;padding:12px 14px;z-index:4}
+  .perm-hidden{display:none}
+  @media(max-width:800px){.perm-modules,.perm-summary{grid-template-columns:1fr}.perm-item{grid-template-columns:22px 92px 1fr}.perm-search{min-width:100%}}
+</style>
+
+<div class="perm-wrap">
+  <div class="perm-head">
+    <div>
+      <h1>Permissões do perfil</h1>
+      <p><strong>{{ perfil.nome }}</strong> · libere páginas e ações por módulo ou controle tudo de uma vez.</p>
+    </div>
+    <div class="perm-actions">
+      <a href="{{ url_for('auth.perfis') }}" class="btn btn-outline">Voltar aos perfis</a>
+    </div>
+  </div>
+
+  <div class="perm-summary">
+    <div class="perm-stat"><span>Módulos disponíveis</span><strong>{{ grupos|length }}</strong></div>
+    <div class="perm-stat"><span>Permissões liberadas</span><strong id="totalMarcadas">{{ total_marcadas }}</strong></div>
+    <div class="perm-stat"><span>Total controlado</span><strong>{{ total_permissoes }}</strong></div>
+  </div>
+
+  <div class="perm-alert">
+    <strong>Atenção:</strong> “Administração e acesso total” libera automaticamente todas as páginas,
+    mesmo que outras opções estejam desmarcadas. Use essa permissão somente em perfis administradores.
+  </div>
+
+  <form method="post" id="permissoesForm">
+    <div class="perm-toolbar">
+      <input id="filtroPermissoes" class="perm-search" type="search" placeholder="Buscar módulo, página, ação ou descrição">
+      <div class="perm-actions">
+        <button class="btn btn-primary" type="submit" name="acao" value="liberar_tudo"
+                onclick="return confirm('Liberar todas as páginas e ações para este perfil?')">Liberar tudo</button>
+        <button class="btn btn-outline" type="submit" name="acao" value="bloquear_tudo"
+                onclick="return confirm('Bloquear todas as páginas e ações deste perfil? Se for seu próprio perfil, você perderá o acesso administrativo.')">Bloquear tudo</button>
       </div>
     </div>
 
-    <div style="padding:24px;">
-      {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-          {% for category, message in messages %}
-            <div style="margin-bottom:12px; padding:12px 14px; border-radius:10px; background:#f5f8fc; border:1px solid #d7e2ef;">
-              {{ message }}
-            </div>
+    <div class="perm-modules" style="margin-top:14px">
+      {% for grupo in grupos %}
+      <section class="perm-module {{ 'admin' if grupo.codigo=='auth' else '' }}" data-module="{{ grupo.codigo }}">
+        <div class="perm-module-head">
+          <label class="perm-module-title">
+            <input type="checkbox" class="module-toggle" data-module="{{ grupo.codigo }}">
+            <strong>{{ grupo.nome }}</strong>
+          </label>
+          <span class="perm-module-count"><b>{{ grupo.marcadas }}</b> de {{ grupo.total }}</span>
+        </div>
+        <div class="perm-list">
+          {% for p in grupo.permissoes %}
+          <label class="perm-item" data-search="{{ (grupo.nome ~ ' ' ~ p.acao ~ ' ' ~ (p.descricao or ''))|lower }}">
+            <input class="permission-checkbox" data-module="{{ grupo.codigo }}" type="checkbox"
+                   name="permissoes" value="{{ p.id }}" {% if p.marcado %}checked{% endif %}>
+            <span class="perm-action">{{ p.acao|replace('_',' ') }}</span>
+            <span class="perm-description">{{ p.descricao or '' }}</span>
+          </label>
           {% endfor %}
-        {% endif %}
-      {% endwith %}
-
-      <form method="post">
-        <div style="overflow-x:auto;">
-          <table class="table" style="width:100%;">
-            <thead>
-              <tr>
-                <th style="width:80px; text-align:center;">Marcar</th>
-                <th>Módulo</th>
-                <th>Ação</th>
-                <th>Descrição</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for p in permissoes %}
-              <tr>
-                <td style="text-align:center;">
-                  <input type="checkbox" name="permissoes" value="{{ p.id }}" {% if p.marcado %}checked{% endif %}>
-                </td>
-                <td>{{ p.modulo }}</td>
-                <td>{{ p.acao }}</td>
-                <td>{{ p.descricao or '' }}</td>
-              </tr>
-              {% else %}
-              <tr>
-                <td colspan="4" style="text-align:center;">Nenhuma permissão encontrada.</td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
         </div>
-
-        <div style="margin-top:24px; display:flex; gap:12px;">
-          <button type="submit" class="btn btn-primary">Salvar permissões</button>
-          <a href="{{ url_for('auth.perfis') }}" class="btn btn-outline">Cancelar</a>
-        </div>
-      </form>
+      </section>
+      {% endfor %}
     </div>
-  </section>
+
+    <div class="perm-footer">
+      <span id="resumoSelecao">{{ total_marcadas }} de {{ total_permissoes }} permissões selecionadas</span>
+      <div class="perm-actions">
+        <a href="{{ url_for('auth.perfis') }}" class="btn btn-outline">Cancelar</a>
+        <button type="submit" name="acao" value="salvar" class="btn btn-primary">Salvar permissões</button>
+      </div>
+    </div>
+  </form>
 </div>
+
+<script>
+(function(){
+  const checks = Array.from(document.querySelectorAll('.permission-checkbox'));
+  const modules = Array.from(document.querySelectorAll('.perm-module'));
+  const total = checks.length;
+  function update(){
+    const marcadas = checks.filter(c => c.checked).length;
+    document.getElementById('totalMarcadas').textContent = marcadas;
+    document.getElementById('resumoSelecao').textContent = marcadas + ' de ' + total + ' permissões selecionadas';
+    modules.forEach(section => {
+      const items = checks.filter(c => c.dataset.module === section.dataset.module);
+      const qtd = items.filter(c => c.checked).length;
+      const toggle = section.querySelector('.module-toggle');
+      toggle.checked = qtd === items.length && items.length > 0;
+      toggle.indeterminate = qtd > 0 && qtd < items.length;
+      section.querySelector('.perm-module-count b').textContent = qtd;
+    });
+  }
+  document.querySelectorAll('.module-toggle').forEach(toggle => {
+    toggle.addEventListener('change', function(){
+      checks.filter(c => c.dataset.module === this.dataset.module).forEach(c => c.checked = this.checked);
+      update();
+    });
+  });
+  checks.forEach(c => c.addEventListener('change', update));
+  document.getElementById('filtroPermissoes').addEventListener('input', function(){
+    const termo = this.value.trim().toLowerCase();
+    modules.forEach(section => {
+      let visiveis = 0;
+      section.querySelectorAll('.perm-item').forEach(item => {
+        const mostrar = !termo || item.dataset.search.includes(termo);
+        item.classList.toggle('perm-hidden', !mostrar);
+        if(mostrar) visiveis++;
+      });
+      section.classList.toggle('perm-hidden', visiveis === 0);
+    });
+  });
+  update();
+})();
+</script>
 {% endblock %}

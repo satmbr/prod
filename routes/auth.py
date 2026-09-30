@@ -10,6 +10,96 @@ from openpyxl import Workbook
 
 bp = Blueprint("auth", __name__, url_prefix="/auth")
 
+PERMISSOES_SISTEMA = (
+    ("auth", "administrar", "Administrar usuários, perfis, permissões e auditoria; concede acesso total ao sistema"),
+    ("operacao", "visualizar", "Acessar as páginas de produção, registros, resumos e cadastros da Operação"),
+    ("operacao", "criar", "Criar planos, registros, observações e cadastros da Operação"),
+    ("operacao", "editar", "Editar planos, registros e cadastros da Operação"),
+    ("operacao", "excluir", "Excluir registros e cadastros da Operação"),
+    ("equipamentos", "visualizar", "Acessar as páginas, controles e partes diárias de Equipamentos"),
+    ("equipamentos", "criar", "Criar máquinas, atividades, pontos e partes diárias"),
+    ("equipamentos", "editar", "Editar máquinas, atividades, pontos e partes diárias"),
+    ("equipamentos", "excluir", "Excluir máquinas, atividades, pontos e partes diárias"),
+    ("equipamentos", "exportar", "Exportar dados e relatórios de Equipamentos"),
+    ("colaboradores", "visualizar", "Acessar todas as páginas e dados de Colaboradores"),
+    ("colaboradores", "criar", "Criar e alterar registros e cadastros de Colaboradores"),
+    ("financeiro", "visualizar", "Acessar todas as páginas do Financeiro"),
+    ("financeiro", "criar", "Criar OM, RD, despesas, faturas e demais registros financeiros"),
+    ("financeiro", "editar", "Editar registros do Financeiro"),
+    ("financeiro", "aprovar", "Aprovar registros e etapas do Financeiro"),
+    ("financeiro", "gerar_nd", "Gerar notas de débito no Financeiro"),
+    ("financeiro_novo", "visualizar", "Acessar despesas, missões, reembolsos, previsões e relatórios do Financeiro Novo"),
+    ("financeiro_novo", "criar", "Criar registros no Financeiro Novo"),
+    ("financeiro_novo", "editar", "Editar registros no Financeiro Novo"),
+    ("financeiro_novo", "aprovar", "Aprovar registros no Financeiro Novo"),
+    ("financeiro_novo", "pagar", "Registrar pagamentos no Financeiro Novo"),
+    ("financeiro_novo", "cancelar", "Cancelar registros no Financeiro Novo"),
+    ("financeiro_novo", "administrar", "Administrar configurações e cadastros do Financeiro Novo"),
+    ("perfil_pagamentos", "visualizar", "Acessar perfis, painel e contas do Perfil de Pagamentos"),
+    ("perfil_pagamentos", "administrar", "Criar, editar e desativar perfis de pagamentos"),
+    ("perfil_pagamentos", "editar", "Editar e vincular contas controladas"),
+    ("perfil_pagamentos", "pagar", "Marcar ou reabrir pagamentos"),
+    ("perfil_pagamentos", "reembolsar", "Marcar ou reverter reembolsos"),
+    ("perfil_pagamentos", "sincronizar", "Executar a sincronização manual das contas"),
+    ("bot", "visualizar", "Acessar as páginas do Bot Prumat"),
+    ("bot", "administrar", "Configurar colaboradores, perfis e fluxos do Bot Prumat"),
+    ("bot", "operar", "Acompanhar e executar solicitações do Bot Prumat"),
+    ("bot", "auditar", "Consultar a auditoria do Bot Prumat"),
+    ("fornecedores", "visualizar", "Acessar fornecedores, solicitações, orçamentos e arquivos"),
+    ("fornecedores", "administrar", "Cadastrar fornecedores, criar e cancelar solicitações"),
+    ("fornecedores", "aprovar", "Negociar, revisar, rejeitar e aprovar orçamentos"),
+    ("fornecedores", "fechar", "Acompanhar a execução e fechar serviços de fornecedores"),
+)
+
+NOMES_MODULOS = {
+    "auth": "Administração e acesso total",
+    "operacao": "Operação",
+    "equipamentos": "Equipamentos",
+    "colaboradores": "Colaboradores",
+    "financeiro": "Financeiro",
+    "financeiro_novo": "Financeiro Novo",
+    "perfil_pagamentos": "Perfil de Pagamentos",
+    "bot": "Bot Prumat",
+    "fornecedores": "Fornecedores",
+}
+
+
+def sincronizar_catalogo_permissoes(conn):
+    for modulo, acao, descricao in PERMISSOES_SISTEMA:
+        conn.execute(
+            text("""
+                INSERT INTO permissoes(modulo,acao,descricao)
+                VALUES (:modulo,:acao,:descricao)
+                ON CONFLICT (modulo,acao)
+                DO UPDATE SET descricao=EXCLUDED.descricao
+            """),
+            {"modulo": modulo, "acao": acao, "descricao": descricao},
+        )
+
+
+def agrupar_permissoes(permissoes):
+    grupos = {}
+    for registro in permissoes:
+        item = dict(registro)
+        modulo = item["modulo"]
+        if modulo not in grupos:
+            grupos[modulo] = {
+                "codigo": modulo,
+                "nome": NOMES_MODULOS.get(modulo, modulo.replace("_", " ").title()),
+                "permissoes": [],
+            }
+        grupos[modulo]["permissoes"].append(item)
+    ordem = {modulo: indice for indice, modulo in enumerate(NOMES_MODULOS)}
+    resultado = sorted(
+        grupos.values(),
+        key=lambda grupo: (ordem.get(grupo["codigo"], 999), grupo["nome"]),
+    )
+    for grupo in resultado:
+        grupo["marcadas"] = sum(1 for permissao in grupo["permissoes"] if permissao["marcado"])
+        grupo["total"] = len(grupo["permissoes"])
+    return resultado
+
+
 def registrar_log(evento, detalhes=None, usuario_id=None, username=None):
     try:
         with get_engine().begin() as conn:
@@ -740,7 +830,8 @@ def editar_perfil(perfil_id):
 @login_required
 @admin_required
 def permissoes_perfil(perfil_id):
-    with get_engine().connect() as conn:
+    with get_engine().begin() as conn:
+        sincronizar_catalogo_permissoes(conn)
         perfil = conn.execute(
             text("""
                 SELECT id, nome, descricao, ativo
@@ -773,12 +864,23 @@ def permissoes_perfil(perfil_id):
             {"perfil_id": perfil_id}
         ).mappings().all()
 
-    return render_template("auth/perfil_permissoes.html", perfil=perfil, permissoes=permissoes)
+    grupos = agrupar_permissoes(permissoes)
+    total = sum(grupo["total"] for grupo in grupos)
+    marcadas = sum(grupo["marcadas"] for grupo in grupos)
+    return render_template(
+        "auth/perfil_permissoes.html",
+        perfil=perfil,
+        permissoes=permissoes,
+        grupos=grupos,
+        total_permissoes=total,
+        total_marcadas=marcadas,
+    )
 
 @bp.post("/perfis/<int:perfil_id>/permissoes")
 @login_required
 @admin_required
 def salvar_permissoes_perfil(perfil_id):
+    acao_formulario = request.form.get("acao") or "salvar"
     permissoes_ids = request.form.getlist("permissoes")
 
     with get_engine().begin() as conn:
@@ -789,6 +891,18 @@ def salvar_permissoes_perfil(perfil_id):
 
         if not perfil:
             abort(404)
+
+        sincronizar_catalogo_permissoes(conn)
+        ids_validos = set(conn.execute(text("SELECT id FROM permissoes")).scalars().all())
+        if acao_formulario == "liberar_tudo":
+            permissoes_ids = [str(permissao_id) for permissao_id in ids_validos]
+        elif acao_formulario == "bloquear_tudo":
+            permissoes_ids = []
+        else:
+            permissoes_ids = [
+                permissao_id for permissao_id in permissoes_ids
+                if permissao_id.isdigit() and int(permissao_id) in ids_validos
+            ]
 
         conn.execute(
             text("DELETE FROM perfil_permissoes WHERE perfil_id = :perfil_id"),
@@ -809,11 +923,23 @@ def salvar_permissoes_perfil(perfil_id):
             )
     registrar_log(
         evento="permissoes_perfil_alteradas",
-        detalhes=f"Permissões alteradas para o perfil ID {perfil_id}",
+        detalhes=(
+            f"Permissões alteradas para o perfil ID {perfil_id}: "
+            f"{len(permissoes_ids)} de {len(ids_validos)} liberadas ({acao_formulario})"
+        ),
         usuario_id=session.get("usuario_id"),
         username=session.get("username")
     )
-    flash("Permissões do perfil atualizadas com sucesso.", "sucesso")
+    if session.get("perfil_id") == perfil_id:
+        session["permissoes"] = carregar_permissoes_usuario(session["usuario_id"])
+    if acao_formulario == "liberar_tudo":
+        flash("Todas as páginas e ações foram liberadas para o perfil.", "sucesso")
+    elif acao_formulario == "bloquear_tudo":
+        flash("Todas as páginas e ações foram bloqueadas para o perfil.", "sucesso")
+    else:
+        flash("Permissões do perfil atualizadas com sucesso.", "sucesso")
+    if "auth:administrar" not in session.get("permissoes", []):
+        return redirect(url_for("dashboard"))
     return redirect(url_for("auth.permissoes_perfil", perfil_id=perfil_id))
 
 @bp.app_errorhandler(403)
