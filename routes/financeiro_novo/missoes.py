@@ -33,6 +33,20 @@ DOCUMENTOS = {
 }
 
 
+def _sincronizar_contas_perfil(conta_ids):
+    if not conta_ids:
+        return
+    from routes.financeiro_novo.services.pagamentos_bucket import sincronizar_arquivo_da_conta
+
+    for conta_id in sorted(set(conta_ids)):
+        try:
+            sincronizar_arquivo_da_conta(conta_id)
+        except Exception:
+            current_app.logger.exception(
+                "Falha ao sincronizar o arquivo da conta %s após quitação da OM.", conta_id
+            )
+
+
 def _registro(conn, tabela, registro_id, bloquear=False):
     ativo = " AND removido_em IS NULL" if tabela == "financeiro3_oms" else ""
     return conn.execute(
@@ -193,6 +207,15 @@ def om_detalhe(om_id):
             LEFT JOIN financeiro3_arquivos ar ON ar.id=a.arquivo_id
             WHERE i.om_id=:id AND i.status='ATIVO' ORDER BY i.id
         """), {"id": om_id}).mappings().all()
+        movimentos = conn.execute(text("""
+            SELECT mv.*,c.nome AS categoria,cc.codigo AS centro_codigo,cc.nome AS centro_nome,
+              pg.tipo AS tipo_pagamento
+            FROM financeiro3_om_movimentos mv
+            JOIN financeiro3_categorias c ON c.id=mv.categoria_id
+            JOIN financeiro3_centros_custo cc ON cc.id=mv.centro_custo_id
+            JOIN financeiro3_om_pagamentos pg ON pg.id=mv.pagamento_id
+            WHERE mv.om_id=:id ORDER BY mv.id
+        """), {"id": om_id}).mappings().all()
         pagamentos = conn.execute(text("""
             SELECT pg.*,a.id AS anexo_id,ar.id AS arquivo_id,ar.nome_original
             FROM financeiro3_om_pagamentos pg
@@ -207,7 +230,8 @@ def om_detalhe(om_id):
     valor_pago = sum((pg["valor"] for pg in pagamentos if pg["status"] == "PAGO"), start=0)
     diferenca = om["valor_total"] + om["valor_reembolsos"] - valor_pago
     return render_template(
-        "financeiro_novo/om_detalhe.html", om=om, itens=itens, decisoes=decisoes, anexos=anexos,
+        "financeiro_novo/om_detalhe.html", om=om, itens=itens, movimentos=movimentos,
+        decisoes=decisoes, anexos=anexos,
         pagamentos=pagamentos, valor_pago=valor_pago, diferenca=diferenca,
         despesa_importada=despesa_importada,
         armazenamento=diagnosticar_armazenamento(),
@@ -250,6 +274,13 @@ def _dados_exportacao_om(om_id):
             WHERE i.om_id=:id AND i.status='ATIVO'
             ORDER BY i.id
         """), {"id": om_id}).mappings().all()
+        movimentos = conn.execute(text("""
+            SELECT mv.*,c.nome AS categoria,cc.codigo AS centro_codigo,cc.nome AS centro_nome
+            FROM financeiro3_om_movimentos mv
+            JOIN financeiro3_categorias c ON c.id=mv.categoria_id
+            JOIN financeiro3_centros_custo cc ON cc.id=mv.centro_custo_id
+            WHERE mv.om_id=:id ORDER BY mv.id
+        """), {"id": om_id}).mappings().all()
         pagamentos = conn.execute(text("""
             SELECT pg.*, ar.id AS arquivo_id, ar.nome_original
             FROM financeiro3_om_pagamentos pg
@@ -267,8 +298,20 @@ def _dados_exportacao_om(om_id):
     itens_exportacao = []
     for item in itens:
         dados = dict(item)
+        dados["tipo_movimento"] = "DESPESA"
         caminho = _caminho(item["object_key"]) if item.get("object_key") else None
         dados["caminho_recibo"] = caminho if caminho and caminho.is_file() else None
+        itens_exportacao.append(dados)
+    for indice, movimento in enumerate(movimentos, start=len(itens_exportacao) + 1):
+        dados = dict(movimento)
+        dados.update({
+            "numero_linha": indice,
+            "data_despesa": movimento["data_movimento"],
+            "tipo_movimento": "PAGAMENTO",
+            "arquivo_id": None,
+            "nome_original": None,
+            "caminho_recibo": None,
+        })
         itens_exportacao.append(dados)
     return dict(om), itens_exportacao, [dict(pg) for pg in pagamentos]
 
@@ -672,7 +715,9 @@ def om_verificar_duplicidades(om_id):
 @permission_required("financeiro_novo", "editar")
 def om_item_novo(om_id):
     from routes.financeiro_novo.reembolsos import _preparar_anexo, _vincular_anexo
+    from routes.financeiro_novo.services.quitacao_om import reconciliar_quitacao_om
     preparados = []
+    contas_sincronizar = []
     try:
         linhas = _linhas_om_formulario()
         preparados = [_preparar_anexo(linha["arquivo"]) for linha in linhas]
@@ -720,6 +765,8 @@ def om_item_novo(om_id):
                 vinculo = _vincular_anexo(conn, preparado, "OM_ITEM", item["id"], "COMPROVANTE")
                 registrar_evento(conn, entidade="OM_ITEM", entidade_id=item["id"], evento="CRIADO",
                     dados_novos={**dict(item), "anexo_id": vinculo})
+            contas_sincronizar = reconciliar_quitacao_om(conn, om_id)
+        _sincronizar_contas_perfil(contas_sincronizar)
         flash(f"{len(linhas)} linha(s) de despesa incluída(s) na OM.", "sucesso")
     except (ValorInvalido, ValueError, AnexoInvalido) as exc:
         for preparado in preparados:
@@ -736,6 +783,8 @@ def om_item_novo(om_id):
 @login_required
 @permission_required("financeiro_novo", "editar")
 def om_item_editar(om_id, item_id):
+    from routes.financeiro_novo.services.quitacao_om import reconciliar_quitacao_om
+    contas_sincronizar = []
     try:
         try:
             centro_custo_id = int(request.form.get("centro_custo_id") or 0)
@@ -784,6 +833,8 @@ def om_item_editar(om_id, item_id):
                 conn, entidade="OM_ITEM", entidade_id=item_id, evento="EDITADO",
                 dados_anteriores=dict(anterior), dados_novos=dict(novo),
             )
+            contas_sincronizar = reconciliar_quitacao_om(conn, om_id)
+        _sincronizar_contas_perfil(contas_sincronizar)
         flash("Linha da OM atualizada.", "sucesso")
     except ValorInvalido as exc:
         flash(str(exc), "erro")
@@ -794,6 +845,8 @@ def om_item_editar(om_id, item_id):
 @login_required
 @permission_required("financeiro_novo", "editar")
 def om_item_remover(om_id, item_id):
+    from routes.financeiro_novo.services.quitacao_om import reconciliar_quitacao_om
+    contas_sincronizar = []
     with get_engine().begin() as conn:
         om = _registro(conn, "financeiro3_oms", om_id, True)
         if not om or om["status"] not in EDITAVEIS: abort(409 if om else 404)
@@ -808,6 +861,8 @@ def om_item_remover(om_id, item_id):
         """), {"u": session.get("usuario_id"), "item": item_id}).mappings().one()
         registrar_evento(conn, entidade="OM_ITEM", entidade_id=item_id, evento="REMOVIDO",
             dados_anteriores=dict(anterior), dados_novos=dict(novo))
+        contas_sincronizar = reconciliar_quitacao_om(conn, om_id)
+    _sincronizar_contas_perfil(contas_sincronizar)
     flash("Linha removida e preservada na auditoria.", "sucesso")
     return redirect(url_for("financeiro_novo.om_detalhe", om_id=om_id))
 
@@ -901,7 +956,12 @@ def _programar_pagamento(tipo, registro_id):
 
 def _registrar_pagamento_om_direto(om_id):
     from routes.financeiro_novo.reembolsos import _preparar_anexo, _vincular_anexo
+    from routes.financeiro_novo.services.quitacao_om import (
+        reconciliar_quitacao_om,
+        registrar_movimento_pagamento_om,
+    )
     preparado = None
+    contas_sincronizar = []
     try:
         tipo_pagamento = (request.form.get("tipo_pagamento") or "").upper()
         if tipo_pagamento not in {"ADIANTAMENTO", "QUITACAO"}:
@@ -927,6 +987,9 @@ def _registrar_pagamento_om_direto(om_id):
             vinculo = _vincular_anexo(conn, preparado, "OM_PAGAMENTO", pagamento["id"], "COMPROVANTE")
             registrar_evento(conn, entidade="OM_PAGAMENTO", entidade_id=pagamento["id"],
                 evento="REGISTRADO", dados_novos={**dict(pagamento), "anexo_id": vinculo})
+            registrar_movimento_pagamento_om(conn, om, pagamento, session.get("usuario_id"))
+            contas_sincronizar = reconciliar_quitacao_om(conn, om_id)
+        _sincronizar_contas_perfil(contas_sincronizar)
         flash("Adiantamento registrado." if tipo_pagamento == "ADIANTAMENTO" else "Quitação registrada.", "sucesso")
     except (ValorInvalido, AnexoInvalido) as exc:
         if preparado:
@@ -941,13 +1004,19 @@ def _registrar_pagamento_om_direto(om_id):
 
 def _registrar_pagamento(tipo, registro_id, pagamento_id):
     from routes.financeiro_novo.reembolsos import _preparar_anexo, _vincular_anexo
+    from routes.financeiro_novo.services.quitacao_om import (
+        reconciliar_quitacao_om,
+        registrar_movimento_pagamento_om,
+    )
     tabela_documento, tabela, fk, entidade, _, _ = _pagamento_config(tipo)
     preparado = None
+    contas_sincronizar = []
     try:
         data_pagamento = data_iso(request.form.get("data_pagamento"), "Data do pagamento")
         preparado = _preparar_anexo(request.files.get("arquivo"))
         with get_engine().begin() as conn:
-            if not _registro(conn, tabela_documento, registro_id, True):
+            documento = _registro(conn, tabela_documento, registro_id, True)
+            if not documento:
                 abort(404)
             anterior = conn.execute(text(f"""
                 SELECT * FROM {tabela} WHERE id=:pagamento AND {fk}=:documento FOR UPDATE
@@ -963,6 +1032,10 @@ def _registrar_pagamento(tipo, registro_id, pagamento_id):
             vinculo = _vincular_anexo(conn, preparado, f"{entidade}_PAGAMENTO", pagamento_id, "COMPROVANTE")
             registrar_evento(conn, entidade=f"{entidade}_PAGAMENTO", entidade_id=pagamento_id,
                 evento="PAGO", dados_anteriores=dict(anterior), dados_novos={**dict(novo), "anexo_id": vinculo})
+            if tipo == "om":
+                registrar_movimento_pagamento_om(conn, documento, novo, session.get("usuario_id"))
+                contas_sincronizar = reconciliar_quitacao_om(conn, registro_id)
+        _sincronizar_contas_perfil(contas_sincronizar)
         flash("Pagamento realizado e movido da previsão para o realizado.", "sucesso")
     except (ValorInvalido, AnexoInvalido) as exc:
         if preparado:

@@ -663,6 +663,7 @@ def pagamento_conta_reembolso(conta_id):
             novo = conn.execute(text("""
                 UPDATE financeiro3_pagamento_contas SET status_reembolso=:status,
                   numero_om=:om,data_reembolso=:data,reembolso_por=:usuario,
+                  reembolso_om_pagamento_id=NULL,
                   status_sincronizacao='PENDENTE',atualizado_em=NOW() WHERE id=:id RETURNING *
             """), {"status": status, "om": numero_om, "data": data_reembolso,
                      "usuario": session.get("usuario_id") if status == "REEMBOLSADA" else None,
@@ -682,8 +683,10 @@ def pagamento_conta_reembolso(conta_id):
 @permission_required("financeiro_novo", "editar")
 def pagamento_conta_replicar_om(conta_id):
     from routes.financeiro_novo.reembolsos import _preparar_anexo, _vincular_anexo
+    from routes.financeiro_novo.services.quitacao_om import reconciliar_quitacao_om
 
     preparado = None
+    contas_sincronizar = []
     try:
         confirmar_duplicidade = request.form.get("confirmar_duplicidade") == "1"
         try:
@@ -782,6 +785,9 @@ def pagamento_conta_replicar_om(conta_id):
                 conn, entidade="PERFIL_PAGAMENTO_CONTA", entidade_id=conta_id,
                 evento="REPLICADA_PARA_OM", dados_anteriores=dict(conta), dados_novos=dict(nova_conta),
             )
+            contas_sincronizar = reconciliar_quitacao_om(conn, om_id)
+        for conta_sincronizar in sorted(set(contas_sincronizar)):
+            sincronizar_arquivo_da_conta(conta_sincronizar)
         flash(f"Conta {origem['numero']} replicada para a OM {om['numero_om']}.", "sucesso")
     except (ValorInvalido, PagamentosStorageErro, AnexoInvalido) as exc:
         if preparado:
@@ -799,6 +805,9 @@ def pagamento_conta_replicar_om(conta_id):
 @permission_required(MODULO, "editar")
 @permission_required("financeiro_novo", "editar")
 def pagamento_conta_desvincular_om(conta_id):
+    from routes.financeiro_novo.services.quitacao_om import reconciliar_quitacao_om
+
+    contas_sincronizar = []
     try:
         with get_engine().begin() as conn:
             conta = _conta(conn, conta_id, bloquear=True)
@@ -837,7 +846,17 @@ def pagamento_conta_desvincular_om(conta_id):
 
             nova_conta = conn.execute(text("""
                 UPDATE financeiro3_pagamento_contas
-                SET om_id=NULL,om_item_id=NULL,atualizado_em=NOW()
+                SET om_id=NULL,om_item_id=NULL,
+                    status_reembolso=CASE WHEN reembolso_om_pagamento_id IS NOT NULL
+                      THEN 'PENDENTE' ELSE status_reembolso END,
+                    numero_om=CASE WHEN reembolso_om_pagamento_id IS NOT NULL
+                      THEN NULL ELSE numero_om END,
+                    data_reembolso=CASE WHEN reembolso_om_pagamento_id IS NOT NULL
+                      THEN NULL ELSE data_reembolso END,
+                    reembolso_por=CASE WHEN reembolso_om_pagamento_id IS NOT NULL
+                      THEN NULL ELSE reembolso_por END,
+                    reembolso_om_pagamento_id=NULL,
+                    status_sincronizacao='PENDENTE',atualizado_em=NOW()
                 WHERE id=:id RETURNING *
             """), {"id": conta_id}).mappings().one()
             registrar_evento(
@@ -848,7 +867,10 @@ def pagamento_conta_desvincular_om(conta_id):
                     "om_status": om["status"], "linha_removida": bool(item_removido),
                 },
             )
+            contas_sincronizar = reconciliar_quitacao_om(conn, om["id"])
 
+        for conta_sincronizar in sorted(set([conta_id, *contas_sincronizar])):
+            sincronizar_arquivo_da_conta(conta_sincronizar)
         if item_removido:
             flash(
                 f"Conta {conta['numero']} desvinculada da OM {om['numero_om']}; "

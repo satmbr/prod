@@ -65,7 +65,13 @@ def gerar_excel_om(om: Mapping, itens: Iterable[Mapping], pagamentos: Iterable[M
     itens = list(itens)
     pagamentos = list(pagamentos)
     moeda = _texto(om.get("moeda")) or "BRL"
-    total = sum((_valor(item.get("valor")) for item in itens), Decimal("0"))
+    quantidade_despesas = sum(
+        1 for item in itens if item.get("tipo_movimento", "DESPESA") == "DESPESA"
+    )
+    total = sum(
+        (_valor(item.get("valor")) for item in itens if item.get("tipo_movimento", "DESPESA") == "DESPESA"),
+        Decimal("0"),
+    )
     total_reembolsos = _valor(om.get("valor_reembolsos"))
 
     wb = Workbook()
@@ -119,7 +125,10 @@ def gerar_excel_om(om: Mapping, itens: Iterable[Mapping], pagamentos: Iterable[M
 
     primeira = cabecalho_linha + 1
     for linha, item in enumerate(itens, start=primeira):
-        recibo = item.get("nome_original") if item.get("arquivo_id") else "Sem recibo"
+        recibo = (
+            "—" if item.get("tipo_movimento") == "PAGAMENTO"
+            else item.get("nome_original") if item.get("arquivo_id") else "Sem recibo"
+        )
         ws.append([
             int(item.get("numero_linha") or linha - cabecalho_linha),
             item.get("data_despesa"),
@@ -144,7 +153,12 @@ def gerar_excel_om(om: Mapping, itens: Iterable[Mapping], pagamentos: Iterable[M
     ultima = max(primeira, primeira + len(itens) - 1)
     total_linha = primeira + len(itens)
     ws.cell(total_linha, 6, "Total das linhas").font = Font(bold=True, color=AZUL)
-    ws.cell(total_linha, 7, f"=SUM(G{primeira}:G{ultima})" if itens else "=0")
+    ultima_despesa = primeira + quantidade_despesas - 1
+    ws.cell(
+        total_linha,
+        7,
+        f"=SUM(G{primeira}:G{ultima_despesa})" if quantidade_despesas else "=0",
+    )
     ws.cell(total_linha, 7).number_format = f'"{moeda}" #,##0.00;[Red]-"{moeda}" #,##0.00;–'
     ws.cell(total_linha, 7).font = Font(bold=True, color=VERDE)
     ws.auto_filter.ref = f"A{cabecalho_linha}:G{ultima}" if itens else f"A{cabecalho_linha}:G{cabecalho_linha}"
@@ -226,7 +240,10 @@ def _resumo_pdf(om: Mapping, itens: list[Mapping]) -> BytesIO:
     doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), leftMargin=14 * mm, rightMargin=14 * mm,
                             topMargin=12 * mm, bottomMargin=14 * mm, title=f"OM {om.get('numero_om', '')}")
     moeda = _texto(om.get("moeda")) or "BRL"
-    total = sum((_valor(item.get("valor")) for item in itens), Decimal("0"))
+    total = sum(
+        (_valor(item.get("valor")) for item in itens if item.get("tipo_movimento", "DESPESA") == "DESPESA"),
+        Decimal("0"),
+    )
     reembolsos = _valor(om.get("valor_reembolsos"))
     recibos = sum(1 for item in itens if item.get("arquivo_id"))
     disponiveis = sum(1 for item in itens if item.get("caminho_recibo"))
@@ -271,7 +288,9 @@ def _resumo_pdf(om: Mapping, itens: list[Mapping]) -> BytesIO:
     linhas = [[Paragraph(c, ParagraphStyle("CabecalhoOM", parent=tabela_texto, textColor=colors.white,
                                             fontName="Helvetica-Bold", alignment=TA_CENTER)) for c in cabecalho]]
     for item in itens:
-        if item.get("arquivo_id"):
+        if item.get("tipo_movimento") == "PAGAMENTO":
+            recibo = "—"
+        elif item.get("arquivo_id"):
             recibo = item.get("nome_original") or "Recibo"
             if not item.get("caminho_recibo"):
                 recibo = f"{recibo} · indisponível"

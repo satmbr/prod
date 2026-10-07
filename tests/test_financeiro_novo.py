@@ -30,6 +30,7 @@ from routes.financeiro_novo.cadastros import TIPOS, _normalizar
 from routes.financeiro_novo.services.valores import ValorInvalido, decimal_br
 from routes.financeiro_novo.services.exportacao_om import gerar_excel_om, gerar_pdf_om
 from routes.financeiro_novo.services.empresas import empresa_valida, nome_empresa
+from routes.financeiro_novo.services.quitacao_om import calcular_quitacoes
 from routes.financeiro_novo.homologacao import diagnosticar_armazenamento
 from routes.financeiro_novo.missoes import _ler_linhas_om_excel, _linhas_om_formulario
 from routes.financeiro_novo.reembolsos import _vincular_anexo
@@ -681,7 +682,9 @@ class FinanceiroNovoIsolamentoTests(unittest.TestCase):
         engine = MagicMock(); engine.begin.return_value = contexto
 
         app = create_app(); app.config.update(TESTING=True, WTF_CSRF_ENABLED=False)
-        with patch("routes.financeiro_novo.missoes.get_engine", return_value=engine):
+        with patch("routes.financeiro_novo.missoes.get_engine", return_value=engine), \
+             patch("routes.financeiro_novo.services.quitacao_om.registrar_movimento_pagamento_om"), \
+             patch("routes.financeiro_novo.services.quitacao_om.reconciliar_quitacao_om", return_value=[]):
             with app.test_client() as client:
                 with client.session_transaction() as sessao:
                     sessao["usuario_id"] = 1
@@ -696,6 +699,37 @@ class FinanceiroNovoIsolamentoTests(unittest.TestCase):
         sql_executado = " ".join(str(chamada.args[0]) for chamada in conexao.execute.call_args_list)
         self.assertIn("'PAGO'", sql_executado)
         self.assertIn("data_pagamento", sql_executado)
+
+    def test_quitacao_om_e_cumulativa_e_nao_quita_linha_parcial(self):
+        itens = [
+            {"id": 1, "valor": Decimal("400.00")},
+            {"id": 2, "valor": Decimal("600.00")},
+            {"id": 3, "valor": Decimal("250.00")},
+        ]
+        pagamentos = [
+            {"id": 10, "data_pagamento": date(2026, 9, 1), "valor": Decimal("700.00")},
+            {"id": 11, "data_pagamento": date(2026, 9, 2), "valor": Decimal("300.00")},
+        ]
+
+        quitacoes = calcular_quitacoes(itens, pagamentos)
+
+        self.assertEqual(quitacoes[1]["id"], 10)
+        self.assertEqual(quitacoes[2]["id"], 11)
+        self.assertIsNone(quitacoes[3])
+
+    def test_migracao_quitacao_cria_flag_movimento_e_vinculo_automatico(self):
+        migration = (self.raiz / "migrations" / "030_financeiro_om_quitacao_linhas.sql").read_text(encoding="utf-8")
+        self.assertIn("quitada BOOLEAN", migration)
+        self.assertIn("financeiro3_om_movimentos", migration)
+        self.assertIn("CHECK (valor < 0)", migration)
+        self.assertIn("reembolso_om_pagamento_id", migration)
+
+    def test_tabela_om_exibe_flag_e_linha_negativa_de_pagamento(self):
+        detalhe = (self.raiz / "templates" / "financeiro_novo" / "om_detalhe.html").read_text(encoding="utf-8")
+        self.assertIn("<th>Quitação</th>", detalhe)
+        self.assertIn("QUITADA", detalhe)
+        self.assertIn("om-payment-row", detalhe)
+        self.assertIn("format(mv.valor)", detalhe)
 
     def test_edicao_nao_autoriza_registrar_pagamento_da_om(self):
         app = create_app(); app.config.update(TESTING=True, WTF_CSRF_ENABLED=False)
