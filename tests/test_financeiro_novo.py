@@ -21,6 +21,7 @@ from werkzeug.datastructures import MultiDict
 os.environ.setdefault("SECRET_KEY", "test-secret-key")
 
 from app import ProdRequest, create_app
+from db import aplicar_migracao_quitacao_om
 from routes.financeiro_novo.services.anexos import (
     AnexoInvalido,
     nome_objeto_pdf,
@@ -723,6 +724,24 @@ class FinanceiroNovoIsolamentoTests(unittest.TestCase):
         self.assertIn("financeiro3_om_movimentos", migration)
         self.assertIn("CHECK (valor < 0)", migration)
         self.assertIn("reembolso_om_pagamento_id", migration)
+
+    def test_aplicador_da_migracao_030_executa_sql_quando_schema_esta_pendente(self):
+        cursor = MagicMock()
+        cursor.__enter__.return_value = cursor
+        cursor.fetchone.return_value = (False, False, False)
+        conexao = MagicMock()
+        conexao.cursor.return_value = cursor
+        engine = MagicMock()
+        engine.raw_connection.return_value = conexao
+
+        with patch("db.get_engine", return_value=engine):
+            aplicar_migracao_quitacao_om()
+
+        chamadas_sql = [chamada.args[0] for chamada in cursor.execute.call_args_list]
+        self.assertTrue(any("CREATE TABLE IF NOT EXISTS financeiro3_om_movimentos" in sql for sql in chamadas_sql))
+        self.assertTrue(any(chamada.kwargs.get("prepare") is False for chamada in cursor.execute.call_args_list))
+        conexao.commit.assert_called()
+        conexao.close.assert_called_once()
 
     def test_tabela_om_exibe_flag_e_linha_negativa_de_pagamento(self):
         detalhe = (self.raiz / "templates" / "financeiro_novo" / "om_detalhe.html").read_text(encoding="utf-8")

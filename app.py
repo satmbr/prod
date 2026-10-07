@@ -38,6 +38,10 @@ def create_app():
         upload_root = os.path.join(os.getenv("RAILWAY_VOLUME_MOUNT_PATH"), "uploads")
     app.config["UPLOAD_ROOT"] = os.path.abspath(upload_root or os.path.join(app.instance_path, "uploads"))
 
+    if em_railway and (os.getenv("DATABASE_URL") or os.getenv("DATABASE_PUBLIC_URL")):
+        from db import aplicar_migracao_quitacao_om
+        aplicar_migracao_quitacao_om()
+
     csrf.init_app(app)
 
     @app.errorhandler(CSRFError)
