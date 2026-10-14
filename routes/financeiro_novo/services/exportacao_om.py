@@ -65,9 +65,6 @@ def gerar_excel_om(om: Mapping, itens: Iterable[Mapping], pagamentos: Iterable[M
     itens = list(itens)
     pagamentos = list(pagamentos)
     moeda = _texto(om.get("moeda")) or "BRL"
-    quantidade_despesas = sum(
-        1 for item in itens if item.get("tipo_movimento", "DESPESA") == "DESPESA"
-    )
     total = sum(
         (_valor(item.get("valor")) for item in itens if item.get("tipo_movimento", "DESPESA") == "DESPESA"),
         Decimal("0"),
@@ -153,11 +150,21 @@ def gerar_excel_om(om: Mapping, itens: Iterable[Mapping], pagamentos: Iterable[M
     ultima = max(primeira, primeira + len(itens) - 1)
     total_linha = primeira + len(itens)
     ws.cell(total_linha, 6, "Total das linhas").font = Font(bold=True, color=AZUL)
-    ultima_despesa = primeira + quantidade_despesas - 1
+    linhas_despesa = [
+        primeira + indice
+        for indice, item in enumerate(itens)
+        if item.get("tipo_movimento", "DESPESA") == "DESPESA"
+    ]
+    if not linhas_despesa:
+        formula_total = "=0"
+    elif linhas_despesa == list(range(linhas_despesa[0], linhas_despesa[-1] + 1)):
+        formula_total = f"=SUM(G{linhas_despesa[0]}:G{linhas_despesa[-1]})"
+    else:
+        formula_total = "=SUM(" + ",".join(f"G{linha}" for linha in linhas_despesa) + ")"
     ws.cell(
         total_linha,
         7,
-        f"=SUM(G{primeira}:G{ultima_despesa})" if quantidade_despesas else "=0",
+        formula_total,
     )
     ws.cell(total_linha, 7).number_format = f'"{moeda}" #,##0.00;[Red]-"{moeda}" #,##0.00;–'
     ws.cell(total_linha, 7).font = Font(bold=True, color=VERDE)

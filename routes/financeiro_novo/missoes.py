@@ -47,6 +47,30 @@ def _sincronizar_contas_perfil(conta_ids):
             )
 
 
+def _ordenar_linhas_om(itens, movimentos):
+    linhas = []
+    for item in itens:
+        dados = dict(item)
+        dados["tipo_movimento"] = "DESPESA"
+        linhas.append(dados)
+    for movimento in movimentos:
+        dados = dict(movimento)
+        dados.update({
+            "tipo_movimento": "PAGAMENTO",
+            "data_despesa": movimento["data_movimento"],
+            "arquivo_id": None,
+            "nome_original": None,
+            "object_key": None,
+            "quitada": True,
+            "data_quitacao": movimento["data_movimento"],
+        })
+        linhas.append(dados)
+    linhas.sort(key=lambda linha: (linha["ordem_registro"], linha["tipo_movimento"], linha["id"]))
+    for numero, linha in enumerate(linhas, start=1):
+        linha["numero_linha"] = numero
+    return linhas
+
+
 def _registro(conn, tabela, registro_id, bloquear=False):
     ativo = " AND removido_em IS NULL" if tabela == "financeiro3_oms" else ""
     return conn.execute(
@@ -198,14 +222,14 @@ def om_detalhe(om_id):
         ), {"id": om_id}).mappings().all()
         anexos = _listar_anexos(conn, "OM", om_id)
         itens = conn.execute(text("""
-            SELECT i.*,ROW_NUMBER() OVER (ORDER BY i.id) AS numero_linha,
+            SELECT i.*,
               c.nome AS categoria,cc.codigo AS centro_codigo,cc.nome AS centro_nome,
               a.id AS anexo_id,ar.id AS arquivo_id,ar.nome_original,ar.paginas
             FROM financeiro3_om_itens i JOIN financeiro3_categorias c ON c.id=i.categoria_id
             JOIN financeiro3_centros_custo cc ON cc.id=i.centro_custo_id
             LEFT JOIN financeiro3_anexos a ON a.entidade='OM_ITEM' AND a.entidade_id=i.id AND a.status='ATIVO'
             LEFT JOIN financeiro3_arquivos ar ON ar.id=a.arquivo_id
-            WHERE i.om_id=:id AND i.status='ATIVO' ORDER BY i.id
+            WHERE i.om_id=:id AND i.status='ATIVO' ORDER BY i.ordem_registro
         """), {"id": om_id}).mappings().all()
         movimentos = conn.execute(text("""
             SELECT mv.*,c.nome AS categoria,cc.codigo AS centro_codigo,cc.nome AS centro_nome,
@@ -214,7 +238,7 @@ def om_detalhe(om_id):
             JOIN financeiro3_categorias c ON c.id=mv.categoria_id
             JOIN financeiro3_centros_custo cc ON cc.id=mv.centro_custo_id
             JOIN financeiro3_om_pagamentos pg ON pg.id=mv.pagamento_id
-            WHERE mv.om_id=:id ORDER BY mv.id
+            WHERE mv.om_id=:id ORDER BY mv.ordem_registro
         """), {"id": om_id}).mappings().all()
         pagamentos = conn.execute(text("""
             SELECT pg.*,a.id AS anexo_id,ar.id AS arquivo_id,ar.nome_original
@@ -227,11 +251,11 @@ def om_detalhe(om_id):
             "SELECT id FROM financeiro3_despesas WHERE origem_om_id=:id"
         ), {"id": om_id}).scalar()
         opcoes = _opcoes(conn)
+    itens = _ordenar_linhas_om(itens, movimentos)
     valor_pago = sum((pg["valor"] for pg in pagamentos if pg["status"] == "PAGO"), start=0)
     diferenca = om["valor_total"] + om["valor_reembolsos"] - valor_pago
     return render_template(
-        "financeiro_novo/om_detalhe.html", om=om, itens=itens, movimentos=movimentos,
-        decisoes=decisoes, anexos=anexos,
+        "financeiro_novo/om_detalhe.html", om=om, itens=itens, decisoes=decisoes, anexos=anexos,
         pagamentos=pagamentos, valor_pago=valor_pago, diferenca=diferenca,
         despesa_importada=despesa_importada,
         armazenamento=diagnosticar_armazenamento(),
@@ -258,7 +282,7 @@ def _dados_exportacao_om(om_id):
         if not om:
             abort(404)
         itens = conn.execute(text("""
-            SELECT i.*, ROW_NUMBER() OVER (ORDER BY i.id) AS numero_linha,
+            SELECT i.*,
               c.nome AS categoria, cc.codigo AS centro_codigo, cc.nome AS centro_nome,
               ar.id AS arquivo_id, ar.nome_original, ar.object_key
             FROM financeiro3_om_itens i
@@ -272,14 +296,14 @@ def _dados_exportacao_om(om_id):
               ORDER BY a.id DESC LIMIT 1
             ) ar ON TRUE
             WHERE i.om_id=:id AND i.status='ATIVO'
-            ORDER BY i.id
+            ORDER BY i.ordem_registro
         """), {"id": om_id}).mappings().all()
         movimentos = conn.execute(text("""
             SELECT mv.*,c.nome AS categoria,cc.codigo AS centro_codigo,cc.nome AS centro_nome
             FROM financeiro3_om_movimentos mv
             JOIN financeiro3_categorias c ON c.id=mv.categoria_id
             JOIN financeiro3_centros_custo cc ON cc.id=mv.centro_custo_id
-            WHERE mv.om_id=:id ORDER BY mv.id
+            WHERE mv.om_id=:id ORDER BY mv.ordem_registro
         """), {"id": om_id}).mappings().all()
         pagamentos = conn.execute(text("""
             SELECT pg.*, ar.id AS arquivo_id, ar.nome_original
@@ -296,22 +320,9 @@ def _dados_exportacao_om(om_id):
         """), {"id": om_id}).mappings().all()
 
     itens_exportacao = []
-    for item in itens:
-        dados = dict(item)
-        dados["tipo_movimento"] = "DESPESA"
-        caminho = _caminho(item["object_key"]) if item.get("object_key") else None
+    for dados in _ordenar_linhas_om(itens, movimentos):
+        caminho = _caminho(dados["object_key"]) if dados.get("object_key") else None
         dados["caminho_recibo"] = caminho if caminho and caminho.is_file() else None
-        itens_exportacao.append(dados)
-    for indice, movimento in enumerate(movimentos, start=len(itens_exportacao) + 1):
-        dados = dict(movimento)
-        dados.update({
-            "numero_linha": indice,
-            "data_despesa": movimento["data_movimento"],
-            "tipo_movimento": "PAGAMENTO",
-            "arquivo_id": None,
-            "nome_original": None,
-            "caminho_recibo": None,
-        })
         itens_exportacao.append(dados)
     return dict(om), itens_exportacao, [dict(pg) for pg in pagamentos]
 

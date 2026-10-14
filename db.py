@@ -37,13 +37,18 @@ def get_engine():
 
 
 def aplicar_migracao_quitacao_om():
-    """Aplica de forma idempotente a migração da quitação de OMs no Railway."""
-    caminho = Path(__file__).resolve().parent / "migrations" / "030_financeiro_om_quitacao_linhas.sql"
-    sql = caminho.read_text(encoding="utf-8").strip()
-    if sql.upper().startswith("BEGIN;"):
-        sql = sql[len("BEGIN;"):].lstrip()
-    if sql.upper().endswith("COMMIT;"):
-        sql = sql[:-len("COMMIT;")].rstrip()
+    """Aplica de forma idempotente as migrações de quitação e ordem das OMs."""
+    def ler_sql(nome):
+        caminho = Path(__file__).resolve().parent / "migrations" / nome
+        sql = caminho.read_text(encoding="utf-8").strip()
+        if sql.upper().startswith("BEGIN;"):
+            sql = sql[len("BEGIN;"):].lstrip()
+        if sql.upper().endswith("COMMIT;"):
+            sql = sql[:-len("COMMIT;")].rstrip()
+        return sql
+
+    sql_quitacao = ler_sql("030_financeiro_om_quitacao_linhas.sql")
+    sql_ordem = ler_sql("031_financeiro_om_ordem_registro.sql")
 
     conexao = get_engine().raw_connection()
     bloqueio_adquirido = False
@@ -65,9 +70,25 @@ def aplicar_migracao_quitacao_om():
                       AND column_name='reembolso_om_pagamento_id'
                   )
             """)
-            pronta = all(cursor.fetchone())
-            if not pronta:
-                cursor.execute(sql, prepare=False)
+            quitacao_pronta = all(cursor.fetchone())
+            if not quitacao_pronta:
+                cursor.execute(sql_quitacao, prepare=False)
+            cursor.execute("""
+                SELECT
+                  EXISTS(
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_schema='public' AND table_name='financeiro3_om_itens'
+                      AND column_name='ordem_registro'
+                  ),
+                  EXISTS(
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_schema='public' AND table_name='financeiro3_om_movimentos'
+                      AND column_name='ordem_registro'
+                  )
+            """)
+            ordem_pronta = all(cursor.fetchone())
+            if not ordem_pronta:
+                cursor.execute(sql_ordem, prepare=False)
         conexao.commit()
     except Exception:
         conexao.rollback()

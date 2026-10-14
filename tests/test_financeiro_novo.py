@@ -33,7 +33,11 @@ from routes.financeiro_novo.services.exportacao_om import gerar_excel_om, gerar_
 from routes.financeiro_novo.services.empresas import empresa_valida, nome_empresa
 from routes.financeiro_novo.services.quitacao_om import calcular_quitacoes
 from routes.financeiro_novo.homologacao import diagnosticar_armazenamento
-from routes.financeiro_novo.missoes import _ler_linhas_om_excel, _linhas_om_formulario
+from routes.financeiro_novo.missoes import (
+    _ler_linhas_om_excel,
+    _linhas_om_formulario,
+    _ordenar_linhas_om,
+)
 from routes.financeiro_novo.reembolsos import _vincular_anexo
 
 
@@ -739,6 +743,7 @@ class FinanceiroNovoIsolamentoTests(unittest.TestCase):
 
         chamadas_sql = [chamada.args[0] for chamada in cursor.execute.call_args_list]
         self.assertTrue(any("CREATE TABLE IF NOT EXISTS financeiro3_om_movimentos" in sql for sql in chamadas_sql))
+        self.assertTrue(any("CREATE SEQUENCE IF NOT EXISTS financeiro3_om_linhas_ordem_seq" in sql for sql in chamadas_sql))
         self.assertTrue(any(chamada.kwargs.get("prepare") is False for chamada in cursor.execute.call_args_list))
         conexao.commit.assert_called()
         conexao.close.assert_called_once()
@@ -748,7 +753,34 @@ class FinanceiroNovoIsolamentoTests(unittest.TestCase):
         self.assertIn("<th>Quitação</th>", detalhe)
         self.assertIn("QUITADA", detalhe)
         self.assertIn("om-payment-row", detalhe)
-        self.assertIn("format(mv.valor)", detalhe)
+        self.assertIn("i.tipo_movimento=='PAGAMENTO'", detalhe)
+
+    def test_linhas_e_adiantamentos_respeitam_a_ordem_unica_de_registro(self):
+        itens = [
+            {"id": 10, "ordem_registro": 25, "descricao": "Despesa 25"},
+            {"id": 11, "ordem_registro": 27, "descricao": "Despesa 27"},
+            {"id": 12, "ordem_registro": 28, "descricao": "Despesa 28"},
+        ]
+        movimentos = [{
+            "id": 5, "ordem_registro": 26, "descricao": "Adiantamento da OM 887",
+            "data_movimento": date(2026, 10, 8), "valor": Decimal("-10000"),
+        }]
+
+        linhas = _ordenar_linhas_om(itens, movimentos)
+
+        self.assertEqual([linha["numero_linha"] for linha in linhas], [1, 2, 3, 4])
+        self.assertEqual(
+            [linha["descricao"] for linha in linhas],
+            ["Despesa 25", "Adiantamento da OM 887", "Despesa 27", "Despesa 28"],
+        )
+        self.assertEqual(linhas[1]["tipo_movimento"], "PAGAMENTO")
+
+    def test_migracao_031_reconstroi_e_mantem_ordem_unica(self):
+        migration = (self.raiz / "migrations" / "031_financeiro_om_ordem_registro.sql").read_text(encoding="utf-8")
+        self.assertIn("financeiro3_om_linhas_ordem_seq", migration)
+        self.assertIn("ADD COLUMN IF NOT EXISTS ordem_registro", migration)
+        self.assertIn("COALESCE(pg.pago_em,pg.criado_em,mv.criado_em)", migration)
+        self.assertIn("ALTER COLUMN ordem_registro SET NOT NULL", migration)
 
     def test_edicao_nao_autoriza_registrar_pagamento_da_om(self):
         app = create_app(); app.config.update(TESTING=True, WTF_CSRF_ENABLED=False)
@@ -979,6 +1011,19 @@ class FinanceiroNovoExportacaoOmTests(unittest.TestCase):
         self.assertEqual(resumo["E12"].value, "Segunda")
         self.assertEqual(resumo["G13"].value, "=SUM(G11:G12)")
         self.assertEqual(resumo.freeze_panes, "A11")
+
+    def test_excel_ignora_adiantamento_intercalado_no_total_das_despesas(self):
+        itens = [
+            {**self._item(1, "Primeira", "100.00"), "tipo_movimento": "DESPESA"},
+            {**self._item(2, "Adiantamento", "-80.00"), "tipo_movimento": "PAGAMENTO"},
+            {**self._item(3, "Terceira", "50.00"), "tipo_movimento": "DESPESA"},
+        ]
+
+        arquivo = gerar_excel_om(self.om, itens, [])
+        resumo = load_workbook(arquivo, data_only=False)["Resumo OM"]
+
+        self.assertEqual(resumo["G14"].value, "=SUM(G11,G13)")
+        self.assertEqual(resumo["B7"].value, 150)
 
     def test_pdf_apresenta_resumo_e_recibos_na_mesma_ordem(self):
         with tempfile.TemporaryDirectory() as pasta:
