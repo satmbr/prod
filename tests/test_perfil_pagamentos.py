@@ -159,6 +159,12 @@ class PerfilPagamentosConfiguracaoTests(unittest.TestCase):
         self.assertIn("financeiro_novo.pagamentos_sincronizar", template)
         self.assertIn("Sincronizar tudo agora", template)
 
+    def test_painel_permite_filtrar_contas_sem_om_vinculada(self):
+        routes = (ROOT / "routes" / "financeiro_novo" / "perfil_pagamentos.py").read_text(encoding="utf-8")
+        template = (ROOT / "templates" / "financeiro_novo" / "pagamentos_painel.html").read_text(encoding="utf-8")
+        self.assertIn('"SEM_OM": "c.om_id IS NULL"', routes)
+        self.assertIn("('SEM_OM','Sem OM vinculada')", template)
+
     def test_importacao_nao_reutiliza_status_em_case_do_postgresql(self):
         service = (ROOT / "routes" / "financeiro_novo" / "services" / "pagamentos_bucket.py").read_text(encoding="utf-8")
         self.assertNotIn("CASE WHEN :pagamento", service)

@@ -150,6 +150,7 @@ def pagamentos_painel():
         "VENCIDAS": "c.status_pagamento='ABERTA' AND c.data_vencimento<CURRENT_DATE",
         "QUITADAS": "c.pasta_atual='QUITADAS'",
         "COM_ERRO": "c.status_sincronizacao='ERRO'",
+        "SEM_OM": "c.om_id IS NULL",
     }
     if situacao:
         if situacao not in situacoes:

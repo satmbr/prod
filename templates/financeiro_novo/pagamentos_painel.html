@@ -55,7 +55,7 @@
       <form class="pp-filter" method="get">
         <input type="search" name="q" value="{{ busca }}" placeholder="Número, descrição, OM ou perfil">
         <select name="perfil_id"><option value="">Todos os perfis</option>{% for p in perfis %}<option value="{{ p.id }}" {% if perfil_id|string == p.id|string %}selected{% endif %}>{{ p.nome }}</option>{% endfor %}</select>
-        <select name="situacao"><option value="">Todas as situações</option>{% for valor,rotulo in [('ABERTAS','Em aberto'),('PAGAS','Pagas'),('REEMBOLSO_PENDENTE','Reembolso pendente'),('REEMBOLSADAS','Reembolsadas'),('VENCIDAS','Vencidas'),('QUITADAS','Quitadas'),('COM_ERRO','Com erro')] %}<option value="{{ valor }}" {% if situacao==valor %}selected{% endif %}>{{ rotulo }}</option>{% endfor %}</select>
+        <select name="situacao"><option value="">Todas as situações</option>{% for valor,rotulo in [('ABERTAS','Em aberto'),('PAGAS','Pagas'),('REEMBOLSO_PENDENTE','Reembolso pendente'),('REEMBOLSADAS','Reembolsadas'),('VENCIDAS','Vencidas'),('QUITADAS','Quitadas'),('SEM_OM','Sem OM vinculada'),('COM_ERRO','Com erro')] %}<option value="{{ valor }}" {% if situacao==valor %}selected{% endif %}>{{ rotulo }}</option>{% endfor %}</select>
         <button class="btn btn-primary" type="submit">Aplicar</button><a class="btn btn-outline" href="{{ url_for('financeiro_novo.pagamentos_painel') }}">Limpar</a>
       </form>
       <div class="pp-table-wrap"><table class="pp-table"><thead><tr><th>Conta</th><th>Perfil</th><th>Descrição</th><th>Documento</th><th>Vencimento</th><th>Pagamento</th><th>Reembolso</th><th>OM</th><th>Comprovante</th><th class="right">Valor</th></tr></thead><tbody>
