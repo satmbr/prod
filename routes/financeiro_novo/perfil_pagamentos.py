@@ -124,14 +124,16 @@ def pagamento_telegram_recibo_temporario(token):
 
 
 @bp.get("/perfil-pagamentos")
+@bp.get("/perfil-pagamentos/repetidas", endpoint="pagamentos_repetidas", defaults={"repetidas": True})
 @login_required
 @permission_required(MODULO, "visualizar")
-def pagamentos_painel():
+def pagamentos_painel(repetidas=False):
     busca = (request.args.get("q") or "").strip()
     perfil_id = (request.args.get("perfil_id") or "").strip()
     situacao = (request.args.get("situacao") or "").strip().upper()
     params = {}
     filtros = ["c.excluida_em IS NULL"]
+    filtros.append("c.repetida_em IS NOT NULL" if repetidas else "c.repetida_em IS NULL")
     if busca:
         filtros.append("(c.numero ILIKE :busca OR c.descricao ILIKE :busca OR "
                        "c.numero_om ILIKE :busca OR om.numero_om ILIKE :busca OR p.nome ILIKE :busca)")
@@ -161,9 +163,9 @@ def pagamentos_painel():
         perfis = conn.execute(text("""
             SELECT p.*,
               (SELECT COUNT(*) FROM financeiro3_pagamento_contas c
-               WHERE c.perfil_id=p.id AND c.excluida_em IS NULL) AS contas,
+               WHERE c.perfil_id=p.id AND c.excluida_em IS NULL AND c.repetida_em IS NULL) AS contas,
               (SELECT COUNT(*) FROM financeiro3_pagamento_contas c
-               WHERE c.perfil_id=p.id AND c.excluida_em IS NULL
+               WHERE c.perfil_id=p.id AND c.excluida_em IS NULL AND c.repetida_em IS NULL
                  AND c.status_pagamento='ABERTA') AS abertas,
               (SELECT COUNT(*) FROM financeiro3_pagamento_telegram_chats tc
                WHERE tc.perfil_id=p.id) AS telegram_chats,
@@ -194,7 +196,7 @@ def pagamentos_painel():
               COUNT(*) FILTER (WHERE pasta_atual='QUITADAS') AS quitadas,
               COALESCE(SUM(valor) FILTER (WHERE status_pagamento='ABERTA'),0) AS valor_aberto,
               COALESCE(SUM(valor) FILTER (WHERE status_pagamento='ABERTA' AND data_vencimento<CURRENT_DATE),0) AS valor_vencido
-            FROM financeiro3_pagamento_contas WHERE excluida_em IS NULL
+            FROM financeiro3_pagamento_contas WHERE excluida_em IS NULL AND repetida_em IS NULL
         """)).mappings().one()
         erros = conn.execute(text("""
             SELECT e.*,p.nome AS perfil_nome,p.portal_token
@@ -222,7 +224,7 @@ def pagamentos_painel():
         perfil_id=perfil_id, situacao=situacao, bucket_ativo=bucket_configurado(),
         portal_base_url=_portal_base_url(), portal_url=_portal_url,
         telegram_username=_telegram_username(), telegram_url=_telegram_url,
-        oms_rascunho=oms_rascunho, today=date.today(),
+        oms_rascunho=oms_rascunho, today=date.today(), repetidas=repetidas,
         subnav_links=build_subnav("perfil_pagamentos"),
     )
 
@@ -517,6 +519,38 @@ def pagamento_conta_detalhe(conta_id):
     )
 
 
+@bp.post("/perfil-pagamentos/contas/<int:conta_id>/repetida")
+@login_required
+@permission_required(MODULO, "editar")
+def pagamento_conta_repetida(conta_id):
+    restaurar = request.form.get("restaurar") == "1"
+    try:
+        with get_engine().begin() as conn:
+            conta = _conta(conn, conta_id, bloquear=True)
+            if not conta:
+                abort(404)
+            if not restaurar:
+                if conta["om_id"] or conta["om_item_id"]:
+                    raise ValorInvalido("Desvincule a conta da OM antes de marcá-la como repetida.")
+                if not _duplicidades_om_conta(conn, conta):
+                    raise ValorInvalido("Não há mais lançamentos em OMs com a mesma data e valor. Tente replicar novamente.")
+            nova = conn.execute(text("""
+                UPDATE financeiro3_pagamento_contas
+                SET repetida_em=CASE WHEN :restaurar THEN NULL ELSE NOW() END,
+                    repetida_por=CASE WHEN :restaurar THEN NULL ELSE :usuario END,
+                    atualizado_em=NOW()
+                WHERE id=:id RETURNING *
+            """), {"id": conta_id, "restaurar": restaurar,
+                     "usuario": session.get("usuario_id")}).mappings().one()
+            registrar_evento(conn, entidade="PERFIL_PAGAMENTO_CONTA", entidade_id=conta_id,
+                             evento="REPETICAO_DESFEITA" if restaurar else "MARCADA_COMO_REPETIDA",
+                             dados_anteriores=dict(conta), dados_novos=dict(nova))
+        flash("Conta devolvida ao painel." if restaurar else "Conta movida para Contas repetidas.", "sucesso")
+    except ValorInvalido as exc:
+        flash(str(exc), "erro")
+    return redirect(url_for("financeiro_novo.pagamentos_repetidas"))
+
+
 @bp.post("/perfil-pagamentos/contas/<int:conta_id>/excluir")
 @login_required
 @permission_required(MODULO, "administrar")
@@ -568,7 +602,7 @@ def pagamento_conta_excluir(conta_id):
             f"Conta {conta['numero']} excluída com seus arquivos do portal.",
             "sucesso",
         )
-        return redirect(url_for("financeiro_novo.pagamentos_painel"))
+        return redirect(url_for("financeiro_novo.pagamentos_repetidas" if conta["repetida_em"] else "financeiro_novo.pagamentos_painel"))
     except (ValorInvalido, PagamentosStorageErro) as exc:
         flash(str(exc), "erro")
         return redirect(url_for("financeiro_novo.pagamento_conta_detalhe", conta_id=conta_id))
@@ -688,6 +722,7 @@ def pagamento_conta_replicar_om(conta_id):
 
     preparado = None
     contas_sincronizar = []
+    destino = "financeiro_novo.pagamentos_painel"
     try:
         confirmar_duplicidade = request.form.get("confirmar_duplicidade") == "1"
         try:
@@ -702,10 +737,12 @@ def pagamento_conta_replicar_om(conta_id):
                 SELECT c.*,p.storage_prefix
                 FROM financeiro3_pagamento_contas c
                 JOIN financeiro3_pagamento_perfis p ON p.id=c.perfil_id
-                WHERE c.id=:id
+                WHERE c.id=:id AND c.excluida_em IS NULL
             """), {"id": conta_id}).mappings().first()
         if not origem:
             abort(404)
+        if origem["repetida_em"]:
+            destino = "financeiro_novo.pagamentos_repetidas"
         if origem["om_id"]:
             raise ValorInvalido("Esta conta já foi replicada para uma OM.")
         with get_engine().connect() as conn:
@@ -775,7 +812,7 @@ def pagamento_conta_replicar_om(conta_id):
             anexo_id = _vincular_anexo(conn, preparado, "OM_ITEM", item["id"], "COMPROVANTE")
             nova_conta = conn.execute(text("""
                 UPDATE financeiro3_pagamento_contas
-                SET om_id=:om,om_item_id=:item,atualizado_em=NOW()
+                SET om_id=:om,om_item_id=:item,repetida_em=NULL,repetida_por=NULL,atualizado_em=NOW()
                 WHERE id=:id RETURNING *
             """), {"om": om_id, "item": item["id"], "id": conta_id}).mappings().one()
             registrar_evento(
@@ -787,6 +824,7 @@ def pagamento_conta_replicar_om(conta_id):
                 evento="REPLICADA_PARA_OM", dados_anteriores=dict(conta), dados_novos=dict(nova_conta),
             )
             contas_sincronizar = reconciliar_quitacao_om(conn, om_id)
+        destino = "financeiro_novo.pagamentos_painel"
         for conta_sincronizar in sorted(set(contas_sincronizar)):
             sincronizar_arquivo_da_conta(conta_sincronizar)
         flash(f"Conta {origem['numero']} replicada para a OM {om['numero_om']}.", "sucesso")
@@ -798,7 +836,7 @@ def pagamento_conta_replicar_om(conta_id):
         if preparado:
             preparado[3].unlink(missing_ok=True)
         raise
-    return redirect(url_for("financeiro_novo.pagamentos_painel"))
+    return redirect(url_for(destino))
 
 
 @bp.post("/perfil-pagamentos/contas/<int:conta_id>/desvincular-om")

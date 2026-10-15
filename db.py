@@ -49,6 +49,7 @@ def aplicar_migracao_quitacao_om():
 
     sql_quitacao = ler_sql("030_financeiro_om_quitacao_linhas.sql")
     sql_ordem = ler_sql("031_financeiro_om_ordem_registro.sql")
+    sql_repetidas = ler_sql("032_perfil_pagamentos_repetidas.sql")
 
     conexao = get_engine().raw_connection()
     bloqueio_adquirido = False
@@ -89,6 +90,13 @@ def aplicar_migracao_quitacao_om():
             ordem_pronta = all(cursor.fetchone())
             if not ordem_pronta:
                 cursor.execute(sql_ordem, prepare=False)
+            cursor.execute("""
+                SELECT COUNT(*)=2 FROM information_schema.columns
+                WHERE table_schema='public' AND table_name='financeiro3_pagamento_contas'
+                  AND column_name IN ('repetida_em','repetida_por')
+            """)
+            if not cursor.fetchone()[0]:
+                cursor.execute(sql_repetidas, prepare=False)
         conexao.commit()
     except Exception:
         conexao.rollback()

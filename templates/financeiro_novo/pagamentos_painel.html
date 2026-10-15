@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Perfil de Pagamentos · Financeiro Novo{% endblock %}
+{% block title %}{{ 'Contas repetidas' if repetidas else 'Perfil de Pagamentos' }} · Financeiro Novo{% endblock %}
 {% block content %}
 {% set admin = 'perfil_pagamentos:administrar' in current_user_permissions or 'auth:administrar' in current_user_permissions %}
 {% set sincroniza = 'perfil_pagamentos:sincronizar' in current_user_permissions or 'auth:administrar' in current_user_permissions %}
@@ -12,6 +12,7 @@
     </div>
   </div>
 
+  {% if not repetidas %}
   <section class="pp-summary">
     <article><span>Total</span><strong>{{ resumo.total }}</strong><small>contas registradas</small></article>
     <article><span>Em aberto</span><strong>{{ resumo.abertas }}</strong><small>R$ {{ '%.2f'|format(resumo.valor_aberto)|replace('.',',') }}</small></article>
@@ -49,19 +50,21 @@
     </div>
   </section>
 
+  {% endif %}
   <section class="zone">
-    <header class="zone-head"><div class="zone-title">Painel de contas</div></header>
+    <header class="zone-head"><div class="zone-title">{{ 'Contas repetidas' if repetidas else 'Painel de contas' }}</div><a class="btn btn-outline" href="{{ url_for('financeiro_novo.pagamentos_painel' if repetidas else 'financeiro_novo.pagamentos_repetidas') }}">{{ 'Voltar ao painel' if repetidas else 'Contas repetidas' }}</a></header>
+    {% if repetidas %}<p class="muted" style="padding:0 16px">Use a seta na coluna OM para tentar replicar novamente. Clique no número da conta para editar ou excluir, ou devolva a conta ao painel.</p>{% endif %}
     <div class="zone-body">
       <form class="pp-filter" method="get">
         <input type="search" name="q" value="{{ busca }}" placeholder="Número, descrição, OM ou perfil">
         <select name="perfil_id"><option value="">Todos os perfis</option>{% for p in perfis %}<option value="{{ p.id }}" {% if perfil_id|string == p.id|string %}selected{% endif %}>{{ p.nome }}</option>{% endfor %}</select>
         <select name="situacao"><option value="">Todas as situações</option>{% for valor,rotulo in [('ABERTAS','Em aberto'),('PAGAS','Pagas'),('REEMBOLSO_PENDENTE','Reembolso pendente'),('REEMBOLSADAS','Reembolsadas'),('VENCIDAS','Vencidas'),('QUITADAS','Quitadas'),('SEM_OM','Sem OM vinculada'),('COM_ERRO','Com erro')] %}<option value="{{ valor }}" {% if situacao==valor %}selected{% endif %}>{{ rotulo }}</option>{% endfor %}</select>
-        <button class="btn btn-primary" type="submit">Aplicar</button><a class="btn btn-outline" href="{{ url_for('financeiro_novo.pagamentos_painel') }}">Limpar</a>
+        <button class="btn btn-primary" type="submit">Aplicar</button><a class="btn btn-outline" href="{{ url_for('financeiro_novo.pagamentos_repetidas' if repetidas else 'financeiro_novo.pagamentos_painel') }}">Limpar</a>
       </form>
       <div class="pp-table-wrap"><table class="pp-table"><thead><tr><th>Conta</th><th>Perfil</th><th>Descrição</th><th>Documento</th><th>Vencimento</th><th>Pagamento</th><th>Reembolso</th><th>OM</th><th>Comprovante</th><th class="right">Valor</th></tr></thead><tbody>
       {% for conta in contas %}
       <tr class="{{ 'overdue' if conta.status_pagamento=='ABERTA' and conta.data_vencimento < today else '' }}">
-        <td><a class="pp-number" href="{{ url_for('financeiro_novo.pagamento_conta_detalhe',conta_id=conta.id) }}">{{ conta.numero }}</a><small>{{ conta.pasta_atual|replace('_',' ') }}</small></td>
+        <td><a class="pp-number" href="{{ url_for('financeiro_novo.pagamento_conta_detalhe',conta_id=conta.id) }}">{{ conta.numero }}</a><small>{{ conta.pasta_atual|replace('_',' ') }}</small>{% if repetidas %}<small>Marcada em {{ conta.repetida_em.strftime('%d/%m/%Y') }}</small><a href="{{ url_for('financeiro_novo.pagamento_conta_detalhe',conta_id=conta.id) }}">Editar / excluir</a>{% if 'perfil_pagamentos:editar' in current_user_permissions or admin %}<form method="post" action="{{ url_for('financeiro_novo.pagamento_conta_repetida',conta_id=conta.id) }}"><input type="hidden" name="restaurar" value="1"><button type="submit" class="btn btn-outline">Voltar ao painel</button></form>{% endif %}{% endif %}</td>
         <td>{{ conta.perfil_nome }}<small>{{ conta.matricula }}</small></td><td>{{ conta.descricao }}</td>
         <td>{{ conta.data_documento.strftime('%d/%m/%Y') }}</td><td>{{ conta.data_vencimento.strftime('%d/%m/%Y') }}{% if conta.status_pagamento=='ABERTA' and conta.data_vencimento < today %}<small class="late">VENCIDA</small>{% endif %}</td>
         <td><span class="pp-chip {{ conta.status_pagamento|lower }}">{{ conta.status_pagamento }}</span></td>
@@ -99,7 +102,7 @@
       </label>
       <small>O centro padrão da OM será usado e a categoria ficará como “A classificar” para edição posterior.</small>
       <div id="pp-duplicate-feedback" class="pp-duplicate-feedback" hidden></div>
-      <div class="pp-dialog-actions"><button type="button" class="btn btn-outline pp-dialog-close">Cancelar</button><button type="submit" class="btn btn-primary" id="pp-om-submit">Replicar linha</button></div>
+      <div class="pp-dialog-actions"><button type="button" class="btn btn-outline pp-dialog-close">Cancelar</button><button type="submit" class="btn btn-outline" id="pp-mark-duplicate" formnovalidate hidden>Marcar como repetida</button><button type="submit" class="btn btn-primary" id="pp-om-submit">Replicar linha</button></div>
     </form>
   </dialog>
   {% endif %}
@@ -120,7 +123,7 @@
     </div>
   </dialog>
 
-  <div class="pp-lower">
+  {% if not repetidas %}<div class="pp-lower">
     <section class="zone"><header class="zone-head"><div class="zone-title">Pendências de importação</div><span class="pp-count">{{ erros|length }}</span></header><div class="zone-body pp-log">
       {% for erro in erros %}<article><div><strong>{{ erro.tipo }} · {{ erro.perfil_nome }}</strong><span>{{ erro.nome_arquivo }}</span></div><p>{{ erro.mensagem }}</p>{% if portal_url(erro) %}<a href="{{ portal_url(erro) }}contas_com_erro" target="_blank" rel="noopener noreferrer">Abrir pasta de erros</a>{% endif %}</article>{% else %}<div class="pp-empty">Nenhuma pendência.</div>{% endfor %}
     </div></section>
@@ -128,6 +131,7 @@
       {% for sync in sincronizacoes %}<article><div><strong>{{ sync.perfil_nome or 'Perfil removido' }}</strong><span>{{ sync.iniciado_em.strftime('%d/%m/%Y %H:%M') }} · {{ sync.origem }}</span></div><p><span class="pp-chip {{ sync.status|lower }}">{{ sync.status }}</span> {{ sync.contas_novas }} conta(s), {{ sync.comprovantes_novos }} comprovante(s), {{ sync.erros }} erro(s)</p></article>{% else %}<div class="pp-empty">Nenhuma sincronização executada.</div>{% endfor %}
     </div></section>
   </div>
+  {% endif %}
 </div>
 <style>
 .pp-page{--pp:#173b5f;--pp-soft:#eaf1f7}.pp-banner{display:flex;justify-content:space-between;gap:18px;align-items:center;padding:14px 16px;margin-bottom:14px;border:1px solid #bfd0de;border-radius:10px;background:#f4f8fb}.pp-banner strong,.pp-banner span{display:block}.pp-banner span{font-size:11px;color:#61768a;margin-top:3px}.pp-service{max-width:480px;padding:8px 11px;border-radius:8px;font-size:11px}.pp-service.ok{background:#dcfce7;color:#166534}.pp-service.warn{background:#fef3c7;color:#92400e}.pp-summary{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:14px}.pp-summary article{padding:14px;border:1px solid #dbe3ea;border-radius:10px;background:#fff}.pp-summary span,.pp-summary small{display:block;color:#6c7f91}.pp-summary strong{display:block;margin:5px 0;font-size:25px;color:var(--pp)}.pp-summary .danger strong{color:#b42318}.pp-summary .success strong{color:#087a55}.pp-profiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(310px,1fr));gap:12px}.pp-profile{padding:14px;border:1px solid #dbe3ea;border-radius:10px;background:#fff}.pp-profile.inactive{opacity:.62}.pp-profile-head{display:flex;justify-content:space-between;gap:10px}.pp-profile-head strong,.pp-profile-head span{display:block}.pp-profile-head span{font-size:11px;color:#6c7f91;margin-top:2px}.pp-profile-metrics{display:flex;gap:14px;padding:10px 0;margin:10px 0;border-block:1px solid #edf1f4;color:#61768a;font-size:11px}.pp-actions{display:flex;gap:7px;align-items:center;flex-wrap:wrap}.pp-actions form{margin:0}.pp-error{padding:7px;border-radius:6px;background:#fff0ef;color:#a52a24;font-size:11px}.pp-chip{display:inline-block;padding:4px 7px;border-radius:999px;background:#edf2f6;color:#52697d;font-size:9px;font-weight:800;letter-spacing:.04em}.pp-chip.ativa,.pp-chip.paga,.pp-chip.reembolsada,.pp-chip.sucesso{background:#dcfce7;color:#166534}.pp-chip.erro,.pp-chip.vencida{background:#fee2e2;color:#991b1b}.pp-chip.pendente,.pp-chip.aberta,.pp-chip.parcial,.pp-chip.aguardando_om{background:#fef3c7;color:#92400e}.pp-filter{display:grid;grid-template-columns:2fr 1fr 1fr auto auto;gap:8px;margin-bottom:12px}.pp-filter input,.pp-filter select{min-height:36px;border:1px solid #ccd8e2;border-radius:7px;padding:7px 9px;background:#fff}.pp-table-wrap{overflow:auto}.pp-table{width:100%;min-width:1120px;border-collapse:collapse}.pp-table th,.pp-table td{padding:9px 8px;border-bottom:1px solid #e8edf1;text-align:left;vertical-align:middle}.pp-table th{background:#f6f8fa;color:#61768a;font-size:10px;text-transform:uppercase}.pp-table td small{display:block;margin-top:3px;color:#8090a0;font-size:9px}.pp-table tr.overdue{background:#fff7f6}.pp-table .right{text-align:right}.pp-number{font-weight:800;color:#185f97}.pp-table .late{color:#b42318;font-weight:800}.pp-proof{font-size:10px;font-weight:700}.pp-proof.yes{color:#087a55}.pp-proof.no{color:#9a4e16}.pp-lower{display:grid;grid-template-columns:1fr 1fr;gap:14px}.pp-log{max-height:360px;overflow:auto}.pp-log article{padding:10px 0;border-bottom:1px solid #edf1f4}.pp-log article>div{display:flex;justify-content:space-between;gap:10px}.pp-log span{font-size:10px;color:#748697}.pp-log p{margin:5px 0;font-size:11px}.pp-log a{color:#185f8f;font-weight:700;font-size:11px}.pp-count{padding:3px 7px;border-radius:999px;background:#edf2f6}.pp-empty{padding:20px;text-align:center;color:#7d8d9b}@media(max-width:1000px){.pp-summary{grid-template-columns:repeat(2,1fr)}.pp-lower{grid-template-columns:1fr}.pp-filter{grid-template-columns:1fr}.pp-banner{align-items:flex-start;flex-direction:column}}
@@ -142,12 +146,15 @@
   const confirmacao = form?.querySelector('[name="confirmar_duplicidade"]');
   const feedback = document.getElementById('pp-duplicate-feedback');
   const submit = document.getElementById('pp-om-submit');
+  const marcar = document.getElementById('pp-mark-duplicate');
   const duplicidadesUrl = {{ url_for('financeiro_novo.pagamento_conta_duplicidades_om',conta_id=0)|tojson }};
   let contaId = null;
   if (!dialog || !form) return;
   document.querySelectorAll('.pp-replicate:not(:disabled)').forEach(button => {
     button.addEventListener('click', () => {
       contaId = button.dataset.contaId;
+      marcar.hidden = true;
+      marcar.formAction = {{ url_for('financeiro_novo.pagamento_conta_repetida',conta_id=0)|tojson }}.replace('/0/', '/' + contaId + '/');
       form.action = {{ url_for('financeiro_novo.pagamento_conta_replicar_om',conta_id=0)|tojson }}.replace('/0/', '/' + button.dataset.contaId + '/');
       conta.textContent = button.dataset.contaNumero;
       form.querySelector('[name="om_id"]').value = '';
@@ -159,6 +166,7 @@
     });
   });
   form.addEventListener('submit', async event => {
+    if (event.submitter === marcar) return;
     if (confirmacao.value === '1') return;
     event.preventDefault();
     submit.disabled = true;
@@ -188,6 +196,7 @@
       feedback.replaceChildren(titulo, lista);
       feedback.hidden = false;
       confirmacao.value = '1';
+      marcar.hidden = false;
       submit.textContent = 'Replicar mesmo assim';
     } catch (erro) {
       feedback.textContent = erro.message;
