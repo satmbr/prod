@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 from routes.financeiro_novo.services.pagamentos_bucket import (
     PagamentosStorageErro,
+    _s3,
     baixar_arquivo,
     configuracao_bucket,
     limpar_nome_arquivo,
@@ -44,6 +45,49 @@ class PagamentosBucketTests(unittest.TestCase):
             cfg = configuracao_bucket()
         self.assertEqual(cfg["bucket"], "pagamentos-abc")
         self.assertEqual(cfg["region"], "auto")
+
+    def test_nao_mistura_chave_nativa_com_segredo_aws(self):
+        with patch.dict(os.environ, {
+            "BUCKET": "bucket", "ENDPOINT": "https://example.com",
+            "ACCESS_KEY_ID": "chave-nativa", "AWS_SECRET_ACCESS_KEY": "segredo-aws",
+        }, clear=True):
+            with self.assertRaisesRegex(PagamentosStorageErro, "Não misture"):
+                configuracao_bucket()
+
+    def test_aceita_pares_completos_dos_aliases(self):
+        for chave, segredo in (
+            ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"),
+            ("BUCKET_ACCESS_KEY_ID", "BUCKET_SECRET_ACCESS_KEY"),
+        ):
+            with self.subTest(chave=chave), patch.dict(os.environ, {
+                "BUCKET": "bucket", "ENDPOINT": "https://example.com",
+                chave: "chave", segredo: "segredo",
+            }, clear=True):
+                cfg = configuracao_bucket()
+                self.assertEqual((cfg["access_key"], cfg["secret_key"]), ("chave", "segredo"))
+
+    def test_diagnostico_assinatura_na_listagem_e_envio(self):
+        from botocore.stub import Stubber
+        from botocore.exceptions import ClientError
+        with patch.dict(os.environ, {
+            "BUCKET": "bucket", "ENDPOINT": "https://example.com",
+            "ACCESS_KEY_ID": "chave", "SECRET_ACCESS_KEY": "segredo",
+        }, clear=True):
+            cliente, bucket = _s3()
+        with Stubber(cliente) as stub:
+            for operacao, params in (
+                ("list_objects_v2", {"Bucket": bucket}),
+                ("put_object", {"Bucket": bucket, "Key": "teste.pdf", "Body": b"pdf"}),
+            ):
+                stub.add_client_error(operacao, service_error_code="SignatureDoesNotMatch")
+                with self.subTest(operacao=operacao):
+                    with self.assertRaisesRegex(PagamentosStorageErro, "aba Credentials"):
+                        getattr(cliente, operacao)(**params)
+            stub.add_client_error("list_objects_v2", service_error_code="AccessDenied")
+            with self.assertRaises(ClientError):
+                cliente.list_objects_v2(Bucket=bucket)
+            stub.add_response("list_objects_v2", {"Contents": []})
+            self.assertEqual(cliente.list_objects_v2(Bucket=bucket), {"Contents": []})
 
     def test_configuracao_incompleta_e_rejeitada(self):
         with patch.dict(os.environ, {}, clear=True):

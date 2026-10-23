@@ -45,11 +45,26 @@ def _env(*nomes):
 
 
 def configuracao_bucket() -> dict:
+    # Não combine uma chave com um segredo de outro conjunto de variáveis.
+    access_key = secret_key = None
+    for chave, segredo in (
+        ("ACCESS_KEY_ID", "SECRET_ACCESS_KEY"),
+        ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"),
+        ("BUCKET_ACCESS_KEY_ID", "BUCKET_SECRET_ACCESS_KEY"),
+    ):
+        access_key, secret_key = _env(chave), _env(segredo)
+        if access_key or secret_key:
+            if not (access_key and secret_key):
+                raise PagamentosStorageErro(
+                    f"Credenciais do armazenamento incompletas: configure {chave} e "
+                    f"{segredo} do mesmo Bucket. Não misture conjuntos de variáveis."
+                )
+            break
     dados = {
         "bucket": _env("BUCKET", "AWS_S3_BUCKET_NAME", "BUCKET_NAME"),
         "endpoint": _env("ENDPOINT", "AWS_ENDPOINT_URL", "BUCKET_ENDPOINT"),
-        "access_key": _env("ACCESS_KEY_ID", "AWS_ACCESS_KEY_ID", "BUCKET_ACCESS_KEY_ID"),
-        "secret_key": _env("SECRET_ACCESS_KEY", "AWS_SECRET_ACCESS_KEY", "BUCKET_SECRET_ACCESS_KEY"),
+        "access_key": access_key,
+        "secret_key": secret_key,
         "region": _env("REGION", "AWS_DEFAULT_REGION", "BUCKET_REGION") or "auto",
         "url_style": (_env("AWS_S3_URL_STYLE", "BUCKET_URL_STYLE") or "virtual").lower(),
     }
@@ -69,6 +84,18 @@ def bucket_configurado() -> bool:
         return False
 
 
+def _verificar_resposta_s3(parsed, **_kwargs):
+    if parsed.get("Error", {}).get("Code") == "SignatureDoesNotMatch":
+        raise PagamentosStorageErro(
+            "O armazenamento recusou a assinatura de acesso. Confira o par de credenciais "
+            "ACCESS_KEY_ID e SECRET_ACCESS_KEY (ou aliases AWS_/BUCKET_), além de BUCKET, "
+            "ENDPOINT e REGION, usando os valores da aba Credentials do mesmo Bucket "
+            "no Railway. Confira AWS_S3_URL_STYLE conforme o estilo informado (virtual "
+            "ou path). Corrija as variáveis nos serviços principal, portal, bot e Cron "
+            "e reaplique o deploy."
+        )
+
+
 def _s3():
     try:
         import boto3
@@ -85,6 +112,7 @@ def _s3():
         region_name=cfg["region"],
         config=Config(signature_version="s3v4", s3={"addressing_style": estilo}),
     )
+    cliente.meta.events.register("after-call.s3", _verificar_resposta_s3)
     return cliente, cfg["bucket"]
 
 

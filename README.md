@@ -116,6 +116,18 @@ credenciais do mesmo Bucket: `BUCKET`, `ENDPOINT`, `ACCESS_KEY_ID`,
 `SECRET_ACCESS_KEY` e `REGION`. O principal também recebe
 `PORTAL_PUBLIC_URL=https://dominio-do-portal`.
 
+Se ocorrer `SignatureDoesNotMatch` no painel ou no bot, confira a aba
+**Credentials** do Bucket no Railway e atualize as referências em **todos** os
+serviços (principal, portal, bot e Cron). `ACCESS_KEY_ID` e `SECRET_ACCESS_KEY`
+devem ser um par do mesmo Bucket; os pares alternativos `AWS_ACCESS_KEY_ID` /
+`AWS_SECRET_ACCESS_KEY` e `BUCKET_ACCESS_KEY_ID` / `BUCKET_SECRET_ACCESS_KEY`
+também são aceitos, nessa ordem de prioridade, sem misturar seus componentes.
+Um par de maior prioridade incompleto gera erro mesmo que outro esteja completo.
+Confira também `BUCKET` (nome S3 completo), `ENDPOINT` (endpoint base) e `REGION`
+com os valores fornecidos pelo Bucket. Defina `AWS_S3_URL_STYLE=path` apenas se
+a aba Credentials indicar path-style; o padrão é `virtual`. Reaplique o deploy
+após corrigir as variáveis. Não publique chaves ou segredos em mensagens ou logs.
+
 O portal apresenta `novas_contas`, `contas_controladas`, `contas_quitadas`,
 `comprovantes` e `contas_com_erro`. O nome completo de entrada é:
 
