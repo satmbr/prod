@@ -4,6 +4,7 @@ import re
 import unicodedata
 import uuid
 from datetime import date, datetime
+from decimal import InvalidOperation
 from io import BytesIO
 from pathlib import Path
 from zipfile import BadZipFile
@@ -93,11 +94,73 @@ def _tem_anexo(conn, entidade, registro_id):
     """), {"entidade": entidade, "id": registro_id}).scalar())
 
 
+def _consultar_recibos(conn, data, valor):
+    registros = conn.execute(text("""
+        SELECT * FROM (
+          SELECT 'OM' AS tipo,o.id AS documento_id,o.numero_om AS numero,
+            o.status AS documento_status,p.nome_razao AS responsavel,
+            i.id AS item_id,i.data_despesa,i.descricao,i.valor,m.codigo AS moeda,
+            ar.id AS arquivo_id,ar.nome_original
+          FROM financeiro3_om_itens i
+          JOIN financeiro3_oms o ON o.id=i.om_id
+          JOIN financeiro3_pessoas p ON p.id=o.solicitante_id
+          JOIN financeiro3_moedas m ON m.id=o.moeda_id
+          LEFT JOIN financeiro3_anexos a
+            ON a.entidade='OM_ITEM' AND a.entidade_id=i.id AND a.status='ATIVO'
+          LEFT JOIN financeiro3_arquivos ar ON ar.id=a.arquivo_id AND ar.status='ATIVO'
+          WHERE i.data_despesa=:data AND i.valor=:valor AND i.status='ATIVO'
+            AND o.removido_em IS NULL
+          UNION ALL
+          SELECT 'RD',r.id,r.numero_rd,r.status,p.nome_razao,
+            i.id,i.data_despesa,i.descricao,i.valor,m.codigo,
+            ar.id,ar.nome_original
+          FROM financeiro3_rd_itens i
+          JOIN financeiro3_rds r ON r.id=i.rd_id
+          JOIN financeiro3_pessoas p ON p.id=r.responsavel_id
+          JOIN financeiro3_moedas m ON m.id=r.moeda_id
+          LEFT JOIN financeiro3_anexos a
+            ON a.entidade='RD' AND a.entidade_id=r.id AND a.status='ATIVO'
+          LEFT JOIN financeiro3_arquivos ar ON ar.id=a.arquivo_id AND ar.status='ATIVO'
+          WHERE i.data_despesa=:data AND i.valor=:valor AND i.status='ATIVO'
+        ) encontrados ORDER BY tipo,numero,documento_id,item_id,nome_original,arquivo_id
+    """), {"data": data, "valor": valor}).mappings().all()
+    resultados = {}
+    for registro in registros:
+        chave = (registro["tipo"], registro["item_id"])
+        if chave not in resultados:
+            resultados[chave] = {**registro, "anexos": []}
+        if registro["arquivo_id"]:
+            anexos = resultados[chave]["anexos"]
+            if not any(a["arquivo_id"] == registro["arquivo_id"] for a in anexos):
+                anexos.append({"arquivo_id": registro["arquivo_id"],
+                               "nome_original": registro["nome_original"]})
+    return list(resultados.values())
+
+
 @bp.get("/missoes")
 @login_required
 @permission_required("financeiro_novo", "visualizar")
 def missoes():
+    consulta = {"data": request.args.get("recibo_data", "").strip(),
+                "valor": request.args.get("recibo_valor", "").strip()}
+    consultou = "recibo_data" in request.args or "recibo_valor" in request.args
+    resultados_recibos, erro_recibo, parametros_recibo = [], None, None
+    if consultou:
+        try:
+            data = data_iso(consulta["data"], "Data do recibo")
+            # Limite evita valores fora da precisão dos campos monetários.
+            if len(consulta["valor"]) > 30:
+                raise ValorInvalido("Informe um valor válido para o recibo.")
+            try:
+                valor = decimal_br(consulta["valor"], positivo=True)
+            except InvalidOperation as exc:
+                raise ValorInvalido("Informe um valor válido para o recibo.") from exc
+            parametros_recibo = (data, valor)
+        except ValorInvalido as exc:
+            erro_recibo = str(exc)
     with get_engine().connect() as conn:
+        if parametros_recibo:
+            resultados_recibos = _consultar_recibos(conn, *parametros_recibo)
         oms = conn.execute(text("""
             SELECT o.*, p.nome_razao AS solicitante, cc.codigo AS centro, m.codigo AS moeda,
               COALESCE((SELECT SUM(pg.valor) FROM financeiro3_om_pagamentos pg
@@ -134,6 +197,8 @@ def missoes():
         """)).mappings().all()
     return render_template(
         "financeiro_novo/missoes.html", oms=oms, rds=rds, acertos=acertos,
+        consulta_recibo=consulta, consultou_recibo=consultou,
+        resultados_recibos=resultados_recibos, erro_recibo=erro_recibo,
         subnav_links=build_subnav("missoes"),
     )
 
@@ -1567,7 +1632,7 @@ def om_item_anexo_baixar(om_id, item_id, arquivo_id):
     if not caminho.is_file():
         flash("O recibo não está mais disponível no armazenamento. Configure o volume persistente e use Substituir para reenviá-lo.", "erro")
         return redirect(url_for("financeiro_novo.om_detalhe", om_id=om_id))
-    return send_file(caminho, mimetype="application/pdf", as_attachment=True,
+    return send_file(caminho, mimetype="application/pdf", as_attachment=request.args.get("visualizar") != "1",
         download_name=f"{Path(arquivo['nome_original']).stem}.pdf")
 
 
@@ -1653,7 +1718,7 @@ def documento_anexo_baixar(tipo, registro_id, arquivo_id):
     caminho = _caminho(arquivo["object_key"])
     if not caminho.is_file():
         abort(404)
-    return send_file(caminho, mimetype="application/pdf", as_attachment=True,
+    return send_file(caminho, mimetype="application/pdf", as_attachment=request.args.get("visualizar") != "1",
                      download_name=f"{Path(arquivo['nome_original']).stem}.pdf")
 
 

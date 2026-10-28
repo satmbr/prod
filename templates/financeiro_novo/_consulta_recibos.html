@@ -1,0 +1,29 @@
+<section class="zone" id="consulta-recibos">
+  <header class="zone-head"><div><div class="zone-title">Consultar recibo</div><div class="muted">Localize despesas em OMs e RDs com a mesma data e o mesmo valor.</div></div></header>
+  <div class="zone-body">
+    <form method="get" action="{{ url_for('financeiro_novo.missoes') }}#consulta-recibos" class="dsp-mini-form">
+      <label><span>Data do recibo *</span><input type="date" name="recibo_data" value="{{ consulta_recibo.data }}" required></label>
+      <label><span>Valor do recibo *</span><input name="recibo_valor" value="{{ consulta_recibo.valor }}" inputmode="decimal" placeholder="Ex.: 150,00" maxlength="30" required></label>
+      <div class="dsp-actions full"><button class="btn btn-primary" type="submit">Consultar recibo</button>{% if consultou_recibo %}<a class="btn btn-outline" href="{{ url_for('financeiro_novo.missoes') }}#consulta-recibos">Limpar consulta</a>{% endif %}</div>
+    </form>
+    {% if erro_recibo %}<p class="dsp-alert" role="alert">{{ erro_recibo }}</p>
+    {% elif consultou_recibo %}
+      <p role="status">{{ resultados_recibos|length }} lançamento(s) encontrado(s) com a mesma data e valor.</p>
+      {% if resultados_recibos %}
+      <p class="muted">Confira a moeda e o arquivo antes de concluir que é o mesmo recibo. Nas RDs, os anexos pertencem ao documento inteiro.</p>
+      <div class="dsp-table-wrap"><table class="dsp-table">
+        <thead><tr><th>Origem</th><th>Favorecido / responsável</th><th>Status</th><th>Data</th><th>Descrição</th><th class="right">Valor</th><th>Recibo para conferência</th></tr></thead>
+        <tbody>{% for item in resultados_recibos %}<tr>
+          <td><a href="{{ url_for('financeiro_novo.om_detalhe', om_id=item.documento_id) if item.tipo == 'OM' else url_for('financeiro_novo.rd_detalhe', rd_id=item.documento_id) }}">{{ item.tipo }} {{ item.numero }}</a></td>
+          <td>{{ item.responsavel }}</td><td>{{ item.documento_status|replace('_', ' ') }}</td>
+          <td>{{ item.data_despesa.strftime('%d/%m/%Y') }}</td><td>{{ item.descricao }}</td>
+          <td class="right">{{ item.moeda }} {{ '%.2f'|format(item.valor)|replace('.', ',') }}</td>
+          <td>{% if item.tipo == 'RD' and item.anexos %}<div class="muted">Anexos da RD</div>{% endif %}
+          {% for anexo in item.anexos %}<div><a target="_blank" rel="noopener" href="{{ url_for('financeiro_novo.om_item_anexo_baixar', om_id=item.documento_id, item_id=item.item_id, arquivo_id=anexo.arquivo_id, visualizar=1) if item.tipo == 'OM' else url_for('financeiro_novo.documento_anexo_baixar', tipo='rd', registro_id=item.documento_id, arquivo_id=anexo.arquivo_id, visualizar=1) }}">{{ 'Ver recibo' if item.tipo == 'OM' else 'Ver anexo' }} · {{ anexo.nome_original }}</a></div>
+          {% else %}<span class="muted">{{ 'Sem recibo anexado' if item.tipo == 'OM' else 'RD sem anexos' }}</span>{% endfor %}</td>
+        </tr>{% endfor %}</tbody>
+      </table></div>
+      {% else %}<p class="dsp-empty">Nenhum lançamento encontrado em OM ou RD para a data e o valor informados.</p>{% endif %}
+    {% endif %}
+  </div>
+</section>
