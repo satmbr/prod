@@ -95,7 +95,17 @@ def _tem_anexo(conn, entidade, registro_id):
 
 
 def _consultar_recibos(conn, data, valor):
-    registros = conn.execute(text("""
+    filtros, parametros = [], {}
+    if data is not None:
+        filtros.append("i.data_despesa=:data")
+        parametros["data"] = data
+    if valor is not None:
+        filtros.append("i.valor=:valor")
+        parametros["valor"] = valor
+    if not filtros:
+        raise ValorInvalido("Informe a data ou o valor do recibo para consultar.")
+    condicao = " AND ".join(filtros)
+    registros = conn.execute(text(f"""
         SELECT * FROM (
           SELECT 'OM' AS tipo,o.id AS documento_id,o.numero_om AS numero,
             o.status AS documento_status,p.nome_razao AS responsavel,
@@ -108,7 +118,7 @@ def _consultar_recibos(conn, data, valor):
           LEFT JOIN financeiro3_anexos a
             ON a.entidade='OM_ITEM' AND a.entidade_id=i.id AND a.status='ATIVO'
           LEFT JOIN financeiro3_arquivos ar ON ar.id=a.arquivo_id AND ar.status='ATIVO'
-          WHERE i.data_despesa=:data AND i.valor=:valor AND i.status='ATIVO'
+          WHERE {condicao} AND i.status='ATIVO'
             AND o.removido_em IS NULL
           UNION ALL
           SELECT 'RD',r.id,r.numero_rd,r.status,p.nome_razao,
@@ -121,9 +131,9 @@ def _consultar_recibos(conn, data, valor):
           LEFT JOIN financeiro3_anexos a
             ON a.entidade='RD' AND a.entidade_id=r.id AND a.status='ATIVO'
           LEFT JOIN financeiro3_arquivos ar ON ar.id=a.arquivo_id AND ar.status='ATIVO'
-          WHERE i.data_despesa=:data AND i.valor=:valor AND i.status='ATIVO'
+          WHERE {condicao} AND i.status='ATIVO'
         ) encontrados ORDER BY tipo,numero,documento_id,item_id,nome_original,arquivo_id
-    """), {"data": data, "valor": valor}).mappings().all()
+    """), parametros).mappings().all()
     resultados = {}
     for registro in registros:
         chave = (registro["tipo"], registro["item_id"])
@@ -147,12 +157,14 @@ def missoes():
     resultados_recibos, erro_recibo, parametros_recibo = [], None, None
     if consultou:
         try:
-            data = data_iso(consulta["data"], "Data do recibo")
+            if not consulta["data"] and not consulta["valor"]:
+                raise ValorInvalido("Informe a data ou o valor do recibo para consultar.")
+            data = data_iso(consulta["data"], "Data do recibo") if consulta["data"] else None
             # Limite evita valores fora da precisão dos campos monetários.
             if len(consulta["valor"]) > 30:
                 raise ValorInvalido("Informe um valor válido para o recibo.")
             try:
-                valor = decimal_br(consulta["valor"], positivo=True)
+                valor = decimal_br(consulta["valor"], positivo=True) if consulta["valor"] else None
             except InvalidOperation as exc:
                 raise ValorInvalido("Informe um valor válido para o recibo.") from exc
             parametros_recibo = (data, valor)

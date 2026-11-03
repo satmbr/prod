@@ -70,6 +70,16 @@ class ConsultaRecibosSQLTests(unittest.TestCase):
         self.assertEqual(rows[1]['anexos'], [])
         self.assertEqual([a['arquivo_id'] for a in rows[2]['anexos']], ['b','c'])
         self.assertEqual(_consultar_recibos(conn, date(2026,10,28), Decimal('99.99')), [])
+        por_data = _consultar_recibos(conn, date(2026,10,28), None)
+        self.assertEqual([r['descricao'] for r in por_data],
+                         ['OM correta', 'Outro valor', 'Sem anexo', 'RD correta', 'Outro valor RD'])
+        por_valor = _consultar_recibos(conn, None, Decimal('1234.56'))
+        self.assertEqual([r['descricao'] for r in por_valor],
+                         ['OM correta', 'Outra data', 'Sem anexo', 'RD correta', 'Outra data RD'])
+        conn.execute.reset_mock()
+        with self.assertRaises(ValueError):
+            _consultar_recibos(conn, None, None)
+        conn.execute.assert_not_called()
 
 
 class ConsultaRecibosHTTPTests(unittest.TestCase):
@@ -90,7 +100,7 @@ class ConsultaRecibosHTTPTests(unittest.TestCase):
             response = self.client.get('/financeiro-novo/missoes')
             self.assertEqual(response.status_code, 200)
             self.assertIn('Consultar recibo', response.get_data(as_text=True))
-            for data, valor in [('','10'),('2026-02-30','10'),('2026-10-28',''),
+            for data, valor in [('',''),('2026-02-30','10'),('   ','   '),
                                 ('2026-10-28','-10'),('2026-10-28','NaN'),('2026-10-28','1e999')]:
                 response = self.client.get('/financeiro-novo/missoes', query_string={
                     'recibo_data':data, 'recibo_valor':valor})
@@ -116,6 +126,27 @@ class ConsultaRecibosHTTPTests(unittest.TestCase):
         self.assertIn('Anexos da RD',html)
         self.assertIn('&lt;script&gt;',html)
         self.assertNotIn('<script>teste</script>',html)
+
+    def test_consulta_com_apenas_um_filtro(self):
+        for query, data, valor in [
+            ({'recibo_data':'2026-10-28'}, date(2026,10,28), None),
+            ({'recibo_valor':'1.234,56'}, None, Decimal('1234.56')),
+            ({'recibo_data':'2026-10-28', 'recibo_valor':'  '}, date(2026,10,28), None),
+            ({'recibo_data':'  ', 'recibo_valor':'1.234,56'}, None, Decimal('1234.56')),
+        ]:
+            with self.subTest(query=query), patch(
+                'routes.financeiro_novo.missoes._consultar_recibos', return_value=[]
+            ) as consultar:
+                response = self.client.get('/financeiro-novo/missoes', query_string=query)
+                self.assertEqual(response.status_code, 200)
+                consultar.assert_called_once_with(self.conn, data, valor)
+                html = response.get_data(as_text=True)
+                self.assertIn('para os filtros informados', html)
+                self.assertNotIn('role="alert"', html)
+                import re
+                for campo in ('recibo_data', 'recibo_valor'):
+                    tag = re.search(r'<input[^>]*name="' + campo + r'"[^>]*>', html).group()
+                    self.assertNotIn('required', tag)
 
     def test_sem_resultados(self):
         with patch('routes.financeiro_novo.missoes._consultar_recibos',return_value=[]):

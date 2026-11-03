@@ -1,14 +1,14 @@
 <section class="zone" id="consulta-recibos">
-  <header class="zone-head"><div><div class="zone-title">Consultar recibo</div><div class="muted">Localize despesas em OMs e RDs com a mesma data e o mesmo valor.</div></div></header>
+  <header class="zone-head"><div><div class="zone-title">Consultar recibo</div><div class="muted">Informe a data, o valor ou ambos para localizar despesas em OMs e RDs.</div></div></header>
   <div class="zone-body">
     <form method="get" action="{{ url_for('financeiro_novo.missoes') }}#consulta-recibos" class="dsp-mini-form">
-      <label><span>Data do recibo *</span><input type="date" name="recibo_data" value="{{ consulta_recibo.data }}" required></label>
-      <label><span>Valor do recibo *</span><input name="recibo_valor" value="{{ consulta_recibo.valor }}" inputmode="decimal" placeholder="Ex.: 150,00" maxlength="30" required></label>
+      <label><span>Data do recibo</span><input type="date" name="recibo_data" value="{{ consulta_recibo.data }}"></label>
+      <label><span>Valor do recibo</span><input name="recibo_valor" value="{{ consulta_recibo.valor }}" inputmode="decimal" placeholder="Ex.: 150,00" maxlength="30"></label>
       <div class="dsp-actions full"><button class="btn btn-primary" type="submit">Consultar recibo</button>{% if consultou_recibo %}<a class="btn btn-outline" href="{{ url_for('financeiro_novo.missoes') }}#consulta-recibos">Limpar consulta</a>{% endif %}</div>
     </form>
     {% if erro_recibo %}<p class="dsp-alert" role="alert">{{ erro_recibo }}</p>
     {% elif consultou_recibo %}
-      <p role="status">{{ resultados_recibos|length }} lançamento(s) encontrado(s) com a mesma data e valor.</p>
+      <p role="status">{{ resultados_recibos|length }} lançamento(s) encontrado(s) para os filtros informados.</p>
       {% if resultados_recibos %}
       <p class="muted">Confira a moeda e o arquivo antes de concluir que é o mesmo recibo. Nas RDs, os anexos pertencem ao documento inteiro.</p>
       <div class="dsp-table-wrap"><table class="dsp-table">
@@ -23,7 +23,7 @@
           {% else %}<span class="muted">{{ 'Sem recibo anexado' if item.tipo == 'OM' else 'RD sem anexos' }}</span>{% endfor %}</td>
         </tr>{% endfor %}</tbody>
       </table></div>
-      {% else %}<p class="dsp-empty">Nenhum lançamento encontrado em OM ou RD para a data e o valor informados.</p>{% endif %}
+      {% else %}<p class="dsp-empty">Nenhum lançamento encontrado em OM ou RD para os filtros informados.</p>{% endif %}
     {% endif %}
   </div>
 </section>
