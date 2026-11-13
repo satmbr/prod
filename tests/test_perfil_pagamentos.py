@@ -110,7 +110,7 @@ class PerfilPagamentosConfiguracaoTests(unittest.TestCase):
         self.assertIn("ADD COLUMN IF NOT EXISTS om_item_id", migration)
         self.assertIn("A_CLASSIFICAR", migration)
         self.assertIn('@bp.post("/perfil-pagamentos/contas/<int:conta_id>/replicar-om")', routes)
-        self.assertIn("o.status='RASCUNHO'", routes)
+        self.assertIn("o.status IN ('RASCUNHO','REJEITADA')", routes)
         self.assertIn("CRIADO_PELO_PERFIL_PAGAMENTOS", routes)
         self.assertIn('@bp.get("/perfil-pagamentos/contas/<int:conta_id>/duplicidades-om")', routes)
         self.assertIn("FROM financeiro3_om_itens", routes)

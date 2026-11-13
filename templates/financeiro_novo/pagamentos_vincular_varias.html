@@ -7,7 +7,7 @@
 <section class="zone">
 <header class="zone-head"><div><div class="zone-title">Vincular várias contas à OM</div><div class="muted">{{ contas|length }} conta(s) sem OM vinculada</div></div><a class="btn btn-outline" href="{{ url_for('financeiro_novo.pagamentos_painel') }}">Voltar ao painel</a></header>
 <div class="zone-body">
-<p>Marque as contas e selecione uma OM em rascunho. As repetições serão apresentadas uma conta por vez para você decidir se deseja vincular ou pular. Após a revisão, as contas aceitas serão enviadas.</p>
+<p>Marque as contas e selecione uma OM em rascunho ou rejeitada. As repetições serão apresentadas uma conta por vez para você decidir se deseja vincular ou pular. Após a revisão, as contas aceitas serão enviadas.</p>
 <p class="muted">Contas já marcadas como repetidas também aparecem nesta lista. Cada vinculação é salva individualmente; se houver uma falha, as já concluídas permanecem salvas.</p>
 <noscript><p class="dsp-alert">Ative o JavaScript para revisar e enviar as contas em lote.</p></noscript>
 <form id="lote-form">
@@ -15,7 +15,7 @@
 <label class="full"><span>OM de destino *</span><select id="lote-om" required><option value="">Selecione uma OM</option>{% for om in oms %}<option value="{{ om.id }}">OM {{ om.numero_om }} · {{ om.favorecido }}</option>{% endfor %}</select></label>
 <label class="full"><span>Buscar contas</span><input id="lote-busca" type="search" placeholder="Número, perfil ou descrição"></label>
 </div>
-{% if not oms %}<p class="dsp-alert">Não há OM em rascunho disponível para vinculação.</p>{% endif %}
+{% if not oms %}<p class="dsp-alert">Não há OM em rascunho ou rejeitada disponível para vinculação.</p>{% endif %}
 <div class="dsp-actions"><button type="button" class="btn btn-outline" id="lote-marcar">Marcar visíveis</button><button type="button" class="btn btn-outline" id="lote-limpar">Desmarcar todas</button><span id="lote-selecao" aria-live="polite">0 selecionada(s)</span><button class="btn btn-primary" id="lote-enviar" type="submit" {% if not oms or not contas %}disabled{% endif %}>Revisar e vincular selecionadas</button></div>
 <p id="lote-progresso" role="status" aria-live="polite"></p>
 <div class="dsp-table-wrap"><table class="dsp-table"><thead><tr><th>Selecionar</th><th>Conta</th><th>Perfil</th><th>Descrição</th><th>Documento</th><th>Vencimento</th><th class="right">Valor</th><th>Resultado</th></tr></thead><tbody>

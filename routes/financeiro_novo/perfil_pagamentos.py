@@ -231,7 +231,7 @@ def pagamentos_painel(repetidas=False):
             FROM financeiro3_oms o
             JOIN financeiro3_pessoas p ON p.id=o.solicitante_id
             JOIN financeiro3_moedas m ON m.id=o.moeda_id
-            WHERE o.status='RASCUNHO' AND o.removido_em IS NULL
+            WHERE o.status IN ('RASCUNHO','REJEITADA') AND o.removido_em IS NULL
             ORDER BY o.numero_om,o.id
         """)).mappings().all()
     return render_template(
@@ -745,7 +745,7 @@ def pagamentos_vincular_varias():
             SELECT o.id,o.numero_om,p.nome_razao AS favorecido
             FROM financeiro3_oms o
             JOIN financeiro3_pessoas p ON p.id=o.solicitante_id
-            WHERE o.status='RASCUNHO' AND o.removido_em IS NULL
+            WHERE o.status IN ('RASCUNHO','REJEITADA') AND o.removido_em IS NULL
             ORDER BY o.numero_om,o.id
         """)).mappings().all()
     return render_template("financeiro_novo/pagamentos_vincular_varias.html",
@@ -836,8 +836,8 @@ def pagamento_conta_replicar_om(conta_id):
             """), {"id": om_id}).mappings().first()
             if not om:
                 raise ValorInvalido("A OM selecionada não existe mais.")
-            if om["status"] != "RASCUNHO":
-                raise ValorInvalido("A conta só pode ser replicada para uma OM em rascunho.")
+            if om["status"] not in {"RASCUNHO", "REJEITADA"}:
+                raise ValorInvalido("A conta só pode ser replicada para uma OM em rascunho ou rejeitada.")
             duplicidades = _duplicidades_om_conta(conn, conta)
             if duplicidades and not confirmar_duplicidade:
                 raise DuplicidadeOM(

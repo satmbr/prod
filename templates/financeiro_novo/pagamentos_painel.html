@@ -77,7 +77,7 @@
           {% elif conta.numero_om %}
           {{ conta.numero_om }}
           {% elif pode_replicar %}
-          <button type="button" class="pp-replicate" data-conta-id="{{ conta.id }}" data-conta-numero="{{ conta.numero }}" title="{{ 'Replicar para uma OM em rascunho' if oms_rascunho else 'Não há OM em rascunho' }}" aria-label="Replicar {{ conta.numero }} para uma OM" {{ 'disabled' if not oms_rascunho else '' }}>↗</button>
+          <button type="button" class="pp-replicate" data-conta-id="{{ conta.id }}" data-conta-numero="{{ conta.numero }}" title="{{ 'Replicar para uma OM em rascunho ou rejeitada' if oms_rascunho else 'Não há OM em rascunho ou rejeitada' }}" aria-label="Replicar {{ conta.numero }} para uma OM" {{ 'disabled' if not oms_rascunho else '' }}>↗</button>
           {% else %}—{% endif %}
         </td><td><span class="pp-proof {{ 'yes' if conta.tem_comprovante else 'no' }}">{{ 'Sim (' ~ conta.quantidade_comprovantes ~ ')' if conta.tem_comprovante else 'Não' }}</span></td>
         <td class="right">R$ {{ '%.2f'|format(conta.valor)|replace('.',',') }}</td>
@@ -95,8 +95,8 @@
         <div><strong>Replicar conta para OM</strong><span id="pp-om-conta"></span></div>
         <button type="button" class="pp-dialog-close" aria-label="Fechar">×</button>
       </div>
-      <p>Selecione uma OM em rascunho. A conta será incluída após a última linha com data, descrição, valor e recibo.</p>
-      <label><span>OM em rascunho</span>
+      <p>Selecione uma OM em rascunho ou rejeitada. A conta será incluída após a última linha com data, descrição, valor e recibo.</p>
+      <label><span>OM em rascunho ou rejeitada</span>
         <select name="om_id" required>
           <option value="">Selecione</option>
           {% for om in oms_rascunho %}<option value="{{ om.id }}">{{ om.numero_om }} · {{ om.favorecido }} · {{ om.moeda }} {{ '%.2f'|format(om.valor_total)|replace('.',',') }}</option>{% endfor %}

@@ -110,6 +110,23 @@ class VinculacaoLoteTests(unittest.TestCase):
         self.assertEqual(r.json['status'],'vinculada')
         self.assertEqual(self.duplicidades.call_count,2)
 
+    def test_om_rejeitada_recebe_vinculacao_individual_e_lote(self):
+        self.om['status'] = 'REJEITADA'
+        self.assertEqual(self.enviar().json['status'], 'vinculada')
+        self.assertEqual(self.enviar(json=False).status_code, 302)
+
+    def test_listas_individual_e_lote_incluem_rejeitadas(self):
+        from flask import session
+        for endpoint in (views.pagamentos_painel, views.pagamentos_vincular_varias):
+            with self.app.test_request_context('/'):
+                session['usuario_id'] = 1
+                session['permissoes'] = ['auth:administrar']
+                self.read.execute.reset_mock()
+                with patch.object(views, 'render_template', return_value='ok'):
+                    endpoint()
+                consultas = [str(call.args[0]) for call in self.read.execute.call_args_list]
+                self.assertTrue(any("o.status IN ('RASCUNHO','REJEITADA')" in sql for sql in consultas))
+
     def test_om_fora_de_rascunho_nao_recebe_lancamento(self):
         self.om['status']='EM_APROVACAO'
         r=self.enviar()
