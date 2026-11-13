@@ -5,7 +5,7 @@ import secrets
 from datetime import date
 from io import BytesIO
 
-from flask import abort, flash, jsonify, redirect, render_template, request, send_file, session, url_for
+from flask import abort, current_app, flash, jsonify, redirect, render_template, request, send_file, session, url_for
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from werkzeug.datastructures import FileStorage
@@ -728,6 +728,44 @@ def pagamento_conta_reembolso(conta_id):
     return redirect(url_for("financeiro_novo.pagamento_conta_detalhe", conta_id=conta_id))
 
 
+@bp.get("/perfil-pagamentos/vincular-varias")
+@login_required
+@permission_required(MODULO, "editar")
+@permission_required("financeiro_novo", "editar")
+def pagamentos_vincular_varias():
+    with get_engine().connect() as conn:
+        contas = conn.execute(text("""
+            SELECT c.*,p.nome AS perfil_nome
+            FROM financeiro3_pagamento_contas c
+            JOIN financeiro3_pagamento_perfis p ON p.id=c.perfil_id
+            WHERE c.om_id IS NULL AND c.excluida_em IS NULL
+            ORDER BY c.data_documento,c.id
+        """)).mappings().all()
+        oms = conn.execute(text("""
+            SELECT o.id,o.numero_om,p.nome_razao AS favorecido
+            FROM financeiro3_oms o
+            JOIN financeiro3_pessoas p ON p.id=o.solicitante_id
+            WHERE o.status='RASCUNHO' AND o.removido_em IS NULL
+            ORDER BY o.numero_om,o.id
+        """)).mappings().all()
+    return render_template("financeiro_novo/pagamentos_vincular_varias.html",
+                           contas=contas, oms=oms, subnav_links=build_subnav("perfil_pagamentos"))
+
+
+class DuplicidadeOM(ValorInvalido):
+    def __init__(self, mensagem, duplicidades):
+        super().__init__(mensagem)
+        self.duplicidades = duplicidades
+
+
+def _duplicidades_json(duplicidades):
+    return [{"om_id": i["om_id"], "numero_om": i["numero_om"],
+             "item_id": i["item_id"], "numero_linha": i["numero_linha"],
+             "data": i["data_despesa"].strftime("%d/%m/%Y"),
+             "descricao": i["descricao"], "valor": str(i["valor"])}
+            for i in duplicidades]
+
+
 @bp.post("/perfil-pagamentos/contas/<int:conta_id>/replicar-om")
 @login_required
 @permission_required(MODULO, "editar")
@@ -736,6 +774,8 @@ def pagamento_conta_replicar_om(conta_id):
     from routes.financeiro_novo.reembolsos import _preparar_anexo, _vincular_anexo
     from routes.financeiro_novo.services.quitacao_om import reconciliar_quitacao_om
 
+    resposta_json = request.accept_mimetypes.best == "application/json"
+    confirmado = False
     preparado = None
     contas_sincronizar = []
     destino = "financeiro_novo.pagamentos_painel"
@@ -768,9 +808,9 @@ def pagamento_conta_replicar_om(conta_id):
                 f"OM {item['numero_om']} · linha {item['numero_linha']}"
                 for item in duplicidades
             )
-            raise ValorInvalido(
+            raise DuplicidadeOM(
                 f"Já existem lançamentos em OM com a mesma data e valor: {numeros}. "
-                "Revise e confirme explicitamente para replicar."
+                "Revise e confirme explicitamente para replicar.", duplicidades
             )
 
         arquivo = baixar_arquivo(
@@ -800,9 +840,9 @@ def pagamento_conta_replicar_om(conta_id):
                 raise ValorInvalido("A conta só pode ser replicada para uma OM em rascunho.")
             duplicidades = _duplicidades_om_conta(conn, conta)
             if duplicidades and not confirmar_duplicidade:
-                raise ValorInvalido(
+                raise DuplicidadeOM(
                     "Foi encontrado um lançamento em OM com a mesma data e valor. "
-                    "Revise e confirme explicitamente para replicar."
+                    "Revise e confirme explicitamente para replicar.", duplicidades
                 )
             categoria_id = conn.execute(text("""
                 SELECT id FROM financeiro3_categorias
@@ -840,16 +880,27 @@ def pagamento_conta_replicar_om(conta_id):
                 evento="REPLICADA_PARA_OM", dados_anteriores=dict(conta), dados_novos=dict(nova_conta),
             )
             contas_sincronizar = reconciliar_quitacao_om(conn, om_id)
+        confirmado = True
         destino = "financeiro_novo.pagamentos_painel"
         for conta_sincronizar in sorted(set(contas_sincronizar)):
-            sincronizar_arquivo_da_conta(conta_sincronizar)
+            try:
+                sincronizar_arquivo_da_conta(conta_sincronizar)
+            except Exception:
+                current_app.logger.exception("Falha ao sincronizar conta %s após vinculação concluída.", conta_sincronizar)
+        if resposta_json:
+            return jsonify(status="vinculada", conta_id=conta_id, om_id=om_id)
         flash(f"Conta {origem['numero']} replicada para a OM {om['numero_om']}.", "sucesso")
     except (ValorInvalido, PagamentosStorageErro, AnexoInvalido) as exc:
-        if preparado:
+        if preparado and not confirmado:
             preparado[3].unlink(missing_ok=True)
+        if resposta_json:
+            if isinstance(exc, DuplicidadeOM):
+                return jsonify(status="duplicidade", mensagem=str(exc),
+                               duplicidades=_duplicidades_json(exc.duplicidades)), 409
+            return jsonify(status="erro", mensagem=str(exc)), 400
         flash(str(exc), "erro")
     except Exception:
-        if preparado:
+        if preparado and not confirmado:
             preparado[3].unlink(missing_ok=True)
         raise
     return redirect(url_for(destino))
@@ -959,14 +1010,4 @@ def pagamento_conta_duplicidades_om(conta_id):
         if not conta:
             abort(404)
         duplicidades = _duplicidades_om_conta(conn, conta)
-    return jsonify({
-        "duplicidades": [{
-            "om_id": item["om_id"],
-            "numero_om": item["numero_om"],
-            "item_id": item["item_id"],
-            "numero_linha": item["numero_linha"],
-            "data": item["data_despesa"].strftime("%d/%m/%Y"),
-            "descricao": item["descricao"],
-            "valor": str(item["valor"]),
-        } for item in duplicidades],
-    })
+    return jsonify({"duplicidades": _duplicidades_json(duplicidades)})

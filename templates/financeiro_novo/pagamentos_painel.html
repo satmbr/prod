@@ -52,7 +52,7 @@
 
   {% endif %}
   <section class="zone">
-    <header class="zone-head"><div class="zone-title">{{ 'Contas repetidas' if repetidas else 'Painel de contas' }}</div><a class="btn btn-outline" href="{{ url_for('financeiro_novo.pagamentos_painel' if repetidas else 'financeiro_novo.pagamentos_repetidas') }}">{{ 'Voltar ao painel' if repetidas else 'Contas repetidas' }}</a></header>
+    <header class="zone-head"><div class="zone-title">{{ 'Contas repetidas' if repetidas else 'Painel de contas' }}</div>{% if pode_replicar %}<a class="btn btn-primary" href="{{ url_for('financeiro_novo.pagamentos_vincular_varias') }}">Vincular várias</a>{% endif %}<a class="btn btn-outline" href="{{ url_for('financeiro_novo.pagamentos_painel' if repetidas else 'financeiro_novo.pagamentos_repetidas') }}">{{ 'Voltar ao painel' if repetidas else 'Contas repetidas' }}</a></header>
     {% if repetidas %}<p class="muted" style="padding:0 16px">Use a seta na coluna OM para tentar replicar novamente. Clique no número da conta para editar ou excluir, ou devolva a conta ao painel.</p>{% endif %}
     <div class="zone-body">
       <form class="pp-filter" method="get">

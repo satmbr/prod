@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Vincular várias contas · Financeiro Novo{% endblock %}
+{% block content %}
+<div class="page-wrap dsp-page" id="lote-contas"
+ data-verificar="{{ url_for('financeiro_novo.pagamento_conta_duplicidades_om',conta_id=0) }}"
+ data-vincular="{{ url_for('financeiro_novo.pagamento_conta_replicar_om',conta_id=0) }}">
+<section class="zone">
+<header class="zone-head"><div><div class="zone-title">Vincular várias contas à OM</div><div class="muted">{{ contas|length }} conta(s) sem OM vinculada</div></div><a class="btn btn-outline" href="{{ url_for('financeiro_novo.pagamentos_painel') }}">Voltar ao painel</a></header>
+<div class="zone-body">
+<p>Marque as contas e selecione uma OM em rascunho. As repetições serão apresentadas uma conta por vez para você decidir se deseja vincular ou pular. Após a revisão, as contas aceitas serão enviadas.</p>
+<p class="muted">Contas já marcadas como repetidas também aparecem nesta lista. Cada vinculação é salva individualmente; se houver uma falha, as já concluídas permanecem salvas.</p>
+<noscript><p class="dsp-alert">Ative o JavaScript para revisar e enviar as contas em lote.</p></noscript>
+<form id="lote-form">
+<div class="dsp-mini-form">
+<label class="full"><span>OM de destino *</span><select id="lote-om" required><option value="">Selecione uma OM</option>{% for om in oms %}<option value="{{ om.id }}">OM {{ om.numero_om }} · {{ om.favorecido }}</option>{% endfor %}</select></label>
+<label class="full"><span>Buscar contas</span><input id="lote-busca" type="search" placeholder="Número, perfil ou descrição"></label>
+</div>
+{% if not oms %}<p class="dsp-alert">Não há OM em rascunho disponível para vinculação.</p>{% endif %}
+<div class="dsp-actions"><button type="button" class="btn btn-outline" id="lote-marcar">Marcar visíveis</button><button type="button" class="btn btn-outline" id="lote-limpar">Desmarcar todas</button><span id="lote-selecao" aria-live="polite">0 selecionada(s)</span><button class="btn btn-primary" id="lote-enviar" type="submit" {% if not oms or not contas %}disabled{% endif %}>Revisar e vincular selecionadas</button></div>
+<p id="lote-progresso" role="status" aria-live="polite"></p>
+<div class="dsp-table-wrap"><table class="dsp-table"><thead><tr><th>Selecionar</th><th>Conta</th><th>Perfil</th><th>Descrição</th><th>Documento</th><th>Vencimento</th><th class="right">Valor</th><th>Resultado</th></tr></thead><tbody>
+{% for c in contas %}<tr data-conta-id="{{ c.id }}" data-numero="{{ c.numero }}" data-data="{{ c.data_documento.isoformat() }}" data-valor="{{ c.valor }}">
+<td><input class="lote-check" type="checkbox" aria-label="Selecionar conta {{ c.numero }}"></td>
+<td><a target="_blank" rel="noopener" href="{{ url_for('financeiro_novo.pagamento_conta_detalhe',conta_id=c.id) }}">{{ c.numero }}</a>{% if c.repetida_em %}<small>Marcada como repetida</small>{% endif %}</td>
+<td>{{ c.perfil_nome }}</td><td>{{ c.descricao }}</td><td>{{ c.data_documento.strftime('%d/%m/%Y') }}</td><td>{{ c.data_vencimento.strftime('%d/%m/%Y') }}</td><td class="right">R$ {{ '%.2f'|format(c.valor)|replace('.',',') }}</td><td class="lote-resultado">Aguardando seleção</td>
+</tr>{% else %}<tr><td colspan="8">Nenhuma conta sem OM vinculada.</td></tr>{% endfor %}
+</tbody></table></div>
+</form>
+</div></section>
+<dialog id="lote-repeticao" aria-labelledby="lote-repeticao-titulo">
+<h3 id="lote-repeticao-titulo">Possível repetição</h3><p id="lote-repeticao-conta"></p>
+<p>Confira os lançamentos abaixo. Pular não exclui nem altera a conta.</p><ul id="lote-repeticoes"></ul>
+<div class="dsp-actions"><button type="button" class="btn btn-outline" data-decisao="parar">Interromper lote</button><button type="button" class="btn btn-outline" data-decisao="pular">Não vincular esta conta</button><button type="button" class="btn btn-primary" data-decisao="vincular">Vincular mesmo assim</button></div>
+</dialog>
+</div>
+{% include "financeiro_novo/_despesa_estilos.html" %}
+<style>#lote-repeticao{width:min(720px,90vw);max-height:85vh;overflow:auto;padding:24px;border:1px solid #ccd8e2;border-radius:12px}#lote-repeticao::backdrop{background:#17355077}#lote-repeticoes li{margin:12px 0}.lote-check{width:20px;height:20px}.dsp-table td small{display:block}#lote-progresso{white-space:pre-line}</style>
+<script src="{{ url_for('static',filename='js/pagamentos_lote.js') }}" defer></script>
+{% endblock %}
