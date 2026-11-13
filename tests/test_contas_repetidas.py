@@ -82,6 +82,45 @@ class ContasRepetidasTests(unittest.TestCase):
                 self.assertEqual(params, {"busca": "%teste%", "perfil_id": 2})
                 self.assertEqual(render.call_args.kwargs["repetidas"], repetidas)
 
+    def test_filtra_vinculacao_do_vinculo_atual_no_horario_de_brasilia(self):
+        from datetime import date
+        with app.test_request_context('/financeiro-novo/perfil-pagamentos?vinculacao_data=2026-11-13&q=OM123'):
+            session['usuario_id'] = 7
+            session['permissoes'] = ['perfil_pagamentos:visualizar']
+            engine = MagicMock()
+            conn = engine.connect.return_value.__enter__.return_value
+            with patch.object(views, 'get_engine', return_value=engine), patch.object(views, 'render_template', return_value='ok') as render:
+                views.pagamentos_painel()
+            query, params = conn.execute.call_args_list[1].args
+            sql = str(query)
+            self.assertEqual(params['vinculacao_data'], date(2026,11,13))
+            self.assertEqual(params['busca'], '%OM123%')
+            self.assertIn("a.evento='REPLICADA_PARA_OM'", sql)
+            self.assertIn("a.dados_novos->>'om_item_id'=CAST(c.om_item_id AS TEXT)", sql)
+            self.assertIn("a.dados_novos->>'om_id'=CAST(c.om_id AS TEXT)", sql)
+            self.assertIn("AT TIME ZONE 'America/Sao_Paulo'", sql)
+            self.assertIn('CAST(vinculo.vinculada_em AS DATE)=:vinculacao_data', sql)
+            self.assertEqual(render.call_args.kwargs['vinculacao_data'], '2026-11-13')
+
+    def test_data_de_vinculacao_invalida_nao_consulta_banco(self):
+        from werkzeug.exceptions import BadRequest
+        with app.test_request_context('/financeiro-novo/perfil-pagamentos?vinculacao_data=2026-02-30'):
+            session['usuario_id'] = 7
+            session['permissoes'] = ['perfil_pagamentos:visualizar']
+            with patch.object(views, 'get_engine') as engine, self.assertRaises(BadRequest):
+                views.pagamentos_painel()
+            engine.assert_not_called()
+
+    def test_desvinculo_preserva_filtros_no_retorno(self):
+        from urllib.parse import urlsplit, parse_qs
+        filtros = dict(vinculacao_data='2026-11-13', q='OM123', perfil_id='2', situacao='ABERTAS')
+        with app.test_request_context('/financeiro-novo/perfil-pagamentos/contas/39/desvincular-om', method='POST', data=filtros):
+            session['usuario_id'] = 7
+            session['permissoes'] = ['perfil_pagamentos:editar', 'financeiro_novo:editar']
+            with patch.object(views, 'get_engine', return_value=self.engine), patch.object(views, '_conta', return_value=self.conta):
+                response = views.pagamento_conta_desvincular_om(39)
+            self.assertEqual(parse_qs(urlsplit(response.location).query), {k:[v] for k,v in filtros.items()})
+
     def test_tela_repetidas_renderiza_acoes_e_dialogo(self):
         from jinja2 import ChoiceLoader, DictLoader, Environment
         env = Environment(loader=ChoiceLoader([

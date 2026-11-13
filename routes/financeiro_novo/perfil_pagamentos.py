@@ -131,8 +131,15 @@ def pagamentos_painel(repetidas=False):
     busca = (request.args.get("q") or "").strip()
     perfil_id = (request.args.get("perfil_id") or "").strip()
     situacao = (request.args.get("situacao") or "").strip().upper()
+    vinculacao_data = (request.args.get("vinculacao_data") or "").strip()
     params = {}
     filtros = ["c.excluida_em IS NULL"]
+    if vinculacao_data:
+        try:
+            params["vinculacao_data"] = data_iso(vinculacao_data, "Data de vinculação")
+        except ValorInvalido:
+            abort(400, description="Data de vinculação inválida.")
+        filtros.append("CAST(vinculo.vinculada_em AS DATE)=:vinculacao_data")
     filtros.append("c.repetida_em IS NOT NULL" if repetidas else "c.repetida_em IS NULL")
     if busca:
         filtros.append("(c.numero ILIKE :busca OR c.descricao ILIKE :busca OR "
@@ -175,7 +182,7 @@ def pagamentos_painel(repetidas=False):
             FROM financeiro3_pagamento_perfis p ORDER BY p.ativo DESC,p.nome
         """)).mappings().all()
         contas = conn.execute(text(f"""
-            SELECT c.*,p.nome AS perfil_nome,p.matricula,
+            SELECT c.*,p.nome AS perfil_nome,p.matricula,vinculo.vinculada_em,
               om.numero_om AS numero_om_vinculada,om.status AS om_status_vinculada,
               EXISTS(SELECT 1 FROM financeiro3_pagamento_comprovantes cp
                      WHERE cp.conta_id=c.id AND cp.ativo) AS tem_comprovante,
@@ -184,6 +191,15 @@ def pagamentos_painel(repetidas=False):
             FROM financeiro3_pagamento_contas c
             JOIN financeiro3_pagamento_perfis p ON p.id=c.perfil_id
             LEFT JOIN financeiro3_oms om ON om.id=c.om_id AND om.removido_em IS NULL
+            LEFT JOIN LATERAL (
+                SELECT a.criado_em AT TIME ZONE 'America/Sao_Paulo' AS vinculada_em
+                FROM financeiro3_auditoria a
+                WHERE a.entidade='PERFIL_PAGAMENTO_CONTA' AND a.entidade_id=c.id
+                  AND a.evento='REPLICADA_PARA_OM'
+                  AND a.dados_novos->>'om_id'=CAST(c.om_id AS TEXT)
+                  AND a.dados_novos->>'om_item_id'=CAST(c.om_item_id AS TEXT)
+                ORDER BY a.criado_em DESC,a.id DESC LIMIT 1
+            ) vinculo ON TRUE
             {where}
             ORDER BY (c.status_pagamento='ABERTA' AND c.data_vencimento<CURRENT_DATE) DESC,
                      c.data_vencimento,c.id DESC LIMIT 500
@@ -221,7 +237,7 @@ def pagamentos_painel(repetidas=False):
     return render_template(
         "financeiro_novo/pagamentos_painel.html", perfis=perfis, contas=contas,
         resumo=resumo, erros=erros, sincronizacoes=sincronizacoes, busca=busca,
-        perfil_id=perfil_id, situacao=situacao, bucket_ativo=bucket_configurado(),
+        perfil_id=perfil_id, situacao=situacao, vinculacao_data=vinculacao_data, bucket_ativo=bucket_configurado(),
         portal_base_url=_portal_base_url(), portal_url=_portal_url,
         telegram_username=_telegram_username(), telegram_url=_telegram_url,
         oms_rascunho=oms_rascunho, today=date.today(), repetidas=repetidas,
@@ -927,7 +943,10 @@ def pagamento_conta_desvincular_om(conta_id):
             )
     except ValorInvalido as exc:
         flash(str(exc), "erro")
-    return redirect(url_for("financeiro_novo.pagamentos_painel"))
+    return redirect(url_for("financeiro_novo.pagamentos_painel", **{
+        nome: request.form[nome] for nome in ("q", "perfil_id", "situacao", "vinculacao_data")
+        if request.form.get(nome)
+    }))
 
 
 @bp.get("/perfil-pagamentos/contas/<int:conta_id>/duplicidades-om")
